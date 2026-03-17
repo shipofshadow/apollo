@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-
+import logo from '../assets/logo.png';
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -34,7 +34,7 @@ export default function Header() {
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center hover:opacity-80 transition-opacity">
           <img 
-            src="https://storage.googleapis.com/aida-uploads/default/2026-03-17/1625.png" 
+            src={logo} 
             alt="1625 Autolab Logo" 
             className="h-10 sm:h-12 md:h-16 w-auto max-w-[180px] sm:max-w-[220px] md:max-w-[300px] object-contain"
             referrerPolicy="no-referrer"
