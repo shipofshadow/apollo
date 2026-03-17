@@ -21,7 +21,6 @@ export default function Header() {
     { name: 'Products', href: '/products' },
     { name: 'Portfolio', href: '/portfolio' },
     { name: 'About', href: '/about' },
-    { name: 'Admin', href: '/admin' },
   ];
 
   return (
