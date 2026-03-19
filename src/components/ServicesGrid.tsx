@@ -17,28 +17,10 @@ export const services: ServiceItem[] = [
     icon: 'MonitorPlay',
   },
   {
-    id: '3',
-    title: 'Performance Tuning',
-    description: 'ECU remaps and piggyback systems to unlock hidden horsepower and torque safely.',
-    icon: 'Zap',
-  },
-  {
-    id: '4',
-    title: 'Custom Fabrication',
-    description: 'Bespoke mounts, brackets, and enclosures designed and 3D printed in-house for a factory-finish look.',
-    icon: 'Wrench',
-  },
-  {
     id: '5',
     title: 'Security Systems',
     description: 'Advanced alarm systems, GPS tracking, and kill switches to protect your investment.',
     icon: 'ShieldAlert',
-  },
-  {
-    id: '6',
-    title: 'Aesthetic Upgrades',
-    description: 'Grille swaps, ambient lighting, and interior trim wrapping to personalize your ride.',
-    icon: 'CarFront',
   },
 ];
 

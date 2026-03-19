@@ -13,7 +13,9 @@
     "@reduxjs/toolkit": "^2.11.2",
     "@tailwindcss/postcss": "^4.2.1",
     "autoprefixer": "^10.4.27",
+    "express": "^5.2.1",
     "lucide-react": "^0.577.0",
+    "node-fetch": "^3.3.2",
     "postcss": "^8.5.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -34,5 +36,18 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.0"
-  }
+  },
+  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/byteress/apollo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/byteress/apollo/issues"
+  },
+  "homepage": "https://github.com/byteress/apollo#readme"
 }
