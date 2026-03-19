@@ -13,16 +13,6 @@ const serviceDetails: Record<string, { image: string; fullDescription: string; f
     fullDescription: 'Upgrade your vehicle\'s infotainment system with our premium Android Headunit installations. We seamlessly integrate modern technology into older vehicles, providing you with wireless Apple CarPlay, Android Auto, GPS navigation, and access to thousands of apps via the Google Play Store. Our installations include custom-fitted bezels and wiring harnesses to retain steering wheel controls and factory cameras.',
     features: ['Wireless Apple CarPlay & Android Auto', 'High-Resolution IPS/OLED Touchscreens', 'Factory Steering Wheel Control Retention', 'Custom 3D Printed Bezels', 'Backup & 360 Camera Integration', 'DSP Audio Tuning']
   },
-  '3': {
-    image: 'https://images.unsplash.com/photo-1503375815615-58532f627725?q=80&w=2070&auto=format&fit=crop',
-    fullDescription: 'Unlock the true potential of your engine with our custom performance tuning services. Whether you are looking for better fuel economy, smoother power delivery, or maximum horsepower for the track, our tuning experts can adjust your ECU parameters to match your goals. We offer both flash tuning and piggyback module installations, tailored to your specific modifications.',
-    features: ['Custom ECU Flash Tuning', 'Piggyback System Installation', 'Dyno-Proven Power Gains', 'Throttle Response Optimization', 'Speed Limiter Removal', 'Data Logging & Diagnostics']
-  },
-  '4': {
-    image: 'https://images.unsplash.com/photo-1632823471565-1ec2a74b45b4?q=80&w=2070&auto=format&fit=crop',
-    fullDescription: 'When off-the-shelf parts won\'t cut it, our custom fabrication team steps in. We design and manufacture bespoke solutions for your vehicle, ranging from custom gauge pods and switch panels to complex mounting brackets for aftermarket accessories. Utilizing advanced CAD software and in-house 3D printing and CNC machining, we ensure a perfect fit and OEM-like finish.',
-    features: ['In-House 3D Printing (ABS, PETG, Nylon)', 'Custom Switch Panels & Gauge Pods', 'Bespoke Mounting Brackets', 'CAD Design & Prototyping', 'Fiberglass & Carbon Fiber Work', 'OEM-Matched Textures & Finishes']
-  },
   '5': {
     image: 'https://images.unsplash.com/photo-1600705722908-bab1e61c0b4d?q=80&w=2070&auto=format&fit=crop',
     fullDescription: 'Protect your investment with our advanced security system installations. We go beyond basic alarms, offering comprehensive security solutions that deter theft and provide peace of mind. From hidden kill switches and GPS tracking modules to 2-way paging alarms with remote start capabilities, we customize the security setup to your specific vehicle and needs.',

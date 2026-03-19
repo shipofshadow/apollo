@@ -11,7 +11,7 @@ export default function ServicesPage() {
           Products & <span className="text-brand-orange">Services</span>
         </h1>
         <p className="text-gray-400 max-w-3xl mx-auto text-lg leading-relaxed">
-          From custom lighting to advanced performance tuning, we provide top-tier automotive upgrades. Explore our full range of services below.
+          From custom lighting to advanced security systems, we provide top-tier automotive upgrades. Explore our full range of services below.
         </p>
       </div>
 
@@ -34,7 +34,7 @@ export default function ServicesPage() {
             { name: 'RGB Demon Eyes Kit', price: '$149.99', img: 'https://images.unsplash.com/photo-1584345611124-287a5085e648?q=80&w=2015&auto=format&fit=crop' },
             { name: '10.1" Android Headunit', price: '$499.99', img: 'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop' },
             { name: 'Sequential LED Halos', price: '$199.99', img: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?q=80&w=2069&auto=format&fit=crop' },
-            { name: 'Performance ECU Tune', price: '$599.99', img: 'https://images.unsplash.com/photo-1503375815615-58532f627725?q=80&w=2070&auto=format&fit=crop' },
+            { name: '2-Way Paging Alarm', price: '$299.99', img: 'https://images.unsplash.com/photo-1600705722908-bab1e61c0b4d?q=80&w=2070&auto=format&fit=crop' },
           ].map((product, idx) => (
             <div key={idx} className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden group">
               <div className="aspect-square bg-asphalt overflow-hidden">

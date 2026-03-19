@@ -20,15 +20,6 @@ const team = [
     email: 'sarah@1625autolab.com',
     phone: '0939 330 8264',
   },
-  {
-    name: 'Marcus "Torque" Johnson',
-    role: 'Performance Specialist',
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1974&auto=format&fit=crop',
-    bio: 'The mastermind behind our ECU tuning and performance upgrades. Marcus extracts every ounce of safe power from your engine.',
-    fullBio: 'Marcus spent a decade working with professional racing teams before bringing his expertise to 1625 Auto Lab. He specializes in custom ECU remaps, piggyback module installations, and dyno tuning. He believes in reliable, usable power that enhances the daily driving experience without compromising engine longevity.',
-    email: 'marcus@1625autolab.com',
-    phone: '0939 330 8265',
-  }
 ];
 
 export default function AboutPage() {
@@ -64,7 +55,7 @@ export default function AboutPage() {
                 Built on Precision. <br/> Driven by Passion.
               </h3>
               <p className="text-gray-400 leading-relaxed text-lg">
-                Founded in 2018, 1625 Auto Lab started as a small garage operation focused on fixing poorly done headlight retrofits. Today, we are Los Angeles' premier destination for high-end automotive electronics, custom fabrication, and performance tuning.
+                Founded in 2018, 1625 Auto Lab started as a small garage operation focused on fixing poorly done headlight retrofits. Today, we are Los Angeles' premier destination for high-end automotive electronics and premium vehicle upgrades.
               </p>
               <p className="text-gray-400 leading-relaxed text-lg">
                 We believe that your vehicle is an extension of your personality. Our mission is to provide unparalleled craftsmanship, using only the highest quality components, to turn your automotive vision into reality.
@@ -100,7 +91,7 @@ export default function AboutPage() {
             <div className="w-24 h-1 bg-brand-orange mx-auto mt-6"></div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {team.map((member, index) => (
               <div 
                 key={index} 

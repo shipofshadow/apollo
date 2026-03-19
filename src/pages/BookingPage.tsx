@@ -4,8 +4,8 @@ import { Clock, CheckCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 const services = [
   { id: 's1', name: 'Headlight Retrofit', duration: '4-6 Hours', price: 'From $250' },
   { id: 's2', name: 'Android Headunit Installation', duration: '2-3 Hours', price: 'From $150' },
-  { id: 's3', name: 'Performance Tuning', duration: '1-2 Hours', price: 'From $300' },
-  { id: 's4', name: 'Custom Fabrication', duration: 'Varies', price: 'Consultation' },
+  { id: 's3', name: 'Security System', duration: '2-4 Hours', price: 'From $200' },
+  { id: 's4', name: 'Aesthetic Upgrades', duration: 'Varies', price: 'Consultation' },
 ];
 
 // Generate next 7 days for mock availability

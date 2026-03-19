@@ -17,7 +17,7 @@ export default function Footer() {
               />
             </div>
             <p className="text-gray-400 leading-relaxed">
-              The premier automotive retrofitting and custom fabrication shop in Los Angeles. We turn ordinary vehicles into extraordinary machines.
+              The premier automotive retrofitting shop in Los Angeles. We turn ordinary vehicles into extraordinary machines.
             </p>
             <div className="flex items-center gap-4">
               <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
@@ -54,9 +54,8 @@ export default function Footer() {
             <ul className="space-y-4">
               <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Headlight Retrofits</a></li>
               <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Android Headunits</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Performance Tuning</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Custom Fabrication</a></li>
               <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Security Systems</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Aesthetic Upgrades</a></li>
             </ul>
           </div>
 

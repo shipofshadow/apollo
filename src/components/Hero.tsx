@@ -32,7 +32,7 @@ export default function Hero() {
           </h1>
 
           <p className="text-gray-400 text-lg md:text-xl max-w-lg leading-relaxed border-l-4 border-brand-orange pl-4">
-            Specializing in custom headlight retrofits, android headunits, and performance electronics. We don't just fix cars; we upgrade them.
+            Specializing in custom headlight retrofits, android headunits, and advanced security systems. We don't just fix cars; we upgrade them.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
