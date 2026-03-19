@@ -25,20 +25,6 @@ const products = [
     img: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?q=80&w=2069&auto=format&fit=crop' 
   },
   { 
-    id: 'p4',
-    name: 'Performance ECU Tune', 
-    price: 599.99, 
-    category: 'Performance',
-    img: 'https://images.unsplash.com/photo-1503375815615-58532f627725?q=80&w=2070&auto=format&fit=crop' 
-  },
-  { 
-    id: 'p5',
-    name: 'Custom Switch Panel', 
-    price: 89.99, 
-    category: 'Interior',
-    img: 'https://images.unsplash.com/photo-1632823471565-1ec2a74b45b4?q=80&w=2070&auto=format&fit=crop' 
-  },
-  { 
     id: 'p6',
     name: '2-Way Paging Alarm', 
     price: 299.99, 
@@ -47,7 +33,7 @@ const products = [
   },
 ];
 
-const categories = ['All', 'Lighting', 'Electronics', 'Performance', 'Interior', 'Security'];
+const categories = ['All', 'Lighting', 'Electronics', 'Security'];
 
 export default function Products() {
   const [activeCategory, setActiveCategory] = useState('All');

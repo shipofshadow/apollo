@@ -197,8 +197,8 @@ export default function IntakeForm() {
                         <option value="" disabled>Select a service</option>
                         <option value="headlights">Headlight Retrofit</option>
                         <option value="headunit">Android Headunit</option>
-                        <option value="tuning">Performance Tuning</option>
-                        <option value="fabrication">Custom Fabrication</option>
+                        <option value="security">Security System</option>
+                        <option value="aesthetics">Aesthetic Upgrades</option>
                         <option value="other">Other / Multiple</option>
                       </select>
                     </div>

@@ -30,24 +30,6 @@ const products = [
     features: ['Sequential turn signals', 'Ultra-bright white DRL', 'Custom fit for various models', 'Waterproof drivers']
   },
   { 
-    id: 'p4',
-    name: 'Performance ECU Tune', 
-    price: 599.99, 
-    category: 'Performance',
-    img: 'https://images.unsplash.com/photo-1503375815615-58532f627725?q=80&w=2070&auto=format&fit=crop',
-    description: 'Unlock hidden horsepower and torque with our custom ECU tune. Optimized for your specific modifications.',
-    features: ['Increased HP and Torque', 'Improved throttle response', 'Optimized air/fuel ratio', 'Reversible to stock']
-  },
-  { 
-    id: 'p5',
-    name: 'Custom Switch Panel', 
-    price: 89.99, 
-    category: 'Interior',
-    img: 'https://images.unsplash.com/photo-1632823471565-1ec2a74b45b4?q=80&w=2070&auto=format&fit=crop',
-    description: 'Clean up your interior wiring with this custom switch panel. Perfect for controlling auxiliary lighting and accessories.',
-    features: ['Laser-cut aluminum panel', 'LED backlit switches', 'Pre-wired with relays', 'OEM-like fitment']
-  },
-  { 
     id: 'p6',
     name: '2-Way Paging Alarm', 
     price: 299.99, 
