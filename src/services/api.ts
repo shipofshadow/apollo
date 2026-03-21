@@ -1,4 +1,5 @@
-import type { BookingPayload, Booking } from '../types';
+import type { BookingPayload, Booking, FacebookPost } from '../types';
+import { FB_ACCESS_TOKEN } from '../config';
 
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {
   return new Promise((resolve, reject) => {
@@ -18,4 +19,34 @@ export const submitBooking = async (payload: BookingPayload): Promise<Booking> =
       }
     }, 2000);
   });
+};
+
+export const fetchFacebookPosts = async (): Promise<FacebookPost[]> => {
+  if (!FB_ACCESS_TOKEN) {
+    throw new Error('Facebook access token is not configured.');
+  }
+
+  const fields = [
+    'id',
+    'message',
+    'created_time',
+    'full_picture',
+    'attachments{description,media,url,subattachments}',
+    'likes.summary(true).limit(0)',
+    'comments.summary(true).limit(0)',
+    'shares',
+  ].join(',');
+
+  const url = `https://graph.facebook.com/v25.0/me/posts?fields=${fields}`;
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${FB_ACCESS_TOKEN}` },
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message ?? 'Failed to fetch Facebook posts.');
+  }
+
+  return (data.data ?? []) as FacebookPost[];
 };

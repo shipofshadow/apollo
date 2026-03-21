@@ -1,36 +1,43 @@
-import { ThumbsUp, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Loader2, AlertCircle } from 'lucide-react';
+import type { FacebookPost } from '../types';
+import { fetchFacebookPosts } from '../services/api';
 
-const posts = [
-  {
-    id: 1,
-    author: '1625 Auto Lab',
-    time: '2 hours ago',
-    content: 'Just finished this insane quad projector retrofit on a 2020 WRX STI. Full RGB demon eyes, sequential halos, and custom etched lenses. The output on these is absolutely ridiculous! 🚗💨🔥 #1625AutoLab #Retrofit #WRXSTI',
-    image: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=1964&auto=format&fit=crop',
-    likes: 245,
-    comments: 32,
-  },
-  {
-    id: 2,
-    author: '1625 Auto Lab',
-    time: 'Yesterday at 4:30 PM',
-    content: 'We are now offering custom 3D printed bezels for all Android Headunit installations! Get that factory-finish look with modern tech. DM us to book your slot. 🛠️📱',
-    image: 'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop',
-    likes: 189,
-    comments: 14,
-  },
-  {
-    id: 3,
-    author: '1625 Auto Lab',
-    time: 'March 14 at 10:15 AM',
-    content: 'Another happy customer! Upgraded the lighting on this Tacoma TRD for those late-night off-road trails. Stay safe out there! 🏕️🔦',
-    image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=2070&auto=format&fit=crop',
-    likes: 312,
-    comments: 45,
+function getPostUrl(postId: string): string {
+  const parts = postId.split('_');
+  return parts.length === 2
+    ? `https://www.facebook.com/${parts[0]}/posts/${parts[1]}`
+    : `https://www.facebook.com/${postId}`;
+}
+
+function getPostImages(post: FacebookPost): string[] {
+  const subattachments = post.attachments?.data?.[0]?.subattachments?.data;
+  if (subattachments && subattachments.length > 0) {
+    return subattachments
+      .map((sub) => sub.media?.image?.src)
+      .filter((src): src is string => Boolean(src));
   }
-];
+  const single =
+    post.full_picture ?? post.attachments?.data?.[0]?.media?.image?.src ?? null;
+  return single ? [single] : [];
+}
 
 export default function FacebookFeed() {
+  const [posts, setPosts] = useState<FacebookPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchFacebookPosts()
+      .then((data) => {
+        setPosts(data.slice(0, 6));
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load posts.');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <section className="py-24 bg-brand-darker border-t border-gray-800">
       <div className="container mx-auto px-4 md:px-6">
@@ -44,63 +51,116 @@ export default function FacebookFeed() {
           <div className="w-24 h-1 bg-brand-orange mx-auto mt-6"></div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {posts.map((post) => (
-            <div key={post.id} className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden flex flex-col">
-              {/* Post Header */}
-              <div className="p-4 flex items-center justify-between border-b border-gray-800/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-brand-orange rounded-full flex items-center justify-center font-display font-bold text-white">
-                    1625
+        {loading && (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="w-10 h-10 text-brand-orange animate-spin" />
+          </div>
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+            <p className="text-gray-400">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {posts.map((post) => {
+              const images = getPostImages(post);
+              const postUrl = getPostUrl(post.id);
+              const readableDate = new Date(post.created_time).toLocaleString();
+              const likesCount = post.likes?.summary?.total_count ?? 0;
+              const commentsCount = post.comments?.summary?.total_count ?? 0;
+              const sharesCount = post.shares?.count ?? 0;
+
+              return (
+                <div
+                  key={post.id}
+                  className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden flex flex-col"
+                >
+                  {/* Post Header */}
+                  <div className="p-4 flex items-center justify-between border-b border-gray-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-brand-orange rounded-full flex items-center justify-center font-display font-bold text-white text-xs">
+                        1625
+                      </div>
+                      <div>
+                        <h4 className="text-white font-bold text-sm">1625 Auto Lab</h4>
+                        <span className="text-gray-500 text-xs">{readableDate}</span>
+                      </div>
+                    </div>
+                    <a
+                      href={postUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-500 hover:text-white transition-colors"
+                      aria-label="View on Facebook"
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </a>
                   </div>
-                  <div>
-                    <h4 className="text-white font-bold text-sm">{post.author}</h4>
-                    <span className="text-gray-500 text-xs">{post.time}</span>
+
+                  {/* Post Content */}
+                  <div className="p-4 flex-grow">
+                    <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap line-clamp-4">
+                      {post.message ?? 'No caption'}
+                    </p>
+                  </div>
+
+                  {/* Post Images */}
+                  {images.length > 0 && (
+                    <div className="w-full aspect-video bg-brand-gray overflow-hidden">
+                      <img
+                        src={images[0]}
+                        alt="Post attachment"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+
+                  {/* Post Stats & Actions */}
+                  <div className="p-4 bg-brand-darker/50">
+                    <div className="flex items-center justify-between text-gray-400 text-xs mb-3 pb-3 border-b border-gray-800">
+                      <span className="flex items-center gap-1">
+                        <ThumbsUp className="w-3 h-3 text-brand-orange" /> {likesCount}
+                      </span>
+                      <span>{commentsCount} Comments</span>
+                      <span>{sharesCount} Shares</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <a
+                        href={postUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-brand-orange transition-colors text-xs sm:text-sm font-bold uppercase tracking-wider"
+                      >
+                        <ThumbsUp className="w-4 h-4" /> <span className="hidden sm:inline">Like</span>
+                      </a>
+                      <a
+                        href={postUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm font-bold uppercase tracking-wider"
+                      >
+                        <MessageCircle className="w-4 h-4" /> <span className="hidden sm:inline">Comment</span>
+                      </a>
+                      <a
+                        href={postUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm font-bold uppercase tracking-wider"
+                      >
+                        <Share2 className="w-4 h-4" /> <span className="hidden sm:inline">Share</span>
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <button className="text-gray-500 hover:text-white transition-colors">
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Post Content */}
-              <div className="p-4 flex-grow">
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  {post.content}
-                </p>
-              </div>
-
-              {/* Post Image */}
-              <div className="w-full aspect-video bg-brand-gray">
-                <img 
-                  src={post.image} 
-                  alt="Post attachment" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-
-              {/* Post Stats & Actions */}
-              <div className="p-4 bg-brand-darker/50">
-                <div className="flex items-center justify-between text-gray-400 text-xs mb-3 pb-3 border-b border-gray-800">
-                  <span className="flex items-center gap-1"><ThumbsUp className="w-3 h-3 text-brand-orange" /> {post.likes}</span>
-                  <span>{post.comments} Comments</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <button className="flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-brand-orange transition-colors text-xs sm:text-sm font-bold uppercase tracking-wider">
-                    <ThumbsUp className="w-4 h-4" /> <span className="hidden sm:inline">Like</span>
-                  </button>
-                  <button className="flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm font-bold uppercase tracking-wider">
-                    <MessageCircle className="w-4 h-4" /> <span className="hidden sm:inline">Comment</span>
-                  </button>
-                  <button className="flex items-center gap-1 sm:gap-2 text-gray-400 hover:text-white transition-colors text-xs sm:text-sm font-bold uppercase tracking-wider">
-                    <Share2 className="w-4 h-4" /> <span className="hidden sm:inline">Share</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

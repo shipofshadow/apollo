@@ -1,37 +1,42 @@
-import { Calendar } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, ThumbsUp, MessageCircle, Share2, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import type { FacebookPost } from '../types';
+import { fetchFacebookPosts } from '../services/api';
 
-const builds = [
-  {
-    id: 1,
-    title: 'Honda BR-V 2017 Full Setup',
-    description: 'Equipped with X1 Bi-LED Projector Headlights and Tri-Color Foglights. Both with 6-8 years lifespan & 3 Years Warranty.',
-    features: [
-      '6000K Super White Light Output',
-      'Low & High Beam Functions',
-      'Super White / Yellowish / Super Yellow Foglights',
-      '40 Watts Output, 25,000 LUX',
-      '100% Waterproof'
-    ],
-    image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80',
-    tags: ['#1625autolab', '#honda', '#hondabrv', '#headlights', '#retrofit']
-  },
-  {
-    id: 2,
-    title: 'HONDA CIVIC FD 2010',
-    description: 'Now equipped with X1 Bi-LED Projector Headlights with FREE Amber Demon Eyes installed 🔥',
-    features: [
-      '6000K Super White Light Output',
-      'High & Low Beam Function',
-      '3 Years Warranty',
-      'Amber Demon Eyes'
-    ],
-    image: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?auto=format&fit=crop&q=80',
-    tags: ['#1625autolab', '#honda', '#hondacivicfd', '#hondacivicfd2010', '#headlightsretorifit', '#hondaclubph']
+function getPostUrl(postId: string): string {
+  const parts = postId.split('_');
+  return parts.length === 2
+    ? `https://www.facebook.com/${parts[0]}/posts/${parts[1]}`
+    : `https://www.facebook.com/${postId}`;
+}
+
+function getPostImages(post: FacebookPost): string[] {
+  const subattachments = post.attachments?.data?.[0]?.subattachments?.data;
+  if (subattachments && subattachments.length > 0) {
+    return subattachments
+      .map((sub) => sub.media?.image?.src)
+      .filter((src): src is string => Boolean(src));
   }
-];
+  const single =
+    post.full_picture ?? post.attachments?.data?.[0]?.media?.image?.src ?? null;
+  return single ? [single] : [];
+}
 
 export default function Portfolio() {
+  const [posts, setPosts] = useState<FacebookPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchFacebookPosts()
+      .then(setPosts)
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load portfolio.');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
       <div className="container mx-auto px-4 md:px-6">
@@ -47,65 +52,115 @@ export default function Portfolio() {
           </p>
         </div>
 
-        <div className="space-y-16">
-          {builds.map((build, index) => (
-            <div key={build.id} className={`flex flex-col lg:flex-row gap-8 lg:gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
-              {/* Image */}
-              <div className="w-full lg:w-1/2">
-                <div className="relative aspect-[4/3] rounded-sm overflow-hidden border border-gray-800 group">
-                  <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                  <img 
-                    src={build.image} 
-                    alt={build.title}
-                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
-                  />
-                </div>
-              </div>
+        {loading && (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="w-10 h-10 text-brand-orange animate-spin" />
+          </div>
+        )}
 
-              {/* Content */}
-              <div className="w-full lg:w-1/2 flex flex-col">
-                <h2 className="text-3xl font-display font-bold text-white uppercase tracking-wide mb-4">
-                  {build.title}
-                </h2>
-                <p className="text-gray-400 text-lg mb-6 leading-relaxed">
-                  {build.description}
-                </p>
-                
-                <div className="mb-8">
-                  <h3 className="text-brand-orange font-bold uppercase tracking-widest text-sm mb-4">Equipped With:</h3>
-                  <ul className="space-y-2">
-                    {build.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-3 text-gray-300">
-                        <span className="text-brand-orange mt-1">✔</span>
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+        {error && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+            <p className="text-gray-400">{error}</p>
+          </div>
+        )}
 
-                <div className="flex flex-wrap gap-2 mb-8">
-                  {build.tags.map((tag, i) => (
-                    <span key={i} className="text-xs font-bold text-gray-500 bg-brand-dark px-2 py-1 rounded-sm border border-gray-800">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+        {!loading && !error && (
+          <div className="space-y-16">
+            {posts.map((post, index) => {
+              const images = getPostImages(post);
+              const postUrl = getPostUrl(post.id);
+              const readableDate = new Date(post.created_time).toLocaleString();
+              const likesCount = post.likes?.summary?.total_count ?? 0;
+              const commentsCount = post.comments?.summary?.total_count ?? 0;
+              const sharesCount = post.shares?.count ?? 0;
+              const message = post.message ?? '';
 
-                <div className="mt-auto p-6 bg-brand-dark border border-gray-800 rounded-sm">
-                  <h4 className="text-white font-bold mb-2">Planning to upgrade your vehicle?</h4>
-                  <p className="text-gray-400 text-sm mb-4">Message us today to schedule your installation.</p>
-                  <Link 
-                    to="/booking"
-                    className="inline-flex items-center justify-center gap-2 bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest hover:bg-white hover:text-brand-dark transition-colors w-full sm:w-auto"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    Book This Setup
-                  </Link>
+              return (
+                <div
+                  key={post.id}
+                  className={`flex flex-col lg:flex-row gap-8 lg:gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}
+                >
+                  {/* Images */}
+                  {images.length > 0 && (
+                    <div className="w-full lg:w-1/2">
+                      {images.length === 1 ? (
+                        <div className="relative aspect-[4/3] rounded-sm overflow-hidden border border-gray-800 group">
+                          <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                          <img
+                            src={images[0]}
+                            alt="Post attachment"
+                            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {images.slice(0, 4).map((src, i) => (
+                            <div key={i} className="relative aspect-square rounded-sm overflow-hidden border border-gray-800 group">
+                              <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                              <img
+                                src={src}
+                                alt={`Post image ${i + 1}`}
+                                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Content */}
+                  <div className={`flex flex-col ${images.length > 0 ? 'w-full lg:w-1/2' : 'w-full'}`}>
+                    <p className="text-gray-300 text-base leading-relaxed mb-6 whitespace-pre-wrap">
+                      {message || 'No caption'}
+                    </p>
+
+                    {/* Stats */}
+                    <div className="flex items-center gap-6 text-gray-400 text-sm mb-6">
+                      <span className="flex items-center gap-1">
+                        <ThumbsUp className="w-4 h-4 text-brand-orange" /> {likesCount} Likes
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MessageCircle className="w-4 h-4" /> {commentsCount} Comments
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Share2 className="w-4 h-4" /> {sharesCount} Shares
+                      </span>
+                    </div>
+
+                    <small className="text-gray-500 block mb-8">{readableDate}</small>
+
+                    <div className="mt-auto p-6 bg-brand-dark border border-gray-800 rounded-sm">
+                      <h4 className="text-white font-bold mb-2">Planning to upgrade your vehicle?</h4>
+                      <p className="text-gray-400 text-sm mb-4">Message us today to schedule your installation.</p>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Link
+                          to="/booking"
+                          className="inline-flex items-center justify-center gap-2 bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest hover:bg-white hover:text-brand-dark transition-colors"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Book This Setup
+                        </Link>
+                        <a
+                          href={postUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 border border-gray-700 text-gray-300 px-6 py-3 font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View on Facebook
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
