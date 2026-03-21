@@ -50,3 +50,31 @@ export interface Product {
   description?: string;
   features?: string[];
 }
+
+export interface FacebookAttachmentMedia {
+  image?: { src: string; height: number; width: number };
+}
+
+export interface FacebookSubAttachment {
+  media?: FacebookAttachmentMedia;
+  url?: string;
+  description?: string;
+}
+
+export interface FacebookAttachment {
+  description?: string;
+  media?: FacebookAttachmentMedia;
+  url?: string;
+  subattachments?: { data: FacebookSubAttachment[] };
+}
+
+export interface FacebookPost {
+  id: string;
+  message?: string;
+  created_time: string;
+  full_picture?: string;
+  attachments?: { data: FacebookAttachment[] };
+  likes?: { summary: { total_count: number } };
+  comments?: { summary: { total_count: number } };
+  shares?: { count: number };
+}

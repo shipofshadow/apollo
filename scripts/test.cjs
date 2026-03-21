@@ -2,7 +2,7 @@ const express = require("express");
 
 const app = express();
 
-const ACCESS_TOKEN = "EAAhserHk7D0BQ9Q4ez6izUkHkYs8E3E9ZAwf9m7yBZAHXAiiyTp5S0HaFIQZBaK9U6V0bRm5Aqo9Mru2J6GCD1EczZCC9oZAFGF6AHhfLmVyjBxsV2CgcRK2P0fL3e5yrQq7d9uFiZAn0sPFtZCrPYebfUELCVZCQW2qeL7KuHCYgZBdyM2mR9ZCpEH3IvfZCJABzDCSUvAxJT9r3owTh3WxL9FlKRssxVTdHphMGzVwPpDaEIwYEalkKoCqtnJtP0ZD";
+const ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN || "";
 
 app.get("/", async (req, res) => {
   try {
