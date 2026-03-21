@@ -1,4 +1,5 @@
 import type { BookingPayload, Booking, FacebookPost } from '../types';
+import { FB_ACCESS_TOKEN } from '../config';
 
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {
   return new Promise((resolve, reject) => {
@@ -21,8 +22,7 @@ export const submitBooking = async (payload: BookingPayload): Promise<Booking> =
 };
 
 export const fetchFacebookPosts = async (): Promise<FacebookPost[]> => {
-  const accessToken = import.meta.env.VITE_FB_ACCESS_TOKEN as string | undefined;
-  if (!accessToken) {
+  if (!FB_ACCESS_TOKEN) {
     throw new Error('Facebook access token is not configured.');
   }
 
@@ -40,7 +40,7 @@ export const fetchFacebookPosts = async (): Promise<FacebookPost[]> => {
   const url = `https://graph.facebook.com/v25.0/me/posts?fields=${fields}`;
 
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${FB_ACCESS_TOKEN}` },
   });
   const data = await response.json();
 
