@@ -26,3 +26,12 @@ require_once __DIR__ . '/Configuration.php';
 // ---------------------------------------------------------------------------
 
 Cors::apply();
+
+// ---------------------------------------------------------------------------
+// 5. Database connection (lazy singleton – available anywhere via
+//    Database::getInstance())
+// ---------------------------------------------------------------------------
+
+if (DB_NAME !== '') {
+    Database::getInstance();
+}

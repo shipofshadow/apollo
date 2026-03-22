@@ -115,7 +115,9 @@ backend/
 ├── .env.example            # Environment variable template
 ├── config/
 │   ├── Configuration.php   # Application constants (sourced from .env)
-│   └── init.php            # Bootstrap: Composer autoload + Dotenv + CORS
+│   └── init.php            # Bootstrap: Composer autoload + Dotenv + CORS + DB
+├── db/
+│   └── Database.php        # PDO singleton (mirrors bitress/phploginsystem)
 └── app/
     ├── Cache.php           # TTL cache (APCu when available, file fallback)
     ├── Cors.php            # CORS header handling
