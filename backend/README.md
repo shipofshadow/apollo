@@ -1,7 +1,11 @@
 # Apollo – PHP Backend
 
-A lightweight PHP script that proxies the **Facebook Graph API** so that the
+A lightweight PHP backend that proxies the **Facebook Graph API** so that the
 page access token is never exposed in the browser.
+
+Built with **OOP / PDO-style architecture** (inspired by
+[bitress/phploginsystem](https://github.com/bitress/phploginsystem)) and
+managed with **Composer**.
 
 ## Endpoints
 
@@ -44,28 +48,30 @@ page access token is never exposed in the browser.
 ## Requirements
 
 - PHP 8.1 or newer
-- `curl` extension enabled (enabled by default in most PHP installations)
-- A web server (Apache with `mod_rewrite`, or Nginx – see below)
+- Composer 2.x
+- `curl` extension enabled (default in most PHP installations)
+- A web server (Apache with `mod_rewrite`, or Nginx)
 
 ## Setup
-
-### Apache
 
 ```bash
 cd backend
 
-# 1. Configure environment variables
+# 1. Install Composer dependencies
+composer install
+
+# 2. Configure environment variables
 cp .env.example .env
 # Edit .env and fill in FB_ACCESS_TOKEN
-
-# 2. Point your virtual host document root at the backend/ directory
-#    The included .htaccess routes all requests to index.php automatically
-#    (requires mod_rewrite to be enabled)
 ```
 
-### Nginx
+### Apache
 
-Add the following inside your `server` block:
+The included `.htaccess` routes all requests to `index.php` automatically
+(requires `mod_rewrite` to be enabled). Point your virtual host document root
+at the `backend/` directory.
+
+### Nginx
 
 ```nginx
 root /path/to/backend;
@@ -85,9 +91,6 @@ location ~ \.php$ {
 ### Built-in PHP server (development only)
 
 ```bash
-cd backend
-cp .env.example .env
-# Edit .env and fill in FB_ACCESS_TOKEN
 php -S localhost:8000
 ```
 
@@ -101,12 +104,48 @@ The API will be available at <http://localhost:8000>.
 | `CORS_ORIGINS` | ❌ | `http://localhost:5173,http://localhost:4173` | Comma-separated allowed origins |
 | `CACHE_TTL_SECONDS` | ❌ | `60` | Seconds to cache first-page `/api/posts` results in memory |
 
+## Project Structure
+
+```
+backend/
+├── composer.json           # Composer manifest
+├── composer.lock           # Locked dependency versions
+├── index.php               # Thin entry point
+├── .htaccess               # Apache mod_rewrite catch-all
+├── .env.example            # Environment variable template
+├── config/
+│   ├── Configuration.php   # Application constants (sourced from .env)
+│   └── init.php            # Bootstrap: Composer autoload + Dotenv + CORS
+└── app/
+    ├── Cache.php           # TTL cache (APCu when available, file fallback)
+    ├── Cors.php            # CORS header handling
+    ├── FacebookService.php # Facebook Graph API client (Guzzle)
+    └── Router.php          # Request router (FastRoute)
+```
+
+## Composer Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `vlucas/phpdotenv` | Loads `.env` files into `$_ENV` |
+| `guzzlehttp/guzzle` | HTTP client for Facebook Graph API requests |
+| `nikic/fast-route` | Lightweight request router |
+
 ## Architecture Highlights
 
-- **No external dependencies** – a single `index.php` with no Composer packages required.
-- **Inline `.env` loader** – reads `backend/.env` at startup (same format as the previous Python backend).
-- **In-memory TTL cache** – uses [APCu](https://www.php.net/manual/en/book.apcu.php) when the extension is available; falls back to a file-based cache in the system temp directory. First-page `/api/posts` responses are cached for `CACHE_TTL_SECONDS` seconds to avoid hitting Facebook's rate limits on every page load.
-- **Cursor-based pagination** – pass the `after` cursor from any response's `paging.cursors.after` field to load the next page of posts. Paginated requests bypass the cache.
-- **Graceful error handling** – network timeouts return HTTP 504; connectivity errors return HTTP 503; Facebook API errors are forwarded with their original status code.
-- **CORS** – configurable via `CORS_ORIGINS`; handles `OPTIONS` preflight requests.
+- **OOP structure** – every concern lives in its own class; `index.php` is a
+  4-line entry point.
+- **Composer autoload** – classmap autoloading for `app/` classes; no manual
+  `require` calls needed.
+- **vlucas/phpdotenv** – safe `.env` loading; existing environment variables
+  are never overwritten.
+- **Guzzle HTTP client** – handles connection timeouts (504) and connectivity
+  errors (503) with typed exceptions.
+- **FastRoute dispatcher** – zero-overhead routing with proper 404/405
+  responses.
+- **In-memory TTL cache** – uses APCu when available, falls back to serialised
+  temp files. First-page `/api/posts` responses are cached for
+  `CACHE_TTL_SECONDS` seconds. Paginated requests (with `after`) bypass the cache.
+- **CORS** – configurable via `CORS_ORIGINS`; handles `OPTIONS` preflight.
+
 

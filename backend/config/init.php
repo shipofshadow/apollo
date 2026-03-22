@@ -3,21 +3,17 @@
 declare(strict_types=1);
 
 // ---------------------------------------------------------------------------
-// 1. Autoloader – resolves class names to files inside app/
+// 1. Composer autoloader – covers vendor packages AND our app/ classes
 // ---------------------------------------------------------------------------
 
-spl_autoload_register(function (string $class): void {
-    $file = __DIR__ . '/../app/' . $class . '.php';
-    if (file_exists($file)) {
-        require_once $file;
-    }
-});
+require_once __DIR__ . '/../vendor/autoload.php';
 
 // ---------------------------------------------------------------------------
-// 2. Load .env into $_ENV (triggers autoload of EnvLoader)
+// 2. Load .env using vlucas/phpdotenv
 // ---------------------------------------------------------------------------
 
-EnvLoader::load(__DIR__ . '/../.env');
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->safeLoad();
 
 // ---------------------------------------------------------------------------
 // 3. Define application constants from the loaded environment
@@ -26,7 +22,7 @@ EnvLoader::load(__DIR__ . '/../.env');
 require_once __DIR__ . '/Configuration.php';
 
 // ---------------------------------------------------------------------------
-// 4. Apply CORS headers and handle OPTIONS preflight (triggers autoload of Cors)
+// 4. Apply CORS headers and handle OPTIONS preflight
 // ---------------------------------------------------------------------------
 
 Cors::apply();

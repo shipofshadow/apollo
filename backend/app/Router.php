@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use FastRoute\Dispatcher;
+use function FastRoute\simpleDispatcher;
+
 /**
- * Simple front-controller router.
+ * Front-controller router using nikic/fast-route.
  *
  * Resolves the request path/method to the appropriate handler method and
  * converts any RuntimeException into a JSON error response.
@@ -14,17 +17,30 @@ class Router
     {
         header('Content-Type: application/json');
 
+        $dispatcher = simpleDispatcher(function (FastRoute\RouteCollector $r): void {
+            $r->addRoute('GET', '/api/posts', 'handlePosts');
+            $r->addRoute('GET', '/health',    'handleHealth');
+        });
+
         $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+        $routeInfo = $dispatcher->dispatch($method, $path);
+
         try {
-            if ($path === '/api/posts' && $method === 'GET') {
-                $this->handlePosts();
-            } elseif ($path === '/health' && $method === 'GET') {
-                echo json_encode(['status' => 'ok']);
-            } else {
-                http_response_code(404);
-                echo json_encode(['detail' => 'Not Found']);
+            switch ($routeInfo[0]) {
+                case Dispatcher::FOUND:
+                    $this->{$routeInfo[1]}();
+                    break;
+
+                case Dispatcher::METHOD_NOT_ALLOWED:
+                    http_response_code(405);
+                    echo json_encode(['detail' => 'Method Not Allowed']);
+                    break;
+
+                default:
+                    http_response_code(404);
+                    echo json_encode(['detail' => 'Not Found']);
             }
         } catch (RuntimeException $e) {
             http_response_code($e->getCode() ?: 500);
@@ -63,5 +79,10 @@ class Router
         }
 
         echo json_encode($result);
+    }
+
+    private function handleHealth(): void
+    {
+        echo json_encode(['status' => 'ok']);
     }
 }
