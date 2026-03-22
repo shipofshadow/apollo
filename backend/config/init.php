@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // ---------------------------------------------------------------------------
-// 1. Composer autoloader – covers vendor packages AND our app/ classes
+// 1. Composer autoloader – covers vendor packages AND our Engine/ classes
 // ---------------------------------------------------------------------------
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -28,7 +28,13 @@ require_once __DIR__ . '/Configuration.php';
 Cors::apply();
 
 // ---------------------------------------------------------------------------
-// 5. Database connection (lazy singleton – available anywhere via
+// 5. Start session
+// ---------------------------------------------------------------------------
+
+Session::startSession();
+
+// ---------------------------------------------------------------------------
+// 6. Database connection (lazy singleton – available anywhere via
 //    Database::getInstance())
 // ---------------------------------------------------------------------------
 

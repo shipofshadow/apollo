@@ -115,14 +115,15 @@ backend/
 ├── .env.example            # Environment variable template
 ├── config/
 │   ├── Configuration.php   # Application constants (sourced from .env)
-│   └── init.php            # Bootstrap: Composer autoload + Dotenv + CORS + DB
+│   └── init.php            # Bootstrap: autoload → Dotenv → CORS → Session → DB
 ├── db/
 │   └── Database.php        # PDO singleton (mirrors bitress/phploginsystem)
-└── app/
+└── Engine/
     ├── Cache.php           # TTL cache (APCu when available, file fallback)
     ├── Cors.php            # CORS header handling
     ├── FacebookService.php # Facebook Graph API client (Guzzle)
-    └── Router.php          # Request router (FastRoute)
+    ├── Router.php          # Request router (FastRoute)
+    └── Session.php         # Secure session manager
 ```
 
 ## Composer Dependencies
