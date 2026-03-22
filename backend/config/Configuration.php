@@ -41,3 +41,11 @@ define('DB_NAME',    $_ENV['DB_NAME']     ?? '');
 define('DB_USER',    $_ENV['DB_USER']     ?? 'root');
 define('DB_PASS',    $_ENV['DB_PASS']     ?? '');
 define('DB_CHARSET', $_ENV['DB_CHARSET']  ?? 'utf8mb4');
+
+// ---------------------------------------------------------------------------
+// JWT constants
+// ---------------------------------------------------------------------------
+
+define('JWT_SECRET',     $_ENV['JWT_SECRET']      ?? '');
+define('JWT_ALGORITHM',  $_ENV['JWT_ALGORITHM']   ?? 'HS256');
+define('JWT_TTL',        (int)($_ENV['JWT_TTL']   ?? 3600));   // seconds
