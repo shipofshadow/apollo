@@ -37,10 +37,11 @@ class Router
             $r->addRoute('PUT',  '/api/auth/profile',   'handleAuthProfile');
 
             // ── Bookings ────────────────────────────────────────────────────
-            $r->addRoute('POST',  '/api/bookings',          'handleBookingCreate');
-            $r->addRoute('GET',   '/api/bookings',           'handleBookingList');
-            $r->addRoute('GET',   '/api/bookings/mine',      'handleBookingMine');
-            $r->addRoute('PATCH', '/api/bookings/{id}',      'handleBookingUpdate');
+            $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
+            $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
+            $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
+            $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
+            $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
 
             // ── Blog posts (public read, admin write) ───────────────────────
             $r->addRoute('GET',    '/api/blog',              'handleBlogList');
@@ -260,6 +261,17 @@ class Router
 
         $booking = (new BookingService())->updateStatus($id, $status);
         echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingAvailability(array $vars = []): void
+    {
+        $date = trim((string) ($_GET['date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('A valid date parameter (YYYY-MM-DD) is required.', 422);
+        }
+        $bookedSlots = (new BookingService())->getBookedSlots($date);
+        echo json_encode(['bookedSlots' => $bookedSlots]);
     }
 
     // -------------------------------------------------------------------------

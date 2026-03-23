@@ -103,6 +103,9 @@ export const fetchMyBookingsApi = (token: string) =>
 export const fetchAllBookingsApi = (token: string) =>
   apiFetch<{ bookings: Booking[] }>('/api/bookings', {}, token);
 
+export const fetchAvailabilityApi = (date: string) =>
+  apiFetch<{ bookedSlots: string[] }>(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
+
 export const updateBookingStatusApi = (
   token: string,
   id: string,

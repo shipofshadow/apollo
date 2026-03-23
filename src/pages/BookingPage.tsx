@@ -1,17 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
+import { fetchServicesAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import { useAuth } from '../context/AuthContext';
-
-const SERVICES = [
-  { id: 1, name: 'Headlight Retrofit',            duration: '4–6 Hours',  price: 'From ₱13,750' },
-  { id: 2, name: 'Android Headunit Installation', duration: '2–3 Hours',  price: 'From ₱8,250'  },
-  { id: 3, name: 'Security System',               duration: '2–4 Hours',  price: 'From ₱11,000' },
-  { id: 4, name: 'Aesthetic Upgrades',            duration: 'Varies',     price: 'Consultation' },
-];
+import { fetchAvailabilityApi } from '../services/api';
+import { BACKEND_URL } from '../config';
 
 const generateNextDays = (): Date[] =>
   Array.from({ length: 14 }, (_, i) => {
@@ -29,12 +25,17 @@ export default function BookingPage() {
   const navigate  = useNavigate();
   const { user, token }        = useAuth();
   const { status: bookStatus } = useSelector((s: RootState) => s.booking);
+  const services = useSelector((s: RootState) =>
+    s.services.items.filter(sv => sv.isActive)
+  );
 
-  const [step,            setStep]            = useState(1);
-  const [selectedService, setSelectedService] = useState<number | null>(null);
-  const [selectedDate,    setSelectedDate]    = useState<Date | null>(null);
-  const [selectedTime,    setSelectedTime]    = useState('');
-  const [form,            setForm]            = useState({
+  const [step,                  setStep]                  = useState(1);
+  const [selectedService,       setSelectedService]       = useState<number | null>(null);
+  const [selectedDate,          setSelectedDate]          = useState<Date | null>(null);
+  const [selectedTime,          setSelectedTime]          = useState('');
+  const [bookedSlots,           setBookedSlots]           = useState<string[]>([]);
+  const [availabilityLoading,   setAvailabilityLoading]   = useState(false);
+  const [form,                  setForm]                  = useState({
     name:        user?.name  ?? '',
     email:       user?.email ?? '',
     phone:       user?.phone ?? '',
@@ -44,12 +45,37 @@ export default function BookingPage() {
 
   const availableDates = generateNextDays();
 
+  // Load services from backend on mount (falls back to Redux initial state)
+  useEffect(() => {
+    dispatch(fetchServicesAsync(token));
+  }, [dispatch, token]);
+
+  const handleDateSelect = async (date: Date) => {
+    setSelectedDate(date);
+    setSelectedTime('');
+    setBookedSlots([]);
+
+    if (!BACKEND_URL) return; // no backend → all slots available
+
+    setAvailabilityLoading(true);
+    try {
+      const { bookedSlots: slots } = await fetchAvailabilityApi(
+        date.toISOString().split('T')[0]
+      );
+      setBookedSlots(slots);
+    } catch {
+      // silently ignore – treat all slots as available
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
   const handleNext = () => setStep(s => s + 1);
   const handleBack = () => setStep(s => s - 1);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const service = SERVICES.find(s => s.id === selectedService)!;
+    const service = services.find(s => s.id === selectedService)!;
     const result = await dispatch(
       submitBookingAsync({
         payload: {
@@ -73,13 +99,14 @@ export default function BookingPage() {
   const reset = () => {
     dispatch(resetBookingState());
     setStep(1);
-    setSelectedService('');
+    setSelectedService(null);
     setSelectedDate(null);
     setSelectedTime('');
+    setBookedSlots([]);
     setForm({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', vehicleInfo: '', notes: '' });
   };
 
-  const selectedServiceObj = SERVICES.find(s => s.id === selectedService);
+  const selectedServiceObj = services.find(s => s.id === selectedService);
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
@@ -126,7 +153,7 @@ export default function BookingPage() {
             <div>
               <h2 className="text-2xl font-display font-bold text-white uppercase mb-6">1. Select Service</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {SERVICES.map(svc => (
+                {services.map(svc => (
                   <button
                     key={svc.id}
                     onClick={() => setSelectedService(svc.id)}
@@ -136,10 +163,10 @@ export default function BookingPage() {
                         : 'border-gray-800 hover:border-gray-600'
                     }`}
                   >
-                    <h3 className="text-lg font-bold text-white mb-2">{svc.name}</h3>
+                    <h3 className="text-lg font-bold text-white mb-2">{svc.title}</h3>
                     <div className="flex items-center gap-4 text-sm text-gray-400">
                       <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {svc.duration}</span>
-                      <span className="text-brand-orange font-bold">{svc.price}</span>
+                      <span className="text-brand-orange font-bold">{svc.startingPrice}</span>
                     </div>
                   </button>
                 ))}
@@ -162,7 +189,7 @@ export default function BookingPage() {
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Available Dates</p>
                 <div className="flex overflow-x-auto pb-3 gap-3 snap-x">
                   {availableDates.map((date, i) => (
-                    <button key={i} onClick={() => setSelectedDate(date)}
+                    <button key={i} onClick={() => handleDateSelect(date)}
                       className={`snap-start shrink-0 w-24 p-4 border text-center transition-all rounded-sm ${
                         selectedDate?.toDateString() === date.toDateString()
                           ? 'border-brand-orange bg-brand-orange/10'
@@ -183,19 +210,29 @@ export default function BookingPage() {
 
               {selectedDate && (
                 <div className="mb-8">
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Available Times</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">
+                    Available Times
+                    {availabilityLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Checking availability…</span>}
+                  </p>
                   <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                    {AVAILABLE_TIMES.map(time => (
-                      <button key={time} onClick={() => setSelectedTime(time)}
-                        className={`p-3 border text-center transition-all font-bold text-sm rounded-sm ${
-                          selectedTime === time
-                            ? 'border-brand-orange bg-brand-orange text-white'
-                            : 'border-gray-800 text-gray-300 hover:border-gray-600'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
+                    {AVAILABLE_TIMES.map(time => {
+                      const isBooked = bookedSlots.includes(time);
+                      return (
+                        <button key={time} onClick={() => !isBooked && setSelectedTime(time)}
+                          disabled={isBooked || availabilityLoading}
+                          title={isBooked ? 'This slot is fully booked' : undefined}
+                          className={`p-3 border text-center transition-all font-bold text-sm rounded-sm ${
+                            isBooked
+                              ? 'border-gray-700 bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                              : selectedTime === time
+                                ? 'border-brand-orange bg-brand-orange text-white'
+                                : 'border-gray-800 text-gray-300 hover:border-gray-600'
+                          }`}
+                        >
+                          {isBooked ? <><span className="block">{time}</span><span className="text-xs font-normal">Taken</span></> : time}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -266,10 +303,10 @@ export default function BookingPage() {
                 {/* Summary */}
                 <div className="bg-brand-darker border border-gray-700 rounded-sm p-4 space-y-2 text-sm">
                   <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Booking Summary</p>
-                  <div className="flex justify-between"><span className="text-gray-400">Service</span><span className="text-white font-semibold">{selectedServiceObj?.name}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Service</span><span className="text-white font-semibold">{selectedServiceObj?.title}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Date</span><span className="text-white">{selectedDate?.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Time</span><span className="text-white">{selectedTime}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-400">Starting Price</span><span className="text-brand-orange font-bold">{selectedServiceObj?.price}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Starting Price</span><span className="text-brand-orange font-bold">{selectedServiceObj?.startingPrice}</span></div>
                 </div>
               </form>
 

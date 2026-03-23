@@ -119,6 +119,21 @@ class BookingService
     }
 
     /**
+     * Return the time slots that are already fully booked for a given date.
+     *
+     * A slot is considered "taken" once MAX_BOOKINGS_PER_SLOT bookings with
+     * status 'pending' or 'confirmed' exist for that date+time combination.
+     *
+     * @return string[]  e.g. ['09:00 AM', '11:00 AM']
+     */
+    public function getBookedSlots(string $date): array
+    {
+        return $this->useDb
+            ? $this->dbGetBookedSlots($date)
+            : $this->fileGetBookedSlots($date);
+    }
+
+    /**
      * Update a booking's status.
      *
      * @return array<string, mixed>  Updated booking
@@ -233,6 +248,45 @@ class BookingService
             'status'          => $row['status'],
             'createdAt'       => $row['created_at'],
         ];
+    }
+
+    // -------------------------------------------------------------------------
+    // DB – availability
+    // -------------------------------------------------------------------------
+
+    private const MAX_BOOKINGS_PER_SLOT = 3;
+
+    /** @return string[] */
+    private function dbGetBookedSlots(string $date): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            "SELECT appointment_time
+             FROM bookings
+             WHERE appointment_date = :date
+               AND status IN ('pending','confirmed')
+             GROUP BY appointment_time
+             HAVING COUNT(*) >= :max"
+        );
+        $stmt->execute([':date' => $date, ':max' => self::MAX_BOOKINGS_PER_SLOT]);
+        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'appointment_time');
+    }
+
+    /** @return string[] */
+    private function fileGetBookedSlots(string $date): array
+    {
+        $counts = [];
+        foreach ($this->fileGetAll() as $b) {
+            if (
+                ($b['appointmentDate'] ?? '') === $date
+                && in_array($b['status'] ?? '', ['pending', 'confirmed'], true)
+            ) {
+                $time = (string) ($b['appointmentTime'] ?? '');
+                $counts[$time] = ($counts[$time] ?? 0) + 1;
+            }
+        }
+        return array_keys(
+            array_filter($counts, fn (int $c) => $c >= self::MAX_BOOKINGS_PER_SLOT)
+        );
     }
 
     // -------------------------------------------------------------------------
