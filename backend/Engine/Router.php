@@ -52,6 +52,7 @@ class Router
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
+            $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
         });
 
         $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -385,6 +386,14 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new BlogPostService())->delete($id);
         echo json_encode(['message' => 'Blog post deleted.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminStats(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $stats = (new BookingService())->getStats();
+        echo json_encode($stats);
     }
 
     // -------------------------------------------------------------------------

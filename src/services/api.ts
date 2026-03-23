@@ -145,6 +145,22 @@ export const deleteBlogPostApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
+// ── Admin API ────────────────────────────────────────────────────────────────
+
+export interface AdminStats {
+  totalBookings: number;
+  pendingBookings: number;
+  confirmedBookings: number;
+  completedBookings: number;
+  cancelledBookings: number;
+  activeBookings: number;
+  bookingsThisWeek: number;
+  bookingsThisMonth: number;
+}
+
+export const fetchAdminStatsApi = (token: string) =>
+  apiFetch<AdminStats>('/api/admin/stats', {}, token);
+
 // ── Legacy / mock (kept for offline fallback) ────────────────────────────────
 
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {

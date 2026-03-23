@@ -5,6 +5,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   TrendingUp, Activity, Eye, EyeOff, AlertCircle, Loader2,
   CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, Save, X, ArrowLeft,
+  Phone, Mail, Lock, CheckCircle, UserCog,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../store/bookingSlice';
@@ -15,6 +16,8 @@ import {
 import {
   fetchBlogPostsAsync, createBlogPostAsync, updateBlogPostAsync, deleteBlogPostAsync,
 } from '../store/contentSlice';
+import { updateProfileAsync, clearAuthError } from '../store/authSlice';
+import { fetchAdminStatsApi, type AdminStats } from '../services/api';
 import type { AppDispatch, RootState } from '../store';
 import type { Booking, Service } from '../types';
 import type { ContentPost } from '../store/contentSlice';
@@ -657,6 +660,263 @@ function ContentPanel() {
   );
 }
 
+// ── Analytics panel ───────────────────────────────────────────────────────────
+function AnalyticsPanel() {
+  const { token } = useAuth();
+  const [stats,   setStats]   = useState<AdminStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    setLoading(true);
+    fetchAdminStatsApi(token)
+      .then(setStats)
+      .catch(e => setError((e as Error).message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm text-sm">
+      <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+    </div>
+  );
+
+  const topCards = [
+    { label: 'Total Bookings',  value: stats?.totalBookings    ?? 0, icon: Calendar,    color: 'text-gray-400'       },
+    { label: 'Active Bookings', value: stats?.activeBookings   ?? 0, icon: Activity,    color: 'text-green-400'      },
+    { label: 'Completed',       value: stats?.completedBookings ?? 0, icon: CheckCircle2, color: 'text-blue-400'     },
+    { label: 'New This Month',  value: stats?.bookingsThisMonth ?? 0, icon: TrendingUp,  color: 'text-brand-orange'  },
+  ];
+
+  const statusRows = [
+    { label: 'Pending',   value: stats?.pendingBookings   ?? 0, color: 'text-yellow-400' },
+    { label: 'Confirmed', value: stats?.confirmedBookings ?? 0, color: 'text-green-400'  },
+    { label: 'Completed', value: stats?.completedBookings ?? 0, color: 'text-blue-400'   },
+    { label: 'Cancelled', value: stats?.cancelledBookings ?? 0, color: 'text-gray-400'   },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Dashboard Overview</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {topCards.map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="bg-brand-dark p-6 border border-gray-800 rounded-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-gray-400 font-bold uppercase tracking-widest text-xs">{label}</h3>
+              <Icon className={`w-5 h-5 ${color}`} />
+            </div>
+            <p className="text-3xl font-display font-bold text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-800">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Bookings by Status</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-800">
+          {statusRows.map(({ label, value, color }) => (
+            <div key={label} className="p-5 text-center">
+              <p className={`text-2xl font-display font-bold ${color}`}>{value}</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Account settings panel ────────────────────────────────────────────────────
+function AccountSettingsPanel() {
+  const dispatch               = useDispatch<AppDispatch>();
+  const { user, token, status, error } = useAuth();
+
+  const [info,     setInfo]    = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
+  const [pw,       setPw]      = useState({ newPw: '', confirm: '' });
+  const [showPw,   setShowPw]  = useState(false);
+  const [localErr, setLocalErr] = useState('');
+  const [saved,    setSaved]   = useState(false);
+
+  useEffect(() => {
+    if (user) setInfo({ name: user.name, phone: user.phone ?? '' });
+  }, [user]);
+
+  useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
+
+  const handleInfoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalErr('');
+    setSaved(false);
+    if (!token) return;
+    dispatch(updateProfileAsync({ token, data: { name: info.name, phone: info.phone } }))
+      .unwrap()
+      .then(() => setSaved(true))
+      .catch(() => {});
+  };
+
+  const handlePwSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalErr('');
+    setSaved(false);
+    if (pw.newPw !== pw.confirm) { setLocalErr('Passwords do not match.'); return; }
+    if (pw.newPw.length < 8)     { setLocalErr('Password must be at least 8 characters.'); return; }
+    if (!token) return;
+    dispatch(updateProfileAsync({
+      token,
+      data: { password: pw.newPw, password_confirmation: pw.confirm },
+    }))
+      .unwrap()
+      .then(() => { setSaved(true); setPw({ newPw: '', confirm: '' }); })
+      .catch(() => {});
+  };
+
+  const displayError = localErr || error;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Account Settings</h2>
+
+      {/* Avatar card */}
+      <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-5 flex items-center gap-4">
+        <div className="w-14 h-14 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0">
+          <span className="text-brand-orange font-black text-xl uppercase">
+            {user?.name?.[0] ?? 'A'}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-white font-bold text-base truncate">{user?.name}</p>
+          <p className="text-gray-500 text-sm truncate flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5 shrink-0" /> {user?.email}
+          </p>
+        </div>
+        <span className="ml-auto shrink-0 px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border border-brand-orange/30 text-brand-orange bg-brand-orange/10">
+          {user?.role}
+        </span>
+      </div>
+
+      {/* Feedback */}
+      {saved && !displayError && (
+        <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-sm text-sm">
+          <CheckCircle className="w-4 h-4 shrink-0" /> Changes saved successfully.
+        </div>
+      )}
+      {displayError && (
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {displayError}
+        </div>
+      )}
+
+      {/* Personal info */}
+      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <h3 className="text-xs font-bold text-white uppercase tracking-widest">Personal Information</h3>
+        </div>
+        <form onSubmit={handleInfoSubmit} className="p-6 space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+              <Mail className="w-3 h-3" /> Email Address
+            </label>
+            <input
+              type="email" value={user?.email ?? ''} disabled
+              className="w-full bg-brand-darker border border-gray-800 text-gray-600 px-4 py-2.5 rounded-sm cursor-not-allowed text-sm"
+            />
+            <p className="text-[11px] text-gray-700">Email cannot be changed.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Full Name</label>
+              <input
+                type="text" required value={info.name}
+                onChange={e => setInfo(p => ({ ...p, name: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+                <Phone className="w-3 h-3" /> Phone Number
+              </label>
+              <input
+                type="tel" value={info.phone}
+                onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+                placeholder="09XXXXXXXXX"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit" disabled={status === 'loading'}
+              className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+            >
+              {status === 'loading' ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Change password */}
+      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-brand-orange" /> Change Password
+          </h3>
+        </div>
+        <form onSubmit={handlePwSubmit} className="p-6 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">New Password</label>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={pw.newPw}
+                  onChange={e => setPw(p => ({ ...p, newPw: e.target.value }))}
+                  autoComplete="new-password"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 pr-10 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+                  placeholder="At least 8 characters"
+                />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 transition-colors">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Confirm Password</label>
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={pw.confirm}
+                onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))}
+                autoComplete="new-password"
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit" disabled={status === 'loading' || !pw.newPw}
+              className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+            >
+              {status === 'loading' ? 'Saving…' : 'Update Password'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, isAdmin, logout } = useAuth();
@@ -671,42 +931,16 @@ export default function AdminPage() {
     { key: 'content',      label: 'Content',   icon: FileText   },
     { key: 'appointments', label: 'Bookings',  icon: Calendar   },
     { key: 'products',     label: 'Products',  icon: Package    },
+    { key: 'settings',     label: 'Settings',  icon: UserCog    },
   ];
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'analytics':
-        return (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">Dashboard Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {[
-                { label: 'Total Revenue',   value: '₱1,347,500', icon: Activity,   sub: '+12% from last month', color: 'text-green-500' },
-                { label: 'Active Bookings', value: '42',         icon: Calendar,   sub: '+5 new this week',     color: 'text-green-500' },
-                { label: 'Website Visits',  value: '1,204',      icon: TrendingUp, sub: 'Last 30 days',         color: 'text-gray-500'  },
-              ].map(({ label, value, icon: Icon, sub, color }) => (
-                <div key={label} className="bg-brand-dark p-6 border border-gray-800 rounded-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-gray-400 font-bold uppercase tracking-widest text-xs">{label}</h3>
-                    <Icon className="w-5 h-5 text-brand-orange" />
-                  </div>
-                  <p className="text-3xl font-display font-bold text-white">{value}</p>
-                  <p className={`text-sm mt-2 ${color}`}>{sub}</p>
-                </div>
-              ))}
-            </div>
-            <div className="bg-brand-dark p-6 border border-gray-800 rounded-sm h-80 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Revenue chart coming soon</p>
-              </div>
-            </div>
-          </div>
-        );
-
+      case 'analytics':    return <AnalyticsPanel />;
       case 'services':     return <ServicesPanel />;
       case 'content':      return <ContentPanel />;
       case 'appointments': return <BookingsPanel />;
+      case 'settings':     return <AccountSettingsPanel />;
 
       case 'products':
         return (

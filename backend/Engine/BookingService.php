@@ -109,6 +109,16 @@ class BookingService
     }
 
     /**
+     * Return aggregate booking statistics for the admin dashboard.
+     *
+     * @return array<string, int>
+     */
+    public function getStats(): array
+    {
+        return $this->useDb ? $this->dbGetStats() : $this->fileGetStats();
+    }
+
+    /**
      * Update a booking's status.
      *
      * @return array<string, mixed>  Updated booking
@@ -226,6 +236,46 @@ class BookingService
     }
 
     // -------------------------------------------------------------------------
+    // DB – stats
+    // -------------------------------------------------------------------------
+
+    /** @return array<string, int> */
+    private function dbGetStats(): array
+    {
+        $db = Database::getInstance();
+
+        $total = (int) $db->query('SELECT COUNT(*) FROM bookings')->fetchColumn();
+
+        $byStatus = $db->query(
+            'SELECT status, COUNT(*) AS cnt FROM bookings GROUP BY status'
+        )->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+        $pending   = (int) ($byStatus['pending']   ?? 0);
+        $confirmed = (int) ($byStatus['confirmed'] ?? 0);
+        $completed = (int) ($byStatus['completed'] ?? 0);
+        $cancelled = (int) ($byStatus['cancelled'] ?? 0);
+
+        $thisWeek = (int) $db->query(
+            "SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+        )->fetchColumn();
+
+        $thisMonth = (int) $db->query(
+            "SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        )->fetchColumn();
+
+        return [
+            'totalBookings'     => $total,
+            'pendingBookings'   => $pending,
+            'confirmedBookings' => $confirmed,
+            'completedBookings' => $completed,
+            'cancelledBookings' => $cancelled,
+            'activeBookings'    => $pending + $confirmed,
+            'bookingsThisWeek'  => $thisWeek,
+            'bookingsThisMonth' => $thisMonth,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
     // File storage (fallback)
     // -------------------------------------------------------------------------
 
@@ -278,6 +328,46 @@ class BookingService
             mkdir($dir, 0755, true);
         }
         file_put_contents(self::$storageFile, json_encode($bookings, JSON_PRETTY_PRINT));
+    }
+
+    /** @return array<string, int> */
+    private function fileGetStats(): array
+    {
+        $all = $this->fileGetAll();
+
+        $weekAgo    = new \DateTime('-7 days');
+        $monthStart = new \DateTime('first day of this month midnight');
+
+        $pending   = 0;
+        $confirmed = 0;
+        $completed = 0;
+        $cancelled = 0;
+        $thisWeek  = 0;
+        $thisMonth = 0;
+
+        foreach ($all as $b) {
+            switch ($b['status'] ?? '') {
+                case 'pending':   $pending++;   break;
+                case 'confirmed': $confirmed++; break;
+                case 'completed': $completed++; break;
+                case 'cancelled': $cancelled++; break;
+            }
+
+            $created = new \DateTime($b['createdAt'] ?? 'now');
+            if ($created >= $weekAgo)    $thisWeek++;
+            if ($created >= $monthStart) $thisMonth++;
+        }
+
+        return [
+            'totalBookings'     => count($all),
+            'pendingBookings'   => $pending,
+            'confirmedBookings' => $confirmed,
+            'completedBookings' => $completed,
+            'cancelledBookings' => $cancelled,
+            'activeBookings'    => $pending + $confirmed,
+            'bookingsThisWeek'  => $thisWeek,
+            'bookingsThisMonth' => $thisMonth,
+        ];
     }
 
     // -------------------------------------------------------------------------
