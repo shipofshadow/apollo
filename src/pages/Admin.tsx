@@ -21,7 +21,7 @@ import {
   updateProductAsync, deleteProductAsync,
 } from '../store/productsSlice';
 import { updateProfileAsync, clearAuthError } from '../store/authSlice';
-import { fetchAdminStatsApi, updateBookingPartsApi, type AdminStats } from '../services/api';
+import { fetchAdminStatsApi, updateBookingPartsApi, updateShopHoursApi, fetchShopHoursApi, type AdminStats } from '../services/api';
 import type { AppDispatch, RootState } from '../store';
 import type { Booking, Service, Product } from '../types';
 import type { ContentPost } from '../store/contentSlice';

@@ -3,34 +3,34 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2,
-  UploadCloud, X,
+  UploadCloud, X, ChevronDown,
 } from 'lucide-react';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import { fetchServicesAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import { useAuth } from '../context/AuthContext';
-import { fetchAvailabilityApi, uploadBookingMediaApi, fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
+import {
+  fetchAvailabilityApi, uploadBookingMediaApi,
+  fetchVehicleMakesApi, fetchVehicleModelsApi,
+  fetchShopHoursApi,
+} from '../services/api';
 import { BACKEND_URL } from '../config';
+import type { ShopDayHours } from '../types';
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
 import SignaturePad from '../components/SignaturePad';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const AVAILABLE_TIMES = ['09:00 AM', '11:00 AM', '01:00 PM', '03:00 PM', '05:00 PM'];
-
-const SLOT_HOUR: Record<string, number> = {
-  '09:00 AM': 9, '11:00 AM': 11, '01:00 PM': 13, '03:00 PM': 15, '05:00 PM': 17,
-};
-const SHOP_CLOSE_HOUR = 18;
-
 const STEPS = ['Services', 'Date & Time', 'Your Details', 'Confirm'];
 
-const generateNextDays = (): Date[] =>
-  Array.from({ length: 14 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i + 1);
-    return d;
-  }).filter(d => d.getDay() !== 0);
+/** Parse "09:00 AM" / "01:00 PM" → 24-hour number (9, 13, etc.) */
+function slotToHour(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  let h = parseInt(timePart.split(':')[0], 10);
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h;
+}
 
 function parseDurationMax(duration: string): number {
   const nums = duration.match(/\d+/g);
@@ -39,10 +39,26 @@ function parseDurationMax(duration: string): number {
 }
 
 function slotCompletionLabel(slot: string, totalHours: number): string {
-  const end = SLOT_HOUR[slot] + totalHours;
+  const end = slotToHour(slot) + totalHours;
   if (end > 12) return `~${end - 12}:00 PM`;
   if (end === 12) return `~12:00 PM`;
   return `~${end}:00 AM`;
+}
+
+/** Build date list from shop hours (falls back to Mon–Sat if hours not loaded) */
+function buildDateList(shopHours: ShopDayHours[]): Date[] {
+  const openDays = shopHours.length
+    ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
+    : new Set([1, 2, 3, 4, 5, 6]); // Mon–Sat default
+
+  const dates: Date[] = [];
+  let cursor = new Date();
+  cursor.setDate(cursor.getDate() + 1);
+  while (dates.length < 14) {
+    if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -59,10 +75,17 @@ export default function BookingPage() {
   // Step 1 – multi-select services
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
+  // Shop hours – loaded on mount to filter the date picker
+  const [shopHours,       setShopHours]       = useState<ShopDayHours[]>([]);
+  const [shopHoursLoaded, setShopHoursLoaded] = useState(false);
+
   // Step 2 – date / time / availability
   const [selectedDate,        setSelectedDate]        = useState<Date | null>(null);
   const [selectedTime,        setSelectedTime]        = useState('');
+  const [availableSlots,      setAvailableSlots]      = useState<string[]>([]);
   const [bookedSlots,         setBookedSlots]         = useState<string[]>([]);
+  const [shopDayIsOpen,       setShopDayIsOpen]       = useState(true);
+  const [shopCloseTime,       setShopCloseTime]       = useState('18:00');
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   // Step 3 – contact
@@ -96,7 +119,7 @@ export default function BookingPage() {
   // Step 3 – signature
   const [signatureData, setSignatureData] = useState('');
 
-  const availableDates = generateNextDays();
+  const availableDates = buildDateList(shopHoursLoaded ? shopHours : []);
 
   const selectedServices = services.filter(s => selectedIds.includes(s.id));
   const totalMaxHours    = selectedServices.reduce(
@@ -104,14 +127,22 @@ export default function BookingPage() {
   );
   const vehicleInfo = [vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(' ');
 
-  // Load services and car makes on mount
+  // Load services + shop hours on mount
   useEffect(() => {
     dispatch(fetchServicesAsync(token));
+    if (BACKEND_URL) {
+      fetchShopHoursApi()
+        .then(({ hours }) => setShopHours(hours))
+        .catch(() => { /* use default Mon–Sat */ })
+        .finally(() => setShopHoursLoaded(true));
+    } else {
+      setShopHoursLoaded(true);
+    }
     if (BACKEND_URL) {
       setMakesLoading(true);
       fetchVehicleMakesApi()
         .then(({ makes }) => setDynamicMakes(makes))
-        .catch(() => { /* silently fall back to static */ })
+        .catch(() => { /* fall back to static */ })
         .finally(() => setMakesLoading(false));
     }
   }, [dispatch, token]);
@@ -137,15 +168,18 @@ export default function BookingPage() {
   const handleDateSelect = async (date: Date) => {
     setSelectedDate(date);
     setSelectedTime('');
+    setAvailableSlots([]);
     setBookedSlots([]);
+    setShopDayIsOpen(true);
     if (!BACKEND_URL) return;
     setAvailabilityLoading(true);
     try {
-      const { bookedSlots: slots } = await fetchAvailabilityApi(
-        date.toISOString().split('T')[0]
-      );
-      setBookedSlots(slots);
-    } catch { /* all slots available */ }
+      const res = await fetchAvailabilityApi(date.toISOString().split('T')[0]);
+      setShopDayIsOpen(res.isOpen);
+      setShopCloseTime(res.closeTime);
+      setAvailableSlots(res.availableSlots);
+      setBookedSlots(res.bookedSlots);
+    } catch { /* show all slots available */ }
     finally { setAvailabilityLoading(false); }
   };
 
@@ -204,7 +238,9 @@ export default function BookingPage() {
     setSelectedIds([]);
     setSelectedDate(null);
     setSelectedTime('');
+    setAvailableSlots([]);
     setBookedSlots([]);
+    setShopDayIsOpen(true);
     setForm({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', notes: '' });
     setVehicleMake(''); setVehicleModel(''); setVehicleYear('');
     setDynamicModels([]);
@@ -308,36 +344,59 @@ export default function BookingPage() {
               </div>
               {selectedDate && (
                 <div className="mb-8">
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
-                    Time Slots
-                    {availabilityLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Checking availability…</span>}
-                  </p>
-                  <p className="text-xs text-gray-600 mb-4">Shop closes at 6:00 PM · Grey slots are taken or end after closing time for your selected services.</p>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    {AVAILABLE_TIMES.map(time => {
-                      const isBooked     = bookedSlots.includes(time);
-                      const exceedsClose = (SLOT_HOUR[time] + totalMaxHours) > SHOP_CLOSE_HOUR;
-                      const disabled     = isBooked || exceedsClose || availabilityLoading;
-                      const completion   = slotCompletionLabel(time, totalMaxHours);
-                      return (
-                        <button key={time} onClick={() => !disabled && setSelectedTime(time)} disabled={disabled}
-                          title={isBooked ? 'Fully booked' : exceedsClose ? `Job would finish at ${completion}, after closing time` : undefined}
-                          className={`p-3 border text-center transition-all font-bold text-sm rounded-sm flex flex-col items-center gap-0.5 ${disabled ? 'border-gray-800 bg-gray-800/30 text-gray-600 cursor-not-allowed' : selectedTime === time ? 'border-brand-orange bg-brand-orange text-white' : 'border-gray-700 text-gray-300 hover:border-gray-500'}`}>
-                          <span>{time}</span>
-                          <span className={`text-[10px] font-normal ${selectedTime === time ? 'text-white/70' : disabled ? 'text-gray-700' : 'text-gray-500'}`}>
-                            {isBooked ? 'Taken' : exceedsClose ? 'Too late' : completion}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
+                    Appointment Time *
+                    {availabilityLoading && (
+                      <span className="ml-2 text-gray-600 normal-case font-normal inline-flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Checking…
+                      </span>
+                    )}
+                  </label>
+
+                  {!availabilityLoading && !shopDayIsOpen && (
+                    <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-sm">
+                      The shop is closed on this date. Please choose a different day.
+                    </p>
+                  )}
+
+                  {!availabilityLoading && shopDayIsOpen && (
+                    <>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
+                      </p>
+                      <div className="relative">
+                        <select
+                          value={selectedTime}
+                          onChange={e => setSelectedTime(e.target.value)}
+                          required
+                          className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 pr-10 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none"
+                        >
+                          <option value="">Choose a time slot…</option>
+                          {availableSlots.map(time => {
+                            const isBooked     = bookedSlots.includes(time);
+                            const [closeH]     = shopCloseTime.split(':').map(Number);
+                            const exceedsClose = slotToHour(time) + totalMaxHours > closeH;
+                            const disabled     = isBooked || exceedsClose;
+                            if (disabled) return null; // hide unavailable slots
+                            const completion = slotCompletionLabel(time, totalMaxHours);
+                            return (
+                              <option key={time} value={time}>
+                                {time}  —  done by {completion}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               <div className="mt-8 flex flex-col-reverse sm:flex-row justify-between gap-4">
                 <button onClick={() => setStep(1)} className="w-full sm:w-auto text-gray-400 hover:text-white px-6 py-3 font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-gray-800 rounded-sm">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button onClick={() => setStep(3)} disabled={!selectedDate || !selectedTime}
+                <button onClick={() => setStep(3)} disabled={!selectedDate || !selectedTime || !shopDayIsOpen}
                   className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm">
                   Next <ArrowRight className="w-4 h-4" />
                 </button>

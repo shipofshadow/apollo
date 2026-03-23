@@ -59,6 +59,10 @@ class Router
             $r->addRoute('PUT',    '/api/products/{id:\d+}', 'handleProductUpdate');
             $r->addRoute('DELETE', '/api/products/{id:\d+}', 'handleProductDelete');
 
+            // ── Shop hours ──────────────────────────────────────────────────
+            $r->addRoute('GET', '/api/shop/hours', 'handleShopHoursGet');
+            $r->addRoute('PUT', '/api/shop/hours', 'handleShopHoursPut');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -277,8 +281,45 @@ class Router
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             throw new RuntimeException('A valid date parameter (YYYY-MM-DD) is required.', 422);
         }
-        $bookedSlots = (new BookingService())->getBookedSlots($date);
-        echo json_encode(['bookedSlots' => $bookedSlots]);
+
+        $svc      = new ShopHoursService();
+        $dayHours = $svc->getForDate($date);
+        $allSlots = $svc->generateSlots($dayHours);
+
+        $bookedSlots = $dayHours['isOpen']
+            ? (new BookingService())->getBookedSlots($date)
+            : [];
+
+        echo json_encode([
+            'isOpen'        => $dayHours['isOpen'],
+            'openTime'      => $dayHours['openTime'],
+            'closeTime'     => $dayHours['closeTime'],
+            'slotIntervalH' => $dayHours['slotIntervalH'],
+            'availableSlots' => $allSlots,
+            'bookedSlots'    => $bookedSlots,
+        ]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleShopHoursGet(array $vars = []): void
+    {
+        $hours = (new ShopHoursService())->getAll();
+        echo json_encode(['hours' => $hours]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleShopHoursPut(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data  = $this->jsonBody();
+        $input = $data['hours'] ?? $data; // accept both {hours:[...]} and [...] directly
+
+        if (!is_array($input)) {
+            throw new RuntimeException('Expected an array of day-hour objects.', 422);
+        }
+
+        $updated = (new ShopHoursService())->updateAll(array_values($input));
+        echo json_encode(['hours' => $updated]);
     }
 
     /** @param array<string, string> $vars */

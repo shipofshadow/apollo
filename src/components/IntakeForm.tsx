@@ -4,26 +4,20 @@ import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import type { RootState, AppDispatch } from '../store';
 import { MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
-import { fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
+import { fetchVehicleMakesApi, fetchVehicleModelsApi, fetchAvailabilityApi } from '../services/api';
 import { BACKEND_URL } from '../config';
 
-const AVAILABLE_TIMES = ['09:00 AM', '11:00 AM', '01:00 PM', '03:00 PM', '05:00 PM'];
-
-// Generate valid booking dates (tomorrow onward, skip Sundays) for the next 30 days
-function getAvailableDates(): string[] {
+/** Fallback: generate next 30 open dates skipping Sundays */
+function getDefaultDates(): string[] {
   const dates: string[] = [];
   const d = new Date();
   d.setDate(d.getDate() + 1);
   while (dates.length < 30) {
-    if (d.getDay() !== 0) {
-      dates.push(d.toISOString().split('T')[0]);
-    }
+    if (d.getDay() !== 0) dates.push(d.toISOString().split('T')[0]);
     d.setDate(d.getDate() + 1);
   }
   return dates;
 }
-
-const AVAILABLE_DATES = getAvailableDates();
 
 export default function IntakeForm() {
   const dispatch = useDispatch<AppDispatch>();
@@ -72,6 +66,30 @@ export default function IntakeForm() {
       .catch(() => { /* fall back to static */ })
       .finally(() => setModelsLoading(false));
   }, [vehicleMake]);
+
+  // Load time slots when date changes
+  const [availableSlots,   setAvailableSlots]   = useState<string[]>([]);
+  const [slotsLoading,     setSlotsLoading]     = useState(false);
+  const [shopDayIsOpen,    setShopDayIsOpen]    = useState(true);
+  const availableDates = getDefaultDates();
+
+  useEffect(() => {
+    const date = formData.preferredDate;
+    if (!date) { setAvailableSlots([]); return; }
+    setFormData(p => ({ ...p, preferredTime: '' }));
+    setAvailableSlots([]);
+    if (!BACKEND_URL) return;
+    setSlotsLoading(true);
+    fetchAvailabilityApi(date)
+      .then(res => {
+        setShopDayIsOpen(res.isOpen);
+        setAvailableSlots(res.isOpen ? res.availableSlots.filter(s => !res.bookedSlots.includes(s)) : []);
+      })
+      .catch(() => { /* silently ignore */ })
+      .finally(() => setSlotsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.preferredDate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -326,7 +344,7 @@ export default function IntakeForm() {
                       <select name="preferredDate" required value={formData.preferredDate} onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
                         <option value="">Select a date…</option>
-                        {AVAILABLE_DATES.map(d => {
+                        {availableDates.map(d => {
                           const dt = new Date(d + 'T00:00:00');
                           return (
                             <option key={d} value={d}>
@@ -337,12 +355,24 @@ export default function IntakeForm() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Preferred Time *</label>
-                      <select name="preferredTime" required value={formData.preferredTime} onChange={handleChange}
-                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
-                        <option value="">Select a time…</option>
-                        {AVAILABLE_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                        Preferred Time *
+                        {slotsLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading…</span>}
+                      </label>
+                      {formData.preferredDate && !shopDayIsOpen ? (
+                        <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-sm">
+                          Shop is closed on this date.
+                        </p>
+                      ) : (
+                        <select name="preferredTime" required value={formData.preferredTime} onChange={handleChange}
+                          disabled={!formData.preferredDate || slotsLoading}
+                          className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-50">
+                          <option value="">{slotsLoading ? 'Loading…' : 'Select a time…'}</option>
+                          {(availableSlots.length ? availableSlots : []).map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </div>
 

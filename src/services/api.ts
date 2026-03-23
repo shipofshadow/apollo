@@ -104,7 +104,9 @@ export const fetchAllBookingsApi = (token: string) =>
   apiFetch<{ bookings: Booking[] }>('/api/bookings', {}, token);
 
 export const fetchAvailabilityApi = (date: string) =>
-  apiFetch<{ bookedSlots: string[] }>(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
+  apiFetch<import('../types').AvailabilityResponse>(
+    `/api/bookings/availability?date=${encodeURIComponent(date)}`
+  );
 
 export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> => {
   const form = new FormData();
@@ -182,6 +184,15 @@ export const fetchVehicleTrimsApi = (make: string, model: string, limit = 50, of
   const params = new URLSearchParams({ make, model, limit: String(limit), offset: String(offset) });
   return apiFetch<{ trims: CarTrim[] }>(`/api/vehicles/trims?${params}`);
 };
+
+export const fetchShopHoursApi = () =>
+  apiFetch<{ hours: import('../types').ShopDayHours[] }>('/api/shop/hours');
+
+export const updateShopHoursApi = (token: string, hours: import('../types').ShopDayHours[]) =>
+  apiFetch<{ hours: import('../types').ShopDayHours[] }>('/api/shop/hours', {
+    method: 'PUT',
+    body: JSON.stringify({ hours }),
+  }, token);
 
 // ── Blog API ─────────────────────────────────────────────────────────────────
 

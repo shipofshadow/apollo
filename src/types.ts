@@ -175,3 +175,27 @@ export interface FacebookPost {
   comments?: { summary: { total_count: number } };
   shares?: { count: number };
 }
+
+// ── Shop hours ────────────────────────────────────────────────────────────────
+
+export interface ShopDayHours {
+  /** 0 = Sunday … 6 = Saturday */
+  dayOfWeek: number;
+  isOpen: boolean;
+  /** "HH:MM" 24-hour, e.g. "09:00" */
+  openTime: string;
+  /** "HH:MM" 24-hour, e.g. "18:00" */
+  closeTime: string;
+  /** Appointment slot interval in hours */
+  slotIntervalH: number;
+}
+
+export interface AvailabilityResponse {
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+  slotIntervalH: number;
+  availableSlots: string[];
+  bookedSlots: string[];
+}
+
