@@ -8,7 +8,7 @@ use Aws\Exception\AwsException;
 /**
  * Thin wrapper around the AWS SDK S3Client pointed at a Cloudflare R2 bucket.
  *
- * R2 is S3-compatible. Set R2_ENDPOINT to the full S3 API endpoint URL, e.g.:
+ * R2 is S3-compatible; the endpoint is:
  *   https://<account-id>.r2.cloudflarestorage.com
  *
  * Files are stored under the R2_KEY_PREFIX (default: chopaeng/1625autolab/).
@@ -23,7 +23,7 @@ class R2Uploader
         $this->client = new S3Client([
             'version'                 => 'latest',
             'region'                  => 'auto',
-            'endpoint'                => R2_ENDPOINT,
+            'endpoint'                => 'https://' . R2_ACCOUNT_ID . '.r2.cloudflarestorage.com',
             'credentials'             => [
                 'key'    => R2_ACCESS_KEY_ID,
                 'secret' => R2_SECRET_ACCESS_KEY,
@@ -68,7 +68,7 @@ class R2Uploader
      */
     public static function isConfigured(): bool
     {
-        return R2_ENDPOINT !== ''
+        return R2_ACCOUNT_ID !== ''
             && R2_ACCESS_KEY_ID !== ''
             && R2_SECRET_ACCESS_KEY !== ''
             && R2_BUCKET_NAME !== ''
