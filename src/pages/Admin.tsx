@@ -2,14 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import {
-  BarChart3, Package, FileText, Calendar, LogOut,
+  BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   TrendingUp, Activity, Eye, EyeOff, AlertCircle, Loader2,
-  CheckCircle2, XCircle, Clock,
+  CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, Save, X,
 } from 'lucide-react';
 import { loginAsync, logoutAsync, clearAuthError } from '../store/authSlice';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../store/bookingSlice';
+import {
+  fetchServicesAsync, createServiceAsync,
+  updateServiceAsync, deleteServiceAsync,
+} from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
-import type { Booking } from '../types';
+import type { Booking, Service } from '../types';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:   'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
@@ -17,6 +21,36 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
   completed: 'bg-blue-500/10   text-blue-400   border-blue-500/30',
   cancelled: 'bg-gray-700      text-gray-400   border-gray-600',
 };
+
+const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
+
+type ServiceForm = {
+  title: string; description: string; fullDescription: string;
+  icon: string; imageUrl: string; duration: string;
+  startingPrice: string; features: string; sortOrder: number; isActive: boolean;
+};
+
+const EMPTY_FORM: ServiceForm = {
+  title: '', description: '', fullDescription: '', icon: 'Wrench',
+  imageUrl: '', duration: '', startingPrice: '', features: '', sortOrder: 0, isActive: true,
+};
+
+function serviceToForm(s: Service): ServiceForm {
+  return {
+    title: s.title, description: s.description, fullDescription: s.fullDescription,
+    icon: s.icon, imageUrl: s.imageUrl, duration: s.duration,
+    startingPrice: s.startingPrice,
+    features: s.features.join('\n'),
+    sortOrder: s.sortOrder, isActive: s.isActive,
+  };
+}
+
+function formToPayload(f: ServiceForm) {
+  return {
+    ...f,
+    features: f.features.split('\n').map(l => l.trim()).filter(Boolean),
+  };
+}
 
 // ── Login screen ──────────────────────────────────────────────────────────────
 function AdminLogin() {
@@ -200,6 +234,233 @@ function BookingsPanel() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Services CRUD panel ───────────────────────────────────────────────────────
+function ServicesPanel() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { user, token } = useSelector((s: RootState) => s.auth);
+  const { items: services, status } = useSelector((s: RootState) => s.services);
+
+  const [editing,    setEditing]    = useState(false);
+  const [editId,     setEditId]     = useState<number | null>(null);
+  const [form,       setForm]       = useState<ServiceForm>(EMPTY_FORM);
+  const [saving,     setSaving]     = useState(false);
+  const [deleteConf, setDeleteConf] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (token) dispatch(fetchServicesAsync(token));
+  }, [token, dispatch]);
+
+  const openNew = () => { setForm(EMPTY_FORM); setEditId(null); setEditing(true); };
+  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setEditing(true); };
+  const cancel = () => { setEditing(false); setEditId(null); };
+
+  const set = (field: keyof ServiceForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setForm(p => ({ ...p, [field]: e.target.value }));
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true);
+    const payload = formToPayload(form);
+    if (editId !== null) {
+      await dispatch(updateServiceAsync({ token, id: editId, data: payload }));
+    } else {
+      await dispatch(createServiceAsync({ token, data: payload }));
+    }
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!token) return;
+    await dispatch(deleteServiceAsync({ token, id }));
+    setDeleteConf(null);
+  };
+
+  // ── Form view ──
+  if (editing) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">
+            {editId ? 'Edit Service' : 'New Service'}
+          </h2>
+          <button onClick={cancel} className="text-gray-400 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Title *</label>
+              <input required value={form.title} onChange={set('title')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Short Description * (card)</label>
+              <textarea required rows={2} value={form.description} onChange={set('description')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Full Description (detail page)</label>
+              <textarea rows={5} value={form.fullDescription} onChange={set('fullDescription')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Icon</label>
+              <select value={form.icon} onChange={set('icon')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm appearance-none">
+                {ICON_OPTIONS.map(ic => <option key={ic}>{ic}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Image URL</label>
+              <input value={form.imageUrl} onChange={set('imageUrl')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                placeholder="https://…" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Duration</label>
+              <input value={form.duration} onChange={set('duration')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                placeholder="e.g. 4–6 Hours" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Starting Price (₱)</label>
+              <input value={form.startingPrice} onChange={set('startingPrice')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                placeholder="e.g. ₱13,750 or Consultation" />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                Key Features &amp; Benefits <span className="font-normal text-gray-600">(one per line)</span>
+              </label>
+              <textarea rows={6} value={form.features} onChange={set('features')}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-y font-mono text-sm"
+                placeholder="Bi-LED Projector Conversions&#10;RGBW Demon Eyes&#10;…" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Sort Order</label>
+              <input type="number" min={0} value={form.sortOrder}
+                onChange={e => setForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+            </div>
+
+            <div className="flex items-center gap-3 pt-6">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-sm font-bold uppercase tracking-widest">
+                <input type="checkbox" checked={form.isActive}
+                  onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))}
+                  className="accent-brand-orange w-4 h-4" />
+                Active (visible on site)
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-4 pt-4 border-t border-gray-800">
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {editId ? 'Save Changes' : 'Create Service'}
+            </button>
+            <button type="button" onClick={cancel}
+              className="px-6 py-3 border border-gray-700 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-colors rounded-sm">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // ── List view ──
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Services</h2>
+        <button onClick={openNew}
+          className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-sm font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
+          <Plus className="w-4 h-4" /> New Service
+        </button>
+      </div>
+
+      {status === 'loading' && (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-brand-orange animate-spin" /></div>
+      )}
+
+      {services.length === 0 && status !== 'loading' && (
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
+          <Wrench className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No services yet. Click <strong>New Service</strong> to create one.</p>
+        </div>
+      )}
+
+      {services.length > 0 && (
+        <div className="space-y-3">
+          {services.map(svc => (
+            <div key={svc.id} className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
+              {svc.imageUrl && (
+                <img src={svc.imageUrl} alt={svc.title}
+                  className="w-16 h-16 object-cover rounded-sm shrink-0 border border-gray-700"
+                  referrerPolicy="no-referrer" />
+              )}
+              <div className="flex-grow min-w-0">
+                <div className="flex items-center gap-3 mb-1">
+                  <h3 className="text-white font-bold text-lg truncate">{svc.title}</h3>
+                  {!svc.isActive && (
+                    <span className="shrink-0 px-2 py-0.5 text-xs font-bold uppercase bg-gray-800 text-gray-500 rounded-sm border border-gray-700">
+                      Hidden
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-400 text-sm line-clamp-1">{svc.description}</p>
+                <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                  {svc.duration      && <span className="bg-gray-800 px-2 py-0.5 rounded">{svc.duration}</span>}
+                  {svc.startingPrice && <span className="bg-brand-orange/10 text-brand-orange px-2 py-0.5 rounded font-bold">{svc.startingPrice}</span>}
+                  <span className="bg-gray-800 px-2 py-0.5 rounded">{svc.features.length} features</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => openEdit(svc)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange text-xs font-bold uppercase rounded-sm transition-colors">
+                  <Pencil className="w-3 h-3" /> Edit
+                </button>
+                {deleteConf === svc.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => handleDelete(svc.id)}
+                      className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
+                      Confirm
+                    </button>
+                    <button onClick={() => setDeleteConf(null)}
+                      className="px-3 py-1.5 border border-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase rounded-sm transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setDeleteConf(svc.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-500 hover:border-red-500/50 hover:text-red-400 text-xs font-bold uppercase rounded-sm transition-colors">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

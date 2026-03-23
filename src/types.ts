@@ -16,6 +16,30 @@ export interface AuthState {
   error: string | null;
 }
 
+// ── Service ────────────────────────────────────────────────────────────────
+
+export interface Service {
+  id: number;
+  title: string;
+  description: string;       // short, shown on cards
+  fullDescription: string;   // long, shown on detail page
+  icon: string;              // Lucide icon name
+  imageUrl: string;          // hero image URL
+  duration: string;          // e.g. "4–6 Hours"
+  startingPrice: string;     // e.g. "₱13,750"
+  features: string[];        // Key Features & Benefits
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServicesState {
+  items: Service[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
+
 // ── Booking ────────────────────────────────────────────────────────────────
 
 export interface BookingPayload {

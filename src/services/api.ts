@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -56,6 +56,38 @@ export const updateProfileApi = (
 
 export const logoutApi = (token: string) =>
   apiFetch<{ message: string }>('/api/auth/logout', { method: 'POST' }, token);
+
+// ── Services API ─────────────────────────────────────────────────────────────
+
+export const fetchServicesApi = (token?: string | null) =>
+  apiFetch<{ services: Service[] }>('/api/services', {}, token);
+
+export const fetchServiceByIdApi = (id: number, token?: string | null) =>
+  apiFetch<{ service: Service }>(`/api/services/${id}`, {}, token);
+
+export const createServiceApi = (
+  token: string,
+  data: Partial<Omit<Service, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ service: Service }>('/api/services', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateServiceApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<Service, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ service: Service }>(`/api/services/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteServiceApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/services/${id}`, {
+    method: 'DELETE',
+  }, token);
 
 // ── Booking API ──────────────────────────────────────────────────────────────
 

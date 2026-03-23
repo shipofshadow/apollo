@@ -22,6 +22,13 @@ class Router
             $r->addRoute('GET',  '/health',             'handleHealth');
             $r->addRoute('GET',  '/api/posts',          'handlePosts');
 
+            // ── Services (public read, admin write) ─────────────────────────
+            $r->addRoute('GET',    '/api/services',          'handleServiceList');
+            $r->addRoute('GET',    '/api/services/{id:\d+}', 'handleServiceGet');
+            $r->addRoute('POST',   '/api/services',          'handleServiceCreate');
+            $r->addRoute('PUT',    '/api/services/{id:\d+}', 'handleServiceUpdate');
+            $r->addRoute('DELETE', '/api/services/{id:\d+}', 'handleServiceDelete');
+
             // ── Auth ────────────────────────────────────────────────────────
             $r->addRoute('POST', '/api/auth/register',  'handleAuthRegister');
             $r->addRoute('POST', '/api/auth/login',     'handleAuthLogin');
@@ -31,9 +38,13 @@ class Router
 
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',          'handleBookingCreate');
-            $r->addRoute('GET',   '/api/bookings',           'handleBookingList');    // admin
-            $r->addRoute('GET',   '/api/bookings/mine',      'handleBookingMine');    // client
-            $r->addRoute('PATCH', '/api/bookings/{id}',      'handleBookingUpdate'); // admin
+            $r->addRoute('GET',   '/api/bookings',           'handleBookingList');
+            $r->addRoute('GET',   '/api/bookings/mine',      'handleBookingMine');
+            $r->addRoute('PATCH', '/api/bookings/{id}',      'handleBookingUpdate');
+
+            // ── Admin utilities ─────────────────────────────────────────────
+            $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
+            $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
         });
 
         $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -229,6 +240,93 @@ class Router
 
         $booking = (new BookingService())->updateStatus($id, $status);
         echo json_encode(['booking' => $booking]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Service handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleServiceList(array $vars = []): void
+    {
+        // Admin sees all; public sees only active
+        $includeInactive = false;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $includeInactive = ($payload['role'] ?? '') === 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $services = (new ServiceCrudService())->getAll($includeInactive);
+        echo json_encode(['services' => $services]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceGet(array $vars = []): void
+    {
+        $id           = (int) ($vars['id'] ?? 0);
+        $requireActive = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $requireActive = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* stay public */ }
+        }
+
+        $service = (new ServiceCrudService())->getById($id, $requireActive);
+        echo json_encode(['service' => $service]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data    = $this->jsonBody();
+        $service = (new ServiceCrudService())->create($data);
+        http_response_code(201);
+        echo json_encode(['service' => $service]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id      = (int) ($vars['id'] ?? 0);
+        $data    = $this->jsonBody();
+        $service = (new ServiceCrudService())->update($id, $data);
+        echo json_encode(['service' => $service]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new ServiceCrudService())->delete($id);
+        echo json_encode(['message' => 'Service deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Migration handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleMigrateRun(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $result = (new MigrationRunner())->run();
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleMigrateStatus(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $status = (new MigrationRunner())->status();
+        echo json_encode(['migrations' => $status]);
     }
 }
 
