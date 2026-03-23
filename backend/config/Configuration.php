@@ -80,11 +80,11 @@ define('UPLOAD_BASE_URL', rtrim($_ENV['UPLOAD_BASE_URL'] ?? '', '/'));
 
 // ---------------------------------------------------------------------------
 // Cloudflare R2 (S3-compatible object storage)
-// When R2_ACCOUNT_ID is set uploads go to R2; otherwise they fall back to
+// When R2_ENDPOINT is set uploads go to R2; otherwise they fall back to
 // the local UPLOAD_DIR.
 // ---------------------------------------------------------------------------
 
-define('R2_ACCOUNT_ID',       $_ENV['R2_ACCOUNT_ID']       ?? '');
+define('R2_ENDPOINT',         rtrim($_ENV['R2_ENDPOINT']        ?? '', '/'));
 define('R2_ACCESS_KEY_ID',    $_ENV['R2_ACCESS_KEY_ID']     ?? '');
 define('R2_SECRET_ACCESS_KEY',$_ENV['R2_SECRET_ACCESS_KEY'] ?? '');
 define('R2_BUCKET_NAME',      $_ENV['R2_BUCKET_NAME']       ?? '');
