@@ -140,7 +140,7 @@ export default function SignaturePad({ value, onChange }: Props) {
       </div>
       <p className="text-[11px] text-gray-600 leading-relaxed">
         By signing above, you acknowledge that custom electrical/optical modifications may void OEM warranties
-        and agree to hold Apollo 1625 Auto Lab harmless for any pre-existing issues unrelated to the work performed.
+        and agree to hold 1625 Auto Lab harmless for any pre-existing issues unrelated to the work performed.
       </p>
     </div>
   );

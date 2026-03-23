@@ -56,7 +56,7 @@ define('JWT_TTL',        (int)($_ENV['JWT_TTL']   ?? 3600));   // seconds
 // ---------------------------------------------------------------------------
 
 define('MAIL_FROM',      $_ENV['MAIL_FROM']       ?? '');           // e.g. noreply@1625autolab.com
-define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME']  ?? 'Apollo 1625 Auto Lab');
+define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME']  ?? '1625 Auto Lab');
 define('MAIL_ADMIN',     $_ENV['MAIL_ADMIN']       ?? '');           // admin notification recipient
 
 // ---------------------------------------------------------------------------

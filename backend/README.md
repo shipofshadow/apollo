@@ -1,4 +1,4 @@
-# Apollo – PHP Backend
+# 1625 Auto Lab – PHP Backend
 
 A lightweight PHP backend that proxies the **Facebook Graph API** so that the
 page access token is never exposed in the browser.

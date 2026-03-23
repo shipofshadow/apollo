@@ -34,7 +34,7 @@ class NotificationService
         $customerName  = (string) ($booking['name']  ?? 'Customer');
 
         if ($customerEmail !== '') {
-            $subject = 'Booking Confirmed – Apollo 1625 Auto Lab';
+            $subject = 'Booking Confirmed – 1625 Auto Lab';
             $body    = $this->buildConfirmationBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -65,7 +65,7 @@ class NotificationService
         }
 
         $status  = ucfirst((string) ($booking['status'] ?? ''));
-        $subject = "Your Booking is $status – Apollo 1625 Auto Lab";
+        $subject = "Your Booking is $status – 1625 Auto Lab";
         $body    = $this->buildStatusUpdateBody($booking);
         $this->send($customerEmail, $customerName, $subject, $body);
     }
@@ -88,7 +88,7 @@ class NotificationService
             return;
         }
 
-        $subject = 'Job Update: Awaiting Parts – Apollo 1625 Auto Lab';
+        $subject = 'Job Update: Awaiting Parts – 1625 Auto Lab';
         $body    = $this->buildAwaitingPartsBody($booking);
         $this->send($customerEmail, $customerName, $subject, $body);
     }
@@ -118,7 +118,7 @@ class NotificationService
                 <tr><td><strong>Booking ID:</strong></td><td>#$id</td></tr>
             </table>
             <p>We will contact you to confirm the appointment or if we need additional information.</p>
-            <p style='color:#888'>Apollo 1625 Auto Lab · NKKS Arcade, Brgy. Alasas, San Fernando, Pampanga</p>
+            <p style='color:#888'>1625 Auto Lab · NKKS Arcade, Brgy. Alasas, San Fernando, Pampanga</p>
         ");
     }
 
@@ -149,7 +149,7 @@ class NotificationService
             <p>Your booking for <strong>$service</strong> is now <strong>$status</strong>.</p>
             <p>If you have any questions, please call us at <strong>0939 330 8263</strong>
                or email <a href='mailto:1625autolab@gmail.com'>1625autolab@gmail.com</a>.</p>
-            <p style='color:#888'>Apollo 1625 Auto Lab</p>
+            <p style='color:#888'>1625 Auto Lab</p>
         ");
     }
 
@@ -165,7 +165,7 @@ class NotificationService
             <p><strong>Details:</strong> $notes</p>
             <p>We will notify you as soon as the parts arrive and work resumes.
                In the meantime, feel free to reach us at <strong>0939 330 8263</strong>.</p>
-            <p style='color:#888'>Apollo 1625 Auto Lab</p>
+            <p style='color:#888'>1625 Auto Lab</p>
         ");
     }
 
@@ -206,9 +206,9 @@ class NotificationService
             ];
         }
 
-        $subject = 'Test Email – Apollo 1625 Auto Lab';
+        $subject = 'Test Email – 1625 Auto Lab';
         $body    = '<h2 style="font-family:sans-serif;color:#f97316">Test Email</h2>'
-                 . '<p style="font-family:sans-serif">This is a test notification from your Apollo 1625 Auto Lab booking system. '
+                 . '<p style="font-family:sans-serif">This is a test notification from your 1625 Auto Lab booking system. '
                  . 'If you received this, your email configuration is working correctly.</p>'
                  . '<p style="font-family:sans-serif;color:#9ca3af;font-size:12px">Sent at: ' . date('Y-m-d H:i:s') . '</p>';
 
@@ -252,7 +252,7 @@ class NotificationService
             "Reply-To: $from",
             'MIME-Version: 1.0',
             'Content-Type: text/html; charset=UTF-8',
-            'X-Mailer: Apollo-1625-AutoLab',
+            'X-Mailer: 1625-AutoLab',
         ]);
 
         @mail($to, $subject, $htmlBody, $headers);

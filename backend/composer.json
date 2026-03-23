@@ -1,6 +1,6 @@
 {
     "name": "apollo/backend",
-    "description": "Apollo Facebook Posts API – PHP backend",
+    "description": "1625 Auto Lab – PHP backend",
     "type": "project",
     "require": {
         "php": ">=8.1",
