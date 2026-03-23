@@ -228,7 +228,7 @@ export const fetchBlogPostByIdApi = (id: number, token?: string | null) =>
 
 export const createBlogPostApi = (
   token: string,
-  data: { title: string; content: string; status: 'Draft' | 'Published' }
+  data: { title: string; content: string; status: 'Draft' | 'Published'; coverImage?: string }
 ) =>
   apiFetch<{ post: import('../types').BlogPost }>('/api/blog', {
     method: 'POST',
@@ -238,7 +238,7 @@ export const createBlogPostApi = (
 export const updateBlogPostApi = (
   token: string,
   id: number,
-  data: Partial<{ title: string; content: string; status: 'Draft' | 'Published' }>
+  data: Partial<{ title: string; content: string; status: 'Draft' | 'Published'; coverImage?: string }>
 ) =>
   apiFetch<{ post: import('../types').BlogPost }>(`/api/blog/${id}`, {
     method: 'PUT',

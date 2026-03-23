@@ -124,8 +124,8 @@ class BlogPostService
     {
         $db   = Database::getInstance();
         $stmt = $db->prepare(
-            "INSERT INTO blog_posts (title, content, status)
-             VALUES (:title, :content, :status)"
+            "INSERT INTO blog_posts (title, content, status, cover_image)
+             VALUES (:title, :content, :status, :cover_image)"
         );
         $stmt->execute($this->bindParams($data));
         return $this->dbGetById((int) $db->lastInsertId(), false);
@@ -137,13 +137,15 @@ class BlogPostService
         $current = $this->dbGetById($id, false);
 
         $merged = array_merge([
-            'title'   => $current['title'],
-            'content' => $current['content'],
-            'status'  => $current['status'],
+            'title'      => $current['title'],
+            'content'    => $current['content'],
+            'status'     => $current['status'],
+            'coverImage' => $current['coverImage'],
         ], $data);
 
         $stmt = Database::getInstance()->prepare(
-            'UPDATE blog_posts SET title = :title, content = :content, status = :status
+            'UPDATE blog_posts SET title = :title, content = :content, status = :status,
+             cover_image = :cover_image
              WHERE id = :id'
         );
         $params        = $this->bindParams($merged);
@@ -271,12 +273,13 @@ class BlogPostService
     private function mapRow(array $row): array
     {
         return [
-            'id'        => (int) $row['id'],
-            'title'     => $row['title'],
-            'content'   => $row['content'],
-            'status'    => $row['status'],
-            'createdAt' => $row['created_at'],
-            'updatedAt' => $row['updated_at'],
+            'id'         => (int) $row['id'],
+            'title'      => $row['title'],
+            'content'    => $row['content'],
+            'status'     => $row['status'],
+            'coverImage' => $row['cover_image'] ?? null,
+            'createdAt'  => $row['created_at'],
+            'updatedAt'  => $row['updated_at'],
         ];
     }
 
@@ -284,9 +287,10 @@ class BlogPostService
     private function bindParams(array $data): array
     {
         return [
-            ':title'   => $data['title']   ?? '',
-            ':content' => $data['content'] ?? '',
-            ':status'  => $data['status']  ?? 'Draft',
+            ':title'       => $data['title']      ?? '',
+            ':content'     => $data['content']    ?? '',
+            ':status'      => $data['status']      ?? 'Draft',
+            ':cover_image' => $data['coverImage'] ?? ($data['cover_image'] ?? null),
         ];
     }
 
@@ -294,12 +298,13 @@ class BlogPostService
     private function buildRecord(int $id, array $data): array
     {
         return [
-            'id'        => $id,
-            'title'     => $data['title']     ?? '',
-            'content'   => $data['content']   ?? '',
-            'status'    => $data['status']    ?? 'Draft',
-            'createdAt' => $data['createdAt'] ?? date('c'),
-            'updatedAt' => date('c'),
+            'id'         => $id,
+            'title'      => $data['title']      ?? '',
+            'content'    => $data['content']    ?? '',
+            'status'     => $data['status']     ?? 'Draft',
+            'coverImage' => $data['coverImage'] ?? null,
+            'createdAt'  => $data['createdAt']  ?? date('c'),
+            'updatedAt'  => date('c'),
         ];
     }
 

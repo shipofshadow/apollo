@@ -27,7 +27,7 @@ export const fetchBlogPostsAsync = createAsyncThunk(
 export const createBlogPostAsync = createAsyncThunk(
   'content/create',
   async (
-    arg: { token: string; data: { title: string; content: string; status: 'Draft' | 'Published' } },
+    arg: { token: string; data: { title: string; content: string; status: 'Draft' | 'Published'; coverImage?: string } },
     { rejectWithValue }
   ) => {
     try {
@@ -42,7 +42,7 @@ export const createBlogPostAsync = createAsyncThunk(
 export const updateBlogPostAsync = createAsyncThunk(
   'content/update',
   async (
-    arg: { token: string; id: number; data: Partial<{ title: string; content: string; status: 'Draft' | 'Published' }> },
+    arg: { token: string; id: number; data: Partial<{ title: string; content: string; status: 'Draft' | 'Published'; coverImage?: string }> },
     { rejectWithValue }
   ) => {
     try {

@@ -37,6 +37,16 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
 
+const UPLOAD_MAX_MB = 10;
+
+/** Returns an error string if the file exceeds the allowed size, or null if OK. */
+function validateImageFile(file: File): string | null {
+  if (file.size > UPLOAD_MAX_MB * 1024 * 1024) {
+    return `Image must be under ${UPLOAD_MAX_MB} MB.`;
+  }
+  return null;
+}
+
 type ServiceForm = {
   title: string; description: string; fullDescription: string;
   icon: string; imageUrl: string; duration: string;
@@ -302,6 +312,18 @@ function BookingsPanel() {
                           📦 {b.partsNotes}
                         </span>
                       )}
+                      {b.mediaUrls && b.mediaUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-800">
+                          {b.mediaUrls.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                              <img src={url} alt={`Photo ${i + 1}`}
+                                className="w-10 h-10 object-cover rounded-sm border border-gray-700 hover:border-brand-orange transition-colors"
+                                referrerPolicy="no-referrer"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -426,6 +448,12 @@ function ServicesPanel() {
                   <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file || !token) return;
+                    const sizeErr = validateImageFile(file);
+                    if (sizeErr) {
+                      setSaveError(sizeErr);
+                      e.target.value = '';
+                      return;
+                    }
                     setImgUploading(true);
                     try {
                       const url = await uploadAdminImageApi(token, file, 'services');
@@ -440,10 +468,22 @@ function ServicesPanel() {
                 </label>
               </div>
               {form.imageUrl && (
-                <img src={form.imageUrl} alt="Preview"
-                  className="mt-2 h-32 w-full object-cover rounded-sm border border-gray-700"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  onLoad={e => { (e.target as HTMLImageElement).style.display = ''; }} />
+                <div className="relative mt-2 h-32 w-full rounded-sm border border-gray-700 overflow-hidden bg-gray-800">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
+                  </div>
+                  <img src={form.imageUrl} alt={form.title || 'Preview'}
+                    className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+                    onLoad={e => { (e.target as HTMLImageElement).style.opacity = '1'; }}
+                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                    referrerPolicy="no-referrer"
+                  />
+                  <button type="button" onClick={() => setForm(p => ({ ...p, imageUrl: '' }))}
+                    className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500/70 text-white rounded-sm transition-colors"
+                    title="Remove image">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               )}
             </div>
 
@@ -584,8 +624,8 @@ function ServicesPanel() {
 
 
 // ── Blog posts panel – API-backed ────────────────────────────────────────────
-type PostForm = { id: number | null; title: string; content: string; status: 'Draft' | 'Published' };
-const EMPTY_POST: PostForm = { id: null, title: '', content: '', status: 'Draft' };
+type PostForm = { id: number | null; title: string; content: string; status: 'Draft' | 'Published'; coverImage: string };
+const EMPTY_POST: PostForm = { id: null, title: '', content: '', status: 'Draft', coverImage: '' };
 
 function ContentPanel() {
   const dispatch = useDispatch<AppDispatch>();
@@ -597,13 +637,18 @@ function ContentPanel() {
   const [saving,     setSaving]     = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
   const [deleteConf, setDeleteConf] = useState<number | null>(null);
+  const [imgUploading, setImgUploading] = useState(false);
 
   useEffect(() => {
     if (token) dispatch(fetchBlogPostsAsync(token));
   }, [token, dispatch]);
 
   const openNew  = ()              => { setCurrent(EMPTY_POST); setSaveError(null); setEditing(true); };
-  const openEdit = (p: ContentPost) => { setCurrent({ id: p.id, title: p.title, content: p.content, status: p.status }); setSaveError(null); setEditing(true); };
+  const openEdit = (p: ContentPost) => {
+    setCurrent({ id: p.id, title: p.title, content: p.content, status: p.status, coverImage: p.coverImage ?? '' });
+    setSaveError(null);
+    setEditing(true);
+  };
   const cancel   = ()              => { setEditing(false); setSaveError(null); };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -611,7 +656,12 @@ function ContentPanel() {
     if (!token) return;
     setSaving(true);
     setSaveError(null);
-    const data = { title: current.title, content: current.content, status: current.status };
+    const data = {
+      title: current.title,
+      content: current.content,
+      status: current.status,
+      ...(current.coverImage ? { coverImage: current.coverImage } : {}),
+    };
     try {
       if (current.id !== null) {
         await dispatch(updateBlogPostAsync({ token, id: current.id, data })).unwrap();
@@ -673,6 +723,56 @@ function ContentPanel() {
                 <option value="Draft">Draft</option>
                 <option value="Published">Published</option>
               </select>
+            </div>
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Cover Image</label>
+              <div className="flex gap-2">
+                <input value={current.coverImage} onChange={e => setCurrent(p => ({ ...p, coverImage: e.target.value }))}
+                  className="flex-1 bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                  placeholder="https://… or upload below" />
+                <label className={`flex items-center gap-2 px-4 py-3 border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange transition-colors rounded-sm cursor-pointer text-sm font-bold uppercase tracking-widest ${imgUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span className="hidden sm:inline">Upload</span>
+                  <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file || !token) return;
+                    const sizeErr = validateImageFile(file);
+                    if (sizeErr) {
+                      setSaveError(sizeErr);
+                      e.target.value = '';
+                      return;
+                    }
+                    setImgUploading(true);
+                    try {
+                      const url = await uploadAdminImageApi(token, file, 'blog');
+                      setCurrent(p => ({ ...p, coverImage: url }));
+                    } catch (err: unknown) {
+                      setSaveError((err as Error)?.message ?? 'Image upload failed.');
+                    } finally {
+                      setImgUploading(false);
+                      e.target.value = '';
+                    }
+                  }} />
+                </label>
+              </div>
+              {current.coverImage && (
+                <div className="relative mt-2 h-32 w-full rounded-sm border border-gray-700 overflow-hidden bg-gray-800">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
+                  </div>
+                  <img src={current.coverImage} alt={current.title || 'Preview'}
+                    className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+                    onLoad={e => { (e.target as HTMLImageElement).style.opacity = '1'; }}
+                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                    referrerPolicy="no-referrer"
+                  />
+                  <button type="button" onClick={() => setCurrent(p => ({ ...p, coverImage: '' }))}
+                    className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500/70 text-white rounded-sm transition-colors"
+                    title="Remove image">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Content *</label>
@@ -941,6 +1041,12 @@ function ProductsPanel() {
                   <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
                     const file = e.target.files?.[0];
                     if (!file || !token) return;
+                    const sizeErr = validateImageFile(file);
+                    if (sizeErr) {
+                      setSaveError(sizeErr);
+                      e.target.value = '';
+                      return;
+                    }
                     setImgUploading(true);
                     try {
                       const url = await uploadAdminImageApi(token, file, 'products');
@@ -955,10 +1061,22 @@ function ProductsPanel() {
                 </label>
               </div>
               {form.imageUrl && (
-                <img src={form.imageUrl} alt="Preview"
-                  className="mt-2 h-32 w-full object-cover rounded-sm border border-gray-700"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  onLoad={e => { (e.target as HTMLImageElement).style.display = ''; }} />
+                <div className="relative mt-2 h-32 w-full rounded-sm border border-gray-700 overflow-hidden bg-gray-800">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
+                  </div>
+                  <img src={form.imageUrl} alt={form.name || 'Preview'}
+                    className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+                    onLoad={e => { (e.target as HTMLImageElement).style.opacity = '1'; }}
+                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                    referrerPolicy="no-referrer"
+                  />
+                  <button type="button" onClick={() => setForm(p => ({ ...p, imageUrl: '' }))}
+                    className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500/70 text-white rounded-sm transition-colors"
+                    title="Remove image">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               )}
             </div>
 

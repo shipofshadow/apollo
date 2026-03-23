@@ -56,7 +56,8 @@ class R2Uploader
                 'ContentType' => $mime,
             ]);
         } catch (AwsException $e) {
-            throw new RuntimeException('R2 upload failed: ' . $e->getAwsErrorMessage(), 500);
+            $msg = $e->getAwsErrorMessage() ?: $e->getMessage();
+            throw new RuntimeException('R2 upload failed: ' . $msg, 500);
         }
 
         return R2_PUBLIC_URL . '/' . $key;

@@ -153,6 +153,7 @@ export interface BlogPost {
   title: string;
   content: string;
   status: 'Draft' | 'Published';
+  coverImage?: string;
   createdAt: string;
   updatedAt: string;
 }

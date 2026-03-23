@@ -40,6 +40,16 @@ export default function Blog() {
             {posts.map(post => (
               <article key={post.id}
                 className="bg-brand-dark border border-gray-800 rounded-sm flex flex-col hover:border-brand-orange/50 transition-colors group">
+                {post.coverImage && (
+                  <div className="h-48 w-full overflow-hidden rounded-t-sm">
+                    <img
+                      src={post.coverImage}
+                      alt={post.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                )}
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-3 font-bold uppercase tracking-widest">
                     <Calendar className="w-3.5 h-3.5" />
