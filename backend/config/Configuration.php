@@ -60,6 +60,17 @@ define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME']  ?? 'Apollo 1625 Auto Lab');
 define('MAIL_ADMIN',     $_ENV['MAIL_ADMIN']       ?? '');           // admin notification recipient
 
 // ---------------------------------------------------------------------------
+// API Ninjas – vehicle data
+// Sign up at https://api-ninjas.com and set CARNINJA_API_KEY in your .env.
+// ---------------------------------------------------------------------------
+
+define('CARNINJA_API_KEY',  $_ENV['CARNINJA_API_KEY']  ?? '');
+define('CARNINJA_BASE_URL', 'https://api.api-ninjas.com/v1');
+/** TTL in seconds for cached vehicle data (24 h for makes, 12 h for models) */
+define('CARNINJA_MAKES_TTL',  (int) ($_ENV['CARNINJA_MAKES_TTL']  ?? 86400));
+define('CARNINJA_MODELS_TTL', (int) ($_ENV['CARNINJA_MODELS_TTL'] ?? 43200));
+
+// ---------------------------------------------------------------------------
 // Media upload constants
 // ---------------------------------------------------------------------------
 

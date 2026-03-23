@@ -9,9 +9,9 @@ import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import { fetchServicesAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import { useAuth } from '../context/AuthContext';
-import { fetchAvailabilityApi, uploadBookingMediaApi } from '../services/api';
+import { fetchAvailabilityApi, uploadBookingMediaApi, fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
 import { BACKEND_URL } from '../config';
-import { VEHICLE_MAKES, VEHICLE_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
 import SignaturePad from '../components/SignaturePad';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -76,6 +76,17 @@ export default function BookingPage() {
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear,  setVehicleYear]  = useState('');
 
+  // Vehicle data – loaded from API Ninjas proxy, fall back to static dataset
+  const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [makesLoading,  setMakesLoading]  = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
+
+  // Resolved lists (dynamic when available, static otherwise)
+  const makesList  = dynamicMakes.length  ? dynamicMakes  : [...STATIC_MAKES];
+  const modelsList = dynamicModels.length ? dynamicModels
+    : vehicleMake ? (STATIC_MODELS[vehicleMake as VehicleMake] ?? []) : [];
+
   // Step 3 – media upload
   const [mediaFiles,      setMediaFiles]      = useState<File[]>([]);
   const [mediaPreviews,   setMediaPreviews]   = useState<string[]>([]);
@@ -93,9 +104,29 @@ export default function BookingPage() {
   );
   const vehicleInfo = [vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(' ');
 
+  // Load services and car makes on mount
   useEffect(() => {
     dispatch(fetchServicesAsync(token));
+    if (BACKEND_URL) {
+      setMakesLoading(true);
+      fetchVehicleMakesApi()
+        .then(({ makes }) => setDynamicMakes(makes))
+        .catch(() => { /* silently fall back to static */ })
+        .finally(() => setMakesLoading(false));
+    }
   }, [dispatch, token]);
+
+  // Load models when make changes
+  useEffect(() => {
+    setDynamicModels([]);
+    setVehicleModel('');
+    if (!vehicleMake || !BACKEND_URL) return;
+    setModelsLoading(true);
+    fetchVehicleModelsApi(vehicleMake)
+      .then(({ models }) => setDynamicModels(models))
+      .catch(() => { /* fall back to static */ })
+      .finally(() => setModelsLoading(false));
+  }, [vehicleMake]);
 
   const toggleService = (id: number) => {
     setSelectedIds(prev =>
@@ -176,6 +207,7 @@ export default function BookingPage() {
     setBookedSlots([]);
     setForm({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', notes: '' });
     setVehicleMake(''); setVehicleModel(''); setVehicleYear('');
+    setDynamicModels([]);
     setMediaFiles([]); setMediaPreviews([]);
     setSignatureData('');
   };
@@ -344,22 +376,31 @@ export default function BookingPage() {
                 </div>
                 {/* Vehicle */}
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Vehicle *</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
+                    Vehicle *
+                    {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading makes…</span>}
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs text-gray-600 uppercase tracking-widest">Make</label>
-                      <select required value={vehicleMake} onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
-                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none">
-                        <option value="">Select make…</option>
-                        {VEHICLE_MAKES.map(m => <option key={m} value={m}>{m}</option>)}
+                      <select required value={vehicleMake}
+                        onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
+                        disabled={makesLoading}
+                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-60">
+                        <option value="">{makesLoading ? 'Loading…' : 'Select make…'}</option>
+                        {makesList.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs text-gray-600 uppercase tracking-widest">Model</label>
-                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} disabled={!vehicleMake}
+                      <label className="text-xs text-gray-600 uppercase tracking-widest">
+                        Model
+                        {modelsLoading && <span className="ml-1 text-gray-600 normal-case font-normal">Loading…</span>}
+                      </label>
+                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
+                        disabled={!vehicleMake || modelsLoading}
                         className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-40">
-                        <option value="">Select model…</option>
-                        {vehicleMake ? (VEHICLE_MODELS[vehicleMake as VehicleMake] ?? []).map(m => <option key={m} value={m}>{m}</option>) : null}
+                        <option value="">{modelsLoading ? 'Loading…' : 'Select model…'}</option>
+                        {modelsList.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div className="space-y-2">

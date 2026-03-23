@@ -142,6 +142,47 @@ export const updateBookingStatusApi = (
     body: JSON.stringify({ status }),
   }, token);
 
+// ── Vehicle data API (API Ninjas proxy) ───────────────────────────────────────
+
+export interface CarTrim {
+  make: string;
+  model: string;
+  generation: string;
+  generation_year_begin: string;
+  generation_year_end: string | null;
+  serie: string;
+  trim: string;
+  trim_start_production_year: number | null;
+  trim_end_production_year: number | null;
+  car_type: string;
+}
+
+/**
+ * Fetch all car makes from the backend proxy.
+ * Optionally filtered by model year.
+ */
+export const fetchVehicleMakesApi = (year?: number) => {
+  const params = year ? `?year=${year}` : '';
+  return apiFetch<{ makes: string[] }>(`/api/vehicles/makes${params}`);
+};
+
+/**
+ * Fetch all models for a given make from the backend proxy.
+ */
+export const fetchVehicleModelsApi = (make: string, year?: number) => {
+  const params = new URLSearchParams({ make });
+  if (year) params.set('year', String(year));
+  return apiFetch<{ models: string[] }>(`/api/vehicles/models?${params}`);
+};
+
+/**
+ * Fetch trims for a given make and model from the backend proxy.
+ */
+export const fetchVehicleTrimsApi = (make: string, model: string, limit = 50, offset = 0) => {
+  const params = new URLSearchParams({ make, model, limit: String(limit), offset: String(offset) });
+  return apiFetch<{ trims: CarTrim[] }>(`/api/vehicles/trims?${params}`);
+};
+
 // ── Blog API ─────────────────────────────────────────────────────────────────
 
 export const fetchBlogPostsApi = (token?: string | null) =>

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import type { RootState, AppDispatch } from '../store';
 import { MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { VEHICLE_MAKES, VEHICLE_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+import { fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
+import { BACKEND_URL } from '../config';
 
 const AVAILABLE_TIMES = ['09:00 AM', '11:00 AM', '01:00 PM', '03:00 PM', '05:00 PM'];
 
@@ -41,6 +43,35 @@ export default function IntakeForm() {
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear,  setVehicleYear]  = useState('');
 
+  // Dynamic vehicle data (API Ninjas proxy), fall back to static dataset
+  const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [makesLoading,  setMakesLoading]  = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
+
+  const makesList  = dynamicMakes.length  ? dynamicMakes  : [...STATIC_MAKES];
+  const modelsList = dynamicModels.length ? dynamicModels
+    : vehicleMake ? (STATIC_MODELS[vehicleMake as VehicleMake] ?? []) : [];
+
+  useEffect(() => {
+    if (!BACKEND_URL) return;
+    setMakesLoading(true);
+    fetchVehicleMakesApi()
+      .then(({ makes }) => setDynamicMakes(makes))
+      .catch(() => { /* fall back to static */ })
+      .finally(() => setMakesLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setDynamicModels([]);
+    setVehicleModel('');
+    if (!vehicleMake || !BACKEND_URL) return;
+    setModelsLoading(true);
+    fetchVehicleModelsApi(vehicleMake)
+      .then(({ models }) => setDynamicModels(models))
+      .catch(() => { /* fall back to static */ })
+      .finally(() => setModelsLoading(false));
+  }, [vehicleMake]);
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -94,6 +125,7 @@ export default function IntakeForm() {
     setVehicleMake('');
     setVehicleModel('');
     setVehicleYear('');
+    setDynamicModels([]);
   };
 
   return (
@@ -229,18 +261,23 @@ export default function IntakeForm() {
 
                   {/* Vehicle cascading dropdowns */}
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Vehicle *</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                      Vehicle *
+                      {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading…</span>}
+                    </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <select required value={vehicleMake}
                         onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
-                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
-                        <option value="">Make…</option>
-                        {VEHICLE_MAKES.map(m => <option key={m} value={m}>{m}</option>)}
+                        disabled={makesLoading}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-60">
+                        <option value="">{makesLoading ? 'Loading…' : 'Make…'}</option>
+                        {makesList.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
-                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} disabled={!vehicleMake}
+                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
+                        disabled={!vehicleMake || modelsLoading}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-40">
-                        <option value="">Model…</option>
-                        {vehicleMake ? (VEHICLE_MODELS[vehicleMake as VehicleMake] ?? []).map(m => <option key={m} value={m}>{m}</option>) : null}
+                        <option value="">{modelsLoading ? 'Loading…' : 'Model…'}</option>
+                        {modelsList.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                       <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">

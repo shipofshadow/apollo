@@ -63,6 +63,11 @@ class Router
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
+
+            // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
+            $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
+            $r->addRoute('GET', '/api/vehicles/models', 'handleVehicleModels');
+            $r->addRoute('GET', '/api/vehicles/trims',  'handleVehicleTrims');
         });
 
         $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -561,6 +566,53 @@ class Router
         $this->requireAuth('admin');
         $status = (new MigrationRunner())->status();
         echo json_encode(['migrations' => $status]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Vehicle data handlers (API Ninjas proxy)
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleVehicleMakes(array $vars = []): void
+    {
+        $year  = isset($_GET['year']) && ctype_digit($_GET['year'])
+            ? (int) $_GET['year']
+            : null;
+
+        $makes = (new VehicleService())->getMakes($year);
+        echo json_encode(['makes' => $makes]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleVehicleModels(array $vars = []): void
+    {
+        $make  = trim((string) ($_GET['make'] ?? ''));
+        $year  = isset($_GET['year']) && ctype_digit($_GET['year'])
+            ? (int) $_GET['year']
+            : null;
+
+        if ($make === '') {
+            throw new RuntimeException("Query parameter 'make' is required.", 422);
+        }
+
+        $models = (new VehicleService())->getModels($make, $year);
+        echo json_encode(['models' => $models]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleVehicleTrims(array $vars = []): void
+    {
+        $make   = trim((string) ($_GET['make']   ?? ''));
+        $model  = trim((string) ($_GET['model']  ?? ''));
+        $limit  = isset($_GET['limit'])  && ctype_digit($_GET['limit'])  ? (int) $_GET['limit']  : 50;
+        $offset = isset($_GET['offset']) && ctype_digit($_GET['offset']) ? (int) $_GET['offset'] : 0;
+
+        if ($make === '' || $model === '') {
+            throw new RuntimeException("Query parameters 'make' and 'model' are required.", 422);
+        }
+
+        $trims = (new VehicleService())->getTrims($make, $model, $limit, $offset);
+        echo json_encode(['trims' => $trims]);
     }
 }
 
