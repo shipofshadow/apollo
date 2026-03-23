@@ -147,12 +147,9 @@ class MigrationRunner
             return;
         }
 
-        // Execute each semicolon-terminated statement separately so PDO
-        // doesn't choke on multi-statement files.
-        $statements = array_filter(
-            array_map('trim', explode(';', $sql)),
-            fn (string $s) => $s !== ''
-        );
+        // Split on statement-terminating semicolons while ignoring semicolons
+        // that appear inside single- or double-quoted string literals.
+        $statements = $this->splitStatements($sql);
 
         $this->db->beginTransaction();
         try {
@@ -184,5 +181,65 @@ class MigrationRunner
                 "Migration '$name' failed: " . $e->getMessage(), 500, $e
             );
         }
+    }
+
+    /**
+     * Split a SQL string into individual statements on semicolons, but skip
+     * semicolons that appear inside single- or double-quoted string literals.
+     * Handles both the SQL standard doubled-quote escape ('') and the
+     * backslash escape (\').
+     *
+     * @return string[]
+     */
+    private function splitStatements(string $sql): array
+    {
+        $statements = [];
+        $current    = '';
+        $inString   = false;
+        $stringChar = '';
+        $len        = strlen($sql);
+
+        for ($i = 0; $i < $len; $i++) {
+            $char = $sql[$i];
+
+            if ($inString) {
+                $current .= $char;
+
+                if ($char === '\\') {
+                    // Backslash escape — consume next character as-is.
+                    if ($i + 1 < $len) {
+                        $current .= $sql[++$i];
+                    }
+                } elseif ($char === $stringChar) {
+                    // Doubled-quote escape ('' or "").
+                    if ($i + 1 < $len && $sql[$i + 1] === $stringChar) {
+                        $current .= $sql[++$i];
+                    } else {
+                        $inString = false;
+                    }
+                }
+            } else {
+                if ($char === "'" || $char === '"') {
+                    $inString   = true;
+                    $stringChar = $char;
+                    $current   .= $char;
+                } elseif ($char === ';') {
+                    $trimmed = trim($current);
+                    if ($trimmed !== '') {
+                        $statements[] = $trimmed;
+                    }
+                    $current = '';
+                } else {
+                    $current .= $char;
+                }
+            }
+        }
+
+        $trimmed = trim($current);
+        if ($trimmed !== '') {
+            $statements[] = $trimmed;
+        }
+
+        return $statements;
     }
 }

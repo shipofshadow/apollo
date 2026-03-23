@@ -1,10 +1,11 @@
 -- Migration: 004_seed_services
 -- Seeds the four core service offerings.
+-- Features are seeded separately in 005_create_service_features.sql.
 -- Uses ON DUPLICATE KEY UPDATE id = id so re-running is safe.
 
 INSERT INTO services
     (id, title, description, full_description, icon, image_url,
-     duration, starting_price, features, sort_order, is_active)
+     duration, starting_price, sort_order, is_active)
 VALUES
 (
     1,
@@ -15,7 +16,6 @@ VALUES
     'https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=1964&auto=format&fit=crop',
     '4–6 Hours',
     '₱13,750',
-    '["Bi-LED & HID Projector Conversions","RGBW Demon Eyes & Halos","Custom Lens Etching","Housing Paint & Blackouts","Sequential Turn Signals","Moisture Sealing & Warranty"]',
     1,
     1
 )
@@ -23,7 +23,7 @@ ON DUPLICATE KEY UPDATE id = id;
 
 INSERT INTO services
     (id, title, description, full_description, icon, image_url,
-     duration, starting_price, features, sort_order, is_active)
+     duration, starting_price, sort_order, is_active)
 VALUES
 (
     2,
@@ -34,7 +34,6 @@ VALUES
     'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop',
     '2–3 Hours',
     '₱8,250',
-    '["Wireless Apple CarPlay & Android Auto","High-Resolution IPS/OLED Touchscreens","Factory Steering Wheel Control Retention","Custom 3D Printed Bezels","Backup & 360 Camera Integration","DSP Audio Tuning"]',
     2,
     1
 )
@@ -42,7 +41,7 @@ ON DUPLICATE KEY UPDATE id = id;
 
 INSERT INTO services
     (id, title, description, full_description, icon, image_url,
-     duration, starting_price, features, sort_order, is_active)
+     duration, starting_price, sort_order, is_active)
 VALUES
 (
     3,
@@ -53,7 +52,6 @@ VALUES
     'https://images.unsplash.com/photo-1600705722908-bab1e61c0b4d?q=80&w=2070&auto=format&fit=crop',
     '2–4 Hours',
     '₱11,000',
-    '["2-Way Paging Alarm Systems","Hidden Kill Switches","Real-Time GPS Tracking","Remote Engine Start","Tilt & Glass Break Sensors","Smartphone Integration"]',
     3,
     1
 )
@@ -61,7 +59,7 @@ ON DUPLICATE KEY UPDATE id = id;
 
 INSERT INTO services
     (id, title, description, full_description, icon, image_url,
-     duration, starting_price, features, sort_order, is_active)
+     duration, starting_price, sort_order, is_active)
 VALUES
 (
     4,
@@ -72,7 +70,6 @@ VALUES
     'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?q=80&w=2069&auto=format&fit=crop',
     'Varies',
     'Consultation',
-    '["Custom Ambient Interior Lighting","Aftermarket Grille Installation","Interior Trim Vinyl Wrapping","Aero Kit & Splitter Installation","Custom Emblems & Badging","Caliper Painting"]',
     4,
     1
 )

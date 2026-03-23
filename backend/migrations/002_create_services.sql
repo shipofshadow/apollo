@@ -1,6 +1,6 @@
 -- Migration: 002_create_services
 -- Stores all service offerings (headlight retrofits, headunits, etc.).
--- features column holds a JSON array of bullet-point strings.
+-- Features are stored in the service_features table (1NF).
 
 CREATE TABLE IF NOT EXISTS services (
     id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS services (
     image_url        VARCHAR(500)  NOT NULL DEFAULT ''     COMMENT 'Hero image URL',
     duration         VARCHAR(80)   NOT NULL DEFAULT ''     COMMENT 'e.g. 4-6 Hours',
     starting_price   VARCHAR(80)   NOT NULL DEFAULT ''     COMMENT 'e.g. ₱13,750',
-    features         TEXT          NOT NULL DEFAULT '[]'   COMMENT 'JSON array of feature strings',
     sort_order       SMALLINT      NOT NULL DEFAULT 0,
     is_active        TINYINT(1)    NOT NULL DEFAULT 1,
     created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,

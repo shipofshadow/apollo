@@ -7,10 +7,10 @@ import type { AppDispatch, RootState } from '../store';
 import { useAuth } from '../context/AuthContext';
 
 const SERVICES = [
-  { id: 's1', name: 'Headlight Retrofit',            duration: '4–6 Hours',  price: 'From ₱13,750' },
-  { id: 's2', name: 'Android Headunit Installation', duration: '2–3 Hours',  price: 'From ₱8,250'  },
-  { id: 's3', name: 'Security System',               duration: '2–4 Hours',  price: 'From ₱11,000' },
-  { id: 's4', name: 'Aesthetic Upgrades',            duration: 'Varies',     price: 'Consultation' },
+  { id: 1, name: 'Headlight Retrofit',            duration: '4–6 Hours',  price: 'From ₱13,750' },
+  { id: 2, name: 'Android Headunit Installation', duration: '2–3 Hours',  price: 'From ₱8,250'  },
+  { id: 3, name: 'Security System',               duration: '2–4 Hours',  price: 'From ₱11,000' },
+  { id: 4, name: 'Aesthetic Upgrades',            duration: 'Varies',     price: 'Consultation' },
 ];
 
 const generateNextDays = (): Date[] =>
@@ -31,7 +31,7 @@ export default function BookingPage() {
   const { status: bookStatus } = useSelector((s: RootState) => s.booking);
 
   const [step,            setStep]            = useState(1);
-  const [selectedService, setSelectedService] = useState('');
+  const [selectedService, setSelectedService] = useState<number | null>(null);
   const [selectedDate,    setSelectedDate]    = useState<Date | null>(null);
   const [selectedTime,    setSelectedTime]    = useState('');
   const [form,            setForm]            = useState({
@@ -58,7 +58,6 @@ export default function BookingPage() {
           phone:           form.phone,
           vehicleInfo:     form.vehicleInfo,
           serviceId:       service.id,
-          serviceName:     service.name,
           appointmentDate: selectedDate!.toISOString().split('T')[0],
           appointmentTime: selectedTime,
           notes:           form.notes,

@@ -47,8 +47,7 @@ export interface BookingPayload {
   email: string;
   phone: string;
   vehicleInfo: string;
-  serviceId: string;
-  serviceName: string;
+  serviceId: number;
   appointmentDate: string;
   appointmentTime: string;
   notes: string;
@@ -81,7 +80,7 @@ export interface Booking {
   email: string;
   phone: string;
   vehicleInfo: string;
-  serviceId: string;
+  serviceId: number;
   serviceName: string;
   appointmentDate: string;
   appointmentTime: string;

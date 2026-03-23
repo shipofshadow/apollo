@@ -98,7 +98,9 @@ class ServiceCrudService
         $stmt  = Database::getInstance()->query(
             "SELECT * FROM services {$where}ORDER BY sort_order ASC, id ASC"
         );
-        return array_map([$this, 'mapRow'], $stmt->fetchAll());
+        $rows     = $stmt->fetchAll();
+        $features = $this->dbFetchAllFeatures();
+        return array_map(fn ($row) => $this->mapRow($row, $features[(int) $row['id']] ?? []), $rows);
     }
 
     /** @return array<string, mixed> */
@@ -113,7 +115,7 @@ class ServiceCrudService
         if (!$row) {
             throw new RuntimeException('Service not found.', 404);
         }
-        return $this->mapRow($row);
+        return $this->mapRow($row, $this->dbFetchFeatures($id));
     }
 
     // -------------------------------------------------------------------------
@@ -127,13 +129,15 @@ class ServiceCrudService
         $stmt = $db->prepare(
             'INSERT INTO services
              (title, description, full_description, icon, image_url,
-              duration, starting_price, features, sort_order, is_active)
+              duration, starting_price, sort_order, is_active)
              VALUES
              (:title, :description, :full_description, :icon, :image_url,
-              :duration, :starting_price, :features, :sort_order, :is_active)'
+              :duration, :starting_price, :sort_order, :is_active)'
         );
         $stmt->execute($this->bindParams($data));
-        return $this->dbGetById((int) $db->lastInsertId(), false);
+        $id = (int) $db->lastInsertId();
+        $this->dbReplaceFeatures($id, $data['features'] ?? []);
+        return $this->dbGetById($id, false);
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
@@ -158,21 +162,22 @@ class ServiceCrudService
         $db   = Database::getInstance();
         $stmt = $db->prepare(
             'UPDATE services SET
-               title           = :title,
-               description     = :description,
+               title            = :title,
+               description      = :description,
                full_description = :full_description,
-               icon            = :icon,
-               image_url       = :image_url,
-               duration        = :duration,
-               starting_price  = :starting_price,
-               features        = :features,
-               sort_order      = :sort_order,
-               is_active       = :is_active
+               icon             = :icon,
+               image_url        = :image_url,
+               duration         = :duration,
+               starting_price   = :starting_price,
+               sort_order       = :sort_order,
+               is_active        = :is_active
              WHERE id = :id'
         );
-        $params         = $this->bindParams($merged);
-        $params[':id']  = $id;
+        $params        = $this->bindParams($merged);
+        $params[':id'] = $id;
         $stmt->execute($params);
+
+        $this->dbReplaceFeatures($id, $merged['features'] ?? []);
 
         return $this->dbGetById($id, false);
     }
@@ -185,6 +190,65 @@ class ServiceCrudService
         $stmt->execute([':id' => $id]);
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Service not found.', 404);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DB – service_features helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Fetch features for a single service.
+     *
+     * @return string[]
+     */
+    private function dbFetchFeatures(int $serviceId): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT feature FROM service_features WHERE service_id = :id ORDER BY sort_order ASC'
+        );
+        $stmt->execute([':id' => $serviceId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * Fetch features for all services in a single query.
+     *
+     * @return array<int, string[]>  service_id => feature[]
+     */
+    private function dbFetchAllFeatures(): array
+    {
+        $stmt = Database::getInstance()->query(
+            'SELECT service_id, feature FROM service_features ORDER BY service_id ASC, sort_order ASC'
+        );
+        $map = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $map[(int) $row['service_id']][] = $row['feature'];
+        }
+        return $map;
+    }
+
+    /**
+     * Replace all features for a service (delete then re-insert).
+     *
+     * @param string[] $features
+     */
+    private function dbReplaceFeatures(int $serviceId, array $features): void
+    {
+        $db = Database::getInstance();
+
+        $db->prepare('DELETE FROM service_features WHERE service_id = :id')
+           ->execute([':id' => $serviceId]);
+
+        if (empty($features)) {
+            return;
+        }
+
+        $stmt = $db->prepare(
+            'INSERT INTO service_features (service_id, feature, sort_order) VALUES (:sid, :feature, :order)'
+        );
+        foreach (array_values($features) as $i => $feature) {
+            $stmt->execute([':sid' => $serviceId, ':feature' => $feature, ':order' => $i + 1]);
         }
     }
 
@@ -330,8 +394,12 @@ class ServiceCrudService
     // Helpers
     // -------------------------------------------------------------------------
 
-    /** Map DB snake_case row to camelCase API shape. @return array<string, mixed> */
-    private function mapRow(array $row): array
+    /** Map DB snake_case row to camelCase API shape.
+     * @param array<string, mixed> $row      Raw PDO fetch row from the services table.
+     * @param string[]             $features Ordered feature strings from service_features.
+     * @return array<string, mixed>
+     */
+    private function mapRow(array $row, array $features = []): array
     {
         return [
             'id'              => (int) $row['id'],
@@ -342,7 +410,7 @@ class ServiceCrudService
             'imageUrl'        => $row['image_url'],
             'duration'        => $row['duration'],
             'startingPrice'   => $row['starting_price'],
-            'features'        => json_decode($row['features'] ?? '[]', true) ?? [],
+            'features'        => $features,
             'sortOrder'       => (int) $row['sort_order'],
             'isActive'        => (bool) $row['is_active'],
             'createdAt'       => $row['created_at'],
@@ -353,11 +421,6 @@ class ServiceCrudService
     /** Build PDO bind params from camelCase $data. @return array<string, mixed> */
     private function bindParams(array $data): array
     {
-        $features = $data['features'] ?? [];
-        if (is_array($features)) {
-            $features = json_encode($features, JSON_UNESCAPED_UNICODE);
-        }
-
         return [
             ':title'            => $data['title']           ?? '',
             ':description'      => $data['description']     ?? '',
@@ -366,7 +429,6 @@ class ServiceCrudService
             ':image_url'        => $data['imageUrl']        ?? ($data['image_url'] ?? ''),
             ':duration'         => $data['duration']        ?? '',
             ':starting_price'   => $data['startingPrice']   ?? ($data['starting_price'] ?? ''),
-            ':features'         => $features,
             ':sort_order'       => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             ':is_active'        => (int) ($data['isActive']  ?? ($data['is_active']  ?? 1)),
         ];

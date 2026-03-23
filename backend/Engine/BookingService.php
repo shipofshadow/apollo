@@ -58,6 +58,9 @@ class BookingService
     {
         $this->validatePayload($data);
 
+        $serviceId   = (int) $data['serviceId'];
+        $serviceName = $this->resolveServiceName($serviceId, $data);
+
         $booking = [
             'id'              => $this->uuid(),
             'userId'          => $userId,
@@ -65,8 +68,8 @@ class BookingService
             'email'           => strtolower(trim($data['email'])),
             'phone'           => trim($data['phone']),
             'vehicleInfo'     => trim($data['vehicleInfo']),
-            'serviceId'       => trim($data['serviceId']),
-            'serviceName'     => trim($data['serviceName']),
+            'serviceId'       => $serviceId,
+            'serviceName'     => $serviceName,
             'appointmentDate' => trim($data['appointmentDate']),
             'appointmentTime' => trim($data['appointmentTime']),
             'notes'           => trim($data['notes'] ?? ''),
@@ -133,10 +136,10 @@ class BookingService
         $db = Database::getInstance();
         $db->prepare(
             'INSERT INTO bookings
-             (id, user_id, name, email, phone, vehicle_info, service_id, service_name,
+             (id, user_id, name, email, phone, vehicle_info, service_id,
               appointment_date, appointment_time, notes, status)
              VALUES
-             (:id, :user_id, :name, :email, :phone, :vehicle_info, :service_id, :service_name,
+             (:id, :user_id, :name, :email, :phone, :vehicle_info, :service_id,
               :appointment_date, :appointment_time, :notes, :status)'
         )->execute([
             ':id'               => $booking['id'],
@@ -146,7 +149,6 @@ class BookingService
             ':phone'            => $booking['phone'],
             ':vehicle_info'     => $booking['vehicleInfo'],
             ':service_id'       => $booking['serviceId'],
-            ':service_name'     => $booking['serviceName'],
             ':appointment_date' => $booking['appointmentDate'],
             ':appointment_time' => $booking['appointmentTime'],
             ':notes'            => $booking['notes'],
@@ -158,7 +160,10 @@ class BookingService
     private function dbGetAll(): array
     {
         $stmt = Database::getInstance()->query(
-            'SELECT * FROM bookings ORDER BY created_at DESC'
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             ORDER BY b.created_at DESC'
         );
         return array_map([$this, 'mapDbRow'], $stmt->fetchAll());
     }
@@ -167,7 +172,11 @@ class BookingService
     private function dbGetByUser(int $userId): array
     {
         $stmt = Database::getInstance()->prepare(
-            'SELECT * FROM bookings WHERE user_id = :uid ORDER BY created_at DESC'
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.user_id = :uid
+             ORDER BY b.created_at DESC'
         );
         $stmt->execute([':uid' => $userId]);
         return array_map([$this, 'mapDbRow'], $stmt->fetchAll());
@@ -186,7 +195,12 @@ class BookingService
             throw new RuntimeException('Booking not found.', 404);
         }
 
-        $row = $db->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
+        $row = $db->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
         $row->execute([':id' => $id]);
         return $this->mapDbRow($row->fetch());
     }
@@ -275,7 +289,7 @@ class BookingService
     {
         $required = [
             'name', 'email', 'phone', 'vehicleInfo',
-            'serviceId', 'serviceName', 'appointmentDate', 'appointmentTime',
+            'serviceId', 'appointmentDate', 'appointmentTime',
         ];
         foreach ($required as $field) {
             if (empty(trim((string) ($data[$field] ?? '')))) {
@@ -285,6 +299,31 @@ class BookingService
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('A valid email address is required.', 422);
         }
+        if ((int) ($data['serviceId'] ?? 0) <= 0) {
+            throw new RuntimeException('A valid serviceId is required.', 422);
+        }
+    }
+
+    /**
+     * Resolve the human-readable service name.
+     * In DB mode the name is fetched from the services table (canonical source).
+     * In file mode the client-supplied serviceName is used as a fallback.
+     */
+    private function resolveServiceName(int $serviceId, array $data): string
+    {
+        if ($this->useDb) {
+            $stmt = Database::getInstance()->prepare(
+                'SELECT title FROM services WHERE id = :id LIMIT 1'
+            );
+            $stmt->execute([':id' => $serviceId]);
+            $row = $stmt->fetch();
+            if (!$row) {
+                throw new RuntimeException('Service not found.', 422);
+            }
+            return $row['title'];
+        }
+
+        return trim((string) ($data['serviceName'] ?? ''));
     }
 
     // -------------------------------------------------------------------------
