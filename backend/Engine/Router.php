@@ -68,8 +68,13 @@ class Router
                     echo json_encode(['detail' => 'Not Found']);
             }
         } catch (RuntimeException $e) {
-            http_response_code($e->getCode() ?: 500);
+            http_response_code((int) $e->getCode() ?: 500);
             echo json_encode(['detail' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            // Catches PDOException and any other uncaught error so PHP never
+            // emits a fatal-error HTML page inside a JSON API.
+            http_response_code(500);
+            echo json_encode(['detail' => 'Internal server error: ' . $e->getMessage()]);
         }
     }
 
