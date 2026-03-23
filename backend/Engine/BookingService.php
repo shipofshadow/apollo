@@ -325,7 +325,7 @@ class BookingService
             'signatureData'   => $row['signature_data'] ?? null,
             'mediaUrls'       => $mediaUrls,
             'status'          => $row['status'],
-            'awaitingParts'   => (bool) ($row['awaiting_parts'] ?? false),
+            'awaitingParts'   => ($row['status'] === 'awaiting_parts'),
             'partsNotes'      => $row['parts_notes'] ?? null,
             'createdAt'       => $row['created_at'],
         ];
