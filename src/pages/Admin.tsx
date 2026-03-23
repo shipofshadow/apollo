@@ -717,15 +717,16 @@ function ProductsPanel() {
   const [editId,     setEditId]     = useState<number | null>(null);
   const [form,       setForm]       = useState<ProductForm>(EMPTY_PRODUCT_FORM);
   const [saving,     setSaving]     = useState(false);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
   const [deleteConf, setDeleteConf] = useState<number | null>(null);
 
   useEffect(() => {
     if (token) dispatch(fetchProductsAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = () => { setForm(EMPTY_PRODUCT_FORM); setEditId(null); setEditing(true); };
-  const openEdit = (p: Product) => { setForm(productToForm(p)); setEditId(p.id); setEditing(true); };
-  const cancel   = () => { setEditing(false); setEditId(null); };
+  const openNew  = () => { setForm(EMPTY_PRODUCT_FORM); setEditId(null); setSaveError(null); setEditing(true); };
+  const openEdit = (p: Product) => { setForm(productToForm(p)); setEditId(p.id); setSaveError(null); setEditing(true); };
+  const cancel   = () => { setEditing(false); setEditId(null); setSaveError(null); };
 
   const set = (field: keyof ProductForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -735,14 +736,21 @@ function ProductsPanel() {
     e.preventDefault();
     if (!token) return;
     setSaving(true);
+    setSaveError(null);
     const payload = productFormToPayload(form);
-    if (editId !== null) {
-      await dispatch(updateProductAsync({ token, id: editId, data: payload }));
-    } else {
-      await dispatch(createProductAsync({ token, data: payload }));
+    try {
+      if (editId !== null) {
+        await dispatch(updateProductAsync({ token, id: editId, data: payload })).unwrap();
+      } else {
+        await dispatch(createProductAsync({ token, data: payload })).unwrap();
+      }
+      setEditing(false);
+      setEditId(null);
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Failed to save product.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setEditing(false);
   };
 
   const handleDelete = async (id: number) => {
@@ -770,6 +778,12 @@ function ProductsPanel() {
         </div>
 
         <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-6">
+          {saveError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {saveError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Name *</label>
