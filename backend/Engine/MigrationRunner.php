@@ -185,7 +185,8 @@ class MigrationRunner
 
     /**
      * Split a SQL string into individual statements on semicolons, but skip
-     * semicolons that appear inside single- or double-quoted string literals.
+     * semicolons that appear inside single- or double-quoted string literals
+     * or inside -- line comments.
      * Handles both the SQL standard doubled-quote escape ('') and the
      * backslash escape (\').
      *
@@ -219,7 +220,17 @@ class MigrationRunner
                     }
                 }
             } else {
-                if ($char === "'" || $char === '"') {
+                // Detect the start of a -- line comment and skip to end-of-line,
+                // appending the comment text so the surrounding whitespace is
+                // preserved but no semicolon inside it can split statements.
+                if ($char === '-' && $i + 1 < $len && $sql[$i + 1] === '-') {
+                    // Consume everything up to (but not including) the newline.
+                    while ($i < $len && $sql[$i] !== "\n") {
+                        $current .= $sql[$i++];
+                    }
+                    // Back up one so the outer loop's $i++ lands on the '\n'.
+                    $i--;
+                } elseif ($char === "'" || $char === '"') {
                     $inString   = true;
                     $stringChar = $char;
                     $current   .= $char;
