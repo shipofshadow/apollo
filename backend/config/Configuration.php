@@ -77,3 +77,16 @@ define('CARNINJA_MODELS_TTL', (int) ($_ENV['CARNINJA_MODELS_TTL'] ?? 43200));
 define('UPLOAD_DIR',      realpath(__DIR__ . '/../') . '/storage/uploads/');
 define('UPLOAD_MAX_MB',   (int)($_ENV['UPLOAD_MAX_MB']  ?? 10));
 define('UPLOAD_BASE_URL', rtrim($_ENV['UPLOAD_BASE_URL'] ?? '', '/'));
+
+// ---------------------------------------------------------------------------
+// Cloudflare R2 (S3-compatible object storage)
+// When R2_ACCOUNT_ID is set uploads go to R2; otherwise they fall back to
+// the local UPLOAD_DIR.
+// ---------------------------------------------------------------------------
+
+define('R2_ACCOUNT_ID',       $_ENV['R2_ACCOUNT_ID']       ?? '');
+define('R2_ACCESS_KEY_ID',    $_ENV['R2_ACCESS_KEY_ID']     ?? '');
+define('R2_SECRET_ACCESS_KEY',$_ENV['R2_SECRET_ACCESS_KEY'] ?? '');
+define('R2_BUCKET_NAME',      $_ENV['R2_BUCKET_NAME']       ?? '');
+define('R2_KEY_PREFIX',       rtrim($_ENV['R2_KEY_PREFIX']   ?? 'chopaeng/1625autolab', '/') . '/');
+define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));

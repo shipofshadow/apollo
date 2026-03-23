@@ -360,10 +360,15 @@ class Router
 
             $ext      = pathinfo((is_array($files['name']) ? $files['name'][$i] : $files['name']), PATHINFO_EXTENSION);
             $filename = bin2hex(random_bytes(16)) . '.' . strtolower($ext);
-            move_uploaded_file($tmpName, $uploadDir . $filename);
 
-            $base = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
-            $urls[] = $base . '/storage/uploads/' . $filename;
+            if (R2Uploader::isConfigured()) {
+                $uploader = new R2Uploader();
+                $urls[]   = $uploader->upload($tmpName, $filename, $mime);
+            } else {
+                move_uploaded_file($tmpName, $uploadDir . $filename);
+                $base   = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
+                $urls[] = $base . '/storage/uploads/' . $filename;
+            }
         }
 
         echo json_encode(['urls' => $urls]);
