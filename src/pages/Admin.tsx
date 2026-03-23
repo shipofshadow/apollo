@@ -261,15 +261,16 @@ function ServicesPanel() {
   const [editId,     setEditId]     = useState<number | null>(null);
   const [form,       setForm]       = useState<ServiceForm>(EMPTY_FORM);
   const [saving,     setSaving]     = useState(false);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
   const [deleteConf, setDeleteConf] = useState<number | null>(null);
 
   useEffect(() => {
     if (token) dispatch(fetchServicesAsync(token));
   }, [token, dispatch]);
 
-  const openNew = () => { setForm(EMPTY_FORM); setEditId(null); setEditing(true); };
-  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setEditing(true); };
-  const cancel = () => { setEditing(false); setEditId(null); };
+  const openNew = () => { setForm(EMPTY_FORM); setEditId(null); setSaveError(null); setEditing(true); };
+  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSaveError(null); setEditing(true); };
+  const cancel = () => { setEditing(false); setEditId(null); setSaveError(null); };
 
   const set = (field: keyof ServiceForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -279,14 +280,21 @@ function ServicesPanel() {
     e.preventDefault();
     if (!token) return;
     setSaving(true);
+    setSaveError(null);
     const payload = formToPayload(form);
-    if (editId !== null) {
-      await dispatch(updateServiceAsync({ token, id: editId, data: payload }));
-    } else {
-      await dispatch(createServiceAsync({ token, data: payload }));
+    try {
+      if (editId !== null) {
+        await dispatch(updateServiceAsync({ token, id: editId, data: payload })).unwrap();
+      } else {
+        await dispatch(createServiceAsync({ token, data: payload })).unwrap();
+      }
+      setEditing(false);
+      setEditId(null);
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Failed to save service.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setEditing(false);
   };
 
   const handleDelete = async (id: number) => {
@@ -309,6 +317,12 @@ function ServicesPanel() {
         </div>
 
         <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-6">
+          {saveError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {saveError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Title *</label>
@@ -491,28 +505,35 @@ function ContentPanel() {
   const [editing,    setEditing]    = useState(false);
   const [current,    setCurrent]    = useState<PostForm>(EMPTY_POST);
   const [saving,     setSaving]     = useState(false);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
   const [deleteConf, setDeleteConf] = useState<number | null>(null);
 
   useEffect(() => {
     if (token) dispatch(fetchBlogPostsAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = ()              => { setCurrent(EMPTY_POST); setEditing(true); };
-  const openEdit = (p: ContentPost) => { setCurrent({ id: p.id, title: p.title, content: p.content, status: p.status }); setEditing(true); };
-  const cancel   = ()              => setEditing(false);
+  const openNew  = ()              => { setCurrent(EMPTY_POST); setSaveError(null); setEditing(true); };
+  const openEdit = (p: ContentPost) => { setCurrent({ id: p.id, title: p.title, content: p.content, status: p.status }); setSaveError(null); setEditing(true); };
+  const cancel   = ()              => { setEditing(false); setSaveError(null); };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
     setSaving(true);
+    setSaveError(null);
     const data = { title: current.title, content: current.content, status: current.status };
-    if (current.id !== null) {
-      await dispatch(updateBlogPostAsync({ token, id: current.id, data }));
-    } else {
-      await dispatch(createBlogPostAsync({ token, data }));
+    try {
+      if (current.id !== null) {
+        await dispatch(updateBlogPostAsync({ token, id: current.id, data })).unwrap();
+      } else {
+        await dispatch(createBlogPostAsync({ token, data })).unwrap();
+      }
+      setEditing(false);
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Failed to save blog post.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setEditing(false);
   };
 
   const handleToggleStatus = async (post: ContentPost) => {
@@ -543,6 +564,12 @@ function ContentPanel() {
         </div>
 
         <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-6">
+          {saveError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {saveError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Title *</label>
