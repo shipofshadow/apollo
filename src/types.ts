@@ -1,11 +1,33 @@
+// ── Auth ───────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'client' | 'admin';
+  created_at: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
+
+// ── Booking ────────────────────────────────────────────────────────────────
+
 export interface BookingPayload {
   name: string;
   email: string;
   phone: string;
   vehicleInfo: string;
-  serviceRequired: string;
-  locationPreference: string;
-  specificRequests: string;
+  serviceId: string;
+  serviceName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  notes: string;
 }
 
 export interface BookingState {
@@ -30,15 +52,18 @@ export interface BuildItem {
 
 export interface Booking {
   id: string;
+  userId?: number | null;
   name: string;
   email: string;
   phone: string;
   vehicleInfo: string;
-  serviceRequired: string;
-  locationPreference: string;
-  specificRequests: string;
-  status: 'pending' | 'approved' | 'rejected';
-  date: string;
+  serviceId: string;
+  serviceName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  notes: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  createdAt: string;
 }
 
 export interface Product {

@@ -8,8 +8,8 @@ use function FastRoute\simpleDispatcher;
 /**
  * Front-controller router using nikic/fast-route.
  *
- * Resolves the request path/method to the appropriate handler method and
- * converts any RuntimeException into a JSON error response.
+ * Resolves the request path/method to the appropriate handler and converts
+ * any RuntimeException into a structured JSON error response.
  */
 class Router
 {
@@ -18,8 +18,22 @@ class Router
         header('Content-Type: application/json');
 
         $dispatcher = simpleDispatcher(function (FastRoute\RouteCollector $r): void {
-            $r->addRoute('GET', '/api/posts', 'handlePosts');
-            $r->addRoute('GET', '/health',    'handleHealth');
+            // ── Public ──────────────────────────────────────────────────────
+            $r->addRoute('GET',  '/health',             'handleHealth');
+            $r->addRoute('GET',  '/api/posts',          'handlePosts');
+
+            // ── Auth ────────────────────────────────────────────────────────
+            $r->addRoute('POST', '/api/auth/register',  'handleAuthRegister');
+            $r->addRoute('POST', '/api/auth/login',     'handleAuthLogin');
+            $r->addRoute('POST', '/api/auth/logout',    'handleAuthLogout');
+            $r->addRoute('GET',  '/api/auth/me',        'handleAuthMe');
+            $r->addRoute('PUT',  '/api/auth/profile',   'handleAuthProfile');
+
+            // ── Bookings ────────────────────────────────────────────────────
+            $r->addRoute('POST',  '/api/bookings',          'handleBookingCreate');
+            $r->addRoute('GET',   '/api/bookings',           'handleBookingList');    // admin
+            $r->addRoute('GET',   '/api/bookings/mine',      'handleBookingMine');    // client
+            $r->addRoute('PATCH', '/api/bookings/{id}',      'handleBookingUpdate'); // admin
         });
 
         $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
@@ -30,7 +44,7 @@ class Router
         try {
             switch ($routeInfo[0]) {
                 case Dispatcher::FOUND:
-                    $this->{$routeInfo[1]}();
+                    $this->{$routeInfo[1]}($routeInfo[2]);
                     break;
 
                 case Dispatcher::METHOD_NOT_ALLOWED:
@@ -49,10 +63,46 @@ class Router
     }
 
     // -------------------------------------------------------------------------
-    // Handlers
+    // Helpers
     // -------------------------------------------------------------------------
 
-    private function handlePosts(): void
+    /** @return array<string, mixed> */
+    private function jsonBody(): array
+    {
+        $raw = file_get_contents('php://input') ?: '{}';
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Require a valid Bearer JWT and return its payload.
+     * Optionally enforce a specific role.
+     *
+     * @return array<string, mixed>
+     */
+    private function requireAuth(?string $role = null): array
+    {
+        $payload = Auth::user();
+
+        if ($role !== null && ($payload['role'] ?? '') !== $role) {
+            throw new RuntimeException('Forbidden.', 403);
+        }
+
+        return $payload;
+    }
+
+    // -------------------------------------------------------------------------
+    // Public handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleHealth(array $vars = []): void
+    {
+        echo json_encode(['status' => 'ok']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePosts(array $vars = []): void
     {
         if (FB_ACCESS_TOKEN === '') {
             throw new RuntimeException('FB_ACCESS_TOKEN is not configured on the server.', 500);
@@ -61,7 +111,6 @@ class Router
         $limit = max(1, min(100, (int) ($_GET['limit'] ?? 10)));
         $after = (isset($_GET['after']) && $_GET['after'] !== '') ? (string) $_GET['after'] : null;
 
-        // Serve from cache on first page
         $cacheKey = 'apollo_posts_' . $limit;
         if ($after === null && CACHE_TTL_SECONDS > 0) {
             $cached = Cache::get($cacheKey);
@@ -81,8 +130,105 @@ class Router
         echo json_encode($result);
     }
 
-    private function handleHealth(): void
+    // -------------------------------------------------------------------------
+    // Auth handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleAuthRegister(array $vars = []): void
     {
-        echo json_encode(['status' => 'ok']);
+        $data   = $this->jsonBody();
+        $result = (new UserService())->register($data);
+        http_response_code(201);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthLogin(array $vars = []): void
+    {
+        $data   = $this->jsonBody();
+        $email  = (string) ($data['email']    ?? '');
+        $pass   = (string) ($data['password'] ?? '');
+        $result = (new UserService())->login($email, $pass);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthLogout(array $vars = []): void
+    {
+        // JWT is stateless; the client simply discards the token.
+        // Future: add token to a blocklist here.
+        echo json_encode(['message' => 'Logged out successfully.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthMe(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $user    = (new UserService())->findById((int) $payload['sub']);
+        echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthProfile(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $data    = $this->jsonBody();
+        $user    = (new UserService())->updateProfile((int) $payload['sub'], $data);
+        echo json_encode(['user' => $user]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Booking handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleBookingCreate(array $vars = []): void
+    {
+        // Optional auth – link booking to user if a valid token is present
+        $userId = null;
+        $token  = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $userId  = (int) ($payload['sub'] ?? 0) ?: null;
+            } catch (RuntimeException) {
+                // invalid token → treat as anonymous booking
+            }
+        }
+
+        $data    = $this->jsonBody();
+        $booking = (new BookingService())->create($data, $userId);
+        http_response_code(201);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingList(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $bookings = (new BookingService())->getAll();
+        echo json_encode(['bookings' => $bookings]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingMine(array $vars = []): void
+    {
+        $payload  = $this->requireAuth();
+        $bookings = (new BookingService())->getByUserId((int) $payload['sub']);
+        echo json_encode(['bookings' => $bookings]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id     = $vars['id'] ?? '';
+        $data   = $this->jsonBody();
+        $status = (string) ($data['status'] ?? '');
+
+        $booking = (new BookingService())->updateStatus($id, $status);
+        echo json_encode(['booking' => $booking]);
     }
 }
+
