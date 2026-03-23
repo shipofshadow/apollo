@@ -38,12 +38,15 @@ class R2Uploader
      * @param  string $tmpPath  Absolute path to the temporary file.
      * @param  string $filename Desired filename (basename only, no path).
      * @param  string $mime     MIME type of the file.
+     * @param  string $subdir   Optional sub-directory appended after R2_KEY_PREFIX,
+     *                          e.g. "bookings/", "services/", "products/".
+     *                          Must end with "/" if non-empty.
      * @return string           Public URL of the uploaded object.
      * @throws RuntimeException on upload failure.
      */
-    public function upload(string $tmpPath, string $filename, string $mime): string
+    public function upload(string $tmpPath, string $filename, string $mime, string $subdir = ''): string
     {
-        $key = R2_KEY_PREFIX . $filename;
+        $key = R2_KEY_PREFIX . $subdir . $filename;
 
         try {
             $this->client->putObject([

@@ -5,7 +5,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   TrendingUp, Activity, Eye, EyeOff, AlertCircle, Loader2,
   CheckCircle2, XCircle, Clock, Plus, Pencil, Trash2, Save, X, ArrowLeft,
-  Phone, Mail, Lock, CheckCircle, UserCog, DollarSign,
+  Phone, Mail, Lock, CheckCircle, UserCog, DollarSign, Upload,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../store/bookingSlice';
@@ -21,7 +21,7 @@ import {
   updateProductAsync, deleteProductAsync,
 } from '../store/productsSlice';
 import { updateProfileAsync, clearAuthError } from '../store/authSlice';
-import { fetchAdminStatsApi, updateBookingPartsApi, updateShopHoursApi, fetchShopHoursApi, type AdminStats } from '../services/api';
+import { fetchAdminStatsApi, updateBookingPartsApi, updateShopHoursApi, fetchShopHoursApi, uploadAdminImageApi, type AdminStats } from '../services/api';
 import type { AppDispatch, RootState } from '../store';
 import type { Booking, Service, Product } from '../types';
 import type { ContentPost } from '../store/contentSlice';
@@ -326,6 +326,7 @@ function ServicesPanel() {
   const [saving,     setSaving]     = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
   const [deleteConf, setDeleteConf] = useState<number | null>(null);
+  const [imgUploading, setImgUploading] = useState(false);
 
   useEffect(() => {
     if (token) dispatch(fetchServicesAsync(token));
@@ -415,9 +416,29 @@ function ServicesPanel() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Image URL</label>
-              <input value={form.imageUrl} onChange={set('imageUrl')}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="https://…" />
+              <div className="flex gap-2">
+                <input value={form.imageUrl} onChange={set('imageUrl')}
+                  className="flex-1 bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                  placeholder="https://… or upload below" />
+                <label className={`flex items-center gap-2 px-4 py-3 border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange transition-colors rounded-sm cursor-pointer text-sm font-bold uppercase tracking-widest ${imgUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span className="hidden sm:inline">Upload</span>
+                  <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file || !token) return;
+                    setImgUploading(true);
+                    try {
+                      const url = await uploadAdminImageApi(token, file, 'services');
+                      setForm(p => ({ ...p, imageUrl: url }));
+                    } catch (err: unknown) {
+                      setSaveError((err as Error)?.message ?? 'Image upload failed.');
+                    } finally {
+                      setImgUploading(false);
+                      e.target.value = '';
+                    }
+                  }} />
+                </label>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -809,6 +830,7 @@ function ProductsPanel() {
   const [saving,     setSaving]     = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
   const [deleteConf, setDeleteConf] = useState<number | null>(null);
+  const [imgUploading, setImgUploading] = useState(false);
 
   useEffect(() => {
     if (token) dispatch(fetchProductsAsync(token));
@@ -903,9 +925,29 @@ function ProductsPanel() {
 
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Image URL</label>
-              <input value={form.imageUrl} onChange={set('imageUrl')}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="https://…" />
+              <div className="flex gap-2">
+                <input value={form.imageUrl} onChange={set('imageUrl')}
+                  className="flex-1 bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                  placeholder="https://… or upload below" />
+                <label className={`flex items-center gap-2 px-4 py-3 border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange transition-colors rounded-sm cursor-pointer text-sm font-bold uppercase tracking-widest ${imgUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span className="hidden sm:inline">Upload</span>
+                  <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file || !token) return;
+                    setImgUploading(true);
+                    try {
+                      const url = await uploadAdminImageApi(token, file, 'products');
+                      setForm(p => ({ ...p, imageUrl: url }));
+                    } catch (err: unknown) {
+                      setSaveError((err as Error)?.message ?? 'Image upload failed.');
+                    } finally {
+                      setImgUploading(false);
+                      e.target.value = '';
+                    }
+                  }} />
+                </label>
+              </div>
             </div>
 
             <div className="md:col-span-2 space-y-2">

@@ -123,6 +123,30 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
   return (data as { urls: string[] }).urls;
 };
 
+export const uploadAdminImageApi = async (
+  token: string,
+  file: File,
+  type: 'services' | 'products' | 'blog'
+): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('type', type);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/admin/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch {
+    throw new Error('Unable to reach the backend server.');
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  return (data as { url: string }).url;
+};
+
 export const updateBookingPartsApi = (
   token: string,
   id: string,

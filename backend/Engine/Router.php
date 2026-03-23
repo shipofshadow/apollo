@@ -67,6 +67,7 @@ class Router
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
+            $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
 
             // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
@@ -363,7 +364,7 @@ class Router
 
             if (R2Uploader::isConfigured()) {
                 $uploader = new R2Uploader();
-                $urls[]   = $uploader->upload($tmpName, $filename, $mime);
+                $urls[]   = $uploader->upload($tmpName, $filename, $mime, 'bookings/');
             } else {
                 move_uploaded_file($tmpName, $uploadDir . $filename);
                 $base   = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
@@ -526,6 +527,59 @@ class Router
         $this->requireAuth('admin');
         $stats = (new BookingService())->getStats();
         echo json_encode($stats);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminMediaUpload(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+
+        $allowed_types = ['services', 'products', 'blog'];
+        $type = $_POST['type'] ?? '';
+        if (!in_array($type, $allowed_types, true)) {
+            throw new RuntimeException('Invalid upload type. Must be one of: ' . implode(', ', $allowed_types) . '.', 422);
+        }
+
+        if (empty($_FILES['file'])) {
+            throw new RuntimeException('No file provided.', 422);
+        }
+
+        $file     = $_FILES['file'];
+        $tmpName  = $file['tmp_name'];
+        $mime     = $file['type'];
+        $size     = $file['size'];
+        $error    = $file['error'];
+
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException("File upload error (code $error).", 422);
+        }
+        $allowed_mimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!in_array($mime, $allowed_mimes, true) || !@getimagesize($tmpName)) {
+            throw new RuntimeException('Only JPEG, PNG, WebP and GIF images are accepted.', 422);
+        }
+        $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
+        if ($size > $maxBytes) {
+            throw new RuntimeException('File must be under ' . UPLOAD_MAX_MB . ' MB.', 422);
+        }
+
+        $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+        $subdir   = $type . '/';
+
+        if (R2Uploader::isConfigured()) {
+            $uploader = new R2Uploader();
+            $url      = $uploader->upload($tmpName, $filename, $mime, $subdir);
+        } else {
+            $uploadDir = UPLOAD_DIR . $subdir;
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            move_uploaded_file($tmpName, $uploadDir . $filename);
+            $base = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
+            $url  = $base . '/storage/uploads/' . $subdir . $filename;
+        }
+
+        echo json_encode(['url' => $url]);
     }
 
     // -------------------------------------------------------------------------
