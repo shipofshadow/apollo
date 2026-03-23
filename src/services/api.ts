@@ -113,6 +113,38 @@ export const updateBookingStatusApi = (
     body: JSON.stringify({ status }),
   }, token);
 
+// ── Blog API ─────────────────────────────────────────────────────────────────
+
+export const fetchBlogPostsApi = (token?: string | null) =>
+  apiFetch<{ posts: import('../types').BlogPost[] }>('/api/blog', {}, token);
+
+export const fetchBlogPostByIdApi = (id: number, token?: string | null) =>
+  apiFetch<{ post: import('../types').BlogPost }>(`/api/blog/${id}`, {}, token);
+
+export const createBlogPostApi = (
+  token: string,
+  data: { title: string; content: string; status: 'Draft' | 'Published' }
+) =>
+  apiFetch<{ post: import('../types').BlogPost }>('/api/blog', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateBlogPostApi = (
+  token: string,
+  id: number,
+  data: Partial<{ title: string; content: string; status: 'Draft' | 'Published' }>
+) =>
+  apiFetch<{ post: import('../types').BlogPost }>(`/api/blog/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteBlogPostApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/blog/${id}`, {
+    method: 'DELETE',
+  }, token);
+
 // ── Legacy / mock (kept for offline fallback) ────────────────────────────────
 
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {

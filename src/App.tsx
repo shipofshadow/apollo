@@ -16,6 +16,7 @@ import ProductDetail from './pages/ProductDetail';
 import Portfolio from './pages/Portfolio';
 import About from './pages/About';
 import BookingPage from './pages/BookingPage';
+import Blog from './pages/Blog';
 
 // Auth pages
 import LoginPage from './pages/auth/LoginPage';
@@ -49,6 +50,7 @@ export default function App() {
                 <Route path="/products"      element={<Products />} />
                 <Route path="/products/:id"  element={<ProductDetail />} />
                 <Route path="/portfolio"     element={<Portfolio />} />
+                <Route path="/blog"          element={<Blog />} />
                 <Route path="/about"         element={<About />} />
                 <Route path="/booking"       element={<BookingPage />} />
 

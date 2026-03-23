@@ -1,67 +1,115 @@
-import { createSlice } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { BlogPost, BlogState } from '../types';
+import {
+  fetchBlogPostsApi,
+  createBlogPostApi,
+  updateBlogPostApi,
+  deleteBlogPostApi,
+} from '../services/api';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Re-export for Admin.tsx compatibility
+export type { BlogPost as ContentPost };
 
-export interface ContentPost {
-  id: number;
-  title: string;
-  type: 'Blog' | 'Portfolio';
-  content: string;
-  status: 'Draft' | 'Published';
-}
+// ── Thunks ────────────────────────────────────────────────────────────────────
 
-interface ContentState {
-  posts: ContentPost[];
-}
+export const fetchBlogPostsAsync = createAsyncThunk(
+  'content/fetchAll',
+  async (token: string | null | undefined, { rejectWithValue }) => {
+    try {
+      const { posts } = await fetchBlogPostsApi(token);
+      return posts;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to load blog posts.');
+    }
+  }
+);
 
-// ── Initial data ──────────────────────────────────────────────────────────────
+export const createBlogPostAsync = createAsyncThunk(
+  'content/create',
+  async (
+    arg: { token: string; data: { title: string; content: string; status: 'Draft' | 'Published' } },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { post } = await createBlogPostApi(arg.token, arg.data);
+      return post;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to create blog post.');
+    }
+  }
+);
 
-const initialState: ContentState = {
-  posts: [
-    {
-      id: 1,
-      title: 'Honda BR-V 2017 Full Setup',
-      type: 'Portfolio',
-      content:
-        'Equipped with X1 Bi-LED Projector Headlights and Tri-Color Foglights. Both with 6-8 years lifespan & 3 Years Warranty.',
-      status: 'Published',
-    },
-    {
-      id: 2,
-      title: 'Why Upgrade Your Headlights?',
-      type: 'Blog',
-      content:
-        'Upgrading your headlights is one of the best safety improvements you can make to your vehicle.',
-      status: 'Draft',
-    },
-  ],
-};
+export const updateBlogPostAsync = createAsyncThunk(
+  'content/update',
+  async (
+    arg: { token: string; id: number; data: Partial<{ title: string; content: string; status: 'Draft' | 'Published' }> },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { post } = await updateBlogPostApi(arg.token, arg.id, arg.data);
+      return post;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to update blog post.');
+    }
+  }
+);
+
+export const deleteBlogPostAsync = createAsyncThunk(
+  'content/delete',
+  async (arg: { token: string; id: number }, { rejectWithValue }) => {
+    try {
+      await deleteBlogPostApi(arg.token, arg.id);
+      return arg.id;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to delete blog post.');
+    }
+  }
+);
 
 // ── Slice ─────────────────────────────────────────────────────────────────────
+
+const initialState: BlogState = {
+  posts:  [],
+  status: 'idle',
+  error:  null,
+};
 
 const contentSlice = createSlice({
   name: 'content',
   initialState,
-  reducers: {
-    addPost(state, action: PayloadAction<Omit<ContentPost, 'id'>>) {
-      state.posts.push({ ...action.payload, id: Date.now() });
-    },
-    updatePost(state, action: PayloadAction<ContentPost>) {
-      const idx = state.posts.findIndex(p => p.id === action.payload.id);
-      if (idx !== -1) state.posts[idx] = action.payload;
-    },
-    deletePost(state, action: PayloadAction<number>) {
-      state.posts = state.posts.filter(p => p.id !== action.payload);
-    },
-    toggleStatus(state, action: PayloadAction<number>) {
-      const post = state.posts.find(p => p.id === action.payload);
-      if (post) {
-        post.status = post.status === 'Published' ? 'Draft' : 'Published';
-      }
-    },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      // fetchAll
+      .addCase(fetchBlogPostsAsync.pending, (state) => {
+        state.status = 'loading';
+        state.error  = null;
+      })
+      .addCase(fetchBlogPostsAsync.fulfilled, (state, action) => {
+        state.status = 'success';
+        state.posts  = action.payload;
+      })
+      .addCase(fetchBlogPostsAsync.rejected, (state, action) => {
+        state.status = 'error';
+        state.error  = action.payload as string;
+      })
+
+      // create
+      .addCase(createBlogPostAsync.fulfilled, (state, action) => {
+        state.posts.unshift(action.payload);
+      })
+
+      // update
+      .addCase(updateBlogPostAsync.fulfilled, (state, action) => {
+        const idx = state.posts.findIndex(p => p.id === action.payload.id);
+        if (idx !== -1) state.posts[idx] = action.payload;
+      })
+
+      // delete
+      .addCase(deleteBlogPostAsync.fulfilled, (state, action) => {
+        state.posts = state.posts.filter(p => p.id !== action.payload);
+      });
   },
 });
 
-export const { addPost, updatePost, deletePost, toggleStatus } = contentSlice.actions;
 export default contentSlice.reducer;

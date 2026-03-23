@@ -11,7 +11,9 @@ import {
   fetchServicesAsync, createServiceAsync,
   updateServiceAsync, deleteServiceAsync,
 } from '../store/servicesSlice';
-import { addPost, updatePost, deletePost, toggleStatus } from '../store/contentSlice';
+import {
+  fetchBlogPostsAsync, createBlogPostAsync, updateBlogPostAsync, deleteBlogPostAsync,
+} from '../store/contentSlice';
 import type { AppDispatch, RootState } from '../store';
 import type { Booking, Service } from '../types';
 import type { ContentPost } from '../store/contentSlice';
@@ -469,29 +471,55 @@ function ServicesPanel() {
 }
 
 
-// ── Content panel – Redux-backed ─────────────────────────────────────────────
-type PostForm = { id: number | null; title: string; type: 'Blog' | 'Portfolio'; content: string; status: 'Draft' | 'Published' };
-const EMPTY_POST: PostForm = { id: null, title: '', type: 'Blog', content: '', status: 'Draft' };
+// ── Blog posts panel – API-backed ────────────────────────────────────────────
+type PostForm = { id: number | null; title: string; content: string; status: 'Draft' | 'Published' };
+const EMPTY_POST: PostForm = { id: null, title: '', content: '', status: 'Draft' };
 
 function ContentPanel() {
   const dispatch = useDispatch<AppDispatch>();
-  const posts    = useSelector((s: RootState) => s.content.posts);
+  const { token } = useAuth();
+  const { posts, status } = useSelector((s: RootState) => s.content);
 
-  const [editing, setEditing] = useState(false);
-  const [current, setCurrent] = useState<PostForm>(EMPTY_POST);
+  const [editing,    setEditing]    = useState(false);
+  const [current,    setCurrent]    = useState<PostForm>(EMPTY_POST);
+  const [saving,     setSaving]     = useState(false);
+  const [deleteConf, setDeleteConf] = useState<number | null>(null);
 
-  const openNew  = ()           => { setCurrent(EMPTY_POST); setEditing(true); };
-  const openEdit = (p: ContentPost) => { setCurrent({ ...p }); setEditing(true); };
-  const cancel   = ()           => setEditing(false);
+  useEffect(() => {
+    if (token) dispatch(fetchBlogPostsAsync(token));
+  }, [token, dispatch]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const openNew  = ()              => { setCurrent(EMPTY_POST); setEditing(true); };
+  const openEdit = (p: ContentPost) => { setCurrent({ id: p.id, title: p.title, content: p.content, status: p.status }); setEditing(true); };
+  const cancel   = ()              => setEditing(false);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (current.id) {
-      dispatch(updatePost(current as ContentPost));
+    if (!token) return;
+    setSaving(true);
+    const data = { title: current.title, content: current.content, status: current.status };
+    if (current.id !== null) {
+      await dispatch(updateBlogPostAsync({ token, id: current.id, data }));
     } else {
-      dispatch(addPost({ title: current.title, type: current.type, content: current.content, status: current.status }));
+      await dispatch(createBlogPostAsync({ token, data }));
     }
+    setSaving(false);
     setEditing(false);
+  };
+
+  const handleToggleStatus = async (post: ContentPost) => {
+    if (!token) return;
+    await dispatch(updateBlogPostAsync({
+      token,
+      id: post.id,
+      data: { status: post.status === 'Published' ? 'Draft' : 'Published' },
+    }));
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!token) return;
+    await dispatch(deleteBlogPostAsync({ token, id }));
+    setDeleteConf(null);
   };
 
   if (editing) {
@@ -514,14 +542,6 @@ function ContentPanel() {
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Type</label>
-              <select value={current.type} onChange={e => setCurrent(p => ({ ...p, type: e.target.value as 'Blog' | 'Portfolio' }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm appearance-none">
-                <option value="Blog">Blog</option>
-                <option value="Portfolio">Portfolio</option>
-              </select>
-            </div>
-            <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Status</label>
               <select value={current.status} onChange={e => setCurrent(p => ({ ...p, status: e.target.value as 'Draft' | 'Published' }))}
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm appearance-none">
@@ -534,13 +554,14 @@ function ContentPanel() {
               <textarea required rows={12} value={current.content}
                 onChange={e => setCurrent(p => ({ ...p, content: e.target.value }))}
                 className="w-full bg-brand-darker border border-gray-700 text-white p-4 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
-                placeholder="Write your content here…" />
+                placeholder="Write your blog post here…" />
             </div>
           </div>
           <div className="flex gap-4 pt-4 border-t border-gray-800">
-            <button type="submit"
-              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
-              <Save className="w-4 h-4" /> Save
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {current.id ? 'Save Changes' : 'Publish'}
             </button>
             <button type="button" onClick={cancel}
               className="px-6 py-3 border border-gray-700 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-colors rounded-sm">
@@ -555,56 +576,82 @@ function ContentPanel() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Manage Content</h2>
+        <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Blog Posts</h2>
         <button onClick={openNew}
           className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-sm font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
           <Plus className="w-4 h-4" /> New Post
         </button>
       </div>
-      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-x-auto">
-        <table className="w-full text-left min-w-[500px]">
-          <thead>
-            <tr className="border-b border-gray-800 bg-brand-darker/50">
-              {['Title', 'Type', 'Status', 'Actions'].map(h => (
-                <th key={h} className="p-4 text-xs font-bold uppercase tracking-widest text-gray-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {posts.map(post => (
-              <tr key={post.id} className="border-b border-gray-800 hover:bg-brand-darker/50 transition-colors">
-                <td className="p-4 text-white font-bold">{post.title}</td>
-                <td className="p-4 text-gray-400 text-sm">{post.type}</td>
-                <td className="p-4">
-                  <button onClick={() => dispatch(toggleStatus(post.id))}
-                    className={`px-2 py-1 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors ${
-                      post.status === 'Published'
-                        ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                    }`}>
-                    {post.status}
-                  </button>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => openEdit(post)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange text-xs font-bold uppercase rounded-sm transition-colors">
-                      <Pencil className="w-3 h-3" /> Edit
-                    </button>
-                    <button onClick={() => dispatch(deletePost(post.id))}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-500 hover:border-red-500/50 hover:text-red-400 text-xs font-bold uppercase rounded-sm transition-colors">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </td>
+
+      {status === 'loading' && (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-brand-orange animate-spin" /></div>
+      )}
+
+      {posts.length > 0 && (
+        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-x-auto">
+          <table className="w-full text-left min-w-[500px]">
+            <thead>
+              <tr className="border-b border-gray-800 bg-brand-darker/50">
+                {['Title', 'Status', 'Date', 'Actions'].map(h => (
+                  <th key={h} className="p-4 text-xs font-bold uppercase tracking-widest text-gray-500">{h}</th>
+                ))}
               </tr>
-            ))}
-            {posts.length === 0 && (
-              <tr><td colSpan={4} className="p-8 text-center text-gray-500">No posts yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {posts.map(post => (
+                <tr key={post.id} className="border-b border-gray-800 hover:bg-brand-darker/50 transition-colors">
+                  <td className="p-4 text-white font-bold">{post.title}</td>
+                  <td className="p-4">
+                    <button onClick={() => handleToggleStatus(post)}
+                      className={`px-2 py-1 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors ${
+                        post.status === 'Published'
+                          ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
+                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      }`}>
+                      {post.status}
+                    </button>
+                  </td>
+                  <td className="p-4 text-gray-400 text-sm">
+                    {new Date(post.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openEdit(post)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange text-xs font-bold uppercase rounded-sm transition-colors">
+                        <Pencil className="w-3 h-3" /> Edit
+                      </button>
+                      {deleteConf === post.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => handleDelete(post.id)}
+                            className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
+                            Confirm
+                          </button>
+                          <button onClick={() => setDeleteConf(null)}
+                            className="px-3 py-1.5 border border-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase rounded-sm transition-colors">
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeleteConf(post.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-500 hover:border-red-500/50 hover:text-red-400 text-xs font-bold uppercase rounded-sm transition-colors">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {posts.length === 0 && status !== 'loading' && (
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
+          <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No blog posts yet. Click <strong>New Post</strong> to create one.</p>
+        </div>
+      )}
     </div>
   );
 }

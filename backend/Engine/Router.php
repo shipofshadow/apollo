@@ -42,6 +42,13 @@ class Router
             $r->addRoute('GET',   '/api/bookings/mine',      'handleBookingMine');
             $r->addRoute('PATCH', '/api/bookings/{id}',      'handleBookingUpdate');
 
+            // ── Blog posts (public read, admin write) ───────────────────────
+            $r->addRoute('GET',    '/api/blog',              'handleBlogList');
+            $r->addRoute('GET',    '/api/blog/{id:\d+}',     'handleBlogGet');
+            $r->addRoute('POST',   '/api/blog',              'handleBlogCreate');
+            $r->addRoute('PUT',    '/api/blog/{id:\d+}',     'handleBlogUpdate');
+            $r->addRoute('DELETE', '/api/blog/{id:\d+}',     'handleBlogDelete');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -312,6 +319,72 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new ServiceCrudService())->delete($id);
         echo json_encode(['message' => 'Service deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Blog post handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleBlogList(array $vars = []): void
+    {
+        $publishedOnly = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $publishedOnly = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $posts = (new BlogPostService())->getAll($publishedOnly);
+        echo json_encode(['posts' => $posts]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBlogGet(array $vars = []): void
+    {
+        $id            = (int) ($vars['id'] ?? 0);
+        $publishedOnly = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $publishedOnly = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $post = (new BlogPostService())->getById($id, $publishedOnly);
+        echo json_encode(['post' => $post]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBlogCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data = $this->jsonBody();
+        $post = (new BlogPostService())->create($data);
+        http_response_code(201);
+        echo json_encode(['post' => $post]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBlogUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id   = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $post = (new BlogPostService())->update($id, $data);
+        echo json_encode(['post' => $post]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBlogDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new BlogPostService())->delete($id);
+        echo json_encode(['message' => 'Blog post deleted.']);
     }
 
     // -------------------------------------------------------------------------

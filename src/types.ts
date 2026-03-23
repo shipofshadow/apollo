@@ -116,6 +116,25 @@ export interface FacebookAttachment {
   subattachments?: { data: FacebookSubAttachment[] };
 }
 
+// ── Blog Post ──────────────────────────────────────────────────────────────
+
+export interface BlogPost {
+  id: number;
+  title: string;
+  content: string;
+  status: 'Draft' | 'Published';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlogState {
+  posts: BlogPost[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
+
+// ── Facebook ───────────────────────────────────────────────────────────────
+
 export interface FacebookPost {
   id: string;
   message?: string;
