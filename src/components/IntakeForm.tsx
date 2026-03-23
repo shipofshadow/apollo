@@ -76,11 +76,11 @@ export default function IntakeForm() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-0">
           
           {/* Left Side: Contact Info */}
-          <div className="bg-brand-gray p-10 md:p-16 border-l-4 border-brand-orange">
+          <div className="bg-brand-gray p-6 md:p-10 lg:p-16 border-l-4 border-brand-orange">
             <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-4">
               Get In Touch
             </span>
-            <h2 className="text-4xl md:text-5xl font-display font-bold text-white uppercase mb-8">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-white uppercase mb-8">
               Contact <span className="text-brand-orange">The Lab</span>
             </h2>
             
@@ -132,7 +132,7 @@ export default function IntakeForm() {
           </div>
 
           {/* Right Side: Booking Form */}
-          <div className="bg-brand-dark p-10 md:p-16 border border-gray-800 relative">
+          <div className="bg-brand-dark p-6 md:p-10 lg:p-16 border border-gray-800 relative">
             {status === 'success' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-dark/95 backdrop-blur-sm p-8 text-center z-10">
                 <CheckCircle className="w-20 h-20 text-green-500 mb-6" />

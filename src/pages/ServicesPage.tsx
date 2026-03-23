@@ -29,7 +29,7 @@ export default function ServicesPage() {
           <div className="w-24 h-1 bg-brand-orange mx-auto mt-6"></div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { name: 'RGB Demon Eyes Kit', price: '$149.99', img: 'https://images.unsplash.com/photo-1584345611124-287a5085e648?q=80&w=2015&auto=format&fit=crop' },
             { name: '10.1" Android Headunit', price: '$499.99', img: 'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop' },

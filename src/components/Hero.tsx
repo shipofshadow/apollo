@@ -24,7 +24,7 @@ export default function Hero() {
             </span>
           </div>
 
-          <h1 className="text-6xl md:text-8xl lg:text-9xl font-display font-black leading-[0.85] text-brand-orange text-outline-thick uppercase tracking-tighter">
+          <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-display font-black leading-[0.85] text-brand-orange text-outline-thick uppercase tracking-tighter">
             1625 <br />
             <span className="text-white text-outline-none tracking-tight">
               AUTOLAB

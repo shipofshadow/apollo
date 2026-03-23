@@ -183,7 +183,7 @@ export default function Portfolio() {
                     </p>
 
                     {/* Stats */}
-                    <div className="flex items-center gap-6 text-gray-400 text-sm mb-6">
+                    <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm mb-6">
                       <span className="flex items-center gap-1">
                         <ThumbsUp className="w-4 h-4 text-brand-orange" /> {likesCount} Likes
                       </span>

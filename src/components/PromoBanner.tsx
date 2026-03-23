@@ -19,7 +19,7 @@ export default function PromoBanner() {
             Limited Time Offer
           </span>
           
-          <h2 className="text-5xl md:text-7xl font-display font-black text-brand-orange uppercase leading-tight drop-shadow-2xl tracking-tighter text-outline">
+          <h2 className="text-3xl sm:text-5xl md:text-7xl font-display font-black text-brand-orange uppercase leading-tight drop-shadow-2xl tracking-tighter text-outline">
             Free <span className="text-white text-outline-none tracking-tight">Demon Eyes</span> <br />
             With Any Retrofit
           </h2>
