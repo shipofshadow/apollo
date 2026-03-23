@@ -11,7 +11,10 @@ export default function RegisterPage() {
   const { user, status, error, register, clearError } = useAuth();
 
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', password: '', confirm: '',
+    name:    params.get('name')  ?? '',
+    email:   params.get('email') ?? '',
+    phone:   params.get('phone') ?? '',
+    password: '', confirm: '',
   });
   const [showPw,   setShowPw]   = useState(false);
   const [localErr, setLocalErr] = useState('');

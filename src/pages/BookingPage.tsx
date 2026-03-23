@@ -308,7 +308,8 @@ export default function BookingPage() {
                     View My Bookings
                   </button>
                 ) : (
-                  <Link to={`/register?redirect=/client/bookings`}
+                  <Link
+                    to={`/register?redirect=/client/bookings&name=${encodeURIComponent(form.name)}&email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phone)}`}
                     className="bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
                     Create Account to Track Booking
                   </Link>
