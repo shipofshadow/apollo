@@ -158,6 +158,14 @@ class MigrationRunner
         try {
             foreach ($statements as $statement) {
                 $this->db->exec($statement);
+                // DDL statements (CREATE TABLE, ALTER TABLE, etc.) cause MySQL to
+                // issue an implicit commit, silently ending the transaction.
+                // After each statement we check whether we are still in a
+                // transaction so that the final commit/rollBack calls are only
+                // made when a real transaction is still open.
+                if (!$this->db->inTransaction()) {
+                    break;
+                }
             }
 
             $stmt = $this->db->prepare(
@@ -165,9 +173,13 @@ class MigrationRunner
             );
             $stmt->execute([':name' => $name]);
 
-            $this->db->commit();
+            if ($this->db->inTransaction()) {
+                $this->db->commit();
+            }
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw new RuntimeException(
                 "Migration '$name' failed: " . $e->getMessage(), 500, $e
             );
