@@ -439,6 +439,12 @@ function ServicesPanel() {
                   }} />
                 </label>
               </div>
+              {form.imageUrl && (
+                <img src={form.imageUrl} alt="Preview"
+                  className="mt-2 h-32 w-full object-cover rounded-sm border border-gray-700"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onLoad={e => { (e.target as HTMLImageElement).style.display = ''; }} />
+              )}
             </div>
 
             <div className="space-y-2">
@@ -948,6 +954,12 @@ function ProductsPanel() {
                   }} />
                 </label>
               </div>
+              {form.imageUrl && (
+                <img src={form.imageUrl} alt="Preview"
+                  className="mt-2 h-32 w-full object-cover rounded-sm border border-gray-700"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onLoad={e => { (e.target as HTMLImageElement).style.display = ''; }} />
+              )}
             </div>
 
             <div className="md:col-span-2 space-y-2">
