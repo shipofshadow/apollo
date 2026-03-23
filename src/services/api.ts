@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -142,6 +142,38 @@ export const updateBlogPostApi = (
 
 export const deleteBlogPostApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/blog/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Products API ─────────────────────────────────────────────────────────────
+
+export const fetchProductsApi = (token?: string | null) =>
+  apiFetch<{ products: Product[] }>('/api/products', {}, token);
+
+export const fetchProductByIdApi = (id: number, token?: string | null) =>
+  apiFetch<{ product: Product }>(`/api/products/${id}`, {}, token);
+
+export const createProductApi = (
+  token: string,
+  data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ product: Product }>('/api/products', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateProductApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ product: Product }>(`/api/products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteProductApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/products/${id}`, {
     method: 'DELETE',
   }, token);
 

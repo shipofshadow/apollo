@@ -49,6 +49,13 @@ class Router
             $r->addRoute('PUT',    '/api/blog/{id:\d+}',     'handleBlogUpdate');
             $r->addRoute('DELETE', '/api/blog/{id:\d+}',     'handleBlogDelete');
 
+            // ── Products (public read, admin write) ─────────────────────────
+            $r->addRoute('GET',    '/api/products',          'handleProductList');
+            $r->addRoute('GET',    '/api/products/{id:\d+}', 'handleProductGet');
+            $r->addRoute('POST',   '/api/products',          'handleProductCreate');
+            $r->addRoute('PUT',    '/api/products/{id:\d+}', 'handleProductUpdate');
+            $r->addRoute('DELETE', '/api/products/{id:\d+}', 'handleProductDelete');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -394,6 +401,72 @@ class Router
         $this->requireAuth('admin');
         $stats = (new BookingService())->getStats();
         echo json_encode($stats);
+    }
+
+    // -------------------------------------------------------------------------
+    // Product handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleProductList(array $vars = []): void
+    {
+        $includeInactive = false;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $includeInactive = ($payload['role'] ?? '') === 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $products = (new ProductService())->getAll($includeInactive);
+        echo json_encode(['products' => $products]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductGet(array $vars = []): void
+    {
+        $id           = (int) ($vars['id'] ?? 0);
+        $requireActive = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $requireActive = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* stay public */ }
+        }
+
+        $product = (new ProductService())->getById($id, $requireActive);
+        echo json_encode(['product' => $product]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data    = $this->jsonBody();
+        $product = (new ProductService())->create($data);
+        http_response_code(201);
+        echo json_encode(['product' => $product]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id      = (int) ($vars['id'] ?? 0);
+        $data    = $this->jsonBody();
+        $product = (new ProductService())->update($id, $data);
+        echo json_encode(['product' => $product]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new ProductService())->delete($id);
+        echo json_encode(['message' => 'Product deleted.']);
     }
 
     // -------------------------------------------------------------------------

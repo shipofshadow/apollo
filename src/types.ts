@@ -90,13 +90,23 @@ export interface Booking {
 }
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
+  description: string;
   price: number;
   category: string;
-  img: string;
-  description?: string;
-  features?: string[];
+  imageUrl: string;
+  features: string[];
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductState {
+  items: Product[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
 }
 
 export interface FacebookAttachmentMedia {

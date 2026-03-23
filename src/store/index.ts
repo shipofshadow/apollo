@@ -3,6 +3,7 @@ import authReducer     from './authSlice';
 import bookingReducer  from './bookingSlice';
 import servicesReducer from './servicesSlice';
 import contentReducer  from './contentSlice';
+import productsReducer from './productsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     booking:  bookingReducer,
     services: servicesReducer,
     content:  contentReducer,
+    products: productsReducer,
   },
 });
 
