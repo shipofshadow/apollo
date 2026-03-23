@@ -180,6 +180,68 @@ class NotificationService
     // Mailer
     // -------------------------------------------------------------------------
 
+    /**
+     * Send a test email to MAIL_ADMIN (or a custom recipient).
+     * Returns an array describing what was attempted.
+     *
+     * @return array<string, mixed>
+     */
+    public function sendTest(string $recipient = ''): array
+    {
+        $to = $recipient !== '' ? $recipient : MAIL_ADMIN;
+
+        if (MAIL_FROM === '') {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'MAIL_FROM is not configured in .env',
+            ];
+        }
+
+        if ($to === '') {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'No recipient – set MAIL_ADMIN in .env or supply a recipient',
+            ];
+        }
+
+        $subject = 'Test Email – Apollo 1625 Auto Lab';
+        $body    = '<h2 style="font-family:sans-serif;color:#f97316">Test Email</h2>'
+                 . '<p style="font-family:sans-serif">This is a test notification from your Apollo 1625 Auto Lab booking system. '
+                 . 'If you received this, your email configuration is working correctly.</p>'
+                 . '<p style="font-family:sans-serif;color:#9ca3af;font-size:12px">Sent at: ' . date('Y-m-d H:i:s') . '</p>';
+
+        $this->send($to, 'Admin', $subject, $body);
+
+        return [
+            'sent'      => true,
+            'recipient' => $to,
+            'reason'    => null,
+        ];
+    }
+
+    /**
+     * Return current mail configuration status (no secrets exposed).
+     *
+     * @return array<string, mixed>
+     */
+    public function configStatus(): array
+    {
+        return [
+            'configured' => MAIL_FROM !== '',
+            'fromSet'    => MAIL_FROM !== '',
+            'adminSet'   => MAIL_ADMIN !== '',
+            'fromName'   => MAIL_FROM_NAME,
+            'fromHint'   => MAIL_FROM !== '' ? $this->maskEmail(MAIL_FROM) : '',
+            'adminHint'  => MAIL_ADMIN !== '' ? $this->maskEmail(MAIL_ADMIN) : '',
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Mailer
+    // -------------------------------------------------------------------------
+
     private function send(string $to, string $toName, string $subject, string $htmlBody): void
     {
         $fromName = MAIL_FROM_NAME;
@@ -194,5 +256,14 @@ class NotificationService
         ]);
 
         @mail($to, $subject, $htmlBody, $headers);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+        $masked = strlen($local) > 2
+            ? substr($local, 0, 2) . str_repeat('*', max(1, strlen($local) - 2))
+            : str_repeat('*', strlen($local));
+        return $masked . ($domain !== '' ? '@' . $domain : '');
     }
 }
