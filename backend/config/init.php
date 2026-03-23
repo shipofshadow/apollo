@@ -8,6 +8,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+// Fallback autoloader: loads Engine/ and db/ classes by filename so a stale
+// composer classmap (e.g. after adding a new service file) never causes a
+// "Class not found" error.
+spl_autoload_register(function (string $class): void {
+    foreach ([__DIR__ . '/../Engine/', __DIR__ . '/../db/'] as $dir) {
+        $file = $dir . $class . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+            return;
+        }
+    }
+});
+
 // ---------------------------------------------------------------------------
 // 2. Load .env using vlucas/phpdotenv
 // ---------------------------------------------------------------------------
