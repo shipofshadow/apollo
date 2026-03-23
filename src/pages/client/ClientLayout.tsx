@@ -1,10 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import {
   LayoutDashboard, Calendar, User, LogOut, ChevronRight,
 } from 'lucide-react';
-import { logoutAsync } from '../../store/authSlice';
-import type { AppDispatch, RootState } from '../../store';
+import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
   { label: 'Dashboard',   href: '/client/dashboard', icon: LayoutDashboard },
@@ -13,12 +11,11 @@ const navItems = [
 ];
 
 export default function ClientLayout() {
-  const dispatch  = useDispatch<AppDispatch>();
-  const navigate  = useNavigate();
-  const { user, token } = useSelector((s: RootState) => s.auth);
+  const navigate     = useNavigate();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    dispatch(logoutAsync(token ?? ''));
+    logout();
     navigate('/', { replace: true });
   };
 

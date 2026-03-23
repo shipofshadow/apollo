@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { loginAsync, clearAuthError } from '../../store/authSlice';
-import type { AppDispatch, RootState } from '../../store';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
-  const dispatch   = useDispatch<AppDispatch>();
   const navigate   = useNavigate();
   const [params]   = useSearchParams();
   const redirect   = params.get('redirect') ?? '';
 
-  const { user, status, error } = useSelector((s: RootState) => s.auth);
+  const { user, status, error, login, clearError } = useAuth();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -25,11 +22,11 @@ export default function LoginPage() {
   }, [user, navigate, redirect]);
 
   // Clean error on unmount
-  useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
+  useEffect(() => () => { clearError(); }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(loginAsync({ email, password }));
+    login(email, password).catch(() => {});
   };
 
   return (

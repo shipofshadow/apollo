@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { User, Phone, Mail, Lock, CheckCircle, AlertCircle } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
-import type { AppDispatch, RootState } from '../../store';
+import type { AppDispatch } from '../../store';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Profile() {
   const dispatch               = useDispatch<AppDispatch>();
-  const { user, token, status, error } = useSelector((s: RootState) => s.auth);
+  const { user, token, status, error } = useAuth();
 
   const [info,    setInfo]    = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
   const [pw,      setPw]      = useState({ current: '', newPw: '', confirm: '' });

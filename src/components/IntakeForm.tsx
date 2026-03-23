@@ -24,7 +24,37 @@ export default function IntakeForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(submitBookingAsync(formData));
+
+    // Map legacy form fields to the current BookingPayload shape
+    const serviceMap: Record<string, { id: string; name: string }> = {
+      headlights: { id: '1', name: 'Headlight Retrofit' },
+      headunit:   { id: '2', name: 'Android Headunit Installation' },
+      security:   { id: '3', name: 'Security System' },
+      aesthetics: { id: '4', name: 'Aesthetic Upgrades' },
+      other:      { id: '0', name: 'Other / Multiple' },
+    };
+    const svc = serviceMap[formData.serviceRequired] ?? { id: '0', name: formData.serviceRequired };
+
+    // Default to next day at 09:00 AM for intake-form submissions
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    dispatch(submitBookingAsync({
+      payload: {
+        name:            formData.name,
+        email:           formData.email,
+        phone:           formData.phone,
+        vehicleInfo:     formData.vehicleInfo,
+        serviceId:       svc.id,
+        serviceName:     svc.name,
+        appointmentDate: nextDay.toISOString().split('T')[0],
+        appointmentTime: '09:00 AM',
+        notes:           [
+          formData.locationPreference && `Location: ${formData.locationPreference}`,
+          formData.specificRequests,
+        ].filter(Boolean).join(' | '),
+      },
+    }));
   };
 
   const handleReset = () => {

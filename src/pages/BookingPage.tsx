@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import type { AppDispatch, RootState } from '../store';
+import { useAuth } from '../context/AuthContext';
 
 const SERVICES = [
   { id: 's1', name: 'Headlight Retrofit',            duration: '4–6 Hours',  price: 'From ₱13,750' },
@@ -26,7 +27,7 @@ const STEPS = ['Service', 'Date & Time', 'Your Details', 'Confirm'];
 export default function BookingPage() {
   const dispatch  = useDispatch<AppDispatch>();
   const navigate  = useNavigate();
-  const { user, token }        = useSelector((s: RootState) => s.auth);
+  const { user, token }        = useAuth();
   const { status: bookStatus } = useSelector((s: RootState) => s.booking);
 
   const [step,            setStep]            = useState(1);

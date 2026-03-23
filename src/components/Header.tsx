@@ -1,16 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut } from 'lucide-react';
 import logo from '../assets/logo.png';
-import { logoutAsync } from '../store/authSlice';
-import type { AppDispatch, RootState } from '../store';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header() {
-  const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user, token } = useSelector((s: RootState) => s.auth);
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { user, logout } = useAuth();
 
   const [isScrolled,      setIsScrolled]      = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -38,7 +35,7 @@ export default function Header() {
   useEffect(() => { setIsMobileMenuOpen(false); setIsDropdownOpen(false); }, [location.pathname]);
 
   const handleLogout = () => {
-    dispatch(logoutAsync(token ?? ''));
+    logout();
     navigate('/', { replace: true });
   };
 

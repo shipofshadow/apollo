@@ -5,6 +5,7 @@ import { Calendar, Loader2, PlusCircle, ChevronDown, ChevronUp } from 'lucide-re
 import { fetchMyBookingsAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 type Filter = 'all' | Booking['status'];
 
@@ -17,7 +18,7 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 export default function MyBookings() {
   const dispatch               = useDispatch<AppDispatch>();
-  const { token }              = useSelector((s: RootState) => s.auth);
+  const { token }              = useAuth();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
 
   const [filter,   setFilter]   = useState<Filter>('all');

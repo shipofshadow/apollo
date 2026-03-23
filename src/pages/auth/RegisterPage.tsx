@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { registerAsync, clearAuthError } from '../../store/authSlice';
-import type { AppDispatch, RootState } from '../../store';
+import { useAuth } from '../../context/AuthContext';
 
 export default function RegisterPage() {
-  const dispatch  = useDispatch<AppDispatch>();
   const navigate  = useNavigate();
   const [params]  = useSearchParams();
   const redirect  = params.get('redirect') ?? '';
 
-  const { user, status, error } = useSelector((s: RootState) => s.auth);
+  const { user, status, error, register, clearError } = useAuth();
 
   const [form, setForm] = useState({
     name: '', email: '', phone: '', password: '', confirm: '',
@@ -25,7 +22,7 @@ export default function RegisterPage() {
     }
   }, [user, navigate, redirect]);
 
-  useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
+  useEffect(() => () => { clearError(); }, []);
 
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [field]: e.target.value }));
@@ -41,12 +38,12 @@ export default function RegisterPage() {
       setLocalErr('Password must be at least 8 characters.');
       return;
     }
-    dispatch(registerAsync({
+    register({
       name: form.name,
       email: form.email,
       phone: form.phone,
       password: form.password,
-    }));
+    }).catch(() => {});
   };
 
   const displayError = localErr || error;

@@ -5,6 +5,7 @@ import { Calendar, Clock, CheckCircle, XCircle, PlusCircle, Loader2 } from 'luci
 import { fetchMyBookingsAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:   'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
@@ -15,7 +16,7 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 export default function ClientDashboard() {
   const dispatch               = useDispatch<AppDispatch>();
-  const { user, token }        = useSelector((s: RootState) => s.auth);
+  const { user, token }        = useAuth();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
 
   // Load this client's bookings on mount
