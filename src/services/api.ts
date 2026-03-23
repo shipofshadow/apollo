@@ -106,6 +106,32 @@ export const fetchAllBookingsApi = (token: string) =>
 export const fetchAvailabilityApi = (date: string) =>
   apiFetch<{ bookedSlots: string[] }>(`/api/bookings/availability?date=${encodeURIComponent(date)}`);
 
+export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> => {
+  const form = new FormData();
+  files.forEach(f => form.append('files[]', f));
+
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/bookings/media`, { method: 'POST', body: form });
+  } catch {
+    throw new Error('Unable to reach the backend server.');
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  return (data as { urls: string[] }).urls;
+};
+
+export const updateBookingPartsApi = (
+  token: string,
+  id: string,
+  awaitingParts: boolean,
+  partsNotes: string
+) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${id}/parts`, {
+    method: 'PATCH',
+    body: JSON.stringify({ awaitingParts, partsNotes }),
+  }, token);
+
 export const updateBookingStatusApi = (
   token: string,
   id: string,
@@ -201,8 +227,12 @@ export const fetchAdminStatsApi = (token: string) =>
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {
   return new Promise((resolve) => {
     setTimeout(() => {
+      const primaryId = payload.serviceIds[0] ?? 0;
       resolve({
         ...payload,
+        serviceId:  primaryId,
+        serviceIds: payload.serviceIds,
+        serviceName: `Service #${primaryId}`,
         id: Math.random().toString(36).substr(2, 9),
         status: 'pending',
         createdAt: new Date().toISOString(),

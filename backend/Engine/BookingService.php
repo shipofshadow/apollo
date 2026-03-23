@@ -36,7 +36,7 @@ class BookingService
 
     private static string $storageFile = __DIR__ . '/../storage/bookings.json';
 
-    private const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'];
+    private const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'awaiting_parts'];
 
     public function __construct()
     {
@@ -58,8 +58,10 @@ class BookingService
     {
         $this->validatePayload($data);
 
-        $serviceId   = (int) $data['serviceId'];
-        $serviceName = $this->resolveServiceName($serviceId, $data);
+        // Support both legacy single-serviceId and new multi-service serviceIds
+        $serviceIds  = $this->resolveServiceIds($data);
+        $primaryId   = $serviceIds[0];
+        $serviceName = $this->resolveServiceNames($serviceIds, $data);
 
         $booking = [
             'id'              => $this->uuid(),
@@ -68,16 +70,26 @@ class BookingService
             'email'           => strtolower(trim($data['email'])),
             'phone'           => trim($data['phone']),
             'vehicleInfo'     => trim($data['vehicleInfo']),
-            'serviceId'       => $serviceId,
+            'vehicleMake'     => trim($data['vehicleMake']  ?? ''),
+            'vehicleModel'    => trim($data['vehicleModel'] ?? ''),
+            'vehicleYear'     => trim($data['vehicleYear']  ?? ''),
+            'serviceId'       => $primaryId,
+            'serviceIds'      => $serviceIds,
             'serviceName'     => $serviceName,
             'appointmentDate' => trim($data['appointmentDate']),
             'appointmentTime' => trim($data['appointmentTime']),
-            'notes'           => trim($data['notes'] ?? ''),
+            'notes'           => trim($data['notes']          ?? ''),
+            'signatureData'   => $data['signatureData']        ?? null,
+            'mediaUrls'       => $data['mediaUrls']            ?? [],
             'status'          => 'pending',
+            'awaitingParts'   => false,
+            'partsNotes'      => null,
             'createdAt'       => date('c'),
         ];
 
         $this->useDb ? $this->dbInsert($booking) : $this->fileInsert($booking);
+
+        (new NotificationService())->bookingCreated($booking);
 
         return $booking;
     }
@@ -146,9 +158,31 @@ class BookingService
             );
         }
 
-        return $this->useDb
+        $booking = $this->useDb
             ? $this->dbUpdateStatus($id, $status)
             : $this->fileUpdateStatus($id, $status);
+
+        (new NotificationService())->bookingStatusChanged($booking);
+
+        return $booking;
+    }
+
+    /**
+     * Update the parts-dependency flag and notes for a booking.
+     *
+     * @return array<string, mixed>  Updated booking
+     */
+    public function updatePartsStatus(string $id, bool $awaitingParts, string $partsNotes): array
+    {
+        $booking = $this->useDb
+            ? $this->dbUpdateParts($id, $awaitingParts, $partsNotes)
+            : $this->fileUpdateParts($id, $awaitingParts, $partsNotes);
+
+        if ($awaitingParts) {
+            (new NotificationService())->bookingAwaitingParts($booking);
+        }
+
+        return $booking;
     }
 
     // -------------------------------------------------------------------------
@@ -161,11 +195,13 @@ class BookingService
         $db = Database::getInstance();
         $db->prepare(
             'INSERT INTO bookings
-             (id, user_id, name, email, phone, vehicle_info, service_id,
-              appointment_date, appointment_time, notes, status)
+             (id, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
+              vehicle_year, service_id, service_ids, appointment_date, appointment_time,
+              notes, signature_data, media_urls, status)
              VALUES
-             (:id, :user_id, :name, :email, :phone, :vehicle_info, :service_id,
-              :appointment_date, :appointment_time, :notes, :status)'
+             (:id, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
+              :vehicle_year, :service_id, :service_ids, :appointment_date, :appointment_time,
+              :notes, :signature_data, :media_urls, :status)'
         )->execute([
             ':id'               => $booking['id'],
             ':user_id'          => $booking['userId'],
@@ -173,10 +209,16 @@ class BookingService
             ':email'            => $booking['email'],
             ':phone'            => $booking['phone'],
             ':vehicle_info'     => $booking['vehicleInfo'],
+            ':vehicle_make'     => $booking['vehicleMake']  ?? null,
+            ':vehicle_model'    => $booking['vehicleModel'] ?? null,
+            ':vehicle_year'     => $booking['vehicleYear']  ?? null,
             ':service_id'       => $booking['serviceId'],
+            ':service_ids'      => json_encode($booking['serviceIds'] ?? [$booking['serviceId']]),
             ':appointment_date' => $booking['appointmentDate'],
             ':appointment_time' => $booking['appointmentTime'],
             ':notes'            => $booking['notes'],
+            ':signature_data'   => $booking['signatureData'] ?? null,
+            ':media_urls'       => json_encode($booking['mediaUrls'] ?? []),
             ':status'           => $booking['status'],
         ]);
     }
@@ -230,9 +272,40 @@ class BookingService
         return $this->mapDbRow($row->fetch());
     }
 
+    /** @return array<string, mixed> */
+    private function dbUpdateParts(string $id, bool $awaitingParts, string $partsNotes): array
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE bookings SET awaiting_parts = :ap, parts_notes = :pn WHERE id = :id'
+        );
+        $stmt->execute([':ap' => (int) $awaitingParts, ':pn' => $partsNotes, ':id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $row = $db->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
+        $row->execute([':id' => $id]);
+        return $this->mapDbRow($row->fetch());
+    }
+
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private function mapDbRow(array $row): array
     {
+        $rawIds = $row['service_ids'] ?? null;
+        $serviceIds = $rawIds
+            ? (json_decode((string) $rawIds, true) ?? [(int) $row['service_id']])
+            : [(int) $row['service_id']];
+
+        $rawMedia = $row['media_urls'] ?? null;
+        $mediaUrls = $rawMedia ? (json_decode((string) $rawMedia, true) ?? []) : [];
+
         return [
             'id'              => $row['id'],
             'userId'          => $row['user_id'] !== null ? (int) $row['user_id'] : null,
@@ -240,12 +313,20 @@ class BookingService
             'email'           => $row['email'],
             'phone'           => $row['phone'],
             'vehicleInfo'     => $row['vehicle_info'],
-            'serviceId'       => $row['service_id'],
+            'vehicleMake'     => $row['vehicle_make']  ?? null,
+            'vehicleModel'    => $row['vehicle_model'] ?? null,
+            'vehicleYear'     => $row['vehicle_year']  ?? null,
+            'serviceId'       => (int) $row['service_id'],
+            'serviceIds'      => $serviceIds,
             'serviceName'     => $row['service_name'],
             'appointmentDate' => $row['appointment_date'],
             'appointmentTime' => $row['appointment_time'],
-            'notes'           => $row['notes'] ?? '',
+            'notes'           => $row['notes']          ?? '',
+            'signatureData'   => $row['signature_data'] ?? null,
+            'mediaUrls'       => $mediaUrls,
             'status'          => $row['status'],
+            'awaitingParts'   => (bool) ($row['awaiting_parts'] ?? false),
+            'partsNotes'      => $row['parts_notes'] ?? null,
             'createdAt'       => $row['created_at'],
         ];
     }
@@ -374,6 +455,30 @@ class BookingService
         return $found;
     }
 
+    /** @return array<string, mixed> */
+    private function fileUpdateParts(string $id, bool $awaitingParts, string $partsNotes): array
+    {
+        $all   = array_reverse($this->fileGetAll());
+        $found = null;
+
+        foreach ($all as &$b) {
+            if ($b['id'] === $id) {
+                $b['awaitingParts'] = $awaitingParts;
+                $b['partsNotes']    = $partsNotes;
+                $found              = $b;
+                break;
+            }
+        }
+        unset($b);
+
+        if ($found === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->fileWrite($all);
+        return $found;
+    }
+
     /** @param array<int, array<string, mixed>> $bookings */
     private function fileWrite(array $bookings): void
     {
@@ -433,7 +538,7 @@ class BookingService
     {
         $required = [
             'name', 'email', 'phone', 'vehicleInfo',
-            'serviceId', 'appointmentDate', 'appointmentTime',
+            'appointmentDate', 'appointmentTime',
         ];
         foreach ($required as $field) {
             if (empty(trim((string) ($data[$field] ?? '')))) {
@@ -443,30 +548,58 @@ class BookingService
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('A valid email address is required.', 422);
         }
-        if ((int) ($data['serviceId'] ?? 0) <= 0) {
-            throw new RuntimeException('A valid serviceId is required.', 422);
+        // Accepts new multi-service format (serviceIds[]) or legacy single serviceId
+        $ids = $this->resolveServiceIds($data);
+        if (empty($ids)) {
+            throw new RuntimeException('At least one valid serviceId is required.', 422);
         }
     }
 
     /**
-     * Resolve the human-readable service name.
-     * In DB mode the name is fetched from the services table (canonical source).
-     * In file mode the client-supplied serviceName is used as a fallback.
+     * Normalise the submitted service ID(s) into an array of positive integers.
+     * Accepts: serviceIds[] (new) or serviceId (legacy single value).
+     *
+     * @return int[]
      */
-    private function resolveServiceName(int $serviceId, array $data): string
+    private function resolveServiceIds(array $data): array
     {
-        if ($this->useDb) {
+        if (!empty($data['serviceIds']) && is_array($data['serviceIds'])) {
+            return array_values(array_filter(
+                array_map('intval', $data['serviceIds']),
+                fn (int $id) => $id > 0
+            ));
+        }
+        $id = (int) ($data['serviceId'] ?? 0);
+        return $id > 0 ? [$id] : [];
+    }
+
+    /**
+     * Resolve human-readable names for all selected service IDs.
+     * In DB mode fetches from the services table; falls back to client-supplied names.
+     *
+     * @param int[] $serviceIds
+     */
+    private function resolveServiceNames(array $serviceIds, array $data): string
+    {
+        if ($this->useDb && !empty($serviceIds)) {
+            $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
             $stmt = Database::getInstance()->prepare(
-                'SELECT title FROM services WHERE id = :id LIMIT 1'
+                "SELECT id, title FROM services WHERE id IN ($placeholders)"
             );
-            $stmt->execute([':id' => $serviceId]);
-            $row = $stmt->fetch();
-            if (!$row) {
-                throw new RuntimeException('Service not found.', 422);
+            $stmt->execute($serviceIds);
+            $map = array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'title', 'id');
+
+            $names = [];
+            foreach ($serviceIds as $id) {
+                if (!isset($map[$id])) {
+                    throw new RuntimeException("Service #$id not found.", 422);
+                }
+                $names[] = $map[$id];
             }
-            return $row['title'];
+            return implode(', ', $names);
         }
 
+        // File-storage fallback: use client-supplied serviceName
         return trim((string) ($data['serviceName'] ?? ''));
     }
 

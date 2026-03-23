@@ -21,17 +21,18 @@ import {
   updateProductAsync, deleteProductAsync,
 } from '../store/productsSlice';
 import { updateProfileAsync, clearAuthError } from '../store/authSlice';
-import { fetchAdminStatsApi, type AdminStats } from '../services/api';
+import { fetchAdminStatsApi, updateBookingPartsApi, type AdminStats } from '../services/api';
 import type { AppDispatch, RootState } from '../store';
 import type { Booking, Service, Product } from '../types';
 import type { ContentPost } from '../store/contentSlice';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:   'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  confirmed: 'bg-green-500/10  text-green-400  border-green-500/30',
-  completed: 'bg-blue-500/10   text-blue-400   border-blue-500/30',
-  cancelled: 'bg-gray-700      text-gray-400   border-gray-600',
+  pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
+  confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
+  completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
+  cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
+  awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
 const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
@@ -132,6 +133,11 @@ function BookingsPanel() {
   const { appointments, status } = useSelector((s: RootState) => s.booking);
   const [statusFilter, setStatusFilter] = useState<'all' | Booking['status']>('all');
 
+  // Parts tracking modal state
+  const [partsModal,  setPartsModal]  = useState<string | null>(null); // booking id
+  const [partsNotes,  setPartsNotes]  = useState('');
+  const [partsBusy,   setPartsBusy]   = useState(false);
+
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));
   }, [token, dispatch]);
@@ -141,21 +147,61 @@ function BookingsPanel() {
     dispatch(updateBookingStatusAsync({ token, id, status: newStatus }));
   };
 
+  const openPartsModal = (b: Booking) => {
+    setPartsNotes(b.partsNotes ?? '');
+    setPartsModal(b.id);
+  };
+
+  const handlePartsSave = async () => {
+    if (!token || !partsModal) return;
+    setPartsBusy(true);
+    try {
+      await updateBookingPartsApi(token, partsModal, true, partsNotes);
+      // Also update status to awaiting_parts
+      dispatch(updateBookingStatusAsync({ token, id: partsModal, status: 'awaiting_parts' }));
+    } catch { /* silently fail */ }
+    finally { setPartsBusy(false); setPartsModal(null); }
+  };
+
   const filtered = statusFilter === 'all'
     ? appointments
     : appointments.filter(b => b.status === statusFilter);
 
   const filters: Array<{ key: 'all' | Booking['status']; label: string }> = [
-    { key: 'all',       label: 'All' },
-    { key: 'pending',   label: 'Pending' },
-    { key: 'confirmed', label: 'Confirmed' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'cancelled', label: 'Cancelled' },
+    { key: 'all',            label: 'All' },
+    { key: 'pending',        label: 'Pending' },
+    { key: 'confirmed',      label: 'Confirmed' },
+    { key: 'awaiting_parts', label: 'Awaiting Parts' },
+    { key: 'completed',      label: 'Completed' },
+    { key: 'cancelled',      label: 'Cancelled' },
   ];
 
   return (
     <div>
       <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">Client Bookings</h2>
+
+      {/* Parts modal */}
+      {partsModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-brand-dark border border-gray-700 rounded-sm p-6 max-w-md w-full space-y-4">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-purple-400" />
+              <h3 className="text-white font-bold uppercase tracking-wide">Flag: Awaiting Parts</h3>
+            </div>
+            <p className="text-gray-400 text-sm">Describe which parts are in transit. The customer will be notified by email.</p>
+            <textarea rows={4} value={partsNotes} onChange={e => setPartsNotes(e.target.value)}
+              placeholder="e.g. Custom AES shrouds ordered from Japan — ETA 7–10 days"
+              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-purple-400 transition-colors resize-none rounded-sm text-sm" />
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setPartsModal(null)} className="px-4 py-2 text-gray-400 border border-gray-700 hover:border-gray-500 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors">Cancel</button>
+              <button onClick={handlePartsSave} disabled={partsBusy || !partsNotes.trim()}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50 flex items-center gap-2">
+                {partsBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Package className="w-3 h-3" />} Save & Notify
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
@@ -220,14 +266,26 @@ function BookingsPanel() {
                     </span>
                   </td>
                   <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {b.status === 'pending' && (
                         <button onClick={() => handleStatus(b.id, 'confirmed')}
                           className="flex items-center gap-1 px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> Confirm
                         </button>
                       )}
-                      {(b.status === 'pending' || b.status === 'confirmed') && (
+                      {(b.status === 'pending' || b.status === 'confirmed' || b.status === 'awaiting_parts') && (
+                        <button onClick={() => openPartsModal(b)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
+                          <Package className="w-3 h-3" /> Parts
+                        </button>
+                      )}
+                      {b.status === 'awaiting_parts' && (
+                        <button onClick={() => handleStatus(b.id, 'confirmed')}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
+                          <CheckCircle2 className="w-3 h-3" /> Resume
+                        </button>
+                      )}
+                      {(b.status === 'pending' || b.status === 'confirmed' || b.status === 'awaiting_parts') && (
                         <button onClick={() => handleStatus(b.id, 'cancelled')}
                           className="flex items-center gap-1 px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <XCircle className="w-3 h-3" /> Cancel
@@ -238,6 +296,11 @@ function BookingsPanel() {
                           className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> Complete
                         </button>
+                      )}
+                      {b.partsNotes && (
+                        <span className="text-xs text-purple-400 italic truncate max-w-[120px]" title={b.partsNotes}>
+                          📦 {b.partsNotes}
+                        </span>
                       )}
                     </div>
                   </td>

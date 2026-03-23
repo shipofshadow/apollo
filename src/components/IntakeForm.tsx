@@ -3,6 +3,25 @@ import { useDispatch, useSelector } from 'react-redux';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import type { RootState, AppDispatch } from '../store';
 import { MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { VEHICLE_MAKES, VEHICLE_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+
+const AVAILABLE_TIMES = ['09:00 AM', '11:00 AM', '01:00 PM', '03:00 PM', '05:00 PM'];
+
+// Generate valid booking dates (tomorrow onward, skip Sundays) for the next 30 days
+function getAvailableDates(): string[] {
+  const dates: string[] = [];
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (dates.length < 30) {
+    if (d.getDay() !== 0) {
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+const AVAILABLE_DATES = getAvailableDates();
 
 export default function IntakeForm() {
   const dispatch = useDispatch<AppDispatch>();
@@ -12,11 +31,15 @@ export default function IntakeForm() {
     name: '',
     email: '',
     phone: '',
-    vehicleInfo: '',
     serviceRequired: '',
     locationPreference: 'in-shop',
     specificRequests: '',
+    preferredDate: '',
+    preferredTime: '',
   });
+  const [vehicleMake,  setVehicleMake]  = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleYear,  setVehicleYear]  = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -25,30 +48,29 @@ export default function IntakeForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Map legacy form fields to the current BookingPayload shape
-    const serviceMap: Record<string, { id: string; name: string }> = {
-      headlights: { id: '1', name: 'Headlight Retrofit' },
-      headunit:   { id: '2', name: 'Android Headunit Installation' },
-      security:   { id: '3', name: 'Security System' },
-      aesthetics: { id: '4', name: 'Aesthetic Upgrades' },
-      other:      { id: '0', name: 'Other / Multiple' },
+    const serviceMap: Record<string, { id: number; name: string }> = {
+      headlights: { id: 1, name: 'Headlight Retrofit' },
+      headunit:   { id: 2, name: 'Android Headunit Installation' },
+      security:   { id: 3, name: 'Security System' },
+      aesthetics: { id: 4, name: 'Aesthetic Upgrades' },
+      other:      { id: 0, name: 'Other / Multiple' },
     };
-    const svc = serviceMap[formData.serviceRequired] ?? { id: '0', name: formData.serviceRequired };
+    const svc = serviceMap[formData.serviceRequired] ?? { id: 0, name: formData.serviceRequired };
 
-    // Default to next day at 09:00 AM for intake-form submissions
-    const nextDay = new Date();
-    nextDay.setDate(nextDay.getDate() + 1);
+    const vehicleInfo = [vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(' ');
 
     dispatch(submitBookingAsync({
       payload: {
         name:            formData.name,
         email:           formData.email,
         phone:           formData.phone,
-        vehicleInfo:     formData.vehicleInfo,
-        serviceId:       svc.id,
-        serviceName:     svc.name,
-        appointmentDate: nextDay.toISOString().split('T')[0],
-        appointmentTime: '09:00 AM',
+        vehicleInfo,
+        vehicleMake,
+        vehicleModel,
+        vehicleYear,
+        serviceIds:      [svc.id],
+        appointmentDate: formData.preferredDate,
+        appointmentTime: formData.preferredTime,
         notes:           [
           formData.locationPreference && `Location: ${formData.locationPreference}`,
           formData.specificRequests,
@@ -63,11 +85,15 @@ export default function IntakeForm() {
       name: '',
       email: '',
       phone: '',
-      vehicleInfo: '',
       serviceRequired: '',
       locationPreference: 'in-shop',
       specificRequests: '',
+      preferredDate: '',
+      preferredTime: '',
     });
+    setVehicleMake('');
+    setVehicleModel('');
+    setVehicleYear('');
   };
 
   return (
@@ -201,17 +227,27 @@ export default function IntakeForm() {
                     />
                   </div>
 
+                  {/* Vehicle cascading dropdowns */}
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Vehicle Info (Year/Make/Model) *</label>
-                    <input
-                      type="text"
-                      name="vehicleInfo"
-                      required
-                      value={formData.vehicleInfo}
-                      onChange={handleChange}
-                      className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                      placeholder="e.g. 2018 Subaru WRX"
-                    />
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Vehicle *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <select required value={vehicleMake}
+                        onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
+                        <option value="">Make…</option>
+                        {VEHICLE_MAKES.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} disabled={!vehicleMake}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-40">
+                        <option value="">Model…</option>
+                        {vehicleMake ? (VEHICLE_MODELS[vehicleMake as VehicleMake] ?? []).map(m => <option key={m} value={m}>{m}</option>) : null}
+                      </select>
+                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
+                        <option value="">Year…</option>
+                        {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,8 +276,35 @@ export default function IntakeForm() {
                         onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none"
                       >
-                        <option value="in-shop">In-Shop (Los Angeles)</option>
+                        <option value="in-shop">In-Shop (San Fernando)</option>
                         <option value="mail-in">Mail-In Service</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Preferred date & time */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Preferred Date *</label>
+                      <select name="preferredDate" required value={formData.preferredDate} onChange={handleChange}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
+                        <option value="">Select a date…</option>
+                        {AVAILABLE_DATES.map(d => {
+                          const dt = new Date(d + 'T00:00:00');
+                          return (
+                            <option key={d} value={d}>
+                              {dt.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Preferred Time *</label>
+                      <select name="preferredTime" required value={formData.preferredTime} onChange={handleChange}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
+                        <option value="">Select a time…</option>
+                        {AVAILABLE_TIMES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                   </div>

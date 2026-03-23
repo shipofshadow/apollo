@@ -41,7 +41,9 @@ class Router
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
+            $r->addRoute('POST',  '/api/bookings/media',            'handleBookingMediaUpload');
             $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/parts',       'handleBookingPartsUpdate');
 
             // ── Blog posts (public read, admin write) ───────────────────────
             $r->addRoute('GET',    '/api/blog',              'handleBlogList');
@@ -272,6 +274,66 @@ class Router
         }
         $bookedSlots = (new BookingService())->getBookedSlots($date);
         echo json_encode(['bookedSlots' => $bookedSlots]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingMediaUpload(array $vars = []): void
+    {
+        if (empty($_FILES['files'])) {
+            throw new RuntimeException('No files provided.', 422);
+        }
+
+        $uploadDir = UPLOAD_DIR;
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        $allowed  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
+        $urls     = [];
+
+        // $_FILES['files'] may be a single file or multiple (files[])
+        $files = $_FILES['files'];
+        $count = is_array($files['name']) ? count($files['name']) : 1;
+
+        for ($i = 0; $i < $count; $i++) {
+            $tmpName = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
+            $mime    = is_array($files['type'])     ? $files['type'][$i]     : $files['type'];
+            $size    = is_array($files['size'])     ? $files['size'][$i]     : $files['size'];
+            $error   = is_array($files['error'])    ? $files['error'][$i]    : $files['error'];
+
+            if ($error !== UPLOAD_ERR_OK) {
+                throw new RuntimeException("File upload error (code $error).", 422);
+            }
+            if (!in_array($mime, $allowed, true) || !@getimagesize($tmpName)) {
+                throw new RuntimeException("Only JPEG, PNG, WebP and GIF images are accepted.", 422);
+            }
+            if ($size > $maxBytes) {
+                throw new RuntimeException("Each file must be under " . UPLOAD_MAX_MB . " MB.", 422);
+            }
+
+            $ext      = pathinfo((is_array($files['name']) ? $files['name'][$i] : $files['name']), PATHINFO_EXTENSION);
+            $filename = bin2hex(random_bytes(16)) . '.' . strtolower($ext);
+            move_uploaded_file($tmpName, $uploadDir . $filename);
+
+            $base = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
+            $urls[] = $base . '/storage/uploads/' . $filename;
+        }
+
+        echo json_encode(['urls' => $urls]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingPartsUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id          = $vars['id'] ?? '';
+        $data        = $this->jsonBody();
+        $waiting     = (bool) ($data['awaitingParts'] ?? false);
+        $partsNotes  = trim((string) ($data['partsNotes'] ?? ''));
+
+        $booking = (new BookingService())->updatePartsStatus($id, $waiting, $partsNotes);
+        echo json_encode(['booking' => $booking]);
     }
 
     // -------------------------------------------------------------------------

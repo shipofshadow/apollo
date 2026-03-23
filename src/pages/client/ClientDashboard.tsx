@@ -8,10 +8,11 @@ import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:   'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  confirmed: 'bg-green-500/10  text-green-400  border-green-500/30',
-  completed: 'bg-blue-500/10   text-blue-400   border-blue-500/30',
-  cancelled: 'bg-gray-700      text-gray-400   border-gray-600',
+  pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
+  confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
+  completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
+  cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
+  awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
 const STAT_LEFT_BORDER: Record<string, string> = {

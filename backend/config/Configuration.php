@@ -49,3 +49,20 @@ define('DB_CHARSET', $_ENV['DB_CHARSET']  ?? 'utf8mb4');
 define('JWT_SECRET',     $_ENV['JWT_SECRET']      ?? '');
 define('JWT_ALGORITHM',  $_ENV['JWT_ALGORITHM']   ?? 'HS256');
 define('JWT_TTL',        (int)($_ENV['JWT_TTL']   ?? 3600));   // seconds
+
+// ---------------------------------------------------------------------------
+// Email / notification constants
+// Set MAIL_FROM to enable transactional email via PHP mail().
+// ---------------------------------------------------------------------------
+
+define('MAIL_FROM',      $_ENV['MAIL_FROM']       ?? '');           // e.g. noreply@1625autolab.com
+define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME']  ?? 'Apollo 1625 Auto Lab');
+define('MAIL_ADMIN',     $_ENV['MAIL_ADMIN']       ?? '');           // admin notification recipient
+
+// ---------------------------------------------------------------------------
+// Media upload constants
+// ---------------------------------------------------------------------------
+
+define('UPLOAD_DIR',      realpath(__DIR__ . '/../') . '/storage/uploads/');
+define('UPLOAD_MAX_MB',   (int)($_ENV['UPLOAD_MAX_MB']  ?? 10));
+define('UPLOAD_BASE_URL', rtrim($_ENV['UPLOAD_BASE_URL'] ?? '', '/'));

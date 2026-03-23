@@ -46,11 +46,20 @@ export interface BookingPayload {
   name: string;
   email: string;
   phone: string;
+  /** Computed display string: "Year Make Model" */
   vehicleInfo: string;
-  serviceId: number;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleYear: string;
+  /** All selected service IDs (supports multi-service bookings) */
+  serviceIds: number[];
   appointmentDate: string;
   appointmentTime: string;
   notes: string;
+  /** Base64 PNG of the signed waiver, if captured */
+  signatureData?: string;
+  /** URLs returned by the media-upload endpoint */
+  mediaUrls?: string[];
 }
 
 export interface BookingState {
@@ -80,12 +89,23 @@ export interface Booking {
   email: string;
   phone: string;
   vehicleInfo: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+  /** Primary service ID (first selected) – kept for backward compat */
   serviceId: number;
+  /** All selected service IDs */
+  serviceIds: number[];
+  /** Comma-joined service names */
   serviceName: string;
   appointmentDate: string;
   appointmentTime: string;
   notes: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'awaiting_parts';
+  awaitingParts?: boolean;
+  partsNotes?: string;
+  signatureData?: string;
+  mediaUrls?: string[];
   createdAt: string;
 }
 

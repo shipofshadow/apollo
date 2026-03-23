@@ -10,17 +10,19 @@ import { useAuth } from '../../context/AuthContext';
 type Filter = 'all' | Booking['status'];
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:   'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  confirmed: 'bg-green-500/10  text-green-400  border-green-500/30',
-  completed: 'bg-blue-500/10   text-blue-400   border-blue-500/30',
-  cancelled: 'bg-gray-700      text-gray-400   border-gray-600',
+  pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
+  confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
+  completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
+  cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
+  awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
 const STATUS_STRIP: Record<Booking['status'], string> = {
-  pending:   'bg-yellow-400',
-  confirmed: 'bg-green-400',
-  completed: 'bg-blue-400',
-  cancelled: 'bg-gray-600',
+  pending:        'bg-yellow-400',
+  confirmed:      'bg-green-400',
+  completed:      'bg-blue-400',
+  cancelled:      'bg-gray-600',
+  awaiting_parts: 'bg-purple-400',
 };
 
 export default function MyBookings() {
@@ -42,11 +44,12 @@ export default function MyBookings() {
     : myBookings.filter(b => b.status === filter);
 
   const tabs: { key: Filter; label: string }[] = [
-    { key: 'all',       label: 'All' },
-    { key: 'pending',   label: 'Pending' },
-    { key: 'confirmed', label: 'Confirmed' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'cancelled', label: 'Cancelled' },
+    { key: 'all',            label: 'All' },
+    { key: 'pending',        label: 'Pending' },
+    { key: 'confirmed',      label: 'Confirmed' },
+    { key: 'awaiting_parts', label: 'Awaiting Parts' },
+    { key: 'completed',      label: 'Completed' },
+    { key: 'cancelled',      label: 'Cancelled' },
   ];
 
   return (
@@ -156,10 +159,11 @@ export default function MyBookings() {
               {expanded === b.id && (
                 <div className="border-t border-gray-800 bg-brand-darker/40 px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
                   {[
-                    { label: 'Name',  value: b.name },
-                    { label: 'Email', value: b.email },
-                    { label: 'Phone', value: b.phone },
-                    { label: 'Time',  value: `${b.appointmentDate} · ${b.appointmentTime}` },
+                    { label: 'Name',    value: b.name },
+                    { label: 'Email',   value: b.email },
+                    { label: 'Phone',   value: b.phone },
+                    { label: 'Vehicle', value: b.vehicleInfo },
+                    { label: 'Time',    value: `${b.appointmentDate} · ${b.appointmentTime}` },
                     ...(b.notes ? [{ label: 'Notes', value: b.notes }] : []),
                   ].map(({ label, value }) => (
                     <div key={label}>
@@ -167,8 +171,16 @@ export default function MyBookings() {
                       <span className="text-gray-300 text-xs">{value}</span>
                     </div>
                   ))}
+                  {b.status === 'awaiting_parts' && b.partsNotes && (
+                    <div className="col-span-2 sm:col-span-3 bg-purple-500/5 border border-purple-500/20 rounded-sm px-4 py-3">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-purple-500 block mb-1">📦 Awaiting Parts</span>
+                      <span className="text-purple-300 text-xs">{b.partsNotes}</span>
+                    </div>
+                  )}
                   <div className="col-span-2 sm:col-span-3 pt-2 border-t border-gray-800 flex items-center gap-3">
-                    <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>{b.status}</span>
+                    <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
+                      {b.status === 'awaiting_parts' ? 'Awaiting Parts' : b.status}
+                    </span>
                     <span className="text-gray-600 font-mono text-[10px]">#{b.id}</span>
                   </div>
                 </div>
