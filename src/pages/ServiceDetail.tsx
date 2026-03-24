@@ -115,6 +115,7 @@ export default function ServiceDetail() {
             <div className="pt-8 border-t border-gray-800">
               <Link
                 to="/booking"
+                state={{ serviceId: service.id }}
                 className="inline-block bg-brand-orange hover:bg-orange-600 text-white font-display uppercase tracking-wider px-8 py-4 rounded-sm transition-all transform hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(243,111,33,0.3)]"
               >
                 Book This Service

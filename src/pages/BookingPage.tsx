@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2,
@@ -66,14 +66,18 @@ function buildDateList(shopHours: ShopDayHours[]): Date[] {
 export default function BookingPage() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, token } = useAuth();
   const { status: bookStatus, error: bookError } = useSelector((s: RootState) => s.booking);
   const services = useSelector((s: RootState) => s.services.items.filter(sv => sv.isActive));
 
   const [step, setStep] = useState(1);
 
-  // Step 1 – multi-select services
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  // Step 1 – multi-select services (pre-select from location state if present)
+  const preselectedId = (location.state as { serviceId?: number } | null)?.serviceId ?? null;
+  const [selectedIds, setSelectedIds] = useState<number[]>(
+    preselectedId ? [preselectedId] : []
+  );
 
   // Shop hours – loaded on mount to filter the date picker
   const [shopHours,       setShopHours]       = useState<ShopDayHours[]>([]);
