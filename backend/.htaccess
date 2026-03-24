@@ -1,6 +1,14 @@
 # Apache – route all requests through index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Pass the Authorization header to PHP.
+    # Apache running PHP as CGI/FastCGI strips this header by default;
+    # the RewriteRule below re-exposes it via HTTP_AUTHORIZATION so that
+    # Bearer-token authentication works in production.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
