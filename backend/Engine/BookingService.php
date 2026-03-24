@@ -185,6 +185,37 @@ class BookingService
         return $booking;
     }
 
+    /**
+     * Allow an authenticated client to cancel their own booking.
+     * Only bookings with status 'pending' or 'confirmed' may be cancelled.
+     *
+     * @throws RuntimeException 403 if booking does not belong to user, 422 if not cancellable
+     * @return array<string, mixed>  Updated booking
+     */
+    public function cancelByUser(string $id, int $userId): array
+    {
+        $booking = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if ((int) ($booking['userId'] ?? 0) !== $userId) {
+            throw new RuntimeException('You are not authorized to cancel this booking.', 403);
+        }
+
+        if (!in_array($booking['status'], ['pending', 'confirmed'], true)) {
+            throw new RuntimeException(
+                'Only pending or confirmed bookings can be cancelled.',
+                422
+            );
+        }
+
+        return $this->updateStatus($id, 'cancelled');
+    }
+
     // -------------------------------------------------------------------------
     // DB storage
     // -------------------------------------------------------------------------
@@ -270,6 +301,31 @@ class BookingService
         );
         $row->execute([':id' => $id]);
         return $this->mapDbRow($row->fetch());
+    }
+
+    /** @return array<string, mixed>|null */
+    private function dbFindById(string $id): ?array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch();
+        return $row ? $this->mapDbRow($row) : null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function fileFindById(string $id): ?array
+    {
+        foreach ($this->fileGetAll() as $b) {
+            if (($b['id'] ?? '') === $id) {
+                return $b;
+            }
+        }
+        return null;
     }
 
     /** @return array<string, mixed> */

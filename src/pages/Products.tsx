@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
+import { SkeletonCard } from '../components/Skeleton';
 
 export default function Products() {
   const dispatch = useDispatch<AppDispatch>();
@@ -77,7 +78,11 @@ export default function Products() {
         </div>
 
         {status === 'loading' && (
-          <div className="text-center py-24 text-gray-400">Loading products…</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         )}
 
         {status !== 'loading' && (

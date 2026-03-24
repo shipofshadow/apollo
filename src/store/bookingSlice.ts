@@ -5,6 +5,7 @@ import {
   fetchMyBookingsApi,
   fetchAllBookingsApi,
   updateBookingStatusApi,
+  cancelMyBookingApi,
   submitBooking as submitBookingMock,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
@@ -63,6 +64,18 @@ export const updateBookingStatusAsync = createAsyncThunk(
       return booking;
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Failed to update booking.');
+    }
+  }
+);
+
+export const cancelMyBookingAsync = createAsyncThunk(
+  'booking/cancelMine',
+  async (arg: { token: string; id: string }, { rejectWithValue }) => {
+    try {
+      const { booking } = await cancelMyBookingApi(arg.token, arg.id);
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to cancel booking.');
     }
   }
 );
@@ -155,6 +168,10 @@ const bookingSlice = createSlice({
         state.appointments = action.payload;
       })
       .addCase(updateBookingStatusAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+      })
+      .addCase(cancelMyBookingAsync.fulfilled, (state, action) => {
         const idx = state.appointments.findIndex(a => a.id === action.payload.id);
         if (idx !== -1) state.appointments[idx] = action.payload;
       });

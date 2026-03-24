@@ -43,6 +43,7 @@ class Router
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
             $r->addRoute('POST',  '/api/bookings/media',            'handleBookingMediaUpload');
             $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/cancel',      'handleBookingCancel');
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',       'handleBookingPartsUpdate');
 
             // ── Blog posts (public read, admin write) ───────────────────────
@@ -385,6 +386,17 @@ class Router
         $partsNotes  = trim((string) ($data['partsNotes'] ?? ''));
 
         $booking = (new BookingService())->updatePartsStatus($id, $waiting, $partsNotes);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingCancel(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $id      = $vars['id'] ?? '';
+        $userId  = (int) ($payload['sub'] ?? 0);
+
+        $booking = (new BookingService())->cancelByUser($id, $userId);
         echo json_encode(['booking' => $booking]);
     }
 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 export default function LoginPage() {
   const navigate   = useNavigate();
@@ -9,17 +10,23 @@ export default function LoginPage() {
   const redirect   = params.get('redirect') ?? '';
 
   const { user, status, error, login, clearError } = useAuth();
+  const { showToast } = useToast();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
+  const hasShownToast = useRef(false);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
+      if (!hasShownToast.current) {
+        hasShownToast.current = true;
+        showToast(`Welcome back, ${user.name.split(' ')[0]}!`, 'success');
+      }
       navigate(redirect || (user.role === 'admin' ? '/admin' : '/client/dashboard'), { replace: true });
     }
-  }, [user, navigate, redirect]);
+  }, [user, navigate, redirect, showToast]);
 
   // Clean error on unmount
   useEffect(() => () => { clearError(); }, []);

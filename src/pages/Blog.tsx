@@ -1,17 +1,35 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { BookOpen, Calendar } from 'lucide-react';
+import { BookOpen, Calendar, Search } from 'lucide-react';
 import { fetchBlogPostsAsync } from '../store/contentSlice';
 import type { AppDispatch, RootState } from '../store';
+import { SkeletonBlogCard } from '../components/Skeleton';
 
 export default function Blog() {
   const dispatch = useDispatch<AppDispatch>();
   const { posts, status } = useSelector((s: RootState) => s.content);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     dispatch(fetchBlogPostsAsync(null));
   }, [dispatch]);
+
+  const publishedPosts = useMemo(
+    () => posts.filter(p => p.status === 'Published'),
+    [posts]
+  );
+
+  const filteredPosts = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return publishedPosts;
+    return publishedPosts.filter(
+      p =>
+        p.title.toLowerCase().includes(q) ||
+        p.content.toLowerCase().includes(q)
+    );
+  }, [publishedPosts, searchQuery]);
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
@@ -27,17 +45,35 @@ export default function Blog() {
           </p>
         </div>
 
-        {/* Loading */}
+        {/* Search bar */}
+        {(status !== 'loading' && publishedPosts.length > 0) && (
+          <div className="max-w-md mx-auto mb-10">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search posts…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-brand-dark border border-gray-800 text-white px-4 py-3 pl-10 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            </div>
+          </div>
+        )}
+
+        {/* Loading skeletons */}
         {status === 'loading' && (
-          <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-2 border-brand-orange border-t-transparent rounded-full animate-spin" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonBlogCard key={i} />
+            ))}
           </div>
         )}
 
         {/* Posts grid */}
-        {posts.length > 0 && (
+        {status !== 'loading' && filteredPosts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.map(post => (
+            {filteredPosts.map(post => (
               <article key={post.id}
                 className="bg-brand-dark border border-gray-800 rounded-sm flex flex-col hover:border-brand-orange/50 transition-colors group">
                 {post.coverImage && (
@@ -71,8 +107,22 @@ export default function Blog() {
           </div>
         )}
 
+        {/* No results from search */}
+        {status !== 'loading' && publishedPosts.length > 0 && filteredPosts.length === 0 && (
+          <div className="text-center py-20">
+            <Search className="w-10 h-10 mx-auto mb-4 text-gray-700" />
+            <p className="text-gray-500 text-lg">No posts match "{searchQuery}".</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-3 text-brand-orange hover:text-white transition-colors underline text-sm"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+
         {/* Empty state */}
-        {posts.length === 0 && status !== 'loading' && (
+        {status !== 'loading' && publishedPosts.length === 0 && (
           <div className="text-center py-20">
             <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-700" />
             <p className="text-gray-500 text-lg">No posts yet. Check back soon!</p>
