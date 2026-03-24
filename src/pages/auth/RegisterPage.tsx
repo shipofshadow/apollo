@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 export default function RegisterPage() {
   const navigate  = useNavigate();
@@ -9,6 +10,7 @@ export default function RegisterPage() {
   const redirect  = params.get('redirect') ?? '';
 
   const { user, status, error, register, clearError } = useAuth();
+  const { showToast } = useToast();
 
   const [form, setForm] = useState({
     name:    params.get('name')  ?? '',
@@ -18,12 +20,17 @@ export default function RegisterPage() {
   });
   const [showPw,   setShowPw]   = useState(false);
   const [localErr, setLocalErr] = useState('');
+  const hasShownToast = useRef(false);
 
   useEffect(() => {
     if (user) {
+      if (!hasShownToast.current) {
+        hasShownToast.current = true;
+        showToast('Account created! Welcome to 1625 Auto Lab.', 'success');
+      }
       navigate(redirect || '/client/dashboard', { replace: true });
     }
-  }, [user, navigate, redirect]);
+  }, [user, navigate, redirect, showToast]);
 
   useEffect(() => () => { clearError(); }, []);
 

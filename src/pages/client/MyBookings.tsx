@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Calendar, Loader2, PlusCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { fetchMyBookingsAsync } from '../../store/bookingSlice';
+import { Calendar, Loader2, PlusCircle, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
+import { fetchMyBookingsAsync, cancelMyBookingAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 type Filter = 'all' | Booking['status'];
 
@@ -29,9 +30,12 @@ export default function MyBookings() {
   const dispatch               = useDispatch<AppDispatch>();
   const { token }              = useAuth();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
+  const { showToast }          = useToast();
 
-  const [filter,   setFilter]   = useState<Filter>('all');
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [filter,        setFilter]        = useState<Filter>('all');
+  const [expanded,      setExpanded]      = useState<string | null>(null);
+  const [cancelTarget,  setCancelTarget]  = useState<string | null>(null);
+  const [cancelBusy,    setCancelBusy]    = useState(false);
 
   useEffect(() => {
     if (token) dispatch(fetchMyBookingsAsync(token));
@@ -51,6 +55,20 @@ export default function MyBookings() {
     { key: 'completed',      label: 'Completed' },
     { key: 'cancelled',      label: 'Cancelled' },
   ];
+
+  const handleCancelConfirm = async () => {
+    if (!token || !cancelTarget) return;
+    setCancelBusy(true);
+    try {
+      await dispatch(cancelMyBookingAsync({ token, id: cancelTarget })).unwrap();
+      showToast('Booking cancelled successfully.', 'success');
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to cancel booking.', 'error');
+    } finally {
+      setCancelBusy(false);
+      setCancelTarget(null);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -177,11 +195,19 @@ export default function MyBookings() {
                       <span className="text-purple-300 text-xs">{b.partsNotes}</span>
                     </div>
                   )}
-                  <div className="col-span-2 sm:col-span-3 pt-2 border-t border-gray-800 flex items-center gap-3">
+                  <div className="col-span-2 sm:col-span-3 pt-2 border-t border-gray-800 flex items-center gap-3 flex-wrap">
                     <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
                       {b.status === 'awaiting_parts' ? 'Awaiting Parts' : b.status}
                     </span>
                     <span className="text-gray-600 font-mono text-[10px]">#{b.id}</span>
+                    {(b.status === 'pending' || b.status === 'confirmed') && (
+                      <button
+                        onClick={() => setCancelTarget(b.id)}
+                        className="ml-auto flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors border border-red-500/30 hover:border-red-400/50 px-3 py-1 rounded-sm"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Cancel
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -189,7 +215,38 @@ export default function MyBookings() {
           ))}
         </div>
       )}
+
+      {/* Cancel confirmation modal */}
+      {cancelTarget && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-brand-dark border border-gray-700 rounded-sm p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-400" />
+              <h3 className="text-white font-bold uppercase tracking-wide text-sm">Cancel Booking?</h3>
+            </div>
+            <p className="text-gray-400 text-sm">
+              Are you sure you want to cancel this appointment? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={handleCancelConfirm}
+                disabled={cancelBusy}
+                className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+              >
+                {cancelBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                Confirm Cancel
+              </button>
+              <button
+                onClick={() => setCancelTarget(null)}
+                disabled={cancelBusy}
+                className="flex-1 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+              >
+                Keep Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Phone, Mail, Lock, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
 import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 export default function Profile() {
   const dispatch               = useDispatch<AppDispatch>();
   const { user, token, status, error } = useAuth();
+  const { showToast }          = useToast();
 
   const [info,     setInfo]    = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
   const [pw,       setPw]      = useState({ newPw: '', confirm: '' });
   const [showPw,   setShowPw]  = useState(false);
   const [localErr, setLocalErr] = useState('');
-  const [saved,    setSaved]   = useState(false);
 
   useEffect(() => {
     if (user) setInfo({ name: user.name, phone: user.phone });
@@ -24,18 +25,16 @@ export default function Profile() {
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLocalErr('');
-    setSaved(false);
     if (!token) return;
     dispatch(updateProfileAsync({ token, data: { name: info.name, phone: info.phone } }))
       .unwrap()
-      .then(() => setSaved(true))
+      .then(() => showToast('Profile updated successfully.', 'success'))
       .catch(() => {});
   };
 
   const handlePwSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLocalErr('');
-    setSaved(false);
     if (pw.newPw !== pw.confirm) { setLocalErr('Passwords do not match.'); return; }
     if (pw.newPw.length < 8)     { setLocalErr('Password must be at least 8 characters.'); return; }
     if (!token) return;
@@ -44,7 +43,7 @@ export default function Profile() {
       data: { password: pw.newPw, password_confirmation: pw.confirm },
     }))
       .unwrap()
-      .then(() => { setSaved(true); setPw({ newPw: '', confirm: '' }); })
+      .then(() => { showToast('Password updated successfully.', 'success'); setPw({ newPw: '', confirm: '' }); })
       .catch(() => {});
   };
 
@@ -79,11 +78,6 @@ export default function Profile() {
       </div>
 
       {/* Feedback */}
-      {saved && !displayError && (
-        <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-sm text-sm">
-          <CheckCircle className="w-4 h-4 shrink-0" /> Changes saved successfully.
-        </div>
-      )}
       {displayError && (
         <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" /> {displayError}

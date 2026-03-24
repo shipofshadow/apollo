@@ -168,6 +168,11 @@ export const updateBookingStatusApi = (
     body: JSON.stringify({ status }),
   }, token);
 
+export const cancelMyBookingApi = (token: string, id: string) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${id}/cancel`, {
+    method: 'PATCH',
+  }, token);
+
 // ── Vehicle data API (API Ninjas proxy) ───────────────────────────────────────
 
 export interface CarTrim {
