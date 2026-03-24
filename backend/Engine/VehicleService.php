@@ -2,37 +2,44 @@
 
 declare(strict_types=1);
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Exception\RequestException;
+use CarApiSdk\CarApi;
+use CarApiSdk\CarApiException;
 
 /**
- * Proxies vehicle data from the API Ninjas car API.
+ * Proxies vehicle data from the CarAPI SDK (https://carapi.app).
  *
  * Endpoints used:
- *   GET /v1/carmakes          → list of all makes
- *   GET /v1/carmodels?make=X  → list of models for a given make
- *   GET /v1/cartrims?make=X&model=Y → list of trims
+ *   GET /api/makes                        → list of all makes
+ *   GET /api/models?make=X                → list of models for a given make
+ *   GET /api/trims?make=X&model=Y         → list of trims
  *
  * Results are cached (APCu when available, file-system otherwise) to avoid
  * hammering the upstream API on every page load.
  *
- * Requires CARNINJA_API_KEY to be set in .env.
+ * Requires CARAPI_TOKEN and CARAPI_SECRET to be set in .env.
  */
 class VehicleService
 {
-    private Client $http;
+    private const JWT_CACHE_KEY = 'carapi_sdk_jwt';
+    /** CarAPI JWTs last ~1 hour; cache slightly shorter to refresh before expiry */
+    private const JWT_TTL = 3300;
+
+    private CarApi $sdk;
 
     public function __construct()
     {
-        $this->http = new Client([
-            'base_uri' => CARNINJA_BASE_URL . '/',
-            'timeout'  => 10,
-            'headers'  => [
-                'X-Api-Key' => CARNINJA_API_KEY,
-                'Accept'    => 'application/json',
-            ],
+        if (CARAPI_TOKEN === '' || CARAPI_SECRET === '') {
+            throw new RuntimeException(
+                'CARAPI_TOKEN and CARAPI_SECRET are not configured on this server.', 503
+            );
+        }
+
+        $this->sdk = CarApi::build([
+            'token'  => CARAPI_TOKEN,
+            'secret' => CARAPI_SECRET,
         ]);
+
+        $this->ensureAuthenticated();
     }
 
     // -------------------------------------------------------------------------
@@ -47,25 +54,21 @@ class VehicleService
      */
     public function getMakes(?int $year = null): array
     {
-        $cacheKey = 'carninja_makes_' . ($year ?? 'all');
+        $cacheKey = 'carapi_makes_' . ($year ?? 'all');
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached['items'] ?? [];
         }
 
-        $params = [];
+        $query = ['limit' => 100];
         if ($year !== null) {
-            $params['year'] = $year;
+            $query['year'] = $year;
         }
 
-        $items = $this->request('carmakes', $params);
-        $makes = array_values(array_filter(
-            is_array($items) ? $items : [],
-            fn ($v) => is_string($v) && $v !== ''
-        ));
+        $makes = $this->fetchAllNames(fn (int $page) => $this->sdk->makes(['query' => array_merge($query, ['page' => $page])]));
 
-        Cache::set($cacheKey, ['items' => $makes], CARNINJA_MAKES_TTL);
+        Cache::set($cacheKey, ['items' => $makes], CARAPI_MAKES_TTL);
         return $makes;
     }
 
@@ -81,60 +84,61 @@ class VehicleService
             throw new RuntimeException("Parameter 'make' is required.", 422);
         }
 
-        $cacheKey = 'carninja_models_' . md5(strtolower($make) . '_' . ($year ?? 'all'));
+        $cacheKey = 'carapi_models_' . md5(strtolower($make) . '_' . ($year ?? 'all'));
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached['items'] ?? [];
         }
 
-        $params = ['make' => $make];
+        $query = ['make' => $make, 'limit' => 100];
         if ($year !== null) {
-            $params['year'] = $year;
+            $query['year'] = $year;
         }
 
-        $items  = $this->request('carmodels', $params);
-        $models = array_values(array_filter(
-            is_array($items) ? $items : [],
-            fn ($v) => is_string($v) && $v !== ''
-        ));
+        $models = $this->fetchAllNames(fn (int $page) => $this->sdk->models(['query' => array_merge($query, ['page' => $page])]));
 
-        Cache::set($cacheKey, ['items' => $models], CARNINJA_MODELS_TTL);
+        Cache::set($cacheKey, ['items' => $models], CARAPI_MODELS_TTL);
         return $models;
     }
 
     /**
      * Return trims for a given make and model.
      *
-     * @param  int $limit  Max results (1–100).
-     * @param  int $offset Pagination offset.
+     * @param  int $limit  Max results per page (1–100).
+     * @param  int $page   1-based page number.
      * @return array<int, array<string, mixed>>
      */
-    public function getTrims(string $make, string $model, int $limit = 50, int $offset = 0): array
+    public function getTrims(string $make, string $model, int $limit = 50, int $page = 1): array
     {
         if ($make === '' || $model === '') {
             throw new RuntimeException("Parameters 'make' and 'model' are required.", 422);
         }
 
-        $limit  = max(1, min(100, $limit));
-        $offset = max(0, $offset);
+        $limit = max(1, min(100, $limit));
+        $page  = max(1, $page);
 
-        $cacheKey = 'carninja_trims_' . md5(strtolower("$make|$model|$limit|$offset"));
+        $cacheKey = 'carapi_trims_' . md5(strtolower("$make|$model|$limit|$page"));
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached['items'] ?? [];
         }
 
-        $items = $this->request('cartrims', [
-            'make'   => $make,
-            'model'  => $model,
-            'limit'  => $limit,
-            'offset' => $offset,
-        ]);
+        try {
+            $result = $this->sdk->trims(['query' => [
+                'make'  => $make,
+                'model' => $model,
+                'limit' => $limit,
+                'page'  => $page,
+            ]]);
+        } catch (CarApiException $e) {
+            throw new RuntimeException('Vehicle API request failed: ' . $e->getMessage(), 502);
+        }
 
-        $trims = is_array($items) ? $items : [];
-        Cache::set($cacheKey, ['items' => $trims], CARNINJA_MODELS_TTL);
+        $trims = array_map(fn ($t) => (array) $t, $result->data ?? []);
+
+        Cache::set($cacheKey, ['items' => $trims], CARAPI_MODELS_TTL);
         return $trims;
     }
 
@@ -143,52 +147,61 @@ class VehicleService
     // -------------------------------------------------------------------------
 
     /**
-     * Make a GET request to the API Ninjas endpoint.
-     *
-     * @param  array<string, mixed> $params
-     * @return mixed  Decoded JSON response body
+     * Authenticate against CarAPI, using a cached JWT when still valid.
      */
-    private function request(string $endpoint, array $params = []): mixed
+    private function ensureAuthenticated(): void
     {
-        if (CARNINJA_API_KEY === '') {
-            throw new RuntimeException(
-                'CARNINJA_API_KEY is not configured on this server.', 503
-            );
+        $cached = Cache::get(self::JWT_CACHE_KEY);
+        $jwt    = $cached['jwt'] ?? null;
+
+        if (!empty($jwt)) {
+            $this->sdk->loadJwt($jwt);
+            if ($this->sdk->isJwtExpired() === false) {
+                return;
+            }
         }
 
         try {
-            $response = $this->http->get($endpoint, [
-                'query'       => $params,
-                'http_errors' => false,
-            ]);
-        } catch (ConnectException $e) {
+            $jwt = $this->sdk->authenticate();
+        } catch (CarApiException $e) {
             throw new RuntimeException(
-                'Unable to reach the API Ninjas vehicle service. Please try again.', 503
-            );
-        } catch (RequestException $e) {
-            throw new RuntimeException('Vehicle API request failed: ' . $e->getMessage(), 502);
-        }
-
-        $status = $response->getStatusCode();
-        $body   = (string) $response->getBody();
-
-        if ($status === 401 || $status === 403) {
-            throw new RuntimeException(
-                'Invalid or missing CARNINJA_API_KEY. Check your server configuration.', 502
+                'Unable to authenticate with CarAPI. Check CARAPI_TOKEN and CARAPI_SECRET.', 503
             );
         }
 
-        if ($status !== 200) {
-            throw new RuntimeException(
-                "Vehicle API returned HTTP $status: $body", 502
-            );
-        }
+        Cache::set(self::JWT_CACHE_KEY, ['jwt' => $jwt], self::JWT_TTL);
+    }
 
-        $decoded = json_decode($body, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Vehicle API returned invalid JSON.', 502);
-        }
+    /**
+     * Paginate through all pages of a collection endpoint, collecting the
+     * `name` property of each item.
+     *
+     * @param  callable(int): object $fetcher  Accepts 1-based page number, returns SDK result object.
+     * @return string[]
+     */
+    private function fetchAllNames(callable $fetcher): array
+    {
+        $names = [];
+        $page  = 1;
 
-        return $decoded;
+        do {
+            try {
+                $result = $fetcher($page);
+            } catch (CarApiException $e) {
+                throw new RuntimeException('Vehicle API request failed: ' . $e->getMessage(), 502);
+            }
+
+            foreach ($result->data ?? [] as $item) {
+                if (isset($item->name) && $item->name !== '') {
+                    $names[] = $item->name;
+                }
+            }
+
+            $lastPage = $result->collection->pages ?? 1;
+            $page++;
+        } while ($page <= $lastPage);
+
+        return array_values(array_unique($names));
     }
 }
+

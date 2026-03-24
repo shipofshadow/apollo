@@ -702,16 +702,16 @@ class Router
     /** @param array<string, string> $vars */
     private function handleVehicleTrims(array $vars = []): void
     {
-        $make   = trim((string) ($_GET['make']   ?? ''));
-        $model  = trim((string) ($_GET['model']  ?? ''));
-        $limit  = isset($_GET['limit'])  && ctype_digit($_GET['limit'])  ? (int) $_GET['limit']  : 50;
-        $offset = isset($_GET['offset']) && ctype_digit($_GET['offset']) ? (int) $_GET['offset'] : 0;
+        $make  = trim((string) ($_GET['make']  ?? ''));
+        $model = trim((string) ($_GET['model'] ?? ''));
+        $limit = isset($_GET['limit']) && ctype_digit($_GET['limit']) ? (int) $_GET['limit'] : 50;
+        $page  = isset($_GET['page'])  && ctype_digit($_GET['page'])  ? (int) $_GET['page']  : 1;
 
         if ($make === '' || $model === '') {
             throw new RuntimeException("Query parameters 'make' and 'model' are required.", 422);
         }
 
-        $trims = (new VehicleService())->getTrims($make, $model, $limit, $offset);
+        $trims = (new VehicleService())->getTrims($make, $model, $limit, $page);
         echo json_encode(['trims' => $trims]);
     }
 }

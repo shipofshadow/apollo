@@ -204,8 +204,8 @@ export const fetchVehicleModelsApi = (make: string, year?: number) => {
 /**
  * Fetch trims for a given make and model from the backend proxy.
  */
-export const fetchVehicleTrimsApi = (make: string, model: string, limit = 50, offset = 0) => {
-  const params = new URLSearchParams({ make, model, limit: String(limit), offset: String(offset) });
+export const fetchVehicleTrimsApi = (make: string, model: string, limit = 50, page = 1) => {
+  const params = new URLSearchParams({ make, model, limit: String(limit), page: String(page) });
   return apiFetch<{ trims: CarTrim[] }>(`/api/vehicles/trims?${params}`);
 };
 

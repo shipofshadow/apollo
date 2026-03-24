@@ -60,15 +60,17 @@ define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME']  ?? '1625 Auto Lab');
 define('MAIL_ADMIN',     $_ENV['MAIL_ADMIN']       ?? '');           // admin notification recipient
 
 // ---------------------------------------------------------------------------
-// API Ninjas – vehicle data
-// Sign up at https://api-ninjas.com and set CARNINJA_API_KEY in your .env.
+// CarAPI – vehicle make / model / trim data
+// Sign up at https://carapi.app and create an API token/secret pair.
+// CARAPI_MAKES_TTL:  cache lifetime in seconds for makes  (default 86400 = 24 h)
+// CARAPI_MODELS_TTL: cache lifetime in seconds for models (default 43200 = 12 h)
 // ---------------------------------------------------------------------------
 
-define('CARNINJA_API_KEY',  $_ENV['CARNINJA_API_KEY']  ?? '');
-define('CARNINJA_BASE_URL', 'https://api.api-ninjas.com/v1');
+define('CARAPI_TOKEN',      $_ENV['CARAPI_TOKEN']      ?? '');
+define('CARAPI_SECRET',     $_ENV['CARAPI_SECRET']     ?? '');
 /** TTL in seconds for cached vehicle data (24 h for makes, 12 h for models) */
-define('CARNINJA_MAKES_TTL',  (int) ($_ENV['CARNINJA_MAKES_TTL']  ?? 86400));
-define('CARNINJA_MODELS_TTL', (int) ($_ENV['CARNINJA_MODELS_TTL'] ?? 43200));
+define('CARAPI_MAKES_TTL',  (int) ($_ENV['CARAPI_MAKES_TTL']  ?? 86400));
+define('CARAPI_MODELS_TTL', (int) ($_ENV['CARAPI_MODELS_TTL'] ?? 43200));
 
 // ---------------------------------------------------------------------------
 // Media upload constants
