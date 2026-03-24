@@ -1,0 +1,621 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Booking creation, retrieval and status management.
+ *
+ * When DB_NAME is configured, bookings are stored in MySQL / MariaDB.
+ * Otherwise they fall back to a local JSON file at storage/bookings.json.
+ *
+ * SQL (run once to create the schema – requires users table first):
+ *
+ *   CREATE TABLE IF NOT EXISTS bookings (
+ *       id               CHAR(36)     NOT NULL PRIMARY KEY,
+ *       user_id          INT UNSIGNED DEFAULT NULL,
+ *       name             VARCHAR(200) NOT NULL,
+ *       email            VARCHAR(255) NOT NULL,
+ *       phone            VARCHAR(30)  NOT NULL,
+ *       vehicle_info     VARCHAR(255) NOT NULL,
+ *       service_id       VARCHAR(50)  NOT NULL,
+ *       service_name     VARCHAR(200) NOT NULL,
+ *       appointment_date DATE         NOT NULL,
+ *       appointment_time VARCHAR(20)  NOT NULL,
+ *       notes            TEXT         DEFAULT NULL,
+ *       status           ENUM('pending','confirmed','completed','cancelled')
+ *                        NOT NULL DEFAULT 'pending',
+ *       created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ *       updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+ *                        ON UPDATE CURRENT_TIMESTAMP,
+ *       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+ *   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ */
+class BookingService
+{
+    private bool $useDb;
+
+    private static string $storageFile = __DIR__ . '/../storage/bookings.json';
+
+    private const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'awaiting_parts'];
+
+    public function __construct()
+    {
+        $this->useDb = DB_NAME !== '';
+    }
+
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Create a new booking.
+     *
+     * @param  array<string, mixed> $data
+     * @param  int|null             $userId  Authenticated user ID, or null for walk-ins.
+     * @return array<string, mixed>
+     */
+    public function create(array $data, ?int $userId = null): array
+    {
+        $this->validatePayload($data);
+
+        // Support both legacy single-serviceId and new multi-service serviceIds
+        $serviceIds  = $this->resolveServiceIds($data);
+        $primaryId   = $serviceIds[0];
+        $serviceName = $this->resolveServiceNames($serviceIds, $data);
+
+        $booking = [
+            'id'              => $this->uuid(),
+            'userId'          => $userId,
+            'name'            => trim($data['name']),
+            'email'           => strtolower(trim($data['email'])),
+            'phone'           => trim($data['phone']),
+            'vehicleInfo'     => trim($data['vehicleInfo']),
+            'vehicleMake'     => trim($data['vehicleMake']  ?? ''),
+            'vehicleModel'    => trim($data['vehicleModel'] ?? ''),
+            'vehicleYear'     => trim($data['vehicleYear']  ?? ''),
+            'serviceId'       => $primaryId,
+            'serviceIds'      => $serviceIds,
+            'serviceName'     => $serviceName,
+            'appointmentDate' => trim($data['appointmentDate']),
+            'appointmentTime' => trim($data['appointmentTime']),
+            'notes'           => trim($data['notes']          ?? ''),
+            'signatureData'   => $data['signatureData']        ?? null,
+            'mediaUrls'       => $data['mediaUrls']            ?? [],
+            'status'          => 'pending',
+            'awaitingParts'   => false,
+            'partsNotes'      => null,
+            'createdAt'       => date('c'),
+        ];
+
+        $this->useDb ? $this->dbInsert($booking) : $this->fileInsert($booking);
+
+        (new NotificationService())->bookingCreated($booking);
+
+        return $booking;
+    }
+
+    /**
+     * Return all bookings (admin use).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAll(): array
+    {
+        return $this->useDb ? $this->dbGetAll() : $this->fileGetAll();
+    }
+
+    /**
+     * Return bookings belonging to a specific user.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getByUserId(int $userId): array
+    {
+        if ($this->useDb) {
+            return $this->dbGetByUser($userId);
+        }
+
+        return array_values(
+            array_filter($this->fileGetAll(), fn (array $b) => (int) ($b['userId'] ?? 0) === $userId)
+        );
+    }
+
+    /**
+     * Return aggregate booking statistics for the admin dashboard.
+     *
+     * @return array<string, int>
+     */
+    public function getStats(): array
+    {
+        return $this->useDb ? $this->dbGetStats() : $this->fileGetStats();
+    }
+
+    /**
+     * Return the time slots that are already fully booked for a given date.
+     *
+     * A slot is considered "taken" once MAX_BOOKINGS_PER_SLOT bookings with
+     * status 'pending' or 'confirmed' exist for that date+time combination.
+     *
+     * @return string[]  e.g. ['09:00 AM', '11:00 AM']
+     */
+    public function getBookedSlots(string $date): array
+    {
+        return $this->useDb
+            ? $this->dbGetBookedSlots($date)
+            : $this->fileGetBookedSlots($date);
+    }
+
+    /**
+     * Update a booking's status.
+     *
+     * @return array<string, mixed>  Updated booking
+     */
+    public function updateStatus(string $id, string $status): array
+    {
+        if (!in_array($status, self::VALID_STATUSES, true)) {
+            throw new RuntimeException(
+                'Invalid status. Allowed: ' . implode(', ', self::VALID_STATUSES) . '.', 422
+            );
+        }
+
+        $booking = $this->useDb
+            ? $this->dbUpdateStatus($id, $status)
+            : $this->fileUpdateStatus($id, $status);
+
+        (new NotificationService())->bookingStatusChanged($booking);
+
+        return $booking;
+    }
+
+    /**
+     * Update the parts-dependency flag and notes for a booking.
+     *
+     * @return array<string, mixed>  Updated booking
+     */
+    public function updatePartsStatus(string $id, bool $awaitingParts, string $partsNotes): array
+    {
+        $booking = $this->useDb
+            ? $this->dbUpdateParts($id, $awaitingParts, $partsNotes)
+            : $this->fileUpdateParts($id, $awaitingParts, $partsNotes);
+
+        if ($awaitingParts) {
+            (new NotificationService())->bookingAwaitingParts($booking);
+        }
+
+        return $booking;
+    }
+
+    // -------------------------------------------------------------------------
+    // DB storage
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, mixed> $booking */
+    private function dbInsert(array $booking): void
+    {
+        $db = Database::getInstance();
+        $db->prepare(
+            'INSERT INTO bookings
+             (id, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
+              vehicle_year, service_id, service_ids, appointment_date, appointment_time,
+              notes, signature_data, media_urls, status)
+             VALUES
+             (:id, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
+              :vehicle_year, :service_id, :service_ids, :appointment_date, :appointment_time,
+              :notes, :signature_data, :media_urls, :status)'
+        )->execute([
+            ':id'               => $booking['id'],
+            ':user_id'          => $booking['userId'],
+            ':name'             => $booking['name'],
+            ':email'            => $booking['email'],
+            ':phone'            => $booking['phone'],
+            ':vehicle_info'     => $booking['vehicleInfo'],
+            ':vehicle_make'     => $booking['vehicleMake']  ?? null,
+            ':vehicle_model'    => $booking['vehicleModel'] ?? null,
+            ':vehicle_year'     => $booking['vehicleYear']  ?? null,
+            ':service_id'       => $booking['serviceId'],
+            ':service_ids'      => json_encode($booking['serviceIds'] ?? [$booking['serviceId']]),
+            ':appointment_date' => $booking['appointmentDate'],
+            ':appointment_time' => $booking['appointmentTime'],
+            ':notes'            => $booking['notes'],
+            ':signature_data'   => $booking['signatureData'] ?? null,
+            ':media_urls'       => json_encode($booking['mediaUrls'] ?? []),
+            ':status'           => $booking['status'],
+        ]);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function dbGetAll(): array
+    {
+        $stmt = Database::getInstance()->query(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             ORDER BY b.created_at DESC'
+        );
+        return array_map([$this, 'mapDbRow'], $stmt->fetchAll());
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function dbGetByUser(int $userId): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.user_id = :uid
+             ORDER BY b.created_at DESC'
+        );
+        $stmt->execute([':uid' => $userId]);
+        return array_map([$this, 'mapDbRow'], $stmt->fetchAll());
+    }
+
+    /** @return array<string, mixed> */
+    private function dbUpdateStatus(string $id, string $status): array
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE bookings SET status = :status WHERE id = :id'
+        );
+        $stmt->execute([':status' => $status, ':id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $row = $db->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
+        $row->execute([':id' => $id]);
+        return $this->mapDbRow($row->fetch());
+    }
+
+    /** @return array<string, mixed> */
+    private function dbUpdateParts(string $id, bool $awaitingParts, string $partsNotes): array
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE bookings SET awaiting_parts = :ap, parts_notes = :pn WHERE id = :id'
+        );
+        $stmt->execute([':ap' => (int) $awaitingParts, ':pn' => $partsNotes, ':id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $row = $db->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
+        $row->execute([':id' => $id]);
+        return $this->mapDbRow($row->fetch());
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private function mapDbRow(array $row): array
+    {
+        $rawIds = $row['service_ids'] ?? null;
+        $serviceIds = $rawIds
+            ? (json_decode((string) $rawIds, true) ?? [(int) $row['service_id']])
+            : [(int) $row['service_id']];
+
+        $rawMedia = $row['media_urls'] ?? null;
+        $mediaUrls = $rawMedia ? (json_decode((string) $rawMedia, true) ?? []) : [];
+
+        return [
+            'id'              => $row['id'],
+            'userId'          => $row['user_id'] !== null ? (int) $row['user_id'] : null,
+            'name'            => $row['name'],
+            'email'           => $row['email'],
+            'phone'           => $row['phone'],
+            'vehicleInfo'     => $row['vehicle_info'],
+            'vehicleMake'     => $row['vehicle_make']  ?? null,
+            'vehicleModel'    => $row['vehicle_model'] ?? null,
+            'vehicleYear'     => $row['vehicle_year']  ?? null,
+            'serviceId'       => (int) $row['service_id'],
+            'serviceIds'      => $serviceIds,
+            'serviceName'     => $row['service_name'],
+            'appointmentDate' => $row['appointment_date'],
+            'appointmentTime' => $row['appointment_time'],
+            'notes'           => $row['notes']          ?? '',
+            'signatureData'   => $row['signature_data'] ?? null,
+            'mediaUrls'       => $mediaUrls,
+            'status'          => $row['status'],
+            'awaitingParts'   => ($row['status'] === 'awaiting_parts'),
+            'partsNotes'      => $row['parts_notes'] ?? null,
+            'createdAt'       => $row['created_at'],
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // DB – availability
+    // -------------------------------------------------------------------------
+
+    private const MAX_BOOKINGS_PER_SLOT = 3;
+
+    /** @return string[] */
+    private function dbGetBookedSlots(string $date): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            "SELECT appointment_time
+             FROM bookings
+             WHERE appointment_date = :date
+               AND status IN ('pending','confirmed')
+             GROUP BY appointment_time
+             HAVING COUNT(*) >= :max"
+        );
+        $stmt->execute([':date' => $date, ':max' => self::MAX_BOOKINGS_PER_SLOT]);
+        return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'appointment_time');
+    }
+
+    /** @return string[] */
+    private function fileGetBookedSlots(string $date): array
+    {
+        $counts = [];
+        foreach ($this->fileGetAll() as $b) {
+            if (
+                ($b['appointmentDate'] ?? '') === $date
+                && in_array($b['status'] ?? '', ['pending', 'confirmed'], true)
+            ) {
+                $time = (string) ($b['appointmentTime'] ?? '');
+                $counts[$time] = ($counts[$time] ?? 0) + 1;
+            }
+        }
+        return array_keys(
+            array_filter($counts, fn (int $c) => $c >= self::MAX_BOOKINGS_PER_SLOT)
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // DB – stats
+    // -------------------------------------------------------------------------
+
+    /** @return array<string, int> */
+    private function dbGetStats(): array
+    {
+        $db = Database::getInstance();
+
+        $total = (int) $db->query('SELECT COUNT(*) FROM bookings')->fetchColumn();
+
+        $byStatus = $db->query(
+            'SELECT status, COUNT(*) AS cnt FROM bookings GROUP BY status'
+        )->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+        $pending   = (int) ($byStatus['pending']   ?? 0);
+        $confirmed = (int) ($byStatus['confirmed'] ?? 0);
+        $completed = (int) ($byStatus['completed'] ?? 0);
+        $cancelled = (int) ($byStatus['cancelled'] ?? 0);
+
+        $thisWeek = (int) $db->query(
+            "SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+        )->fetchColumn();
+
+        $thisMonth = (int) $db->query(
+            "SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        )->fetchColumn();
+
+        return [
+            'totalBookings'     => $total,
+            'pendingBookings'   => $pending,
+            'confirmedBookings' => $confirmed,
+            'completedBookings' => $completed,
+            'cancelledBookings' => $cancelled,
+            'activeBookings'    => $pending + $confirmed,
+            'bookingsThisWeek'  => $thisWeek,
+            'bookingsThisMonth' => $thisMonth,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // File storage (fallback)
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, mixed> $booking */
+    private function fileInsert(array $booking): void
+    {
+        $all   = $this->fileGetAll();
+        $all[] = $booking;
+        $this->fileWrite($all);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function fileGetAll(): array
+    {
+        if (!file_exists(self::$storageFile)) {
+            return [];
+        }
+        $data = json_decode((string) file_get_contents(self::$storageFile), true);
+        return is_array($data) ? array_reverse($data) : [];
+    }
+
+    /** @return array<string, mixed> */
+    private function fileUpdateStatus(string $id, string $status): array
+    {
+        $all   = array_reverse($this->fileGetAll()); // back to chronological order
+        $found = null;
+
+        foreach ($all as &$b) {
+            if ($b['id'] === $id) {
+                $b['status'] = $status;
+                $found       = $b;
+                break;
+            }
+        }
+        unset($b);
+
+        if ($found === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->fileWrite($all);
+        return $found;
+    }
+
+    /** @return array<string, mixed> */
+    private function fileUpdateParts(string $id, bool $awaitingParts, string $partsNotes): array
+    {
+        $all   = array_reverse($this->fileGetAll());
+        $found = null;
+
+        foreach ($all as &$b) {
+            if ($b['id'] === $id) {
+                $b['awaitingParts'] = $awaitingParts;
+                $b['partsNotes']    = $partsNotes;
+                $found              = $b;
+                break;
+            }
+        }
+        unset($b);
+
+        if ($found === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->fileWrite($all);
+        return $found;
+    }
+
+    /** @param array<int, array<string, mixed>> $bookings */
+    private function fileWrite(array $bookings): void
+    {
+        $dir = dirname(self::$storageFile);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents(self::$storageFile, json_encode($bookings, JSON_PRETTY_PRINT));
+    }
+
+    /** @return array<string, int> */
+    private function fileGetStats(): array
+    {
+        $all = $this->fileGetAll();
+
+        $weekAgo    = new \DateTime('-7 days');
+        $monthStart = new \DateTime('first day of this month midnight');
+
+        $pending   = 0;
+        $confirmed = 0;
+        $completed = 0;
+        $cancelled = 0;
+        $thisWeek  = 0;
+        $thisMonth = 0;
+
+        foreach ($all as $b) {
+            switch ($b['status'] ?? '') {
+                case 'pending':   $pending++;   break;
+                case 'confirmed': $confirmed++; break;
+                case 'completed': $completed++; break;
+                case 'cancelled': $cancelled++; break;
+            }
+
+            $created = new \DateTime($b['createdAt'] ?? 'now');
+            if ($created >= $weekAgo)    $thisWeek++;
+            if ($created >= $monthStart) $thisMonth++;
+        }
+
+        return [
+            'totalBookings'     => count($all),
+            'pendingBookings'   => $pending,
+            'confirmedBookings' => $confirmed,
+            'completedBookings' => $completed,
+            'cancelledBookings' => $cancelled,
+            'activeBookings'    => $pending + $confirmed,
+            'bookingsThisWeek'  => $thisWeek,
+            'bookingsThisMonth' => $thisMonth,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, mixed> $data */
+    private function validatePayload(array $data): void
+    {
+        $required = [
+            'name', 'email', 'phone', 'vehicleInfo',
+            'appointmentDate', 'appointmentTime',
+        ];
+        foreach ($required as $field) {
+            if (empty(trim((string) ($data[$field] ?? '')))) {
+                throw new RuntimeException("Field '$field' is required.", 422);
+            }
+        }
+        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid email address is required.', 422);
+        }
+        // Accepts new multi-service format (serviceIds[]) or legacy single serviceId
+        $ids = $this->resolveServiceIds($data);
+        if (empty($ids)) {
+            throw new RuntimeException('At least one valid serviceId is required.', 422);
+        }
+    }
+
+    /**
+     * Normalise the submitted service ID(s) into an array of positive integers.
+     * Accepts: serviceIds[] (new) or serviceId (legacy single value).
+     *
+     * @return int[]
+     */
+    private function resolveServiceIds(array $data): array
+    {
+        if (!empty($data['serviceIds']) && is_array($data['serviceIds'])) {
+            return array_values(array_filter(
+                array_map('intval', $data['serviceIds']),
+                fn (int $id) => $id > 0
+            ));
+        }
+        $id = (int) ($data['serviceId'] ?? 0);
+        return $id > 0 ? [$id] : [];
+    }
+
+    /**
+     * Resolve human-readable names for all selected service IDs.
+     * In DB mode fetches from the services table; falls back to client-supplied names.
+     *
+     * @param int[] $serviceIds
+     */
+    private function resolveServiceNames(array $serviceIds, array $data): string
+    {
+        if ($this->useDb && !empty($serviceIds)) {
+            $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
+            $stmt = Database::getInstance()->prepare(
+                "SELECT id, title FROM services WHERE id IN ($placeholders)"
+            );
+            $stmt->execute($serviceIds);
+            $map = array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'title', 'id');
+
+            $names = [];
+            foreach ($serviceIds as $id) {
+                if (!isset($map[$id])) {
+                    throw new RuntimeException("Service #$id not found.", 422);
+                }
+                $names[] = $map[$id];
+            }
+            return implode(', ', $names);
+        }
+
+        // File-storage fallback: use client-supplied serviceName
+        return trim((string) ($data['serviceName'] ?? ''));
+    }
+
+    // -------------------------------------------------------------------------
+    // Utilities
+    // -------------------------------------------------------------------------
+
+    private function uuid(): string
+    {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+    }
+}

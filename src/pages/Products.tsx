@@ -1,45 +1,29 @@
 import { Search, Filter } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-
-const products = [
-  { 
-    id: 'p1',
-    name: 'RGB Demon Eyes Kit', 
-    price: 149.99, 
-    category: 'Lighting',
-    img: 'https://images.unsplash.com/photo-1584345611124-287a5085e648?q=80&w=2015&auto=format&fit=crop' 
-  },
-  { 
-    id: 'p2',
-    name: '10.1" Android Headunit', 
-    price: 499.99, 
-    category: 'Electronics',
-    img: 'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop' 
-  },
-  { 
-    id: 'p3',
-    name: 'Sequential LED Halos', 
-    price: 199.99, 
-    category: 'Lighting',
-    img: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?q=80&w=2069&auto=format&fit=crop' 
-  },
-  { 
-    id: 'p6',
-    name: '2-Way Paging Alarm', 
-    price: 299.99, 
-    category: 'Security',
-    img: 'https://images.unsplash.com/photo-1600705722908-bab1e61c0b4d?q=80&w=2070&auto=format&fit=crop' 
-  },
-];
-
-const categories = ['All', 'Lighting', 'Electronics', 'Security'];
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../store';
+import { fetchProductsAsync } from '../store/productsSlice';
 
 export default function Products() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { items: products, status } = useSelector((s: RootState) => s.products);
+
+  useEffect(() => {
+    dispatch(fetchProductsAsync(null));
+  }, [dispatch]);
+
+  const activeProducts = useMemo(() => products.filter(p => p.isActive), [products]);
+
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(activeProducts.map(p => p.category)))],
+    [activeProducts]
+  );
+
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = activeProducts.filter(product => {
     const matchesCategory = activeCategory === 'All' || product.category === activeCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -92,6 +76,11 @@ export default function Products() {
           </div>
         </div>
 
+        {status === 'loading' && (
+          <div className="text-center py-24 text-gray-400">Loading products…</div>
+        )}
+
+        {status !== 'loading' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
             <Link 
@@ -104,7 +93,7 @@ export default function Products() {
                   {product.category}
                 </div>
                 <img 
-                  src={product.img} 
+                  src={product.imageUrl} 
                   alt={product.name} 
                   className="w-full h-full object-cover mix-blend-luminosity group-hover:mix-blend-normal transition-all duration-500 group-hover:scale-110"
                   referrerPolicy="no-referrer"
@@ -119,8 +108,9 @@ export default function Products() {
             </Link>
           ))}
         </div>
+        )}
 
-        {filteredProducts.length === 0 && (
+        {status !== 'loading' && filteredProducts.length === 0 && (
           <div className="text-center py-24">
             <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
             <button 

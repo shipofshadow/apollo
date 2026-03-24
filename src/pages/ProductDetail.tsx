@@ -1,49 +1,30 @@
+import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { ArrowLeft, Check } from 'lucide-react';
-
-const products = [
-  { 
-    id: 'p1',
-    name: 'RGB Demon Eyes Kit', 
-    price: 149.99, 
-    category: 'Lighting',
-    img: 'https://images.unsplash.com/photo-1584345611124-287a5085e648?q=80&w=2015&auto=format&fit=crop',
-    description: 'Add a menacing look to your headlights with our RGB Demon Eyes Kit. Control colors and patterns directly from your smartphone.',
-    features: ['Bluetooth smartphone control', 'Millions of colors', 'Easy installation', 'Durable and heat-resistant']
-  },
-  { 
-    id: 'p2',
-    name: '10.1" Android Headunit', 
-    price: 499.99, 
-    category: 'Electronics',
-    img: 'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop',
-    description: 'Upgrade your infotainment system with this massive 10.1" Android headunit. Features wireless CarPlay and Android Auto.',
-    features: ['10.1" IPS Touchscreen', 'Wireless Apple CarPlay & Android Auto', 'Built-in GPS navigation', 'DSP Audio Processing']
-  },
-  { 
-    id: 'p3',
-    name: 'Sequential LED Halos', 
-    price: 199.99, 
-    category: 'Lighting',
-    img: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?q=80&w=2069&auto=format&fit=crop',
-    description: 'Custom sequential LED halos for a modern, aggressive front-end look. Features switchback turn signal functionality.',
-    features: ['Sequential turn signals', 'Ultra-bright white DRL', 'Custom fit for various models', 'Waterproof drivers']
-  },
-  { 
-    id: 'p6',
-    name: '2-Way Paging Alarm', 
-    price: 299.99, 
-    category: 'Security',
-    img: 'https://images.unsplash.com/photo-1600705722908-bab1e61c0b4d?q=80&w=2070&auto=format&fit=crop',
-    description: 'Protect your investment with our advanced 2-way paging alarm system. Get real-time alerts on your LCD remote.',
-    features: ['Up to 1-mile range', 'LCD 2-way remote', 'Shock and tilt sensors', 'Starter kill relay']
-  },
-];
+import type { AppDispatch, RootState } from '../store';
+import { fetchProductsAsync } from '../store/productsSlice';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  
-  const product = products.find(p => p.id === id);
+  const dispatch = useDispatch<AppDispatch>();
+  const { items: products, status } = useSelector((s: RootState) => s.products);
+
+  useEffect(() => {
+    if (status === 'idle') {
+      dispatch(fetchProductsAsync(null));
+    }
+  }, [dispatch, status]);
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-brand-darker pt-32 pb-24 flex items-center justify-center">
+        <div className="text-center text-gray-400">Loading…</div>
+      </div>
+    );
+  }
+
+  const product = products.find(p => p.id === Number(id));
 
   if (!product) {
     return (
@@ -74,9 +55,10 @@ export default function ProductDetail() {
           <div className="relative aspect-square rounded-sm overflow-hidden border border-gray-800 group">
             <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <img 
-              src={product.img} 
+              src={product.imageUrl} 
               alt={product.name}
               className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+              referrerPolicy="no-referrer"
             />
           </div>
 
@@ -100,7 +82,7 @@ export default function ProductDetail() {
               </p>
             </div>
 
-            {product.features && (
+            {product.features && product.features.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-xl font-display font-bold text-white uppercase tracking-wider mb-4">
                   Key Features

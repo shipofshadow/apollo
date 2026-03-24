@@ -129,7 +129,7 @@ export default function AboutPage() {
 
       {/* Team Member Modal */}
       {selectedMember && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedMember(null)}>
+        <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto" onClick={() => setSelectedMember(null)}>
           <div 
             className="bg-brand-darker border border-gray-800 w-full max-w-3xl flex flex-col md:flex-row overflow-hidden rounded-sm relative"
             onClick={(e) => e.stopPropagation()}

@@ -1,293 +1,581 @@
-import React, { useState } from 'react';
-import { Clock, CheckCircle, ArrowLeft, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2,
+  UploadCloud, X, ChevronDown,
+} from 'lucide-react';
+import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
+import { fetchServicesAsync } from '../store/servicesSlice';
+import type { AppDispatch, RootState } from '../store';
+import { useAuth } from '../context/AuthContext';
+import {
+  fetchAvailabilityApi, uploadBookingMediaApi,
+  fetchVehicleMakesApi, fetchVehicleModelsApi,
+  fetchShopHoursApi,
+} from '../services/api';
+import { BACKEND_URL } from '../config';
+import type { ShopDayHours } from '../types';
+import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+import SignaturePad from '../components/SignaturePad';
 
-const services = [
-  { id: 's1', name: 'Headlight Retrofit', duration: '4-6 Hours', price: 'From $250' },
-  { id: 's2', name: 'Android Headunit Installation', duration: '2-3 Hours', price: 'From $150' },
-  { id: 's3', name: 'Security System', duration: '2-4 Hours', price: 'From $200' },
-  { id: 's4', name: 'Aesthetic Upgrades', duration: 'Varies', price: 'Consultation' },
-];
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-// Generate next 7 days for mock availability
-const generateNextDays = () => {
-  const days = [];
-  for (let i = 1; i <= 7; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    days.push(date);
+const STEPS = ['Services', 'Date & Time', 'Your Details', 'Confirm'];
+
+/** Parse "09:00 AM" / "01:00 PM" → 24-hour number (9, 13, etc.) */
+function slotToHour(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  let h = parseInt(timePart.split(':')[0], 10);
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h;
+}
+
+function parseDurationMax(duration: string): number {
+  const nums = duration.match(/\d+/g);
+  if (!nums) return 4;
+  return Math.max(...nums.map(Number));
+}
+
+function slotCompletionLabel(slot: string, totalHours: number): string {
+  const end = slotToHour(slot) + totalHours;
+  if (end > 12) return `~${end - 12}:00 PM`;
+  if (end === 12) return `~12:00 PM`;
+  return `~${end}:00 AM`;
+}
+
+/** Build date list from shop hours (falls back to Mon–Sat if hours not loaded) */
+function buildDateList(shopHours: ShopDayHours[]): Date[] {
+  const openDays = shopHours.length
+    ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
+    : new Set([1, 2, 3, 4, 5, 6]); // Mon–Sat default
+
+  const dates: Date[] = [];
+  let cursor = new Date();
+  cursor.setDate(cursor.getDate() + 1);
+  while (dates.length < 14) {
+    if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
   }
-  return days;
-};
+  return dates;
+}
 
-const availableDates = generateNextDays();
-const availableTimes = ['09:00 AM', '11:00 AM', '01:00 PM', '03:00 PM'];
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function BookingPage() {
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, token } = useAuth();
+  const { status: bookStatus, error: bookError } = useSelector((s: RootState) => s.booking);
+  const services = useSelector((s: RootState) => s.services.items.filter(sv => sv.isActive));
+
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTime, setSelectedTime] = useState('');
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    vehicleInfo: '',
-    notes: ''
+
+  // Step 1 – multi-select services (pre-select from location state if present)
+  const preselectedId = (location.state as { serviceId?: number } | null)?.serviceId ?? null;
+  const [selectedIds, setSelectedIds] = useState<number[]>(
+    preselectedId ? [preselectedId] : []
+  );
+
+  // Shop hours – loaded on mount to filter the date picker
+  const [shopHours,       setShopHours]       = useState<ShopDayHours[]>([]);
+  const [shopHoursLoaded, setShopHoursLoaded] = useState(false);
+
+  // Step 2 – date / time / availability
+  const [selectedDate,        setSelectedDate]        = useState<Date | null>(null);
+  const [selectedTime,        setSelectedTime]        = useState('');
+  const [availableSlots,      setAvailableSlots]      = useState<string[]>([]);
+  const [bookedSlots,         setBookedSlots]         = useState<string[]>([]);
+  const [shopDayIsOpen,       setShopDayIsOpen]       = useState(true);
+  const [shopCloseTime,       setShopCloseTime]       = useState('18:00');
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+
+  // Step 3 – contact
+  const [form, setForm] = useState({
+    name:  user?.name  ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? '',
+    notes: '',
   });
+  const [vehicleMake,  setVehicleMake]  = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleYear,  setVehicleYear]  = useState('');
 
-  const handleNext = () => setStep(s => s + 1);
-  const handleBack = () => setStep(s => s - 1);
+  // Vehicle data – loaded from CarAPI proxy, fall back to static dataset
+  const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [makesLoading,  setMakesLoading]  = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Resolved lists (dynamic when available, static otherwise)
+  const makesList  = dynamicMakes.length  ? dynamicMakes  : [...STATIC_MAKES];
+  const modelsList = dynamicModels.length ? dynamicModels
+    : vehicleMake ? (STATIC_MODELS[vehicleMake as VehicleMake] ?? []) : [];
+
+  // Step 3 – media upload
+  const [mediaFiles,      setMediaFiles]      = useState<File[]>([]);
+  const [mediaPreviews,   setMediaPreviews]   = useState<string[]>([]);
+  const [mediaUploadBusy, setMediaUploadBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Step 3 – signature
+  const [signatureData, setSignatureData] = useState('');
+
+  const availableDates = buildDateList(shopHoursLoaded ? shopHours : []);
+
+  const selectedServices = services.filter(s => selectedIds.includes(s.id));
+  const totalMaxHours    = selectedServices.reduce(
+    (acc, s) => acc + parseDurationMax(s.duration), 0
+  );
+  const vehicleInfo = [vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(' ');
+
+  // Load services + shop hours on mount
+  useEffect(() => {
+    dispatch(fetchServicesAsync(token));
+    if (BACKEND_URL) {
+      fetchShopHoursApi()
+        .then(({ hours }) => setShopHours(hours))
+        .catch(() => { /* use default Mon–Sat */ })
+        .finally(() => setShopHoursLoaded(true));
+    } else {
+      setShopHoursLoaded(true);
+    }
+  }, [dispatch, token]);
+
+  // Re-fetch makes whenever year changes; passes year to the API when selected
+  useEffect(() => {
+    setDynamicMakes([]);
+    setVehicleMake('');
+    setDynamicModels([]);
+    setVehicleModel('');
+    if (!BACKEND_URL) return;
+    setMakesLoading(true);
+    const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
+    fetchVehicleMakesApi(year)
+      .then(({ makes }) => setDynamicMakes(makes))
+      .catch(() => { /* fall back to static */ })
+      .finally(() => setMakesLoading(false));
+  }, [vehicleYear]);
+
+  // Load models when make changes, passing year when available
+  useEffect(() => {
+    setDynamicModels([]);
+    setVehicleModel('');
+    if (!vehicleMake || !BACKEND_URL) return;
+    setModelsLoading(true);
+    const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
+    fetchVehicleModelsApi(vehicleMake, year)
+      .then(({ models }) => setDynamicModels(models))
+      .catch(() => { /* fall back to static */ })
+      .finally(() => setModelsLoading(false));
+  }, [vehicleMake, vehicleYear]);
+
+  const toggleService = (id: number) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleDateSelect = async (date: Date) => {
+    setSelectedDate(date);
+    setSelectedTime('');
+    setAvailableSlots([]);
+    setBookedSlots([]);
+    setShopDayIsOpen(true);
+    if (!BACKEND_URL) return;
+    setAvailabilityLoading(true);
+    try {
+      const res = await fetchAvailabilityApi(date.toISOString().split('T')[0]);
+      setShopDayIsOpen(res.isOpen);
+      setShopCloseTime(res.closeTime);
+      setAvailableSlots(res.availableSlots);
+      setBookedSlots(res.bookedSlots);
+    } catch { /* show all slots available */ }
+    finally { setAvailabilityLoading(false); }
+  };
+
+  const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const added = Array.from(e.target.files ?? []);
+    if (!added.length) return;
+    setMediaFiles(prev => [...prev, ...added]);
+    added.forEach(f => {
+      const reader = new FileReader();
+      reader.onload = ev => setMediaPreviews(p => [...p, ev.target?.result as string]);
+      reader.readAsDataURL(f);
+    });
+    e.target.value = '';
+  };
+
+  const removeFile = (i: number) => {
+    setMediaFiles(prev => prev.filter((_, idx) => idx !== i));
+    setMediaPreviews(prev => prev.filter((_, idx) => idx !== i));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock API call
-    setTimeout(() => {
-      setStep(4);
-    }, 1000);
+    let mediaUrls: string[] = [];
+    if (mediaFiles.length && BACKEND_URL) {
+      setMediaUploadBusy(true);
+      try { mediaUrls = await uploadBookingMediaApi(mediaFiles); }
+      catch { /* proceed without media */ }
+      finally { setMediaUploadBusy(false); }
+    }
+    const result = await dispatch(
+      submitBookingAsync({
+        payload: {
+          name:            form.name,
+          email:           form.email,
+          phone:           form.phone,
+          vehicleInfo,
+          vehicleMake,
+          vehicleModel,
+          vehicleYear,
+          serviceIds:      selectedIds,
+          appointmentDate: selectedDate!.toISOString().split('T')[0],
+          appointmentTime: selectedTime,
+          notes:           form.notes,
+          signatureData:   signatureData || undefined,
+          mediaUrls:       mediaUrls.length ? mediaUrls : undefined,
+        },
+        token,
+      })
+    );
+    if (submitBookingAsync.fulfilled.match(result)) setStep(4);
+  };
+
+  const reset = () => {
+    dispatch(resetBookingState());
+    setStep(1);
+    setSelectedIds([]);
+    setSelectedDate(null);
+    setSelectedTime('');
+    setAvailableSlots([]);
+    setBookedSlots([]);
+    setShopDayIsOpen(true);
+    setForm({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', notes: '' });
+    setVehicleMake(''); setVehicleModel(''); setVehicleYear('');
+    setDynamicModels([]);
+    setMediaFiles([]); setMediaPreviews([]);
+    setSignatureData('');
   };
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
       <div className="container mx-auto px-4 md:px-6 max-w-4xl">
         <div className="text-center mb-12">
+          <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-3">Schedule Your Visit</span>
           <h1 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter mb-4">
             Book <span className="text-brand-orange">Appointment</span>
           </h1>
-          <p className="text-gray-400 text-lg">
-            Schedule your service at The Lab. Select a service, date, and time below.
-          </p>
+          <p className="text-gray-400 text-lg">Select your services, choose a date and time, then provide your details.</p>
         </div>
 
-        {/* Progress Bar */}
+        {/* Step indicators */}
         <div className="flex justify-between items-center mb-12 relative">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-800 z-0"></div>
-          <div 
-            className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-brand-orange z-0 transition-all duration-300"
-            style={{ width: `${((step - 1) / 3) * 100}%` }}
-          ></div>
-          
-          {[1, 2, 3, 4].map((s) => (
-            <div 
-              key={s}
-              className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${
-                step >= s ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-500'
-              }`}
-            >
-              {s === 4 && step === 4 ? <CheckCircle className="w-5 h-5" /> : s}
-            </div>
-          ))}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-gray-800 z-0" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-brand-orange z-0 transition-all duration-500"
+            style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }} />
+          {STEPS.map((label, i) => {
+            const n = i + 1;
+            const active = step >= n;
+            return (
+              <div key={n} className="relative z-10 flex flex-col items-center gap-2">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${active ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-500'}`}>
+                  {n === STEPS.length && step === STEPS.length ? <CheckCircle className="w-5 h-5" /> : n}
+                </div>
+                <span className={`hidden md:block text-xs font-bold uppercase tracking-widest ${active ? 'text-brand-orange' : 'text-gray-600'}`}>{label}</span>
+              </div>
+            );
+          })}
         </div>
 
         <div className="bg-brand-dark border border-gray-800 p-6 md:p-10 rounded-sm">
-          {/* Step 1: Select Service */}
+
+          {/* ── Step 1: Services ── */}
           {step === 1 && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <h2 className="text-2xl font-display font-bold text-white uppercase mb-6">1. Select Service</h2>
+            <div>
+              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">1. Select Services</h2>
+              <p className="text-sm text-gray-500 mb-6">Pick one or more services — prices and durations are shown per service.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {services.map(service => (
-                  <button
-                    key={service.id}
-                    onClick={() => setSelectedService(service.id)}
-                    className={`p-6 border text-left transition-all ${
-                      selectedService === service.id 
-                        ? 'border-brand-orange bg-brand-orange/10' 
-                        : 'border-gray-800 hover:border-gray-600'
-                    }`}
-                  >
-                    <h3 className="text-lg font-bold text-white mb-2">{service.name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-400">
-                      <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {service.duration}</span>
-                      <span>{service.price}</span>
-                    </div>
-                  </button>
-                ))}
+                {services.map(svc => {
+                  const active = selectedIds.includes(svc.id);
+                  return (
+                    <button key={svc.id} onClick={() => toggleService(svc.id)}
+                      className={`p-6 border text-left transition-all rounded-sm relative ${active ? 'border-brand-orange bg-brand-orange/10' : 'border-gray-800 hover:border-gray-600'}`}>
+                      {active && (
+                        <span className="absolute top-3 right-3 w-5 h-5 bg-brand-orange rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        </span>
+                      )}
+                      <h3 className="text-lg font-bold text-white mb-2 pr-8">{svc.title}</h3>
+                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {svc.duration}</span>
+                        <span className="text-brand-orange font-bold">{svc.startingPrice}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+              {selectedIds.length > 0 && (
+                <div className="mt-6 bg-brand-darker border border-gray-700 rounded-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                  <div>
+                    <span className="text-gray-400">Selected: </span>
+                    <span className="text-white font-semibold">{selectedServices.map(s => s.title).join(', ')}</span>
+                  </div>
+                  <span className="text-brand-orange font-bold flex items-center gap-1 shrink-0">
+                    <Clock className="w-4 h-4" /> Est. {totalMaxHours}h max
+                  </span>
+                </div>
+              )}
               <div className="mt-8 flex justify-end">
-                <button
-                  onClick={handleNext}
-                  disabled={!selectedService}
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-                >
+                <button onClick={() => setStep(2)} disabled={selectedIds.length === 0}
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm">
                   Next <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 2: Select Date & Time */}
+          {/* ── Step 2: Date & Time ── */}
           {step === 2 && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div>
               <h2 className="text-2xl font-display font-bold text-white uppercase mb-6">2. Select Date & Time</h2>
-              
               <div className="mb-8">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Available Dates</h3>
-                <div className="flex overflow-x-auto pb-4 gap-3 snap-x">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Available Dates</p>
+                <div className="flex overflow-x-auto pb-3 gap-3 snap-x">
                   {availableDates.map((date, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedDate(date)}
-                      className={`snap-start shrink-0 w-24 p-4 border text-center transition-all ${
-                        selectedDate?.toDateString() === date.toDateString()
-                          ? 'border-brand-orange bg-brand-orange/10'
-                          : 'border-gray-800 hover:border-gray-600'
-                      }`}
-                    >
-                      <div className="text-xs text-gray-400 uppercase mb-1">
-                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                      </div>
-                      <div className="text-2xl font-display font-bold text-white">
-                        {date.getDate()}
-                      </div>
-                      <div className="text-xs text-gray-500 uppercase mt-1">
-                        {date.toLocaleDateString('en-US', { month: 'short' })}
-                      </div>
+                    <button key={i} onClick={() => handleDateSelect(date)}
+                      className={`snap-start shrink-0 w-24 p-4 border text-center transition-all rounded-sm ${selectedDate?.toDateString() === date.toDateString() ? 'border-brand-orange bg-brand-orange/10' : 'border-gray-800 hover:border-gray-600'}`}>
+                      <div className="text-xs text-gray-400 uppercase mb-1">{date.toLocaleDateString('en-PH', { weekday: 'short' })}</div>
+                      <div className="text-2xl font-display font-bold text-white">{date.getDate()}</div>
+                      <div className="text-xs text-gray-500 uppercase mt-1">{date.toLocaleDateString('en-PH', { month: 'short' })}</div>
                     </button>
                   ))}
                 </div>
               </div>
-
               {selectedDate && (
-                <div className="mb-8 animate-in fade-in duration-300">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Available Times</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {availableTimes.map((time, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setSelectedTime(time)}
-                        className={`p-3 border text-center transition-all font-bold ${
-                          selectedTime === time
-                            ? 'border-brand-orange bg-brand-orange text-white'
-                            : 'border-gray-800 text-gray-300 hover:border-gray-600'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                  </div>
+                <div className="mb-8">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
+                    Appointment Time *
+                    {availabilityLoading && (
+                      <span className="ml-2 text-gray-600 normal-case font-normal inline-flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Checking…
+                      </span>
+                    )}
+                  </label>
+
+                  {!availabilityLoading && !shopDayIsOpen && (
+                    <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-sm">
+                      The shop is closed on this date. Please choose a different day.
+                    </p>
+                  )}
+
+                  {!availabilityLoading && shopDayIsOpen && (
+                    <>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
+                      </p>
+                      <div className="relative">
+                        <select
+                          value={selectedTime}
+                          onChange={e => setSelectedTime(e.target.value)}
+                          required
+                          className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 pr-10 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none"
+                        >
+                          <option value="">Choose a time slot…</option>
+                          {availableSlots.map(time => {
+                            const isBooked     = bookedSlots.includes(time);
+                            const [closeH]     = shopCloseTime.split(':').map(Number);
+                            const exceedsClose = slotToHour(time) + totalMaxHours > closeH;
+                            const disabled     = isBooked || exceedsClose;
+                            if (disabled) return null; // hide unavailable slots
+                            const completion = slotCompletionLabel(time, totalMaxHours);
+                            return (
+                              <option key={time} value={time}>
+                                {time}  —  done by {completion}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-
               <div className="mt-8 flex flex-col-reverse sm:flex-row justify-between gap-4">
-                <button
-                  onClick={handleBack}
-                  className="w-full sm:w-auto text-gray-400 hover:text-white px-6 py-3 font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-gray-800 sm:border-transparent rounded-sm"
-                >
+                <button onClick={() => setStep(1)} className="w-full sm:w-auto text-gray-400 hover:text-white px-6 py-3 font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-gray-800 rounded-sm">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button
-                  onClick={handleNext}
-                  disabled={!selectedDate || !selectedTime}
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-                >
+                <button onClick={() => setStep(3)} disabled={!selectedDate || !selectedTime || !shopDayIsOpen}
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm">
                   Next <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Your Details */}
+          {/* ── Step 3: Details ── */}
           {step === 3 && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div>
               <h2 className="text-2xl font-display font-bold text-white uppercase mb-6">3. Your Details</h2>
-              
+              {!user && (
+                <div className="mb-6 flex items-center justify-between bg-brand-orange/10 border border-brand-orange/30 px-4 py-3 rounded-sm text-sm">
+                  <span className="text-gray-300">Have an account? Sign in to pre-fill your details.</span>
+                  <Link to="/login?redirect=/booking" className="text-brand-orange font-bold hover:text-orange-400 transition-colors ml-4 shrink-0">Sign In</Link>
+                </div>
+              )}
               <form id="booking-form" onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Contact */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Full Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.name}
-                      onChange={e => setFormData({...formData, name: e.target.value})}
-                      className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
+                    <input type="text" required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm" placeholder="Juan dela Cruz" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Phone Number *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={e => setFormData({...formData, phone: e.target.value})}
-                      className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
+                    <input type="tel" required value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm" placeholder="09XXXXXXXXX" />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Email Address *</label>
-                    <input
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={e => setFormData({...formData, email: e.target.value})}
-                      className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Vehicle (Year/Make/Model) *</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.vehicleInfo}
-                      onChange={e => setFormData({...formData, vehicleInfo: e.target.value})}
-                      className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
+                    <input type="email" required value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm" placeholder="juan@email.com" />
                   </div>
                 </div>
-
+                {/* Vehicle */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
+                    Vehicle *
+                    {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading makes…</span>}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-600 uppercase tracking-widest">Year</label>
+                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
+                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none">
+                        <option value="">Select year…</option>
+                        {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-600 uppercase tracking-widest">Make</label>
+                      <select required value={vehicleMake}
+                        onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
+                        disabled={makesLoading}
+                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-60">
+                        <option value="">{makesLoading ? 'Loading…' : 'Select make…'}</option>
+                        {makesList.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-600 uppercase tracking-widest">
+                        Model
+                        {modelsLoading && <span className="ml-1 text-gray-600 normal-case font-normal">Loading…</span>}
+                      </label>
+                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
+                        disabled={!vehicleMake || modelsLoading}
+                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-40">
+                        <option value="">{modelsLoading ? 'Loading…' : 'Select model…'}</option>
+                        {modelsList.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                {/* Notes */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Additional Notes</label>
-                  <textarea
-                    rows={4}
-                    value={formData.notes}
-                    onChange={e => setFormData({...formData, notes: e.target.value})}
-                    className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors resize-none"
-                  ></textarea>
+                  <textarea rows={3} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors resize-none rounded-sm"
+                    placeholder="Describe your vision or specific parts you want used…" />
                 </div>
+                {/* Media upload */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                    Reference Photos <span className="text-gray-600 normal-case font-normal">(optional)</span>
+                  </label>
+                  <div onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-700 rounded-sm p-6 text-center cursor-pointer hover:border-gray-500 transition-colors">
+                    <UploadCloud className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Click to upload photos <span className="text-gray-700">(JPEG, PNG, WebP · max 10 MB each)</span></p>
+                    <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileAdd} />
+                  </div>
+                  {mediaPreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
+                      {mediaPreviews.map((src, i) => (
+                        <div key={i} className="relative w-20 h-20 rounded-sm overflow-hidden border border-gray-700">
+                          <img src={src} alt="" className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removeFile(i)}
+                            className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Signature pad */}
+                <SignaturePad value={signatureData} onChange={setSignatureData} />
+                {/* Summary */}
+                <div className="bg-brand-darker border border-gray-700 rounded-sm p-4 space-y-2 text-sm">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Booking Summary</p>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Services</span>
+                    <span className="text-white font-semibold text-right max-w-[60%]">{selectedServices.map(s => s.title).join(', ')}</span>
+                  </div>
+                  <div className="flex justify-between"><span className="text-gray-400">Vehicle</span><span className="text-white">{vehicleInfo || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Date</span><span className="text-white">{selectedDate?.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Time</span><span className="text-white">{selectedTime}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Est. Duration</span><span className="text-brand-orange font-bold">up to {totalMaxHours} hours</span></div>
+                </div>
+                {bookError && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/30 p-3 rounded-sm">{bookError}</p>}
               </form>
-
               <div className="mt-8 flex flex-col-reverse sm:flex-row justify-between gap-4 pt-6 border-t border-gray-800">
-                <button
-                  onClick={handleBack}
-                  className="w-full sm:w-auto text-gray-400 hover:text-white px-6 py-3 font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-gray-800 sm:border-transparent rounded-sm"
-                >
+                <button onClick={() => setStep(2)} className="w-full sm:w-auto text-gray-400 hover:text-white px-6 py-3 font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-gray-800 rounded-sm">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button
-                  type="submit"
-                  form="booking-form"
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  Confirm Booking <CheckCircle className="w-4 h-4" />
+                <button type="submit" form="booking-form"
+                  disabled={bookStatus === 'loading' || mediaUploadBusy || !signatureData}
+                  title={!signatureData ? 'Please sign the waiver to continue' : undefined}
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm disabled:opacity-60">
+                  {(bookStatus === 'loading' || mediaUploadBusy)
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {mediaUploadBusy ? 'Uploading…' : 'Submitting…'}</>
+                    : <><CheckCircle className="w-4 h-4" /> Confirm Booking</>}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Success */}
+          {/* ── Step 4: Success ── */}
           {step === 4 && (
-            <div className="text-center py-12 animate-in zoom-in duration-500">
+            <div className="text-center py-12">
               <CheckCircle className="w-24 h-24 text-brand-orange mx-auto mb-6" />
-              <h2 className="text-3xl md:text-4xl font-display font-bold text-white uppercase mb-4">
-                Booking Confirmed!
-              </h2>
-              <p className="text-gray-400 text-lg mb-8 max-w-md mx-auto">
-                Thank you, {formData.name}. Your appointment for {services.find(s => s.id === selectedService)?.name} is confirmed for {selectedDate?.toLocaleDateString()} at {selectedTime}. We've sent a confirmation email with details.
+              <h2 className="text-3xl md:text-4xl font-display font-bold text-white uppercase mb-4">Booking Confirmed!</h2>
+              <p className="text-gray-400 text-lg mb-2 max-w-md mx-auto">
+                Thank you, <span className="text-white font-bold">{form.name}</span>. Your appointment is set for{" "}
+                <span className="text-white">{selectedDate?.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</span>{" "}
+                at <span className="text-white">{selectedTime}</span>.
               </p>
-              <button
-                onClick={() => {
-                  setStep(1);
-                  setSelectedService('');
-                  setSelectedDate(null);
-                  setSelectedTime('');
-                  setFormData({ name: '', email: '', phone: '', vehicleInfo: '', notes: '' });
-                }}
-                className="bg-transparent border border-gray-600 text-white px-8 py-3 font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors"
-              >
-                Book Another Service
-              </button>
+              <p className="text-sm text-gray-500 mb-8">Services: {selectedServices.map(s => s.title).join(', ')}</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                {user ? (
+                  <button onClick={() => navigate('/client/bookings')}
+                    className="bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
+                    View My Bookings
+                  </button>
+                ) : (
+                  <Link to={`/register?redirect=/client/bookings&name=${encodeURIComponent(form.name)}&email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phone)}`}
+                    className="bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
+                    Create Account to Track Booking
+                  </Link>
+                )}
+                <button onClick={reset} className="border border-gray-600 text-white px-8 py-3 font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors rounded-sm">
+                  Book Another
+                </button>
+              </div>
             </div>
           )}
         </div>
