@@ -37,7 +37,7 @@ export default function IntakeForm() {
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear,  setVehicleYear]  = useState('');
 
-  // Dynamic vehicle data (API Ninjas proxy), fall back to static dataset
+  // Dynamic vehicle data (CarAPI proxy), fall back to static dataset
   const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [makesLoading,  setMakesLoading]  = useState(false);
@@ -47,25 +47,33 @@ export default function IntakeForm() {
   const modelsList = dynamicModels.length ? dynamicModels
     : vehicleMake ? (STATIC_MODELS[vehicleMake as VehicleMake] ?? []) : [];
 
+  // Re-fetch makes whenever year changes; passes year to the API when selected
   useEffect(() => {
+    setDynamicMakes([]);
+    setVehicleMake('');
+    setDynamicModels([]);
+    setVehicleModel('');
     if (!BACKEND_URL) return;
     setMakesLoading(true);
-    fetchVehicleMakesApi()
+    const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
+    fetchVehicleMakesApi(year)
       .then(({ makes }) => setDynamicMakes(makes))
       .catch(() => { /* fall back to static */ })
       .finally(() => setMakesLoading(false));
-  }, []);
+  }, [vehicleYear]);
 
+  // Load models when make changes, passing year when available
   useEffect(() => {
     setDynamicModels([]);
     setVehicleModel('');
     if (!vehicleMake || !BACKEND_URL) return;
     setModelsLoading(true);
-    fetchVehicleModelsApi(vehicleMake)
+    const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
+    fetchVehicleModelsApi(vehicleMake, year)
       .then(({ models }) => setDynamicModels(models))
       .catch(() => { /* fall back to static */ })
       .finally(() => setModelsLoading(false));
-  }, [vehicleMake]);
+  }, [vehicleMake, vehicleYear]);
 
   // Load time slots when date changes
   const [availableSlots,   setAvailableSlots]   = useState<string[]>([]);
@@ -284,6 +292,11 @@ export default function IntakeForm() {
                       {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading…</span>}
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
+                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
+                        <option value="">Year…</option>
+                        {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
                       <select required value={vehicleMake}
                         onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
                         disabled={makesLoading}
@@ -296,11 +309,6 @@ export default function IntakeForm() {
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-40">
                         <option value="">{modelsLoading ? 'Loading…' : 'Model…'}</option>
                         {modelsList.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
-                        className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
-                        <option value="">Year…</option>
-                        {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                     </div>
                   </div>

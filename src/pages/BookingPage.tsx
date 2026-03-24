@@ -99,7 +99,7 @@ export default function BookingPage() {
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear,  setVehicleYear]  = useState('');
 
-  // Vehicle data – loaded from API Ninjas proxy, fall back to static dataset
+  // Vehicle data – loaded from CarAPI proxy, fall back to static dataset
   const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [makesLoading,  setMakesLoading]  = useState(false);
@@ -138,26 +138,35 @@ export default function BookingPage() {
     } else {
       setShopHoursLoaded(true);
     }
-    if (BACKEND_URL) {
-      setMakesLoading(true);
-      fetchVehicleMakesApi()
-        .then(({ makes }) => setDynamicMakes(makes))
-        .catch(() => { /* fall back to static */ })
-        .finally(() => setMakesLoading(false));
-    }
   }, [dispatch, token]);
 
-  // Load models when make changes
+  // Re-fetch makes whenever year changes; passes year to the API when selected
+  useEffect(() => {
+    setDynamicMakes([]);
+    setVehicleMake('');
+    setDynamicModels([]);
+    setVehicleModel('');
+    if (!BACKEND_URL) return;
+    setMakesLoading(true);
+    const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
+    fetchVehicleMakesApi(year)
+      .then(({ makes }) => setDynamicMakes(makes))
+      .catch(() => { /* fall back to static */ })
+      .finally(() => setMakesLoading(false));
+  }, [vehicleYear]);
+
+  // Load models when make changes, passing year when available
   useEffect(() => {
     setDynamicModels([]);
     setVehicleModel('');
     if (!vehicleMake || !BACKEND_URL) return;
     setModelsLoading(true);
-    fetchVehicleModelsApi(vehicleMake)
+    const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
+    fetchVehicleModelsApi(vehicleMake, year)
       .then(({ models }) => setDynamicModels(models))
       .catch(() => { /* fall back to static */ })
       .finally(() => setModelsLoading(false));
-  }, [vehicleMake]);
+  }, [vehicleMake, vehicleYear]);
 
   const toggleService = (id: number) => {
     setSelectedIds(prev =>
@@ -441,6 +450,14 @@ export default function BookingPage() {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
+                      <label className="text-xs text-gray-600 uppercase tracking-widest">Year</label>
+                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
+                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none">
+                        <option value="">Select year…</option>
+                        {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
                       <label className="text-xs text-gray-600 uppercase tracking-widest">Make</label>
                       <select required value={vehicleMake}
                         onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
@@ -460,14 +477,6 @@ export default function BookingPage() {
                         className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-40">
                         <option value="">{modelsLoading ? 'Loading…' : 'Select model…'}</option>
                         {modelsList.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-600 uppercase tracking-widest">Year</label>
-                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
-                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none">
-                        <option value="">Select year…</option>
-                        {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                     </div>
                   </div>
