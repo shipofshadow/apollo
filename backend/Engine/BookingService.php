@@ -38,9 +38,26 @@ class BookingService
 
     private const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'awaiting_parts'];
 
+    /** @var int|null Cached slot capacity to avoid repeated DB/file reads within one request. */
+    private ?int $slotCapacityCache = null;
+
     public function __construct()
     {
         $this->useDb = DB_NAME !== '';
+    }
+
+    /**
+     * Return the configured maximum number of bookings allowed per time slot.
+     * Reads from site_settings key 'slot_capacity', defaulting to 3.
+     */
+    public function getSlotCapacity(): int
+    {
+        if ($this->slotCapacityCache !== null) {
+            return $this->slotCapacityCache;
+        }
+        $settings = (new SiteSettingsService())->getAll();
+        $this->slotCapacityCache = max(1, (int) ($settings['slot_capacity'] ?? 3));
+        return $this->slotCapacityCache;
     }
 
     // -------------------------------------------------------------------------
@@ -57,6 +74,16 @@ class BookingService
     public function create(array $data, ?int $userId = null): array
     {
         $this->validatePayload($data);
+
+        // Server-side capacity check – reject immediately if the slot is already full
+        $date = trim($data['appointmentDate']);
+        $time = trim($data['appointmentTime']);
+        if (in_array($time, $this->getBookedSlots($date), true)) {
+            throw new RuntimeException(
+                'This time slot is fully booked. Please choose a different time.',
+                409
+            );
+        }
 
         // Support both legacy single-serviceId and new multi-service serviceIds
         $serviceIds  = $this->resolveServiceIds($data);
@@ -133,8 +160,8 @@ class BookingService
     /**
      * Return the time slots that are already fully booked for a given date.
      *
-     * A slot is considered "taken" once MAX_BOOKINGS_PER_SLOT bookings with
-     * status 'pending' or 'confirmed' exist for that date+time combination.
+     * A slot is considered "taken" once the configured slot capacity is reached
+     * for bookings with status 'pending' or 'confirmed'.
      *
      * @return string[]  e.g. ['09:00 AM', '11:00 AM']
      */
@@ -143,6 +170,19 @@ class BookingService
         return $this->useDb
             ? $this->dbGetBookedSlots($date)
             : $this->fileGetBookedSlots($date);
+    }
+
+    /**
+     * Return the number of active bookings per time slot for a given date.
+     * Only bookings with status 'pending' or 'confirmed' are counted.
+     *
+     * @return array<string, int>  e.g. ['09:00 AM' => 2, '11:00 AM' => 3]
+     */
+    public function getSlotCounts(string $date): array
+    {
+        return $this->useDb
+            ? $this->dbGetSlotCounts($date)
+            : $this->fileGetSlotCounts($date);
     }
 
     /**
@@ -391,8 +431,6 @@ class BookingService
     // DB – availability
     // -------------------------------------------------------------------------
 
-    private const MAX_BOOKINGS_PER_SLOT = 3;
-
     /** @return string[] */
     private function dbGetBookedSlots(string $date): array
     {
@@ -404,12 +442,38 @@ class BookingService
              GROUP BY appointment_time
              HAVING COUNT(*) >= :max"
         );
-        $stmt->execute([':date' => $date, ':max' => self::MAX_BOOKINGS_PER_SLOT]);
+        $stmt->execute([':date' => $date, ':max' => $this->getSlotCapacity()]);
         return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'appointment_time');
     }
 
     /** @return string[] */
     private function fileGetBookedSlots(string $date): array
+    {
+        $counts = $this->fileGetSlotCounts($date);
+        $max    = $this->getSlotCapacity();
+        return array_keys(array_filter($counts, fn (int $c) => $c >= $max));
+    }
+
+    /** @return array<string, int> */
+    private function dbGetSlotCounts(string $date): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            "SELECT appointment_time, COUNT(*) AS cnt
+             FROM bookings
+             WHERE appointment_date = :date
+               AND status IN ('pending','confirmed')
+             GROUP BY appointment_time"
+        );
+        $stmt->execute([':date' => $date]);
+        $result = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $result[(string) $row['appointment_time']] = (int) $row['cnt'];
+        }
+        return $result;
+    }
+
+    /** @return array<string, int> */
+    private function fileGetSlotCounts(string $date): array
     {
         $counts = [];
         foreach ($this->fileGetAll() as $b) {
@@ -421,9 +485,7 @@ class BookingService
                 $counts[$time] = ($counts[$time] ?? 0) + 1;
             }
         }
-        return array_keys(
-            array_filter($counts, fn (int $c) => $c >= self::MAX_BOOKINGS_PER_SLOT)
-        );
+        return $counts;
     }
 
     // -------------------------------------------------------------------------

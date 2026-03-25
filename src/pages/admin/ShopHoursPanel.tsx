@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Clock, Save, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { fetchShopHoursApi, updateShopHoursApi } from '../../services/api';
+import { Clock, Save, Loader2, AlertCircle, CheckCircle, Users } from 'lucide-react';
+import { fetchShopHoursApi, updateShopHoursApi, fetchSiteSettingsApi, updateSiteSettingsApi } from '../../services/api';
 import type { ShopDayHours } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
@@ -25,17 +25,24 @@ function buildDefaults(existing: ShopDayHours[]): ShopDayHours[] {
 export default function ShopHoursPanel() {
   const { token } = useAuth();
 
-  const [hours,   setHours]   = useState<ShopDayHours[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
-  const [saved,   setSaved]   = useState(false);
+  const [hours,        setHours]        = useState<ShopDayHours[]>([]);
+  const [slotCapacity, setSlotCapacity] = useState(3);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState<string | null>(null);
+  const [saved,        setSaved]        = useState(false);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchShopHoursApi()
-      .then(({ hours: h }) => setHours(buildDefaults(h)))
+    Promise.all([
+      fetchShopHoursApi(),
+      fetchSiteSettingsApi(),
+    ])
+      .then(([{ hours: h }, { settings }]) => {
+        setHours(buildDefaults(h));
+        setSlotCapacity(Math.max(1, parseInt(settings.slot_capacity ?? '3', 10) || 3));
+      })
       .catch(e => {
         // If backend has no hours yet, use all-defaults gracefully
         setHours(buildDefaults([]));
@@ -201,6 +208,61 @@ export default function ShopHoursPanel() {
           </button>
         </div>
       </form>
+
+      {/* Booking capacity setting */}
+      <div className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-4">
+        <h3 className="text-base font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
+          <Users className="w-5 h-5 text-brand-orange" />
+          Booking Capacity
+        </h3>
+        <p className="text-gray-400 text-sm">
+          Set the maximum number of customers that can book the same time slot. When a slot reaches this limit it is hidden from the booking page.
+        </p>
+        <div className="flex items-center gap-4">
+          <label htmlFor="slot-capacity" className="text-xs font-bold uppercase tracking-widest text-gray-500 shrink-0">
+            Max per slot
+          </label>
+          <input
+            id="slot-capacity"
+            type="number"
+            min={1}
+            max={20}
+            value={slotCapacity}
+            onChange={e => { setSaved(false); setSlotCapacity(Math.max(1, parseInt(e.target.value, 10) || 1)); }}
+            className="w-24 bg-brand-darker border border-gray-700 text-white px-3 py-2 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+          />
+          <span className="text-xs text-gray-600">customers</span>
+        </div>
+        <p className="text-xs text-gray-600">
+          Currently set to <span className="text-white font-semibold">{slotCapacity}</span>. Changes take effect after saving.
+        </p>
+      </div>
+
+      {/* Combined save button for capacity section */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            if (!token) return;
+            setSaving(true);
+            setError(null);
+            setSaved(false);
+            try {
+              await updateSiteSettingsApi(token, { slot_capacity: String(slotCapacity) });
+              setSaved(true);
+            } catch (err: unknown) {
+              setError((err as Error)?.message ?? 'Failed to save capacity.');
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? 'Saving…' : 'Save Capacity'}
+        </button>
+      </div>
     </div>
   );
 }
