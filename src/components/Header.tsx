@@ -4,6 +4,11 @@ import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut } from 'l
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 
+// Header heights match the Tailwind padding + logo height at each breakpoint:
+//   mobile (<sm):  py-6 (24px×2) + h-10 (40px) = 88px  |  scrolled: py-4 (16px×2) + 40px = 72px
+//   sm (640–767px): py-6 (24px×2) + h-12 (48px) = 96px  |  scrolled: py-4 (16px×2) + 48px = 80px
+const HEADER_HEIGHT = { default: 'top-[88px] sm:top-24', scrolled: 'top-[72px] sm:top-20' } as const;
+
 export default function Header() {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -34,6 +39,12 @@ export default function Header() {
   // Close mobile menu on route change
   useEffect(() => { setIsMobileMenuOpen(false); setIsDropdownOpen(false); }, [location.pathname]);
 
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobileMenuOpen]);
+
   const handleLogout = () => {
     logout();
     navigate('/', { replace: true });
@@ -55,6 +66,7 @@ export default function Header() {
   ];
 
   return (
+    <>
     <header className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
       isScrolled ? 'bg-brand-darker/95 backdrop-blur-md py-4 shadow-lg border-b border-gray-800' : 'bg-transparent py-6'
     }`}>
@@ -142,10 +154,19 @@ export default function Header() {
           </button>
         </div>
       </div>
+    </header>
 
-      {/* Mobile Nav */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-brand-darker border-t border-gray-800 p-4 flex flex-col gap-1 shadow-xl">
+    {/* Mobile Nav — full-viewport overlay so page content is fully covered */}
+    {isMobileMenuOpen && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation"
+        className={`md:hidden fixed inset-x-0 bottom-0 z-30 bg-brand-darker border-t border-gray-800 overflow-y-auto ${
+          isScrolled ? HEADER_HEIGHT.scrolled : HEADER_HEIGHT.default
+        }`}
+      >
+        <div className="p-4 flex flex-col gap-1 shadow-xl">
           {navLinks.map(link => (
             <Link key={link.name} to={link.href}
               className={`text-base font-bold uppercase tracking-widest transition-colors py-2 px-2 border-b border-gray-800 ${
@@ -188,7 +209,8 @@ export default function Header() {
             </div>
           )}
         </div>
-      )}
-    </header>
+      </div>
+    )}
+    </>
   );
 }
