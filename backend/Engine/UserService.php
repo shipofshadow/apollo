@@ -46,25 +46,7 @@ class UserService
      */
     public function register(array $data): array
     {
-        $this->validateRegistration($data);
-
-        $stmt = $this->db->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
-        $stmt->execute([':email' => strtolower(trim($data['email']))]);
-        if ($stmt->fetch()) {
-            throw new RuntimeException('That email address is already registered.', 409);
-        }
-
-        $stmt = $this->db->prepare(
-            'INSERT INTO users (name, email, phone, password, role)
-             VALUES (:name, :email, :phone, :password, :role)'
-        );
-        $stmt->execute([
-            ':name'     => trim($data['name']),
-            ':email'    => strtolower(trim($data['email'])),
-            ':phone'    => trim($data['phone'] ?? ''),
-            ':password' => Auth::hashPassword($data['password']),
-            ':role'     => 'client',
-        ]);
+        Auth::register($data);
 
         $user  = $this->findById((int) $this->db->lastInsertId());
         $token = $this->issueTokenFor($user);
@@ -81,22 +63,9 @@ class UserService
      */
     public function login(string $email, string $password): array
     {
-        $stmt = $this->db->prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
-        $stmt->execute([':email' => strtolower(trim($email))]);
-        $row = $stmt->fetch();
-
-        if (!$row || !Auth::verifyPassword($password, $row['password'])) {
-            throw new RuntimeException('Invalid email or password.', 401);
-        }
-
-        // Rehash on-the-fly if cost factors changed
-        if (Auth::needsRehash($row['password'])) {
-            $this->db->prepare('UPDATE users SET password = :p WHERE id = :id')
-                     ->execute([':p' => Auth::hashPassword($password), ':id' => $row['id']]);
-        }
-
-        $user  = $this->sanitize($row);
-        $token = $this->issueTokenFor($user);
+        $token   = Auth::login(['email' => $email, 'password' => $password]);
+        $payload = Auth::decodeToken($token);
+        $user    = $this->findById((int) $payload['sub']);
 
         return ['token' => $token, 'user' => $user];
     }
@@ -177,19 +146,5 @@ class UserService
     {
         unset($row['password']);
         return $row;
-    }
-
-    /** @param array<string, mixed> $data */
-    private function validateRegistration(array $data): void
-    {
-        if (empty(trim($data['name'] ?? ''))) {
-            throw new RuntimeException('Name is required.', 422);
-        }
-        if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            throw new RuntimeException('A valid email address is required.', 422);
-        }
-        if (empty($data['password']) || strlen($data['password']) < 8) {
-            throw new RuntimeException('Password must be at least 8 characters.', 422);
-        }
     }
 }
