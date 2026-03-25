@@ -20,10 +20,10 @@ export default function Footer() {
               The premier automotive retrofitting shop in Los Angeles. We turn ordinary vehicles into extraordinary machines.
             </p>
             <div className="flex items-center gap-4">
-              <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
+              <a href="https://www.instagram.com/1625autolab" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
                 <Instagram className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
+              <a href="https://www.facebook.com/1625autolab/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
                 <Facebook className="w-5 h-5" />
               </a>
               <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">

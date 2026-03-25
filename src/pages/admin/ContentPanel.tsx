@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   FileText, Loader2, AlertCircle, Plus, Pencil, Trash2, Save, X, Upload,
 } from 'lucide-react';
+import RichTextEditor from '../../components/RichTextEditor';
 import {
   fetchBlogPostsAsync, createBlogPostAsync, updateBlogPostAsync, deleteBlogPostAsync,
 } from '../../store/contentSlice';
@@ -48,6 +49,8 @@ export default function ContentPanel() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    const plainText = (new DOMParser().parseFromString(current.content, 'text/html').body.textContent ?? '').trim();
+    if (!plainText) { setSaveError('Content is required.'); return; }
     setSaving(true);
     setSaveError(null);
     const data = {
@@ -166,10 +169,12 @@ export default function ContentPanel() {
             </div>
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Content *</label>
-              <textarea required rows={12} value={current.content}
-                onChange={e => setCurrent(p => ({ ...p, content: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white p-4 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
-                placeholder="Write your blog post here…" />
+              <RichTextEditor
+                value={current.content}
+                onChange={html => setCurrent(p => ({ ...p, content: html }))}
+                placeholder="Write your blog post here…"
+                minHeight={320}
+              />
             </div>
           </div>
           <div className="flex gap-4 pt-4 border-t border-gray-800">
