@@ -2,7 +2,7 @@ import { ArrowRight, ChevronRight } from 'lucide-react';
 
 export default function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center pt-24">
+    <section className="relative min-h-screen flex items-center justify-center pt-24 overflow-hidden">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0 bg-asphalt">
         <img
