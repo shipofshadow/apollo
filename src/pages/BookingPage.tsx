@@ -421,7 +421,7 @@ export default function BookingPage() {
                                 <span className={`text-[10px] font-normal mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-500'}`}>
                                   done by {completion}
                                 </span>
-                                {takenCount > 0 && spotsLeft > 0 && (
+                                {spotsLeft > 0 && (
                                   <span className={`text-[10px] font-semibold mt-1 ${isSelected ? 'text-orange-100' : almostFull ? 'text-yellow-400' : 'text-gray-400'}`}>
                                     {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
                                   </span>
