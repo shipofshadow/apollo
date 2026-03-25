@@ -75,6 +75,7 @@ export default function ClientLayout() {
               <NavLink
                 key={href}
                 to={href}
+                title={label}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-all duration-150 group relative ${
                     isActive
@@ -99,6 +100,7 @@ export default function ClientLayout() {
           <div className="md:hidden p-2 border-t border-gray-800">
             <button
               onClick={handleLogout}
+              title="Sign Out"
               className="w-full flex items-center justify-center gap-3 px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors"
             >
               <LogOut className="w-4 h-4 shrink-0" />

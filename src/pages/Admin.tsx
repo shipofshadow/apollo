@@ -155,6 +155,7 @@ export default function AdminPage() {
           <nav className="p-2 md:p-3 space-y-0.5 flex-grow">
             {tabs.map(({ key, label, icon: Icon }) => (
               <button key={key} onClick={() => setActiveTab(key)}
+                title={label}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm relative ${
                   activeTab === key
                     ? 'text-brand-orange bg-brand-orange/10'
@@ -170,6 +171,7 @@ export default function AdminPage() {
           {/* Logout (mobile only) */}
           <div className="md:hidden p-2 border-t border-gray-800">
             <button onClick={() => logout()}
+              title="Sign Out"
               className="w-full flex items-center justify-center px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
               <LogOut className="w-4 h-4 shrink-0" />
             </button>

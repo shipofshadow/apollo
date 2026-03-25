@@ -6,6 +6,7 @@ import { fetchMyBookingsAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { formatStatus } from '../../utils/formatStatus';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
@@ -58,7 +59,7 @@ export default function ClientDashboard() {
         <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter">
           Welcome back, {user?.name?.split(' ')[0]}
         </h1>
-        <p className="text-gray-400 mt-1 text-sm">Here's a summary of your appointments with us.</p>
+        <p className="text-gray-400 mt-1 text-sm">Here's a quick overview of your appointments and what's coming up.</p>
       </div>
 
       {/* Stat cards */}
@@ -127,7 +128,7 @@ export default function ClientDashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
-                        {b.status}
+                        {formatStatus(b.status)}
                       </span>
                     </td>
                   </tr>
