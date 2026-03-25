@@ -380,47 +380,45 @@ export default function BookingPage() {
                     </p>
                   )}
 
-                  {!availabilityLoading && shopDayIsOpen && (
-                    <>
-                      <p className="text-xs text-gray-600 mb-3">
-                        Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
-                      </p>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                        {availableSlots.map(time => {
-                          const isBooked     = bookedSlots.includes(time);
-                          const [closeH]     = shopCloseTime.split(':').map(Number);
-                          const exceedsClose = slotToHour(time) + totalMaxHours > closeH;
-                          const disabled     = isBooked || exceedsClose;
-                          if (disabled) return null;
-                          const completion   = slotCompletionLabel(time, totalMaxHours);
-                          const isSelected   = selectedTime === time;
-                          return (
-                            <button
-                              key={time}
-                              type="button"
-                              onClick={() => setSelectedTime(time)}
-                              className={`flex flex-col items-center justify-center px-2 py-3 rounded-sm border font-bold transition-colors focus:outline-none
-                                ${isSelected
-                                  ? 'bg-brand-orange border-brand-orange text-white'
-                                  : 'bg-brand-darker border-gray-700 text-white hover:border-brand-orange hover:text-brand-orange'
-                                }`}
-                            >
-                              <span className="text-sm leading-tight">{time}</span>
-                              <span className={`text-[10px] font-normal mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-500'}`}>
-                                done by {completion}
-                              </span>
-                            </button>
-                          );
-                        })}
-                        {availableSlots.filter(time => {
-                          const [closeH] = shopCloseTime.split(':').map(Number);
-                          return !bookedSlots.includes(time) && !(slotToHour(time) + totalMaxHours > closeH);
-                        }).length === 0 && (
-                          <p className="col-span-full text-sm text-gray-500 py-2">No available slots for this date.</p>
-                        )}
-                      </div>
-                    </>
-                  )}
+                  {!availabilityLoading && shopDayIsOpen && (() => {
+                    const [closeH] = shopCloseTime.split(':').map(Number);
+                    const visibleSlots = availableSlots.filter(time =>
+                      !bookedSlots.includes(time) && slotToHour(time) + totalMaxHours <= closeH
+                    );
+                    return (
+                      <>
+                        <p className="text-xs text-gray-600 mb-3">
+                          Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
+                        </p>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                          {visibleSlots.length === 0 && (
+                            <p className="col-span-full text-sm text-gray-500 py-2">No available slots for this date.</p>
+                          )}
+                          {visibleSlots.map(time => {
+                            const isSelected = selectedTime === time;
+                            const completion = slotCompletionLabel(time, totalMaxHours);
+                            const baseClass  = 'flex flex-col items-center justify-center px-2 py-3 rounded-sm border font-bold transition-colors focus:outline-none';
+                            const stateClass = isSelected
+                              ? 'bg-brand-orange border-brand-orange text-white'
+                              : 'bg-brand-darker border-gray-700 text-white hover:border-brand-orange hover:text-brand-orange';
+                            return (
+                              <button
+                                key={time}
+                                type="button"
+                                onClick={() => setSelectedTime(time)}
+                                className={`${baseClass} ${stateClass}`}
+                              >
+                                <span className="text-sm leading-tight">{time}</span>
+                                <span className={`text-[10px] font-normal mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-500'}`}>
+                                  done by {completion}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               <div className="mt-8 flex flex-col-reverse sm:flex-row justify-between gap-4">
