@@ -1,52 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Users, Shield, Zap, X, Mail, Phone, Facebook, Instagram, Loader2 } from 'lucide-react';
+import { Users, Shield, Zap, X, Mail, Phone, Facebook, Instagram, Loader2, MapPin, Clock, ExternalLink } from 'lucide-react';
 import { fetchTeamMembersAsync, fetchSiteSettingsAsync } from '../store/siteSettingsSlice';
 import type { AppDispatch, RootState } from '../store';
 import type { TeamMember } from '../types';
-
-// Fallback team data used when the backend is not available
-const FALLBACK_TEAM: TeamMember[] = [
-  {
-    id: 1,
-    name: 'Alex "The Spark" Mercer',
-    role: 'Master Retrofitter & Founder',
-    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop',
-    bio: 'With over 15 years of experience in automotive electronics, Alex founded 1625 Auto Lab to push the boundaries of custom lighting.',
-    fullBio: 'Alex started his journey in his parents\' garage, fixing broken headlight seals and upgrading halogen bulbs. His obsession with perfection led him to master projector retrofitting and custom LED integration. Today, he oversees all major builds at 1625 Auto Lab, ensuring every vehicle leaves with a signature look and flawless functionality.',
-    email: 'alex@1625autolab.com',
-    phone: '0939 330 8263',
-    facebook: null,
-    instagram: null,
-    sortOrder: 0,
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 2,
-    name: 'Sarah Chen',
-    role: 'Lead Technician',
-    imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1976&auto=format&fit=crop',
-    bio: 'Specializing in Android headunit integrations and complex wiring harnesses. Sarah ensures every install looks factory-perfect.',
-    fullBio: 'Sarah holds a degree in Electrical Engineering and brings a meticulous approach to automotive wiring. She specializes in integrating modern Android headunits into older vehicles, ensuring steering wheel controls, backup cameras, and factory amplifiers work seamlessly. Her wiring harnesses are known for being cleaner than OEM.',
-    email: 'sarah@1625autolab.com',
-    phone: '0939 330 8264',
-    facebook: null,
-    instagram: null,
-    sortOrder: 1,
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-];
-
-const DEFAULT_SETTINGS = {
-  about_heading:         'Built on Precision. Driven by Passion.',
-  company_description_1: 'Founded in 2018, 1625 Auto Lab started as a small garage operation focused on fixing poorly done headlight retrofits. Today, we are Los Angeles\' premier destination for high-end automotive electronics and premium vehicle upgrades.',
-  company_description_2: 'We believe that your vehicle is an extension of your personality. Our mission is to provide unparalleled craftsmanship, using only the highest quality components, to turn your automotive vision into reality.',
-  about_image_url:       'https://images.unsplash.com/photo-1632823471565-1ec2a74b45b4?q=80&w=2070&auto=format&fit=crop',
-};
 
 export default function AboutPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -58,12 +15,19 @@ export default function AboutPage() {
     dispatch(fetchSiteSettingsAsync());
   }, [dispatch]);
 
-  // Only show fallback when we haven't successfully loaded from the backend yet
-  const displayTeam = status === 'success' ? members : (members.length > 0 ? members : FALLBACK_TEAM);
-  const heading     = settings.about_heading         || DEFAULT_SETTINGS.about_heading;
-  const desc1       = settings.company_description_1 || DEFAULT_SETTINGS.company_description_1;
-  const desc2       = settings.company_description_2 || DEFAULT_SETTINGS.company_description_2;
-  const aboutImage  = settings.about_image_url       || DEFAULT_SETTINGS.about_image_url;
+  const heading    = settings.about_heading         ?? '';
+  const desc1      = settings.company_description_1 ?? '';
+  const desc2      = settings.company_description_2 ?? '';
+  const aboutImage = settings.about_image_url       ?? '';
+
+  // Location / map
+  const DEFAULT_MAP_EMBED = 'https://www.openstreetmap.org/export/embed.html?bbox=120.6699%2C15.0086%2C120.7099%2C15.0486&layer=mapnik&marker=15.0286%2C120.6899';
+  const DEFAULT_MAP_LINK  = 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899';
+  const mapEmbed = settings.map_embed_url || DEFAULT_MAP_EMBED;
+  const mapLink  = settings.map_link_url  || DEFAULT_MAP_LINK;
+  const address  = settings.footer_address ?? '';
+  const phone    = settings.footer_phone   ?? '';
+  const email    = settings.footer_email   ?? '';
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker relative">
@@ -138,8 +102,8 @@ export default function AboutPage() {
           )}
 
           {(status !== 'loading' || members.length > 0) && (
-            <div className={`grid grid-cols-1 ${displayTeam.length === 1 ? 'max-w-sm mx-auto' : displayTeam.length === 2 ? 'md:grid-cols-2 max-w-3xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-3'} gap-8`}>
-              {displayTeam.map((member) => (
+            <div className={`grid grid-cols-1 ${members.length === 1 ? 'max-w-sm mx-auto' : members.length === 2 ? 'md:grid-cols-2 max-w-3xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-3'} gap-8`}>
+              {members.map((member) => (
                 <div
                   key={member.id}
                   onClick={() => setSelectedMember(member)}
@@ -179,6 +143,106 @@ export default function AboutPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Find Us / Map Section */}
+        <div className="mt-24">
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+            <span className="text-brand-orange font-bold uppercase tracking-widest text-sm">
+              Visit Us
+            </span>
+            <h2 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter">
+              Find <span className="text-brand-orange">Our Shop</span>
+            </h2>
+            <div className="w-24 h-1 bg-brand-orange mx-auto mt-6"></div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            {/* Map iframe */}
+            <div className="lg:col-span-2 rounded-sm overflow-hidden border border-gray-800 shadow-2xl bg-brand-dark aspect-video">
+              <iframe
+                src={mapEmbed}
+                title="Shop location map"
+                className="w-full h-full"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                allowFullScreen
+              />
+            </div>
+
+            {/* Contact details */}
+            <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 space-y-8">
+              <div>
+                <h3 className="text-white font-display font-bold uppercase tracking-wide text-xl mb-6">
+                  Contact & Directions
+                </h3>
+              </div>
+
+              {address && (
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-brand-orange/10 flex items-center justify-center rounded-sm shrink-0 mt-0.5">
+                    <MapPin className="w-5 h-5 text-brand-orange" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Address</p>
+                    <p className="text-gray-300 leading-relaxed whitespace-pre-line">{address}</p>
+                  </div>
+                </div>
+              )}
+
+              {phone && (
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-brand-orange/10 flex items-center justify-center rounded-sm shrink-0">
+                    <Phone className="w-5 h-5 text-brand-orange" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Phone</p>
+                    <a href={`tel:${phone.replace(/\s/g, '')}`}
+                      className="text-gray-300 hover:text-brand-orange transition-colors">
+                      {phone}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {email && (
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-brand-orange/10 flex items-center justify-center rounded-sm shrink-0">
+                    <Mail className="w-5 h-5 text-brand-orange" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Email</p>
+                    <a href={`mailto:${email}`}
+                      className="text-gray-300 hover:text-brand-orange transition-colors break-all">
+                      {email}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-brand-orange/10 flex items-center justify-center rounded-sm shrink-0">
+                  <Clock className="w-5 h-5 text-brand-orange" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Hours</p>
+                  <a href="/booking" className="text-gray-300 hover:text-brand-orange transition-colors">
+                    View shop hours &rarr;
+                  </a>
+                </div>
+              </div>
+
+              <a
+                href={mapLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-brand-orange text-white py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm text-sm"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open in Maps
+              </a>
+            </div>
+          </div>
         </div>
 
       </div>

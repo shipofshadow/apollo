@@ -1,34 +1,68 @@
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { Instagram, Facebook, Youtube, MapPin, Phone, Mail } from 'lucide-react';
+import { fetchSiteSettingsAsync } from '../store/siteSettingsSlice';
+import type { AppDispatch, RootState } from '../store';
 
 export default function Footer() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { settings, status } = useSelector((s: RootState) => s.siteSettings);
+  const services = useSelector((s: RootState) => s.services.items);
+
+  useEffect(() => {
+    if (status === 'idle') {
+      dispatch(fetchSiteSettingsAsync());
+    }
+  }, [dispatch, status]);
+
+  // Resolve dynamic values with hardcoded fallbacks
+  const tagline   = settings.footer_tagline   ?? 'The premier automotive retrofitting shop. We turn ordinary vehicles into extraordinary machines.';
+  const address   = settings.footer_address   ?? 'NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000';
+  const phone     = settings.footer_phone     ?? '0939 330 8263';
+  const email     = settings.footer_email     ?? '1625autolab@gmail.com';
+  const instagram = settings.footer_instagram ?? 'https://www.instagram.com/1625autolab';
+  const facebook  = settings.footer_facebook  ?? 'https://www.facebook.com/1625autolab/';
+  const youtube   = settings.footer_youtube   ?? '';
+
+  // Show up to 4 active services in the footer
+  const footerServices = services.filter(s => s.isActive).slice(0, 4);
+
   return (
     <footer className="bg-brand-darker border-t border-gray-800 pt-20 pb-10">
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          
+
           {/* Brand Column */}
           <div className="space-y-6">
             <div className="flex items-start">
-              <img 
-                src="https://storage.googleapis.com/aida-uploads/default/2026-03-17/1625.png" 
-                alt="1625 Autolab Logo" 
+              <img
+                src="https://storage.googleapis.com/aida-uploads/default/2026-03-17/1625.png"
+                alt="1625 Autolab Logo"
                 className="h-12 md:h-16 w-auto max-w-[200px] md:max-w-[300px] object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
-            <p className="text-gray-400 leading-relaxed">
-              The premier automotive retrofitting shop in Los Angeles. We turn ordinary vehicles into extraordinary machines.
-            </p>
+            <p className="text-gray-400 leading-relaxed">{tagline}</p>
             <div className="flex items-center gap-4">
-              <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
-                <Youtube className="w-5 h-5" />
-              </a>
+              {instagram && (
+                <a href={instagram} target="_blank" rel="noopener noreferrer"
+                  className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
+                  <Instagram className="w-5 h-5" />
+                </a>
+              )}
+              {facebook && (
+                <a href={facebook} target="_blank" rel="noopener noreferrer"
+                  className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
+                  <Facebook className="w-5 h-5" />
+                </a>
+              )}
+              {youtube && (
+                <a href={youtube} target="_blank" rel="noopener noreferrer"
+                  className="w-10 h-10 bg-brand-gray flex items-center justify-center rounded-sm hover:bg-brand-orange hover:text-white transition-colors text-gray-400">
+                  <Youtube className="w-5 h-5" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -38,11 +72,20 @@ export default function Footer() {
               Quick Links
             </h4>
             <ul className="space-y-4">
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Home</a></li>
-              <li><a href="#services" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Services</a></li>
-              <li><a href="#builds" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Recent Builds</a></li>
-              <li><a href="#contact" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Book Appointment</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> FAQ</a></li>
+              {[
+                { label: 'Home',             to: '/' },
+                { label: 'Services',         to: '/services' },
+                { label: 'Portfolio',        to: '/portfolio' },
+                { label: 'Book Appointment', to: '/booking' },
+                { label: 'FAQ',              to: '/faq' },
+              ].map(({ label, to }) => (
+                <li key={to}>
+                  <Link to={to} className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span>
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -52,10 +95,24 @@ export default function Footer() {
               Our Services
             </h4>
             <ul className="space-y-4">
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Headlight Retrofits</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Android Headunits</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Security Systems</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span> Aesthetic Upgrades</a></li>
+              {footerServices.length > 0
+                ? footerServices.map(svc => (
+                  <li key={svc.id}>
+                    <Link to={`/services/${svc.id}`} className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span>
+                      {svc.title}
+                    </Link>
+                  </li>
+                ))
+                : ['Headlight Retrofits', 'Android Headunits', 'Security Systems', 'Aesthetic Upgrades'].map(t => (
+                  <li key={t}>
+                    <Link to="/services" className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span>
+                      {t}
+                    </Link>
+                  </li>
+                ))
+              }
             </ul>
           </div>
 
@@ -65,18 +122,28 @@ export default function Footer() {
               Contact Us
             </h4>
             <ul className="space-y-6">
-              <li className="flex items-start gap-4">
-                <MapPin className="w-5 h-5 text-brand-orange shrink-0 mt-1" />
-                <span className="text-gray-400">NKKS Arcade, Krystal Homes, Brgy. Alasas<br />Pampanga, San Fernando, Philippines, 2000</span>
-              </li>
-              <li className="flex items-center gap-4">
-                <Phone className="w-5 h-5 text-brand-orange shrink-0" />
-                <span className="text-gray-400">0939 330 8263</span>
-              </li>
-              <li className="flex items-center gap-4">
-                <Mail className="w-5 h-5 text-brand-orange shrink-0" />
-                <span className="text-gray-400">1625autolab@gmail.com</span>
-              </li>
+              {address && (
+                <li className="flex items-start gap-4">
+                  <MapPin className="w-5 h-5 text-brand-orange shrink-0 mt-1" />
+                  <span className="text-gray-400 whitespace-pre-line">{address}</span>
+                </li>
+              )}
+              {phone && (
+                <li className="flex items-center gap-4">
+                  <Phone className="w-5 h-5 text-brand-orange shrink-0" />
+                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="text-gray-400 hover:text-brand-orange transition-colors">
+                    {phone}
+                  </a>
+                </li>
+              )}
+              {email && (
+                <li className="flex items-center gap-4">
+                  <Mail className="w-5 h-5 text-brand-orange shrink-0" />
+                  <a href={`mailto:${email}`} className="text-gray-400 hover:text-brand-orange transition-colors">
+                    {email}
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
 

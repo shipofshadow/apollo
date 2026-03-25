@@ -375,6 +375,35 @@ export const deleteTestimonialApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
+// ── FAQ API ───────────────────────────────────────────────────────────────────
+
+export const fetchFaqsApi = (token?: string | null) =>
+  apiFetch<{ faqs: import('../types').FaqItem[] }>('/api/faq', {}, token);
+
+export const createFaqApi = (
+  token: string,
+  data: Partial<Omit<import('../types').FaqItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ faq: import('../types').FaqItem }>('/api/faq', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateFaqApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<import('../types').FaqItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ faq: import('../types').FaqItem }>(`/api/faq/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteFaqApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/faq/${id}`, {
+    method: 'DELETE',
+  }, token);
+
 // ── Legacy / mock (kept for offline fallback) ────────────────────────────────
 
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {

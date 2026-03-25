@@ -4,6 +4,7 @@ import PromoBanner from '../components/PromoBanner';
 import RecentBuilds from '../components/RecentBuilds';
 import FacebookFeed from '../components/FacebookFeed';
 import Testimonials from '../components/Testimonials';
+import HomeFaqSection from '../components/HomeFaqSection';
 
 export default function Home() {
   return (
@@ -13,6 +14,7 @@ export default function Home() {
       <PromoBanner />
       <RecentBuilds />
       <Testimonials />
+      <HomeFaqSection />
       <FacebookFeed />
     </>
   );

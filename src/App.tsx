@@ -19,6 +19,7 @@ import Portfolio from './pages/Portfolio';
 import About from './pages/About';
 import BookingPage from './pages/BookingPage';
 import Blog from './pages/Blog';
+import FaqPage from './pages/Faq';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Auth pages
@@ -66,6 +67,7 @@ export default function App() {
                 <Route path="/products/:id" element={<ProductDetail />} />
                 <Route path="/portfolio"    element={<Portfolio />} />
                 <Route path="/blog"         element={<Blog />} />
+                <Route path="/faq"          element={<FaqPage />} />
                 <Route path="/about"        element={<About />} />
                 <Route path="/booking"      element={<BookingPage />} />
                 <Route path="/login"        element={<LoginPage />} />
