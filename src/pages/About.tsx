@@ -58,7 +58,8 @@ export default function AboutPage() {
     dispatch(fetchSiteSettingsAsync());
   }, [dispatch]);
 
-  const displayTeam = members.length > 0 ? members : FALLBACK_TEAM;
+  // Only show fallback when we haven't successfully loaded from the backend yet
+  const displayTeam = status === 'success' ? members : (members.length > 0 ? members : FALLBACK_TEAM);
   const heading     = settings.about_heading         || DEFAULT_SETTINGS.about_heading;
   const desc1       = settings.company_description_1 || DEFAULT_SETTINGS.company_description_1;
   const desc2       = settings.company_description_2 || DEFAULT_SETTINGS.company_description_2;
@@ -90,10 +91,8 @@ export default function AboutPage() {
               />
             </div>
             <div className="space-y-6">
-              <h3 className="text-3xl font-display font-bold text-white uppercase tracking-wide">
-                {heading.split('.').map((part, i, arr) => (
-                  <span key={i}>{part.trim()}{i < arr.length - 1 ? '.' : ''}{i < arr.length - 1 ? <br /> : null}</span>
-                ))}
+              <h3 className="text-3xl font-display font-bold text-white uppercase tracking-wide whitespace-pre-line">
+                {heading}
               </h3>
               <p className="text-gray-400 leading-relaxed text-lg">
                 {desc1}

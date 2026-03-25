@@ -52,7 +52,8 @@ export default function Testimonials() {
     dispatch(fetchTestimonialsAsync(null));
   }, [dispatch]);
 
-  const displayList = testimonials.length > 0 ? testimonials : FALLBACK_TESTIMONIALS;
+  // Only use fallback when we haven't successfully loaded from the backend
+  const displayList = status === 'success' ? testimonials : (testimonials.length > 0 ? testimonials : FALLBACK_TESTIMONIALS);
 
   return (
     <section className="py-24 bg-brand-darker relative overflow-hidden">
