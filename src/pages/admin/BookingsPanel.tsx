@@ -10,6 +10,7 @@ import { updateBookingPartsApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { formatStatus } from '../../utils/formatStatus';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
@@ -118,7 +119,7 @@ export default function BookingsPanel() {
               {/* Status row */}
               <div className="flex items-center justify-between">
                 <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[viewBooking.status]}`}>
-                  {viewBooking.status.replace('_', ' ')}
+                  {formatStatus(viewBooking.status)}
                 </span>
                 <span className="text-gray-500 text-xs flex items-center gap-1">
                   <Hash className="w-3 h-3" />{viewBooking.id}
@@ -318,41 +319,47 @@ export default function BookingsPanel() {
                   </td>
                   <td className="px-5 py-4">
                     <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
-                      {b.status}
+                      {formatStatus(b.status)}
                     </span>
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <button onClick={() => setViewBooking(b)}
+                        title="View full booking details"
                         className="flex items-center gap-1 px-3 py-1.5 bg-gray-700/50 border border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white text-xs font-bold uppercase rounded-sm transition-colors">
                         <Eye className="w-3 h-3" /> View
                       </button>
                       {b.status === 'pending' && (
                         <button onClick={() => handleStatus(b.id, 'confirmed')}
+                          title="Confirm this booking"
                           className="flex items-center gap-1 px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> Confirm
                         </button>
                       )}
                       {(b.status === 'pending' || b.status === 'confirmed' || b.status === 'awaiting_parts') && (
                         <button onClick={() => openPartsModal(b)}
+                          title="Flag as waiting for parts"
                           className="flex items-center gap-1 px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <Package className="w-3 h-3" /> Parts
                         </button>
                       )}
                       {b.status === 'awaiting_parts' && (
                         <button onClick={() => handleStatus(b.id, 'confirmed')}
+                          title="Parts arrived — resume this booking"
                           className="flex items-center gap-1 px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> Resume
                         </button>
                       )}
                       {(b.status === 'pending' || b.status === 'confirmed' || b.status === 'awaiting_parts') && (
                         <button onClick={() => handleStatus(b.id, 'cancelled')}
+                          title="Cancel this booking"
                           className="flex items-center gap-1 px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <XCircle className="w-3 h-3" /> Cancel
                         </button>
                       )}
                       {b.status === 'confirmed' && (
                         <button onClick={() => handleStatus(b.id, 'completed')}
+                          title="Mark as completed"
                           className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> Complete
                         </button>

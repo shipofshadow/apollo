@@ -21,7 +21,12 @@ import SignaturePad from '../components/SignaturePad';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STEPS = ['Services', 'Date & Time', 'Your Details', 'Confirm'];
+const STEPS = [
+  { label: 'Services',    desc: 'Choose what you need' },
+  { label: 'Date & Time', desc: 'Pick a schedule' },
+  { label: 'Your Details', desc: 'Tell us about you' },
+  { label: 'Confirmed',   desc: 'All done!' },
+];
 
 /** Parse "09:00 AM" / "01:00 PM" → 24-hour number (9, 13, etc.) */
 function slotToHour(slot: string): number {
@@ -277,7 +282,7 @@ export default function BookingPage() {
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-gray-800 z-0" />
           <div className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-brand-orange z-0 transition-all duration-500"
             style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }} />
-          {STEPS.map((label, i) => {
+          {STEPS.map(({ label, desc }, i) => {
             const n = i + 1;
             const active = step >= n;
             return (
@@ -286,6 +291,7 @@ export default function BookingPage() {
                   {n === STEPS.length && step === STEPS.length ? <CheckCircle className="w-5 h-5" /> : n}
                 </div>
                 <span className={`hidden md:block text-xs font-bold uppercase tracking-widest ${active ? 'text-brand-orange' : 'text-gray-600'}`}>{label}</span>
+                <span className={`hidden lg:block text-[11px] -mt-1 ${active ? 'text-gray-400' : 'text-gray-700'}`}>{desc}</span>
               </div>
             );
           })}
@@ -297,7 +303,7 @@ export default function BookingPage() {
           {step === 1 && (
             <div>
               <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">1. Select Services</h2>
-              <p className="text-sm text-gray-500 mb-6">Pick one or more services — prices and durations are shown per service.</p>
+              <p className="text-sm text-gray-400 mb-6">Tap the services you'd like — you can choose more than one. Prices and estimated times are shown on each card.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {services.map(svc => {
                   const active = selectedIds.includes(svc.id);
@@ -331,8 +337,9 @@ export default function BookingPage() {
               )}
               <div className="mt-8 flex justify-end">
                 <button onClick={() => setStep(2)} disabled={selectedIds.length === 0}
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm">
-                  Next <ArrowRight className="w-4 h-4" />
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm"
+                  title={selectedIds.length === 0 ? 'Please select at least one service to continue' : undefined}>
+                  Choose Date & Time <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -341,7 +348,8 @@ export default function BookingPage() {
           {/* ── Step 2: Date & Time ── */}
           {step === 2 && (
             <div>
-              <h2 className="text-2xl font-display font-bold text-white uppercase mb-6">2. Select Date & Time</h2>
+              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">2. Choose a Date & Time</h2>
+              <p className="text-sm text-gray-400 mb-6">Scroll left/right to see more dates, then pick a time that works for you.</p>
               <div className="mb-8">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Available Dates</p>
                 <div className="flex overflow-x-auto pb-3 gap-3 snap-x">
@@ -410,8 +418,9 @@ export default function BookingPage() {
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button onClick={() => setStep(3)} disabled={!selectedDate || !selectedTime || !shopDayIsOpen}
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm">
-                  Next <ArrowRight className="w-4 h-4" />
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm"
+                  title={!selectedDate ? 'Please pick a date first' : !selectedTime ? 'Please pick a time slot' : undefined}>
+                  Enter Your Details <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -420,7 +429,8 @@ export default function BookingPage() {
           {/* ── Step 3: Details ── */}
           {step === 3 && (
             <div>
-              <h2 className="text-2xl font-display font-bold text-white uppercase mb-6">3. Your Details</h2>
+              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">3. Your Details</h2>
+              <p className="text-sm text-gray-400 mb-6">Fill in your contact info and vehicle details so we can prepare for your visit.</p>
               {!user && (
                 <div className="mb-6 flex items-center justify-between bg-brand-orange/10 border border-brand-orange/30 px-4 py-3 rounded-sm text-sm">
                   <span className="text-gray-300">Have an account? Sign in to pre-fill your details.</span>
@@ -448,10 +458,11 @@ export default function BookingPage() {
                 </div>
                 {/* Vehicle */}
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
                     Vehicle *
                     {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading makes…</span>}
                   </p>
+                  <p className="text-xs text-gray-600 mb-3">Select the year first, then the make and model of your car.</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs text-gray-600 uppercase tracking-widest">Year</label>
@@ -497,6 +508,7 @@ export default function BookingPage() {
                   <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
                     Reference Photos <span className="text-gray-600 normal-case font-normal">(optional)</span>
                   </label>
+                  <p className="text-xs text-gray-600 -mt-1">Upload photos of your vehicle or inspiration images to help us understand what you're looking for.</p>
                   <div onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-gray-700 rounded-sm p-6 text-center cursor-pointer hover:border-gray-500 transition-colors">
                     <UploadCloud className="w-8 h-8 text-gray-600 mx-auto mb-2" />
@@ -553,13 +565,14 @@ export default function BookingPage() {
           {step === 4 && (
             <div className="text-center py-12">
               <CheckCircle className="w-24 h-24 text-brand-orange mx-auto mb-6" />
-              <h2 className="text-3xl md:text-4xl font-display font-bold text-white uppercase mb-4">Booking Confirmed!</h2>
+              <h2 className="text-3xl md:text-4xl font-display font-bold text-white uppercase mb-4">You're All Set!</h2>
               <p className="text-gray-400 text-lg mb-2 max-w-md mx-auto">
-                Thank you, <span className="text-white font-bold">{form.name}</span>. Your appointment is set for{" "}
+                Thank you, <span className="text-white font-bold">{form.name}</span>! Your appointment has been booked for{" "}
                 <span className="text-white">{selectedDate?.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</span>{" "}
                 at <span className="text-white">{selectedTime}</span>.
               </p>
-              <p className="text-sm text-gray-500 mb-8">Services: {selectedServices.map(s => s.title).join(', ')}</p>
+              <p className="text-sm text-gray-500 mb-2">Services: {selectedServices.map(s => s.title).join(', ')}</p>
+              <p className="text-sm text-gray-600 mb-8">We'll send a confirmation to your email. If you need to change anything, just give us a call.</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 {user ? (
                   <button onClick={() => navigate('/client/bookings')}
@@ -569,11 +582,11 @@ export default function BookingPage() {
                 ) : (
                   <Link to={`/register?redirect=/client/bookings&name=${encodeURIComponent(form.name)}&email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phone)}`}
                     className="bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
-                    Create Account to Track Booking
+                    Create an Account to Track Your Booking
                   </Link>
                 )}
                 <button onClick={reset} className="border border-gray-600 text-white px-8 py-3 font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors rounded-sm">
-                  Book Another
+                  Book Another Service
                 </button>
               </div>
             </div>

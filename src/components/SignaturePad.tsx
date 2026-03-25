@@ -124,6 +124,7 @@ export default function SignaturePad({ value, onChange }: Props) {
           </button>
         )}
       </div>
+      <p className="text-xs text-gray-600">Use your finger or mouse to draw your signature in the box below.</p>
       <div className="relative border border-gray-700 rounded-sm bg-brand-darker overflow-hidden">
         <canvas
           ref={canvasRef}
