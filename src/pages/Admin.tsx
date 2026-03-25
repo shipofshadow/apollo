@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
-  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog,
+  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ import ContentPanel        from './admin/ContentPanel';
 import ProductsPanel       from './admin/ProductsPanel';
 import AccountSettingsPanel from './admin/AccountSettingsPanel';
 import ShopHoursPanel      from './admin/ShopHoursPanel';
+import SiteSettingsPanel   from './admin/SiteSettingsPanel';
 
 // ── Admin login screen ────────────────────────────────────────────────────────
 function AdminLogin() {
@@ -84,24 +85,26 @@ export default function AdminPage() {
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const tabs = [
-    { key: 'analytics',    label: 'Analytics',  icon: BarChart3  },
-    { key: 'services',     label: 'Services',   icon: Wrench     },
-    { key: 'content',      label: 'Content',    icon: FileText   },
-    { key: 'appointments', label: 'Bookings',   icon: Calendar   },
-    { key: 'products',     label: 'Products',   icon: Package    },
-    { key: 'shop-hours',   label: 'Shop Hours', icon: Clock      },
-    { key: 'settings',     label: 'Settings',   icon: UserCog    },
+    { key: 'analytics',    label: 'Analytics',      icon: BarChart3          },
+    { key: 'services',     label: 'Services',       icon: Wrench             },
+    { key: 'content',      label: 'Content',        icon: FileText           },
+    { key: 'appointments', label: 'Bookings',       icon: Calendar           },
+    { key: 'products',     label: 'Products',       icon: Package            },
+    { key: 'shop-hours',   label: 'Shop Hours',     icon: Clock              },
+    { key: 'site-settings', label: 'Site Settings', icon: SlidersHorizontal  },
+    { key: 'settings',     label: 'Settings',       icon: UserCog            },
   ];
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'analytics':    return <AnalyticsPanel />;
-      case 'services':     return <ServicesPanel />;
-      case 'content':      return <ContentPanel />;
-      case 'appointments': return <BookingsPanel />;
-      case 'products':     return <ProductsPanel />;
-      case 'shop-hours':   return <ShopHoursPanel />;
-      case 'settings':     return <AccountSettingsPanel />;
+      case 'analytics':     return <AnalyticsPanel />;
+      case 'services':      return <ServicesPanel />;
+      case 'content':       return <ContentPanel />;
+      case 'appointments':  return <BookingsPanel />;
+      case 'products':      return <ProductsPanel />;
+      case 'shop-hours':    return <ShopHoursPanel />;
+      case 'site-settings': return <SiteSettingsPanel />;
+      case 'settings':      return <AccountSettingsPanel />;
       default: return null;
     }
   };
