@@ -64,6 +64,22 @@ class Router
             $r->addRoute('GET', '/api/shop/hours', 'handleShopHoursGet');
             $r->addRoute('PUT', '/api/shop/hours', 'handleShopHoursPut');
 
+            // ── Site settings (public read, admin write) ─────────────────────
+            $r->addRoute('GET', '/api/site-settings', 'handleSiteSettingsGet');
+            $r->addRoute('PUT', '/api/site-settings', 'handleSiteSettingsPut');
+
+            // ── Team members (public read, admin write) ──────────────────────
+            $r->addRoute('GET',    '/api/team-members',          'handleTeamMemberList');
+            $r->addRoute('POST',   '/api/team-members',          'handleTeamMemberCreate');
+            $r->addRoute('PUT',    '/api/team-members/{id:\d+}', 'handleTeamMemberUpdate');
+            $r->addRoute('DELETE', '/api/team-members/{id:\d+}', 'handleTeamMemberDelete');
+
+            // ── Testimonials (public read, admin write) ──────────────────────
+            $r->addRoute('GET',    '/api/testimonials',          'handleTestimonialList');
+            $r->addRoute('POST',   '/api/testimonials',          'handleTestimonialCreate');
+            $r->addRoute('PUT',    '/api/testimonials/{id:\d+}', 'handleTestimonialUpdate');
+            $r->addRoute('DELETE', '/api/testimonials/{id:\d+}', 'handleTestimonialDelete');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -546,7 +562,7 @@ class Router
     {
         $this->requireAuth('admin');
 
-        $allowed_types = ['services', 'products', 'blog'];
+        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials'];
         $type = $_POST['type'] ?? '';
         if (!in_array($type, $allowed_types, true)) {
             throw new RuntimeException('Invalid upload type. Must be one of: ' . implode(', ', $allowed_types) . '.', 422);
@@ -725,6 +741,124 @@ class Router
 
         $trims = (new VehicleService())->getTrims($make, $model, $limit, $page);
         echo json_encode(['trims' => $trims]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Site settings handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleSiteSettingsGet(array $vars = []): void
+    {
+        $settings = (new SiteSettingsService())->getAll();
+        echo json_encode(['settings' => $settings]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleSiteSettingsPut(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data     = $this->jsonBody();
+        $settings = (new SiteSettingsService())->update($data);
+        echo json_encode(['settings' => $settings]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Team member handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleTeamMemberList(array $vars = []): void
+    {
+        $activeOnly = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload    = Auth::decodeToken($token);
+                $activeOnly = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $members = (new TeamMemberService())->getAll($activeOnly);
+        echo json_encode(['members' => $members]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTeamMemberCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data   = $this->jsonBody();
+        $member = (new TeamMemberService())->create($data);
+        http_response_code(201);
+        echo json_encode(['member' => $member]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTeamMemberUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id     = (int) ($vars['id'] ?? 0);
+        $data   = $this->jsonBody();
+        $member = (new TeamMemberService())->update($id, $data);
+        echo json_encode(['member' => $member]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTeamMemberDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new TeamMemberService())->delete($id);
+        echo json_encode(['message' => 'Team member deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Testimonial handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleTestimonialList(array $vars = []): void
+    {
+        $activeOnly = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload    = Auth::decodeToken($token);
+                $activeOnly = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $testimonials = (new TestimonialService())->getAll($activeOnly);
+        echo json_encode(['testimonials' => $testimonials]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTestimonialCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data        = $this->jsonBody();
+        $testimonial = (new TestimonialService())->create($data);
+        http_response_code(201);
+        echo json_encode(['testimonial' => $testimonial]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTestimonialUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id          = (int) ($vars['id'] ?? 0);
+        $data        = $this->jsonBody();
+        $testimonial = (new TestimonialService())->update($id, $data);
+        echo json_encode(['testimonial' => $testimonial]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTestimonialDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new TestimonialService())->delete($id);
+        echo json_encode(['message' => 'Testimonial deleted.']);
     }
 }
 

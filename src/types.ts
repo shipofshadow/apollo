@@ -200,3 +200,47 @@ export interface AvailabilityResponse {
   bookedSlots: string[];
 }
 
+// ── Site Settings ─────────────────────────────────────────────────────────────
+
+export interface SiteSettings {
+  about_heading?: string;
+  company_description_1?: string;
+  company_description_2?: string;
+  about_image_url?: string;
+  [key: string]: string | undefined;
+}
+
+// ── Team Member ───────────────────────────────────────────────────────────────
+
+export interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  imageUrl: string | null;
+  bio: string | null;
+  fullBio: string | null;
+  email: string | null;
+  phone: string | null;
+  facebook: string | null;
+  instagram: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Testimonial ───────────────────────────────────────────────────────────────
+
+export interface Testimonial {
+  id: number;
+  name: string;
+  role: string;
+  content: string;
+  rating: number;
+  imageUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+

@@ -126,7 +126,7 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
 export const uploadAdminImageApi = async (
   token: string,
   file: File,
-  type: 'services' | 'products' | 'blog'
+  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials'
 ): Promise<string> => {
   const form = new FormData();
   form.append('file', file);
@@ -302,6 +302,78 @@ export interface AdminStats {
 
 export const fetchAdminStatsApi = (token: string) =>
   apiFetch<AdminStats>('/api/admin/stats', {}, token);
+
+// ── Site Settings API ─────────────────────────────────────────────────────────
+
+export const fetchSiteSettingsApi = () =>
+  apiFetch<{ settings: import('../types').SiteSettings }>('/api/site-settings');
+
+export const updateSiteSettingsApi = (
+  token: string,
+  data: import('../types').SiteSettings
+) =>
+  apiFetch<{ settings: import('../types').SiteSettings }>('/api/site-settings', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+// ── Team Members API ──────────────────────────────────────────────────────────
+
+export const fetchTeamMembersApi = (token?: string | null) =>
+  apiFetch<{ members: import('../types').TeamMember[] }>('/api/team-members', {}, token);
+
+export const createTeamMemberApi = (
+  token: string,
+  data: Partial<Omit<import('../types').TeamMember, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ member: import('../types').TeamMember }>('/api/team-members', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateTeamMemberApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<import('../types').TeamMember, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ member: import('../types').TeamMember }>(`/api/team-members/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteTeamMemberApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/team-members/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Testimonials API ──────────────────────────────────────────────────────────
+
+export const fetchTestimonialsApi = (token?: string | null) =>
+  apiFetch<{ testimonials: import('../types').Testimonial[] }>('/api/testimonials', {}, token);
+
+export const createTestimonialApi = (
+  token: string,
+  data: Partial<Omit<import('../types').Testimonial, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ testimonial: import('../types').Testimonial }>('/api/testimonials', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateTestimonialApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<import('../types').Testimonial, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ testimonial: import('../types').Testimonial }>(`/api/testimonials/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteTestimonialApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/testimonials/${id}`, {
+    method: 'DELETE',
+  }, token);
 
 // ── Legacy / mock (kept for offline fallback) ────────────────────────────────
 

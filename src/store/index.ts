@@ -1,17 +1,19 @@
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer     from './authSlice';
-import bookingReducer  from './bookingSlice';
-import servicesReducer from './servicesSlice';
-import contentReducer  from './contentSlice';
-import productsReducer from './productsSlice';
+import authReducer         from './authSlice';
+import bookingReducer      from './bookingSlice';
+import servicesReducer     from './servicesSlice';
+import contentReducer      from './contentSlice';
+import productsReducer     from './productsSlice';
+import siteSettingsReducer from './siteSettingsSlice';
 
 export const store = configureStore({
   reducer: {
-    auth:     authReducer,
-    booking:  bookingReducer,
-    services: servicesReducer,
-    content:  contentReducer,
-    products: productsReducer,
+    auth:         authReducer,
+    booking:      bookingReducer,
+    services:     servicesReducer,
+    content:      contentReducer,
+    products:     productsReducer,
+    siteSettings: siteSettingsReducer,
   },
 });
 
