@@ -93,6 +93,8 @@ export default function BookingPage() {
   const [selectedTime,        setSelectedTime]        = useState('');
   const [availableSlots,      setAvailableSlots]      = useState<string[]>([]);
   const [bookedSlots,         setBookedSlots]         = useState<string[]>([]);
+  const [slotCounts,          setSlotCounts]          = useState<Record<string, number>>({});
+  const [slotCapacity,        setSlotCapacity]        = useState(3);
   const [shopDayIsOpen,       setShopDayIsOpen]       = useState(true);
   const [shopCloseTime,       setShopCloseTime]       = useState('18:00');
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
@@ -188,6 +190,7 @@ export default function BookingPage() {
     setSelectedTime('');
     setAvailableSlots([]);
     setBookedSlots([]);
+    setSlotCounts({});
     setShopDayIsOpen(true);
     if (!BACKEND_URL) return;
     setAvailabilityLoading(true);
@@ -197,6 +200,8 @@ export default function BookingPage() {
       setShopCloseTime(res.closeTime);
       setAvailableSlots(res.availableSlots);
       setBookedSlots(res.bookedSlots);
+      setSlotCounts(res.slotCounts ?? {});
+      setSlotCapacity(res.slotCapacity ?? 3);
     } catch { /* show all slots available */ }
     finally { setAvailabilityLoading(false); }
   };
@@ -258,6 +263,7 @@ export default function BookingPage() {
     setSelectedTime('');
     setAvailableSlots([]);
     setBookedSlots([]);
+    setSlotCounts({});
     setShopDayIsOpen(true);
     setForm({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', notes: '' });
     setVehicleMake(''); setVehicleModel(''); setVehicleYear('');
@@ -395,10 +401,13 @@ export default function BookingPage() {
                             <p className="col-span-full text-sm text-gray-500 py-2">No available slots for this date.</p>
                           )}
                           {visibleSlots.map(time => {
-                            const isSelected = selectedTime === time;
-                            const completion = slotCompletionLabel(time, totalMaxHours);
-                            const baseClass  = 'flex flex-col items-center justify-center px-2 py-3 rounded-sm border font-bold transition-colors focus:outline-none';
-                            const stateClass = isSelected
+                            const isSelected  = selectedTime === time;
+                            const completion  = slotCompletionLabel(time, totalMaxHours);
+                            const takenCount  = slotCounts[time] ?? 0;
+                            const spotsLeft   = slotCapacity - takenCount;
+                            const almostFull  = spotsLeft === 1;
+                            const baseClass   = 'flex flex-col items-center justify-center px-2 py-3 rounded-sm border font-bold transition-colors focus:outline-none';
+                            const stateClass  = isSelected
                               ? 'bg-brand-orange border-brand-orange text-white'
                               : 'bg-brand-darker border-gray-700 text-white hover:border-brand-orange hover:text-brand-orange';
                             return (
@@ -412,6 +421,11 @@ export default function BookingPage() {
                                 <span className={`text-[10px] font-normal mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-500'}`}>
                                   done by {completion}
                                 </span>
+                                {takenCount > 0 && spotsLeft > 0 && (
+                                  <span className={`text-[10px] font-semibold mt-1 ${isSelected ? 'text-orange-100' : almostFull ? 'text-yellow-400' : 'text-gray-400'}`}>
+                                    {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}

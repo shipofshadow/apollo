@@ -130,6 +130,8 @@ class SiteSettingsService
             // Map / location settings
             'map_embed_url'    => 'https://www.openstreetmap.org/export/embed.html?bbox=120.6699%2C15.0086%2C120.7099%2C15.0486&layer=mapnik&marker=15.0286%2C120.6899',
             'map_link_url'     => 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899',
+            // Booking settings
+            'slot_capacity'    => '3',
         ];
     }
 }

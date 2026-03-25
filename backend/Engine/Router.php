@@ -312,8 +312,12 @@ class Router
         $dayHours = $svc->getForDate($date);
         $allSlots = $svc->generateSlots($dayHours);
 
+        $bookingSvc  = new BookingService();
         $bookedSlots = $dayHours['isOpen']
-            ? (new BookingService())->getBookedSlots($date)
+            ? $bookingSvc->getBookedSlots($date)
+            : [];
+        $slotCounts  = $dayHours['isOpen']
+            ? $bookingSvc->getSlotCounts($date)
             : [];
 
         echo json_encode([
@@ -323,6 +327,8 @@ class Router
             'slotIntervalH' => $dayHours['slotIntervalH'],
             'availableSlots' => $allSlots,
             'bookedSlots'    => $bookedSlots,
+            'slotCapacity'   => $bookingSvc->getSlotCapacity(),
+            'slotCounts'     => $slotCounts,
         ]);
     }
 

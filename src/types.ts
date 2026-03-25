@@ -198,6 +198,10 @@ export interface AvailabilityResponse {
   slotIntervalH: number;
   availableSlots: string[];
   bookedSlots: string[];
+  /** Maximum number of bookings allowed per time slot. */
+  slotCapacity: number;
+  /** Number of active bookings per slot for the requested date. */
+  slotCounts: Record<string, number>;
 }
 
 // ── Site Settings ─────────────────────────────────────────────────────────────
