@@ -83,53 +83,10 @@ export const deleteServiceAsync = createAsyncThunk(
   }
 );
 
-// ── Initial state (hardcoded fallback shown until API responds) ───────────────
-
-const FALLBACK_SERVICES: Service[] = [
-  {
-    id: 1, title: 'Headlight Retrofits',
-    description: 'Custom projector retrofits, demon eyes, halos, and sequential turn signals for maximum visibility and aggressive styling.',
-    fullDescription: 'Our headlight retrofitting service is where art meets engineering. We don\'t just install bulbs; we completely rebuild your headlight housings with state-of-the-art bi-LED or HID projectors.',
-    icon: 'Lightbulb',
-    imageUrl: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=1964&auto=format&fit=crop',
-    duration: '4–6 Hours', startingPrice: '₱13,750',
-    features: ['Bi-LED & HID Projector Conversions','RGBW Demon Eyes & Halos','Custom Lens Etching','Housing Paint & Blackouts','Sequential Turn Signals','Moisture Sealing & Warranty'],
-    sortOrder: 1, isActive: true, createdAt: '', updatedAt: '',
-  },
-  {
-    id: 2, title: 'Android Headunits',
-    description: 'Modernize your dash with high-resolution Android screens featuring Apple CarPlay, Android Auto, and custom bezels.',
-    fullDescription: 'Upgrade your vehicle\'s infotainment system with our premium Android Headunit installations.',
-    icon: 'MonitorPlay',
-    imageUrl: 'https://images.unsplash.com/photo-1533558701576-23c65e0272fb?q=80&w=1974&auto=format&fit=crop',
-    duration: '2–3 Hours', startingPrice: '₱8,250',
-    features: ['Wireless Apple CarPlay & Android Auto','High-Resolution IPS/OLED Touchscreens','Factory Steering Wheel Control Retention','Custom 3D Printed Bezels','Backup & 360 Camera Integration','DSP Audio Tuning'],
-    sortOrder: 2, isActive: true, createdAt: '', updatedAt: '',
-  },
-  {
-    id: 3, title: 'Security Systems',
-    description: 'Advanced alarm systems, GPS tracking, and kill switches to protect your investment.',
-    fullDescription: 'Protect your investment with our advanced security system installations.',
-    icon: 'ShieldAlert',
-    imageUrl: 'https://images.unsplash.com/photo-1600705722908-bab1e61c0b4d?q=80&w=2070&auto=format&fit=crop',
-    duration: '2–4 Hours', startingPrice: '₱11,000',
-    features: ['2-Way Paging Alarm Systems','Hidden Kill Switches','Real-Time GPS Tracking','Remote Engine Start','Tilt & Glass Break Sensors','Smartphone Integration'],
-    sortOrder: 3, isActive: true, createdAt: '', updatedAt: '',
-  },
-  {
-    id: 4, title: 'Aesthetic Upgrades',
-    description: 'Transform the look of your vehicle inside and out with custom grilles, ambient lighting, vinyl wraps, and more.',
-    fullDescription: 'Transform the look and feel of your vehicle with our aesthetic upgrades.',
-    icon: 'CarFront',
-    imageUrl: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?q=80&w=2069&auto=format&fit=crop',
-    duration: 'Varies', startingPrice: 'Consultation',
-    features: ['Custom Ambient Interior Lighting','Aftermarket Grille Installation','Interior Trim Vinyl Wrapping','Aero Kit & Splitter Installation','Custom Emblems & Badging','Caliper Painting'],
-    sortOrder: 4, isActive: true, createdAt: '', updatedAt: '',
-  },
-];
+// ── Slice ─────────────────────────────────────────────────────────────────────
 
 const initialState: ServicesState = {
-  items:  FALLBACK_SERVICES,
+  items:  [],
   status: 'idle',
   error:  null,
 };
@@ -154,7 +111,6 @@ const servicesSlice = createSlice({
       .addCase(fetchServicesAsync.rejected, (state, action) => {
         state.status = 'error';
         state.error  = action.payload as string;
-        // keep existing items (fallback) on failure
       })
 
       // fetchById – upsert into items

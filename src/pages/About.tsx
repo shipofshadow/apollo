@@ -5,49 +5,6 @@ import { fetchTeamMembersAsync, fetchSiteSettingsAsync } from '../store/siteSett
 import type { AppDispatch, RootState } from '../store';
 import type { TeamMember } from '../types';
 
-// Fallback team data used when the backend is not available
-const FALLBACK_TEAM: TeamMember[] = [
-  {
-    id: 1,
-    name: 'Alex "The Spark" Mercer',
-    role: 'Master Retrofitter & Founder',
-    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop',
-    bio: 'With over 15 years of experience in automotive electronics, Alex founded 1625 Auto Lab to push the boundaries of custom lighting.',
-    fullBio: 'Alex started his journey in his parents\' garage, fixing broken headlight seals and upgrading halogen bulbs. His obsession with perfection led him to master projector retrofitting and custom LED integration. Today, he oversees all major builds at 1625 Auto Lab, ensuring every vehicle leaves with a signature look and flawless functionality.',
-    email: 'alex@1625autolab.com',
-    phone: '0939 330 8263',
-    facebook: null,
-    instagram: null,
-    sortOrder: 0,
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 2,
-    name: 'Sarah Chen',
-    role: 'Lead Technician',
-    imageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1976&auto=format&fit=crop',
-    bio: 'Specializing in Android headunit integrations and complex wiring harnesses. Sarah ensures every install looks factory-perfect.',
-    fullBio: 'Sarah holds a degree in Electrical Engineering and brings a meticulous approach to automotive wiring. She specializes in integrating modern Android headunits into older vehicles, ensuring steering wheel controls, backup cameras, and factory amplifiers work seamlessly. Her wiring harnesses are known for being cleaner than OEM.',
-    email: 'sarah@1625autolab.com',
-    phone: '0939 330 8264',
-    facebook: null,
-    instagram: null,
-    sortOrder: 1,
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-];
-
-const DEFAULT_SETTINGS = {
-  about_heading:         'Built on Precision. Driven by Passion.',
-  company_description_1: 'Founded in 2018, 1625 Auto Lab started as a small garage operation focused on fixing poorly done headlight retrofits. Today, we are Los Angeles\' premier destination for high-end automotive electronics and premium vehicle upgrades.',
-  company_description_2: 'We believe that your vehicle is an extension of your personality. Our mission is to provide unparalleled craftsmanship, using only the highest quality components, to turn your automotive vision into reality.',
-  about_image_url:       'https://images.unsplash.com/photo-1632823471565-1ec2a74b45b4?q=80&w=2070&auto=format&fit=crop',
-};
-
 export default function AboutPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { members, settings, status } = useSelector((s: RootState) => s.siteSettings);
@@ -58,21 +15,19 @@ export default function AboutPage() {
     dispatch(fetchSiteSettingsAsync());
   }, [dispatch]);
 
-  // Only show fallback when we haven't successfully loaded from the backend yet
-  const displayTeam = status === 'success' ? members : (members.length > 0 ? members : FALLBACK_TEAM);
-  const heading     = settings.about_heading         || DEFAULT_SETTINGS.about_heading;
-  const desc1       = settings.company_description_1 || DEFAULT_SETTINGS.company_description_1;
-  const desc2       = settings.company_description_2 || DEFAULT_SETTINGS.company_description_2;
-  const aboutImage  = settings.about_image_url       || DEFAULT_SETTINGS.about_image_url;
+  const heading    = settings.about_heading         ?? '';
+  const desc1      = settings.company_description_1 ?? '';
+  const desc2      = settings.company_description_2 ?? '';
+  const aboutImage = settings.about_image_url       ?? '';
 
   // Location / map
   const DEFAULT_MAP_EMBED = 'https://www.openstreetmap.org/export/embed.html?bbox=120.6699%2C15.0086%2C120.7099%2C15.0486&layer=mapnik&marker=15.0286%2C120.6899';
   const DEFAULT_MAP_LINK  = 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899';
-  const mapEmbed  = settings.map_embed_url || DEFAULT_MAP_EMBED;
-  const mapLink   = settings.map_link_url  || DEFAULT_MAP_LINK;
-  const address   = settings.footer_address || 'NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000';
-  const phone     = settings.footer_phone   || '0939 330 8263';
-  const email     = settings.footer_email   || '1625autolab@gmail.com';
+  const mapEmbed = settings.map_embed_url || DEFAULT_MAP_EMBED;
+  const mapLink  = settings.map_link_url  || DEFAULT_MAP_LINK;
+  const address  = settings.footer_address ?? '';
+  const phone    = settings.footer_phone   ?? '';
+  const email    = settings.footer_email   ?? '';
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker relative">
@@ -147,8 +102,8 @@ export default function AboutPage() {
           )}
 
           {(status !== 'loading' || members.length > 0) && (
-            <div className={`grid grid-cols-1 ${displayTeam.length === 1 ? 'max-w-sm mx-auto' : displayTeam.length === 2 ? 'md:grid-cols-2 max-w-3xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-3'} gap-8`}>
-              {displayTeam.map((member) => (
+            <div className={`grid grid-cols-1 ${members.length === 1 ? 'max-w-sm mx-auto' : members.length === 2 ? 'md:grid-cols-2 max-w-3xl mx-auto' : 'md:grid-cols-2 lg:grid-cols-3'} gap-8`}>
+              {members.map((member) => (
                 <div
                   key={member.id}
                   onClick={() => setSelectedMember(member)}
