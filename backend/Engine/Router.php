@@ -217,8 +217,10 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAuthLogout(array $vars = []): void
     {
-        // JWT is stateless; the client simply discards the token.
-        // Future: add token to a blocklist here.
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            Auth::logout($token);
+        }
         echo json_encode(['message' => 'Logged out successfully.']);
     }
 
