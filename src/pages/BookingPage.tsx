@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2,
-  UploadCloud, X, ChevronDown,
+  UploadCloud, X,
 } from 'lucide-react';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import { fetchServicesAsync } from '../store/servicesSlice';
@@ -279,8 +279,8 @@ export default function BookingPage() {
 
         {/* Step indicators */}
         <div className="flex justify-between items-center mb-12 relative">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-gray-800 z-0" />
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-brand-orange z-0 transition-all duration-500"
+          <div className="absolute left-0 top-5 -translate-y-1/2 w-full h-0.5 bg-gray-800 z-0" />
+          <div className="absolute left-0 top-5 -translate-y-1/2 h-0.5 bg-brand-orange z-0 transition-all duration-500"
             style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }} />
           {STEPS.map(({ label, desc }, i) => {
             const n = i + 1;
@@ -380,37 +380,45 @@ export default function BookingPage() {
                     </p>
                   )}
 
-                  {!availabilityLoading && shopDayIsOpen && (
-                    <>
-                      <p className="text-xs text-gray-600 mb-3">
-                        Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
-                      </p>
-                      <div className="relative">
-                        <select
-                          value={selectedTime}
-                          onChange={e => setSelectedTime(e.target.value)}
-                          required
-                          className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 pr-10 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none"
-                        >
-                          <option value="">Choose a time slot…</option>
-                          {availableSlots.map(time => {
-                            const isBooked     = bookedSlots.includes(time);
-                            const [closeH]     = shopCloseTime.split(':').map(Number);
-                            const exceedsClose = slotToHour(time) + totalMaxHours > closeH;
-                            const disabled     = isBooked || exceedsClose;
-                            if (disabled) return null; // hide unavailable slots
+                  {!availabilityLoading && shopDayIsOpen && (() => {
+                    const [closeH] = shopCloseTime.split(':').map(Number);
+                    const visibleSlots = availableSlots.filter(time =>
+                      !bookedSlots.includes(time) && slotToHour(time) + totalMaxHours <= closeH
+                    );
+                    return (
+                      <>
+                        <p className="text-xs text-gray-600 mb-3">
+                          Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
+                        </p>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                          {visibleSlots.length === 0 && (
+                            <p className="col-span-full text-sm text-gray-500 py-2">No available slots for this date.</p>
+                          )}
+                          {visibleSlots.map(time => {
+                            const isSelected = selectedTime === time;
                             const completion = slotCompletionLabel(time, totalMaxHours);
+                            const baseClass  = 'flex flex-col items-center justify-center px-2 py-3 rounded-sm border font-bold transition-colors focus:outline-none';
+                            const stateClass = isSelected
+                              ? 'bg-brand-orange border-brand-orange text-white'
+                              : 'bg-brand-darker border-gray-700 text-white hover:border-brand-orange hover:text-brand-orange';
                             return (
-                              <option key={time} value={time}>
-                                {time}  —  done by {completion}
-                              </option>
+                              <button
+                                key={time}
+                                type="button"
+                                onClick={() => setSelectedTime(time)}
+                                className={`${baseClass} ${stateClass}`}
+                              >
+                                <span className="text-sm leading-tight">{time}</span>
+                                <span className={`text-[10px] font-normal mt-0.5 ${isSelected ? 'text-orange-200' : 'text-gray-500'}`}>
+                                  done by {completion}
+                                </span>
+                              </button>
                             );
                           })}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                      </div>
-                    </>
-                  )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
               <div className="mt-8 flex flex-col-reverse sm:flex-row justify-between gap-4">
