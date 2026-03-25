@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
-  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal,
+  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ import ProductsPanel       from './admin/ProductsPanel';
 import AccountSettingsPanel from './admin/AccountSettingsPanel';
 import ShopHoursPanel      from './admin/ShopHoursPanel';
 import SiteSettingsPanel   from './admin/SiteSettingsPanel';
+import FaqPanel            from './admin/FaqPanel';
 
 // ── Admin login screen ────────────────────────────────────────────────────────
 function AdminLogin() {
@@ -90,6 +91,7 @@ export default function AdminPage() {
     { key: 'content',      label: 'Content',        icon: FileText           },
     { key: 'appointments', label: 'Bookings',       icon: Calendar           },
     { key: 'products',     label: 'Products',       icon: Package            },
+    { key: 'faq',          label: 'FAQ',            icon: HelpCircle         },
     { key: 'shop-hours',   label: 'Shop Hours',     icon: Clock              },
     { key: 'site-settings', label: 'Site Settings', icon: SlidersHorizontal  },
     { key: 'settings',     label: 'Settings',       icon: UserCog            },
@@ -102,6 +104,7 @@ export default function AdminPage() {
       case 'content':       return <ContentPanel />;
       case 'appointments':  return <BookingsPanel />;
       case 'products':      return <ProductsPanel />;
+      case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;
       case 'site-settings': return <SiteSettingsPanel />;
       case 'settings':      return <AccountSettingsPanel />;

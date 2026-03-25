@@ -244,3 +244,22 @@ export interface Testimonial {
   updatedAt: string;
 }
 
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+
+export interface FaqItem {
+  id: number;
+  question: string;
+  answer: string;
+  category: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FaqState {
+  items: FaqItem[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
+

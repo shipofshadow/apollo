@@ -119,6 +119,14 @@ class SiteSettingsService
             'company_description_1' => 'Founded in 2018, 1625 Auto Lab started as a small garage operation focused on fixing poorly done headlight retrofits. Today, we are Los Angeles\' premier destination for high-end automotive electronics and premium vehicle upgrades.',
             'company_description_2' => 'We believe that your vehicle is an extension of your personality. Our mission is to provide unparalleled craftsmanship, using only the highest quality components, to turn your automotive vision into reality.',
             'about_image_url'       => 'https://images.unsplash.com/photo-1632823471565-1ec2a74b45b4?q=80&w=2070&auto=format&fit=crop',
+            // Footer settings
+            'footer_tagline'   => 'The premier automotive retrofitting shop. We turn ordinary vehicles into extraordinary machines.',
+            'footer_address'   => "NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000",
+            'footer_phone'     => '0939 330 8263',
+            'footer_email'     => '1625autolab@gmail.com',
+            'footer_instagram' => 'https://www.instagram.com/1625autolab',
+            'footer_facebook'  => 'https://www.facebook.com/1625autolab/',
+            'footer_youtube'   => '',
         ];
     }
 }

@@ -762,17 +762,159 @@ function TestimonialsPanel() {
   );
 }
 
+// ── Sub-panel: Footer Settings ───────────────────────────────────────────────
+
+function FooterSettingsPanel() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { token } = useAuth();
+  const { settings, status } = useSelector((s: RootState) => s.siteSettings);
+
+  const [form, setForm] = useState({
+    footer_tagline:   '',
+    footer_address:   '',
+    footer_phone:     '',
+    footer_email:     '',
+    footer_instagram: '',
+    footer_facebook:  '',
+    footer_youtube:   '',
+  });
+  const [saving,      setSaving]      = useState(false);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchSiteSettingsAsync());
+  }, [dispatch]);
+
+  useEffect(() => {
+    setForm({
+      footer_tagline:   settings.footer_tagline   ?? '',
+      footer_address:   settings.footer_address   ?? '',
+      footer_phone:     settings.footer_phone     ?? '',
+      footer_email:     settings.footer_email     ?? '',
+      footer_instagram: settings.footer_instagram ?? '',
+      footer_facebook:  settings.footer_facebook  ?? '',
+      footer_youtube:   settings.footer_youtube   ?? '',
+    });
+  }, [settings]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({ token, data: form })).unwrap();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Failed to save settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = 'w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm';
+
+  return (
+    <div>
+      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide mb-6">
+        Footer Settings
+      </h3>
+
+      {status === 'loading' && (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-brand-orange animate-spin" /></div>
+      )}
+
+      {status !== 'loading' && (
+        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
+          {saveError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
+            </div>
+          )}
+          {saveSuccess && (
+            <div className="bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
+              Footer settings saved successfully.
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Tagline</label>
+            <textarea rows={2} value={form.footer_tagline}
+              onChange={e => setForm(f => ({ ...f, footer_tagline: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="Short description shown below the logo" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Address</label>
+            <textarea rows={2} value={form.footer_address}
+              onChange={e => setForm(f => ({ ...f, footer_address: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="Shop address" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Phone</label>
+              <input value={form.footer_phone}
+                onChange={e => setForm(f => ({ ...f, footer_phone: e.target.value }))}
+                className={inputCls} placeholder="0939 330 8263" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
+              <input type="email" value={form.footer_email}
+                onChange={e => setForm(f => ({ ...f, footer_email: e.target.value }))}
+                className={inputCls} placeholder="info@example.com" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Instagram URL</label>
+            <input value={form.footer_instagram}
+              onChange={e => setForm(f => ({ ...f, footer_instagram: e.target.value }))}
+              className={inputCls} placeholder="https://www.instagram.com/yourhandle" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Facebook URL</label>
+            <input value={form.footer_facebook}
+              onChange={e => setForm(f => ({ ...f, footer_facebook: e.target.value }))}
+              className={inputCls} placeholder="https://www.facebook.com/yourpage" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">YouTube URL</label>
+            <input value={form.footer_youtube}
+              onChange={e => setForm(f => ({ ...f, footer_youtube: e.target.value }))}
+              className={inputCls} placeholder="https://www.youtube.com/@yourchannel (leave blank to hide)" />
+          </div>
+
+          <div className="pt-4 border-t border-gray-800">
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Changes
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 // ── Main SiteSettingsPanel ────────────────────────────────────────────────────
 
-type Tab = 'company' | 'team' | 'testimonials';
+type Tab = 'company' | 'footer' | 'team' | 'testimonials';
 
 export default function SiteSettingsPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('company');
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: 'company',      label: 'Company Info',  icon: <Settings className="w-4 h-4" /> },
-    { key: 'team',         label: 'Team Members',  icon: <Users className="w-4 h-4" /> },
-    { key: 'testimonials', label: 'Testimonials',  icon: <MessageSquare className="w-4 h-4" /> },
+    { key: 'company',      label: 'Company Info',    icon: <Settings className="w-4 h-4" /> },
+    { key: 'footer',       label: 'Footer',          icon: <Settings className="w-4 h-4" /> },
+    { key: 'team',         label: 'Team Members',    icon: <Users className="w-4 h-4" /> },
+    { key: 'testimonials', label: 'Testimonials',    icon: <MessageSquare className="w-4 h-4" /> },
   ];
 
   return (
@@ -796,6 +938,7 @@ export default function SiteSettingsPanel() {
       </div>
 
       {activeTab === 'company'      && <CompanyInfoPanel />}
+      {activeTab === 'footer'       && <FooterSettingsPanel />}
       {activeTab === 'team'         && <TeamMembersPanel />}
       {activeTab === 'testimonials' && <TestimonialsPanel />}
     </div>

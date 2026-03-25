@@ -80,6 +80,12 @@ class Router
             $r->addRoute('PUT',    '/api/testimonials/{id:\d+}', 'handleTestimonialUpdate');
             $r->addRoute('DELETE', '/api/testimonials/{id:\d+}', 'handleTestimonialDelete');
 
+            // ── FAQ ──────────────────────────────────────────────────────────────
+            $r->addRoute('GET',    '/api/faq',              'handleFaqList');
+            $r->addRoute('POST',   '/api/faq',              'handleFaqCreate');
+            $r->addRoute('PUT',    '/api/faq/{id:\d+}',     'handleFaqUpdate');
+            $r->addRoute('DELETE', '/api/faq/{id:\d+}',     'handleFaqDelete');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -861,6 +867,55 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new TestimonialService())->delete($id);
         echo json_encode(['message' => 'Testimonial deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // FAQ handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleFaqList(array $vars = []): void
+    {
+        $activeOnly = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload    = Auth::decodeToken($token);
+                $activeOnly = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $faqs = (new FaqService())->getAll($activeOnly);
+        echo json_encode(['faqs' => $faqs]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFaqCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data = $this->jsonBody();
+        $faq  = (new FaqService())->create($data);
+        http_response_code(201);
+        echo json_encode(['faq' => $faq]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFaqUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id   = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $faq  = (new FaqService())->update($id, $data);
+        echo json_encode(['faq' => $faq]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFaqDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new FaqService())->delete($id);
+        echo json_encode(['message' => 'FAQ deleted.']);
     }
 }
 

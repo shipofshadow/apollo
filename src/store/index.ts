@@ -5,6 +5,7 @@ import servicesReducer     from './servicesSlice';
 import contentReducer      from './contentSlice';
 import productsReducer     from './productsSlice';
 import siteSettingsReducer from './siteSettingsSlice';
+import faqReducer          from './faqSlice';
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     content:      contentReducer,
     products:     productsReducer,
     siteSettings: siteSettingsReducer,
+    faq:          faqReducer,
   },
 });
 
