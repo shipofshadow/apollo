@@ -258,9 +258,9 @@ class FaqService
     {
         return [
             'id'        => $id,
-            'question'  => $data['question']  ?? '',
-            'answer'    => $data['answer']     ?? '',
-            'category'  => $data['category']  ?? 'General',
+            'question'  => $data['question'] ?? '',
+            'answer'    => $data['answer']   ?? '',
+            'category'  => $data['category'] ?? 'General',
             'sortOrder' => (int) ($data['sortOrder'] ?? 0),
             'isActive'  => isset($data['isActive']) ? (bool) $data['isActive'] : true,
             'createdAt' => $data['createdAt'] ?? date('c'),

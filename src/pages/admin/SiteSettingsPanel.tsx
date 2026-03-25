@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Settings, Users, MessageSquare, Loader2, AlertCircle,
-  Plus, Pencil, Trash2, Save, X, Upload, Star,
+  Plus, Pencil, Trash2, Save, X, Upload, Star, Layout,
 } from 'lucide-react';
 import {
   fetchSiteSettingsAsync, updateSiteSettingsAsync,
@@ -33,6 +33,8 @@ function CompanyInfoPanel() {
     company_description_1: '',
     company_description_2: '',
     about_image_url:       '',
+    map_embed_url:         '',
+    map_link_url:          '',
   });
   const [saving,       setSaving]       = useState(false);
   const [saveError,    setSaveError]    = useState<string | null>(null);
@@ -49,6 +51,8 @@ function CompanyInfoPanel() {
       company_description_1: settings.company_description_1 ?? '',
       company_description_2: settings.company_description_2 ?? '',
       about_image_url:       settings.about_image_url       ?? '',
+      map_embed_url:         settings.map_embed_url         ?? '',
+      map_link_url:          settings.map_link_url          ?? '',
     });
   }, [settings]);
 
@@ -159,6 +163,24 @@ function CompanyInfoPanel() {
                 </button>
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Map Embed URL (About Page)</label>
+            <input value={form.map_embed_url}
+              onChange={e => setForm(f => ({ ...f, map_embed_url: e.target.value }))}
+              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+              placeholder="https://www.openstreetmap.org/export/embed.html?… or Google Maps embed src" />
+            <p className="text-xs text-gray-500">Paste the <code className="bg-brand-darker px-1 rounded">src</code> URL from an OpenStreetMap or Google Maps embed iframe. Leave blank to use the default map.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Open in Maps Link (About Page)</label>
+            <input value={form.map_link_url}
+              onChange={e => setForm(f => ({ ...f, map_link_url: e.target.value }))}
+              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+              placeholder="https://www.openstreetmap.org/?mlat=… or Google Maps share link" />
+            <p className="text-xs text-gray-500">The URL that opens when users click "Open in Maps". Leave blank to use the default link.</p>
           </div>
 
           <div className="pt-4 border-t border-gray-800">
@@ -912,7 +934,7 @@ export default function SiteSettingsPanel() {
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'company',      label: 'Company Info',    icon: <Settings className="w-4 h-4" /> },
-    { key: 'footer',       label: 'Footer',          icon: <Settings className="w-4 h-4" /> },
+    { key: 'footer',       label: 'Footer',          icon: <Layout className="w-4 h-4" /> },
     { key: 'team',         label: 'Team Members',    icon: <Users className="w-4 h-4" /> },
     { key: 'testimonials', label: 'Testimonials',    icon: <MessageSquare className="w-4 h-4" /> },
   ];
