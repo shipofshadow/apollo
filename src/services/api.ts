@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
 export const uploadAdminImageApi = async (
   token: string,
   file: File,
-  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials'
+  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials' | 'portfolio'
 ): Promise<string> => {
   const form = new FormData();
   form.append('file', file);
@@ -284,6 +284,38 @@ export const updateProductApi = (
 
 export const deleteProductApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/products/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Portfolio API ─────────────────────────────────────────────────────────────
+
+export const fetchPortfolioApi = (token?: string | null) =>
+  apiFetch<{ portfolio: PortfolioItem[] }>('/api/portfolio', {}, token);
+
+export const fetchPortfolioItemApi = (id: number, token?: string | null) =>
+  apiFetch<{ portfolioItem: PortfolioItem }>(`/api/portfolio/${id}`, {}, token);
+
+export const createPortfolioItemApi = (
+  token: string,
+  data: Partial<Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ portfolioItem: PortfolioItem }>('/api/portfolio', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updatePortfolioItemApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ portfolioItem: PortfolioItem }>(`/api/portfolio/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deletePortfolioItemApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/portfolio/${id}`, {
     method: 'DELETE',
   }, token);
 

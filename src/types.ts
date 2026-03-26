@@ -82,6 +82,24 @@ export interface BuildItem {
   imageUrl: string;
 }
 
+export interface PortfolioItem {
+  id: number;
+  title: string;
+  category: string;
+  description: string;
+  imageUrl: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortfolioState {
+  items: PortfolioItem[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
+
 export interface Booking {
   id: string;
   userId?: number | null;

@@ -60,6 +60,13 @@ class Router
             $r->addRoute('PUT',    '/api/products/{id:\d+}', 'handleProductUpdate');
             $r->addRoute('DELETE', '/api/products/{id:\d+}', 'handleProductDelete');
 
+            // ── Portfolio (public read, admin write) ─────────────────────────
+            $r->addRoute('GET',    '/api/portfolio',          'handlePortfolioList');
+            $r->addRoute('GET',    '/api/portfolio/{id:\d+}', 'handlePortfolioGet');
+            $r->addRoute('POST',   '/api/portfolio',          'handlePortfolioCreate');
+            $r->addRoute('PUT',    '/api/portfolio/{id:\d+}', 'handlePortfolioUpdate');
+            $r->addRoute('DELETE', '/api/portfolio/{id:\d+}', 'handlePortfolioDelete');
+
             // ── Shop hours ──────────────────────────────────────────────────
             $r->addRoute('GET', '/api/shop/hours', 'handleShopHoursGet');
             $r->addRoute('PUT', '/api/shop/hours', 'handleShopHoursPut');
@@ -576,7 +583,7 @@ class Router
     {
         $this->requireAuth('admin');
 
-        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials'];
+        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio'];
         $type = $_POST['type'] ?? '';
         if (!in_array($type, $allowed_types, true)) {
             throw new RuntimeException('Invalid upload type. Must be one of: ' . implode(', ', $allowed_types) . '.', 422);
@@ -688,6 +695,72 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new ProductService())->delete($id);
         echo json_encode(['message' => 'Product deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Portfolio handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioList(array $vars = []): void
+    {
+        $includeInactive = false;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $includeInactive = ($payload['role'] ?? '') === 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $items = (new PortfolioService())->getAll($includeInactive);
+        echo json_encode(['portfolio' => $items]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioGet(array $vars = []): void
+    {
+        $id           = (int) ($vars['id'] ?? 0);
+        $requireActive = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $requireActive = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* stay public */ }
+        }
+
+        $item = (new PortfolioService())->getById($id, $requireActive);
+        echo json_encode(['portfolioItem' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data = $this->jsonBody();
+        $item = (new PortfolioService())->create($data);
+        http_response_code(201);
+        echo json_encode(['portfolioItem' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id   = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $item = (new PortfolioService())->update($id, $data);
+        echo json_encode(['portfolioItem' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new PortfolioService())->delete($id);
+        echo json_encode(['message' => 'Portfolio item deleted.']);
     }
 
     // -------------------------------------------------------------------------
