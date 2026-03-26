@@ -4,6 +4,22 @@ import { UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
+/** Returns a score 0–4 for password strength. */
+function passwordStrength(pw: string): number {
+  if (!pw) return 0;
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw))    score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.min(score, 4);
+}
+
+const STRENGTH_LABELS  = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+const STRENGTH_COLORS  = ['', 'bg-red-500', 'bg-yellow-500', 'bg-blue-400', 'bg-green-500'];
+const STRENGTH_TEXT    = ['', 'text-red-400', 'text-yellow-400', 'text-blue-400', 'text-green-400'];
+
 export default function RegisterPage() {
   const navigate  = useNavigate();
   const [params]  = useSearchParams();
@@ -127,6 +143,23 @@ export default function RegisterPage() {
                   {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {/* Password strength meter */}
+              {form.password && (() => {
+                const score = passwordStrength(form.password);
+                return (
+                  <div className="space-y-1">
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4].map(n => (
+                        <div
+                          key={n}
+                          className={`h-1 flex-1 rounded-full transition-colors ${n <= score ? STRENGTH_COLORS[score] : 'bg-gray-700'}`}
+                        />
+                      ))}
+                    </div>
+                    <p className={`text-xs font-semibold ${STRENGTH_TEXT[score]}`}>{STRENGTH_LABELS[score]}</p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Confirm password */}
