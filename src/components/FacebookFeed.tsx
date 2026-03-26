@@ -7,19 +7,15 @@
  *
  * The Facebook SDK is loaded lazily (only when the component mounts) so
  * it doesn't block the initial page render.
- *
- * To configure the Page URL, set VITE_FB_PAGE_URL in your .env file:
- *   VITE_FB_PAGE_URL=https://www.facebook.com/your.page.name
- *
- * If the env variable is absent the component falls back to a generic
- * Facebook page URL so something is always rendered.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Facebook } from 'lucide-react';
 
-const FB_PAGE_URL =
-  (import.meta.env.VITE_FB_PAGE_URL as string | undefined) ??
-  'https://www.facebook.com';
+const FB_PAGE_URL = 'https://www.facebook.com/1625autolab';
+
+/** Facebook Page Plugin accepts widths between 180 and 500 px. */
+const FB_MIN_WIDTH = 180;
+const FB_MAX_WIDTH = 500;
 
 declare global {
   interface Window {
@@ -32,7 +28,38 @@ declare global {
 }
 
 export default function FacebookFeed() {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [pluginWidth, setPluginWidth] = useState(FB_MAX_WIDTH);
+
+  // Keep pluginWidth in sync with the wrapper's actual rendered width.
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+
+    const update = (entries?: ResizeObserverEntry[]) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const w = entries ? entries[0].contentRect.width : el.clientWidth;
+        const clamped = Math.min(FB_MAX_WIDTH, Math.max(FB_MIN_WIDTH, Math.floor(w)));
+        setPluginWidth((prev) => (prev === clamped ? prev : clamped));
+      }, 100);
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      clearTimeout(debounceTimer);
+      ro.disconnect();
+    };
+  }, []);
+
+  // Re-parse XFBML whenever the measured width changes so the plugin resizes.
+  useEffect(() => {
+    window.FB?.XFBML.parse();
+  }, [pluginWidth]);
 
   useEffect(() => {
     // Re-parse XFBML after the SDK loads so the plugin renders
@@ -61,6 +88,9 @@ export default function FacebookFeed() {
 
   return (
     <section className="py-24 bg-brand-darker border-t border-gray-800">
+      {/* Facebook root div required by the SDK */}
+      <div id="fb-root" />
+
       <div className="container mx-auto px-4 md:px-6">
         {/* Section header */}
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -73,23 +103,27 @@ export default function FacebookFeed() {
           <div className="w-24 h-1 bg-brand-orange mx-auto mt-6" />
         </div>
 
-        {/* Embed wrapper */}
-        <div
-          ref={rootRef}
-          className="flex flex-col items-center gap-8"
-        >
-          {/* Facebook Page Plugin */}
+        {/* Responsive embed wrapper — capped at FB_MAX_WIDTH so the plugin
+            always fills its container up to the SDK's 500 px hard limit. */}
+        <div className="flex flex-col items-center gap-8">
           <div
-            className="fb-page rounded-sm overflow-hidden shadow-2xl border border-gray-800"
-            data-href={FB_PAGE_URL}
-            data-tabs="timeline"
-            data-width="500"
-            data-height="700"
-            data-small-header="false"
-            data-adapt-container-width="true"
-            data-hide-cover="false"
-            data-show-facepile="true"
-          />
+            ref={wrapperRef}
+            className="w-full"
+            style={{ maxWidth: FB_MAX_WIDTH }}
+          >
+            {/* Facebook Page Plugin */}
+            <div
+              className="fb-page rounded-sm overflow-hidden shadow-2xl border border-gray-800"
+              data-href={FB_PAGE_URL}
+              data-tabs="timeline"
+              data-width={String(pluginWidth)}
+              data-height="700"
+              data-small-header="false"
+              data-adapt-container-width="true"
+              data-hide-cover="false"
+              data-show-facepile="true"
+            />
+          </div>
 
           {/* Fallback / CTA link */}
           <a
@@ -103,9 +137,6 @@ export default function FacebookFeed() {
           </a>
         </div>
       </div>
-
-      {/* Facebook root div required by the SDK */}
-      <div id="fb-root" />
     </section>
   );
 }
