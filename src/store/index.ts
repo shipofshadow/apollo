@@ -6,6 +6,7 @@ import contentReducer      from './contentSlice';
 import productsReducer     from './productsSlice';
 import siteSettingsReducer from './siteSettingsSlice';
 import faqReducer          from './faqSlice';
+import portfolioReducer    from './portfolioSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     products:     productsReducer,
     siteSettings: siteSettingsReducer,
     faq:          faqReducer,
+    portfolio:    portfolioReducer,
   },
 });
 

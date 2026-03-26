@@ -57,13 +57,20 @@ function buildDateList(shopHours: ShopDayHours[]): Date[] {
     : new Set([1, 2, 3, 4, 5, 6]); // Mon–Sat default
 
   const dates: Date[] = [];
-  let cursor = new Date();
+  const cursor = new Date();
   cursor.setDate(cursor.getDate() + 1);
   while (dates.length < 14) {
     if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Accepts PH mobile numbers: 09XXXXXXXXX, +639XXXXXXXXX, or with spaces/dashes */
+function isValidPhone(phone: string): boolean {
+  return /^(\+?63|0)[-\s]?9\d{2}[-\s]?\d{3}[-\s]?\d{4}$/.test(phone.trim());
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -129,6 +136,9 @@ export default function BookingPage() {
 
   // Step 3 – signature
   const [signatureData, setSignatureData] = useState('');
+
+  // Step 3 – validation errors
+  const [formErrors, setFormErrors] = useState<{ phone?: string; email?: string }>({});
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : []);
 
@@ -223,8 +233,25 @@ export default function BookingPage() {
     setMediaPreviews(prev => prev.filter((_, idx) => idx !== i));
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(p => ({ ...p, phone: e.target.value }));
+    setFormErrors(prev => ({ ...prev, phone: undefined }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Client-side validation
+    const errors: { phone?: string; email?: string } = {};
+    if (form.phone && !isValidPhone(form.phone)) {
+      errors.phone = 'Enter a valid Philippine mobile number (e.g. 09171234567).';
+    }
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
     let mediaUrls: string[] = [];
     if (mediaFiles.length && BACKEND_URL) {
       setMediaUploadBusy(true);
@@ -270,6 +297,7 @@ export default function BookingPage() {
     setDynamicModels([]);
     setMediaFiles([]); setMediaPreviews([]);
     setSignatureData('');
+    setFormErrors({});
   };
 
   return (
@@ -469,8 +497,11 @@ export default function BookingPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Phone Number *</label>
-                    <input type="tel" required value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm" placeholder="09XXXXXXXXX" />
+                    <input type="tel" required value={form.phone}
+                      onChange={handlePhoneChange}
+                      className={`w-full bg-brand-darker border text-white px-4 py-3 focus:outline-none transition-colors rounded-sm ${formErrors.phone ? 'border-red-500 focus:border-red-400' : 'border-gray-700 focus:border-brand-orange'}`}
+                      placeholder="09XXXXXXXXX" />
+                    {formErrors.phone && <p className="text-xs text-red-400 mt-1">{formErrors.phone}</p>}
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Email Address *</label>

@@ -1,18 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Settings, Users, MessageSquare, Loader2, AlertCircle,
   Plus, Pencil, Trash2, Save, X, Upload, Star, Layout,
+  ServerCog, CheckCircle2, Clock, RefreshCw, Database, Info,
 } from 'lucide-react';
 import {
   fetchSiteSettingsAsync, updateSiteSettingsAsync,
   fetchTeamMembersAsync, createTeamMemberAsync, updateTeamMemberAsync, deleteTeamMemberAsync,
   fetchTestimonialsAsync, createTestimonialAsync, updateTestimonialAsync, deleteTestimonialAsync,
 } from '../../store/siteSettingsSlice';
-import { uploadAdminImageApi } from '../../services/api';
+import {
+  uploadAdminImageApi,
+  fetchMigrationStatusApi, runMigrationsApi,
+  type MigrationEntry,
+} from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import type { TeamMember, Testimonial } from '../../types';
+import { BACKEND_URL } from '../../config';
 
 const UPLOAD_MAX_MB = 10;
 function validateImageFile(file: File): string | null {
@@ -925,9 +931,221 @@ function FooterSettingsPanel() {
   );
 }
 
+// ── Sub-panel: System Info & Migrations ───────────────────────────────────────
+
+const APP_VERSION = '1.0.0';
+const APP_NAME    = '1625 Auto Lab';
+const TECH_STACK  = 'React 19 · Redux Toolkit · Tailwind CSS · PHP 8 · MySQL';
+
+function SystemPanel() {
+  const { token } = useAuth();
+
+  const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
+  const [migrLoading,   setMigrLoading]   = useState(true);
+  const [migrError,     setMigrError]     = useState<string | null>(null);
+  const [running,       setRunning]       = useState(false);
+  const [runResult,     setRunResult]     = useState<{ ran: string[]; skipped: string[]; total: number } | null>(null);
+  const [runError,      setRunError]      = useState<string | null>(null);
+
+  const loadStatus = useCallback(() => {
+    if (!token) return;
+    setMigrLoading(true);
+    setMigrError(null);
+    fetchMigrationStatusApi(token)
+      .then(res => setMigrations(res.migrations))
+      .catch(e  => setMigrError((e as Error).message))
+      .finally(() => setMigrLoading(false));
+  }, [token]);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const handleRunMigrations = async () => {
+    if (!token || running) return;
+    setRunning(true);
+    setRunResult(null);
+    setRunError(null);
+    try {
+      const result = await runMigrationsApi(token);
+      setRunResult(result);
+      // Refresh the migration list after running
+      loadStatus();
+    } catch (e: unknown) {
+      setRunError((e as Error).message ?? 'Failed to run migrations.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const pendingCount = migrations.filter(m => m.status === 'pending').length;
+  const ranCount     = migrations.filter(m => m.status === 'ran').length;
+
+  return (
+    <div className="space-y-8">
+      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">
+        System Information
+      </h3>
+
+      {/* Info cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
+          <div className="w-10 h-10 bg-brand-orange/10 rounded-sm flex items-center justify-center shrink-0">
+            <Info className="w-5 h-5 text-brand-orange" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Application</p>
+            <p className="text-white font-bold text-sm">{APP_NAME}</p>
+            <p className="text-gray-400 text-xs mt-0.5">v{APP_VERSION}</p>
+          </div>
+        </div>
+
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
+          <div className="w-10 h-10 bg-blue-500/10 rounded-sm flex items-center justify-center shrink-0">
+            <ServerCog className="w-5 h-5 text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Backend URL</p>
+            <p className="text-white font-bold text-sm break-all">{BACKEND_URL}</p>
+            <p className="text-gray-400 text-xs mt-0.5">PHP API Server</p>
+          </div>
+        </div>
+
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
+          <div className="w-10 h-10 bg-purple-500/10 rounded-sm flex items-center justify-center shrink-0">
+            <Database className="w-5 h-5 text-purple-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Migrations</p>
+            <p className="text-white font-bold text-sm">{ranCount} / {migrations.length} applied</p>
+            <p className={`text-xs mt-0.5 font-bold ${pendingCount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+              {pendingCount > 0 ? `${pendingCount} pending` : 'All up to date'}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4 sm:col-span-2 lg:col-span-3">
+          <div className="w-10 h-10 bg-gray-700/50 rounded-sm flex items-center justify-center shrink-0">
+            <Settings className="w-5 h-5 text-gray-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Tech Stack</p>
+            <p className="text-gray-300 text-sm">{TECH_STACK}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Database Migrations */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
+            <Database className="w-5 h-5 text-brand-orange" />
+            Database Migrations
+          </h3>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={loadStatus}
+              disabled={migrLoading}
+              title="Refresh status"
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50">
+              <RefreshCw className={`w-3.5 h-3.5 ${migrLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={handleRunMigrations}
+              disabled={running || migrLoading || pendingCount === 0}
+              className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-sm font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-sm">
+              {running
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
+                : <><RefreshCw className="w-4 h-4" /> Run Migrations</>
+              }
+            </button>
+          </div>
+        </div>
+
+        {/* Run result banner */}
+        {runResult && (
+          <div className="mb-4 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
+            <p className="font-bold mb-1">
+              Migrations complete — {runResult.ran.length} applied, {runResult.skipped.length} skipped.
+            </p>
+            {runResult.ran.length > 0 && (
+              <ul className="list-disc list-inside text-xs space-y-0.5 text-green-300">
+                {runResult.ran.map(name => <li key={name}>{name}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {runError && (
+          <div className="mb-4 flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {runError}
+          </div>
+        )}
+
+        {migrLoading && (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 text-brand-orange animate-spin" />
+          </div>
+        )}
+
+        {migrError && (
+          <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm mb-4">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{migrError}</span>
+            <span className="text-gray-500 text-xs ml-2">(Database may not be configured)</span>
+          </div>
+        )}
+
+        {!migrLoading && !migrError && migrations.length > 0 && (
+          <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-left">
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500">Migration File</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500 w-28">Status</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500 hidden md:table-cell">Applied At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {migrations.map((m, i) => (
+                  <tr key={m.name} className={`border-b border-gray-800/60 last:border-0 ${i % 2 === 1 ? 'bg-brand-darker/40' : ''}`}>
+                    <td className="px-5 py-3 font-mono text-xs text-gray-300">{m.name}</td>
+                    <td className="px-5 py-3">
+                      {m.status === 'ran' ? (
+                        <span className="inline-flex items-center gap-1.5 text-green-400 text-xs font-bold uppercase tracking-wider">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Applied
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-yellow-400 text-xs font-bold uppercase tracking-wider">
+                          <Clock className="w-3.5 h-3.5" /> Pending
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-gray-500 text-xs hidden md:table-cell">
+                      {m.ran_at ? new Date(m.ran_at).toLocaleString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!migrLoading && !migrError && migrations.length === 0 && (
+          <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
+            <Database className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            <p>No migration files found.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main SiteSettingsPanel ────────────────────────────────────────────────────
 
-type Tab = 'company' | 'footer' | 'team' | 'testimonials';
+type Tab = 'company' | 'footer' | 'team' | 'testimonials' | 'system';
 
 export default function SiteSettingsPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('company');
@@ -937,6 +1155,7 @@ export default function SiteSettingsPanel() {
     { key: 'footer',       label: 'Footer',          icon: <Layout className="w-4 h-4" /> },
     { key: 'team',         label: 'Team Members',    icon: <Users className="w-4 h-4" /> },
     { key: 'testimonials', label: 'Testimonials',    icon: <MessageSquare className="w-4 h-4" /> },
+    { key: 'system',       label: 'System',          icon: <ServerCog className="w-4 h-4" /> },
   ];
 
   return (
@@ -963,6 +1182,7 @@ export default function SiteSettingsPanel() {
       {activeTab === 'footer'       && <FooterSettingsPanel />}
       {activeTab === 'team'         && <TeamMembersPanel />}
       {activeTab === 'testimonials' && <TestimonialsPanel />}
+      {activeTab === 'system'       && <SystemPanel />}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { updateBookingPartsApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
@@ -23,6 +24,7 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 export default function BookingsPanel() {
   const dispatch = useDispatch<AppDispatch>();
   const { token } = useAuth();
+  const { showToast } = useToast();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
   const [statusFilter, setStatusFilter] = useState<'all' | Booking['status']>('all');
 
@@ -53,8 +55,10 @@ export default function BookingsPanel() {
     try {
       await updateBookingPartsApi(token, partsModal, true, partsNotes);
       dispatch(updateBookingStatusAsync({ token, id: partsModal, status: 'awaiting_parts' }));
-    } catch { /* silently fail */ }
-    finally { setPartsBusy(false); setPartsModal(null); }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save parts info. Please try again.';
+      showToast(msg, 'error');
+    } finally { setPartsBusy(false); setPartsModal(null); }
   };
 
   const filtered = statusFilter === 'all'

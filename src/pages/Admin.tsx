@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
-  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle,
+  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Images,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import AccountSettingsPanel from './admin/AccountSettingsPanel';
 import ShopHoursPanel      from './admin/ShopHoursPanel';
 import SiteSettingsPanel   from './admin/SiteSettingsPanel';
 import FaqPanel            from './admin/FaqPanel';
+import PortfolioPanel      from './admin/PortfolioPanel';
 
 // ── Admin login screen ────────────────────────────────────────────────────────
 function AdminLogin() {
@@ -88,6 +89,7 @@ export default function AdminPage() {
   const tabs = [
     { key: 'analytics',    label: 'Analytics',      icon: BarChart3          },
     { key: 'services',     label: 'Services',       icon: Wrench             },
+    { key: 'portfolio',    label: 'Portfolio',      icon: Images             },
     { key: 'content',      label: 'Content',        icon: FileText           },
     { key: 'appointments', label: 'Bookings',       icon: Calendar           },
     { key: 'products',     label: 'Products',       icon: Package            },
@@ -101,6 +103,7 @@ export default function AdminPage() {
     switch (activeTab) {
       case 'analytics':     return <AnalyticsPanel />;
       case 'services':      return <ServicesPanel />;
+      case 'portfolio':     return <PortfolioPanel />;
       case 'content':       return <ContentPanel />;
       case 'appointments':  return <BookingsPanel />;
       case 'products':      return <ProductsPanel />;

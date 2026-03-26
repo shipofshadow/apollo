@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
 export const uploadAdminImageApi = async (
   token: string,
   file: File,
-  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials'
+  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials' | 'portfolio'
 ): Promise<string> => {
   const form = new FormData();
   form.append('file', file);
@@ -287,6 +287,38 @@ export const deleteProductApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
+// ── Portfolio API ─────────────────────────────────────────────────────────────
+
+export const fetchPortfolioApi = (token?: string | null) =>
+  apiFetch<{ portfolio: PortfolioItem[] }>('/api/portfolio', {}, token);
+
+export const fetchPortfolioItemApi = (id: number, token?: string | null) =>
+  apiFetch<{ portfolioItem: PortfolioItem }>(`/api/portfolio/${id}`, {}, token);
+
+export const createPortfolioItemApi = (
+  token: string,
+  data: Partial<Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ portfolioItem: PortfolioItem }>('/api/portfolio', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updatePortfolioItemApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ portfolioItem: PortfolioItem }>(`/api/portfolio/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deletePortfolioItemApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/portfolio/${id}`, {
+    method: 'DELETE',
+  }, token);
+
 // ── Admin API ────────────────────────────────────────────────────────────────
 
 export interface AdminStats {
@@ -302,6 +334,28 @@ export interface AdminStats {
 
 export const fetchAdminStatsApi = (token: string) =>
   apiFetch<AdminStats>('/api/admin/stats', {}, token);
+
+export interface MigrationEntry {
+  name: string;
+  status: 'ran' | 'pending';
+  ran_at: string | null;
+}
+
+export interface MigrationStatusResponse {
+  migrations: MigrationEntry[];
+}
+
+export interface MigrationRunResponse {
+  ran: string[];
+  skipped: string[];
+  total: number;
+}
+
+export const fetchMigrationStatusApi = (token: string) =>
+  apiFetch<MigrationStatusResponse>('/api/admin/migrate', {}, token);
+
+export const runMigrationsApi = (token: string) =>
+  apiFetch<MigrationRunResponse>('/api/admin/migrate', { method: 'POST' }, token);
 
 // ── Site Settings API ─────────────────────────────────────────────────────────
 
