@@ -335,6 +335,28 @@ export interface AdminStats {
 export const fetchAdminStatsApi = (token: string) =>
   apiFetch<AdminStats>('/api/admin/stats', {}, token);
 
+export interface MigrationEntry {
+  name: string;
+  status: 'ran' | 'pending';
+  ran_at: string | null;
+}
+
+export interface MigrationStatusResponse {
+  migrations: MigrationEntry[];
+}
+
+export interface MigrationRunResponse {
+  ran: string[];
+  skipped: string[];
+  total: number;
+}
+
+export const fetchMigrationStatusApi = (token: string) =>
+  apiFetch<MigrationStatusResponse>('/api/admin/migrate', {}, token);
+
+export const runMigrationsApi = (token: string) =>
+  apiFetch<MigrationRunResponse>('/api/admin/migrate', { method: 'POST' }, token);
+
 // ── Site Settings API ─────────────────────────────────────────────────────────
 
 export const fetchSiteSettingsApi = () =>
