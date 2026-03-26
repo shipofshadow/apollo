@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Images,
+  Menu, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -81,7 +82,23 @@ function AdminLogin() {
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, isAdmin, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('analytics');
+  const [activeTab,      setActiveTab]      = useState('analytics');
+  const [collapsed,      setCollapsed]      = useState(false);
+  const [mobileOpen,     setMobileOpen]     = useState(false);
+
+  // Close mobile sidebar when tab changes
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    setMobileOpen(false);
+  };
+
+  // Close mobile sidebar on wider screens
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => { if (e.matches) setMobileOpen(false); };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   if (!user)    return <AdminLogin />;
   if (!isAdmin) return <Navigate to="/" replace />;
@@ -118,17 +135,26 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-brand-darker flex flex-col">
       {/* Top bar */}
-      <header className="h-16 bg-brand-dark border-b border-gray-800 flex items-center justify-between px-4 md:px-6 shrink-0 z-30">
-        <div className="flex items-center gap-4">
-          <img src={logo} alt="1625 Autolab" className="h-8 w-auto object-contain" referrerPolicy="no-referrer" />
+      <header className="h-14 md:h-16 bg-brand-dark border-b border-gray-800 flex items-center justify-between px-3 md:px-6 shrink-0 z-30">
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Mobile menu toggle */}
+          <button
+            onClick={() => setMobileOpen(v => !v)}
+            className="md:hidden p-1.5 rounded-sm text-gray-400 hover:text-white hover:bg-gray-800/60 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          <img src={logo} alt="1625 Autolab" className="h-7 md:h-8 w-auto object-contain" referrerPolicy="no-referrer" />
           <span className="hidden sm:block text-gray-600 text-lg select-none">/</span>
           <span className="hidden sm:block text-xs font-bold uppercase tracking-widest text-brand-orange">Admin Panel</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           <a href="/"
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Site
+            <span className="hidden sm:inline">Back to Site</span>
           </a>
           <div className="w-px h-5 bg-gray-700" />
           <button onClick={() => logout()}
@@ -139,53 +165,85 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile overlay */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 z-20 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-16 md:w-60 bg-brand-dark border-r border-gray-800 flex-shrink-0 flex flex-col">
+        <aside className={`
+          fixed md:relative inset-y-0 left-0 z-30 md:z-auto
+          flex flex-col bg-brand-dark border-r border-gray-800 flex-shrink-0
+          transition-all duration-300 ease-in-out
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          ${collapsed ? 'md:w-16' : 'md:w-60'}
+          w-64
+          top-14 md:top-0
+        `}>
           {/* User card */}
-          <div className="p-4 md:p-5 border-b border-gray-800">
+          <div className={`border-b border-gray-800 ${collapsed ? 'p-3' : 'p-4 md:p-5'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0">
                 <span className="text-brand-orange font-black text-sm uppercase">
                   {user.name?.[0] ?? 'A'}
                 </span>
               </div>
-              <div className="hidden md:block min-w-0">
-                <p className="text-white font-bold text-sm truncate leading-tight">{user.name}</p>
-                <p className="text-gray-500 text-xs truncate">{user.email}</p>
-              </div>
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-white font-bold text-sm truncate leading-tight">{user.name}</p>
+                  <p className="text-gray-500 text-xs truncate">{user.email}</p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Nav */}
-          <nav className="p-2 md:p-3 space-y-0.5 flex-grow">
+          <nav className={`${collapsed ? 'p-2' : 'p-2 md:p-3'} space-y-0.5 flex-grow overflow-y-auto`}>
             {tabs.map(({ key, label, icon: Icon }) => (
-              <button key={key} onClick={() => setActiveTab(key)}
-                title={label}
+              <button key={key} onClick={() => handleTabChange(key)}
+                title={collapsed ? label : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm relative ${
                   activeTab === key
                     ? 'text-brand-orange bg-brand-orange/10'
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                }`}>
+                } ${collapsed ? 'justify-center' : ''}`}>
                 <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-brand-orange rounded-r-full transition-opacity ${activeTab === key ? 'opacity-100' : 'opacity-0'}`} />
                 <Icon className="w-4 h-4 shrink-0" />
-                <span className="hidden md:inline">{label}</span>
+                {!collapsed && <span>{label}</span>}
               </button>
             ))}
           </nav>
 
-          {/* Logout (mobile only) */}
-          <div className="md:hidden p-2 border-t border-gray-800">
+          {/* Collapse toggle (desktop) + Logout (mobile) */}
+          <div className="border-t border-gray-800 p-2 flex items-center gap-2">
+            {/* Desktop collapse button */}
+            <button
+              onClick={() => setCollapsed(v => !v)}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hidden md:flex items-center justify-center w-full px-3 py-2 rounded-sm text-gray-500 hover:text-white hover:bg-gray-800/60 transition-colors"
+            >
+              {collapsed
+                ? <ChevronRight className="w-4 h-4" />
+                : <><ChevronLeft className="w-4 h-4 mr-2" /><span className="text-xs font-bold uppercase tracking-widest">Collapse</span></>
+              }
+            </button>
+
+            {/* Mobile logout */}
             <button onClick={() => logout()}
               title="Sign Out"
-              className="w-full flex items-center justify-center px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
+              className="md:hidden w-full flex items-center gap-2 px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
               <LogOut className="w-4 h-4 shrink-0" />
+              <span>Sign Out</span>
             </button>
           </div>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-5 md:p-8 lg:p-10">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 min-w-0">
           {renderContent()}
         </main>
       </div>

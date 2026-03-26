@@ -7,13 +7,15 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function AccountSettingsPanel() {
   const dispatch                       = useDispatch<AppDispatch>();
-  const { user, token, status, error } = useAuth();
+  const { user, token, error } = useAuth();
 
-  const [info,     setInfo]    = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
-  const [pw,       setPw]      = useState({ newPw: '', confirm: '' });
-  const [showPw,   setShowPw]  = useState(false);
-  const [localErr, setLocalErr] = useState('');
-  const [saved,    setSaved]   = useState(false);
+  const [info,        setInfo]       = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
+  const [pw,          setPw]         = useState({ newPw: '', confirm: '' });
+  const [showPw,      setShowPw]     = useState(false);
+  const [localErr,    setLocalErr]   = useState('');
+  const [saved,       setSaved]      = useState(false);
+  const [savingInfo,  setSavingInfo]  = useState(false);
+  const [savingPw,    setSavingPw]    = useState(false);
 
   useEffect(() => {
     if (user) setInfo({ name: user.name, phone: user.phone ?? '' });
@@ -26,10 +28,12 @@ export default function AccountSettingsPanel() {
     setLocalErr('');
     setSaved(false);
     if (!token) return;
+    setSavingInfo(true);
     dispatch(updateProfileAsync({ token, data: { name: info.name, phone: info.phone } }))
       .unwrap()
       .then(() => setSaved(true))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSavingInfo(false));
   };
 
   const handlePwSubmit = (e: React.FormEvent) => {
@@ -39,13 +43,15 @@ export default function AccountSettingsPanel() {
     if (pw.newPw !== pw.confirm) { setLocalErr('Passwords do not match.'); return; }
     if (pw.newPw.length < 8)     { setLocalErr('Password must be at least 8 characters.'); return; }
     if (!token) return;
+    setSavingPw(true);
     dispatch(updateProfileAsync({
       token,
       data: { password: pw.newPw, password_confirmation: pw.confirm },
     }))
       .unwrap()
       .then(() => { setSaved(true); setPw({ newPw: '', confirm: '' }); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSavingPw(false));
   };
 
   const displayError = localErr || error;
@@ -125,10 +131,10 @@ export default function AccountSettingsPanel() {
 
           <div className="flex justify-end">
             <button
-              type="submit" disabled={status === 'loading'}
+              type="submit" disabled={savingInfo}
               className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
             >
-              {status === 'loading' ? 'Saving…' : 'Save Changes'}
+              {savingInfo ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -174,10 +180,10 @@ export default function AccountSettingsPanel() {
 
           <div className="flex justify-end">
             <button
-              type="submit" disabled={status === 'loading' || !pw.newPw}
+              type="submit" disabled={savingPw || !pw.newPw}
               className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
             >
-              {status === 'loading' ? 'Saving…' : 'Update Password'}
+              {savingPw ? 'Saving…' : 'Update Password'}
             </button>
           </div>
         </form>
