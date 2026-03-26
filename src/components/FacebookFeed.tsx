@@ -7,19 +7,11 @@
  *
  * The Facebook SDK is loaded lazily (only when the component mounts) so
  * it doesn't block the initial page render.
- *
- * To configure the Page URL, set VITE_FB_PAGE_URL in your .env file:
- *   VITE_FB_PAGE_URL=https://www.facebook.com/your.page.name
- *
- * If the env variable is absent the component falls back to a generic
- * Facebook page URL so something is always rendered.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Facebook } from 'lucide-react';
 
-const FB_PAGE_URL =
-  (import.meta.env.VITE_FB_PAGE_URL as string | undefined) ??
-  'https://www.facebook.com';
+const FB_PAGE_URL = 'https://www.facebook.com/1625autolab';
 
 /** Facebook Page Plugin accepts widths between 180 and 500 px. */
 const FB_MIN_WIDTH = 180;
