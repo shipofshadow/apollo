@@ -92,9 +92,17 @@ export default function AdminPage() {
     setMobileOpen(false);
   };
 
-  // Close mobile sidebar on wider screens
+  // Close mobile sidebar when pressing Escape
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Close mobile sidebar on wider screens (Tailwind 'md' = 768px)
+  const MD_BREAKPOINT = 768;
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`);
     const handler = (e: MediaQueryListEvent) => { if (e.matches) setMobileOpen(false); };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -140,8 +148,9 @@ export default function AdminPage() {
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileOpen(v => !v)}
-            className="md:hidden p-1.5 rounded-sm text-gray-400 hover:text-white hover:bg-gray-800/60 transition-colors"
             aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
+            className="md:hidden p-1.5 rounded-sm text-gray-400 hover:text-white hover:bg-gray-800/60 transition-colors"
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>

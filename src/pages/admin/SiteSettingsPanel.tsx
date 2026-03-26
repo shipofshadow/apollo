@@ -1164,18 +1164,20 @@ export default function SiteSettingsPanel() {
         <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Site Settings</h2>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 mb-8 border-b border-gray-800">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 -mb-px ${
-              activeTab === t.key
-                ? 'border-brand-orange text-brand-orange'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}>
-            {t.icon} {t.label}
-          </button>
-        ))}
+      {/* Tab bar - scrollable on mobile */}
+      <div className="overflow-x-auto mb-8 border-b border-gray-800 -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-1 min-w-max">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 -mb-px whitespace-nowrap ${
+                activeTab === t.key
+                  ? 'border-brand-orange text-brand-orange'
+                  : 'border-transparent text-gray-400 hover:text-white'
+              }`}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeTab === 'company'      && <CompanyInfoPanel />}
