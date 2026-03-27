@@ -233,7 +233,7 @@ export default function BookingDetail() {
   const { id }              = useParams<{ id: string }>();
   const dispatch            = useDispatch<AppDispatch>();
   const navigate            = useNavigate();
-  const { token }           = useAuth();
+  const { token, user }     = useAuth();
   const { showToast }       = useToast();
   const appointments        = useSelector((s: RootState) => s.booking.appointments);
 
@@ -245,18 +245,20 @@ export default function BookingDetail() {
   const [cancelBusy, setCancelBusy]       = useState(false);
   const [mediaExpanded, setMediaExpanded] = useState(false);
 
-  // Try redux cache first, then fetch
+  // Try redux cache first (only if it belongs to the current user), then fetch
   useEffect(() => {
     if (!id || !token) return;
 
-    const cached = appointments.find(b => b.id === id && !b.id.startsWith('mock'));
+    const cached = appointments.find(
+      b => b.id === id && !b.id.startsWith('mock') && b.userId === user?.id
+    );
     if (cached) {
       setBooking(cached);
       setLoading(false);
       // Refresh in the background for up-to-date data
       dispatch(fetchBookingByIdAsync({ token, id }))
         .unwrap()
-        .then(setBooking)
+        .then(updated => { if (updated.userId === user?.id) setBooking(updated); })
         .catch(() => {/* use cached */});
       return;
     }
@@ -264,10 +266,19 @@ export default function BookingDetail() {
     setLoading(true);
     dispatch(fetchBookingByIdAsync({ token, id }))
       .unwrap()
-      .then(setBooking)
+      .then(fetched => {
+        // The backend already enforces ownership (returns 403 for other users),
+        // but guard here too for defense in depth.
+        if (fetched.userId !== user?.id) {
+          setLoadError('You are not authorized to view this booking.');
+        } else {
+          setBooking(fetched);
+        }
+      })
       .catch((e: unknown) => setLoadError((e as Error).message ?? 'Failed to load booking.'))
       .finally(() => setLoading(false));
-  }, [id, token, dispatch, appointments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, token]);
 
   const handleCancelConfirm = async () => {
     if (!token || !booking) return;

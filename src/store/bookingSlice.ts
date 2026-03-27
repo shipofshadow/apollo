@@ -187,12 +187,11 @@ const bookingSlice = createSlice({
         state.error  = action.payload as string;
       })
       .addCase(fetchMyBookingsAsync.fulfilled, (state, action) => {
-        // Replace client-owned entries with fresh data from server
-        const fetched = action.payload;
-        const fetchedIds = new Set(fetched.map(b => b.id));
+        // Replace all real bookings with the current user's fresh data.
+        // Keep only mock/demo entries so they can still serve as UI placeholders.
         state.appointments = [
-          ...fetched,
-          ...state.appointments.filter(a => !fetchedIds.has(a.id)),
+          ...action.payload,
+          ...state.appointments.filter(a => a.id.startsWith('mock')),
         ];
       })
       .addCase(fetchAllBookingsAsync.fulfilled, (state, action) => {

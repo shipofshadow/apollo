@@ -28,7 +28,7 @@ const STATUS_STRIP: Record<Booking['status'], string> = {
 
 export default function MyBookings() {
   const dispatch               = useDispatch<AppDispatch>();
-  const { token }              = useAuth();
+  const { token, user }        = useAuth();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
 
   const [filter, setFilter] = useState<Filter>('all');
@@ -37,7 +37,12 @@ export default function MyBookings() {
     if (token) dispatch(fetchMyBookingsAsync(token));
   }, [token, dispatch]);
 
-  const myBookings = appointments.filter(b => !b.id.startsWith('mock'));
+  // Only show real bookings that belong to the logged-in user.
+  // The userId check is a safety net: even if the Redux store were to contain
+  // bookings from another session, they will never appear here.
+  const myBookings = appointments.filter(
+    b => !b.id.startsWith('mock') && b.userId === user?.id
+  );
 
   const filtered = filter === 'all'
     ? myBookings

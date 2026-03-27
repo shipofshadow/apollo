@@ -33,7 +33,10 @@ export default function ClientDashboard() {
     if (token) dispatch(fetchMyBookingsAsync(token));
   }, [token, dispatch]);
 
-  const myBookings = appointments.filter(b => !b.id.startsWith('mock'));
+  // Only show bookings that belong to the current user.
+  const myBookings = appointments.filter(
+    b => !b.id.startsWith('mock') && b.userId === user?.id
+  );
   const recent     = myBookings.slice(0, 5);
 
   const counts = {
