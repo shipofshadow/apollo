@@ -74,7 +74,7 @@ export default function ServicesPanel() {
   }, [token, dispatch]);
 
   const openNew  = () => { setForm(EMPTY_FORM); setEditId(null); setSlugEdited(false); setSaveError(null); setEditing(true); };
-  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSlugEdited(true); setSaveError(null); setEditing(true); };
+  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSlugEdited(false); setSaveError(null); setEditing(true); };
   const cancel   = () => { setEditing(false); setEditId(null); setSlugEdited(false); setSaveError(null); };
 
   const set = (field: keyof ServiceForm) =>
@@ -83,8 +83,7 @@ export default function ServicesPanel() {
       if (field === 'slug') setSlugEdited(true);
       setForm(p => {
         const next = { ...p, [field]: value };
-        // Auto-generate slug from title when creating a new service and slug hasn't been manually edited
-        if (field === 'title' && !slugEdited && editId === null) {
+        if (field === 'title' && !slugEdited) {
           next.slug = toSlug(value);
         }
         return next;
