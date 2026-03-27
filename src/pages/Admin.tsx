@@ -3,21 +3,21 @@ import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Images,
-  Menu, X, ChevronLeft, ChevronRight, Facebook,
+  Menu, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
-import AnalyticsPanel      from './admin/AnalyticsPanel';
-import BookingsPanel       from './admin/BookingsPanel';
-import ServicesPanel       from './admin/ServicesPanel';
-import ContentPanel        from './admin/ContentPanel';
-import ProductsPanel       from './admin/ProductsPanel';
+import AnalyticsPanel       from './admin/AnalyticsPanel';
+import BookingsPanel        from './admin/BookingsPanel';
+import AdminBookingDetail   from './admin/AdminBookingDetail';
+import ServicesPanel        from './admin/ServicesPanel';
+import ContentPanel         from './admin/ContentPanel';
+import ProductsPanel        from './admin/ProductsPanel';
 import AccountSettingsPanel from './admin/AccountSettingsPanel';
-import ShopHoursPanel      from './admin/ShopHoursPanel';
-import SiteSettingsPanel   from './admin/SiteSettingsPanel';
-import FaqPanel            from './admin/FaqPanel';
-import PortfolioPanel      from './admin/PortfolioPanel';
-import FacebookPanel       from './admin/FacebookPanel';
+import ShopHoursPanel       from './admin/ShopHoursPanel';
+import SiteSettingsPanel    from './admin/SiteSettingsPanel';
+import FaqPanel             from './admin/FaqPanel';
+import PortfolioPanel       from './admin/PortfolioPanel';
 
 // ── Admin login screen ────────────────────────────────────────────────────────
 function AdminLogin() {
@@ -86,10 +86,12 @@ export default function AdminPage() {
   const [activeTab,      setActiveTab]      = useState('analytics');
   const [collapsed,      setCollapsed]      = useState(false);
   const [mobileOpen,     setMobileOpen]     = useState(false);
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
 
   // Close mobile sidebar when tab changes
   const handleTabChange = (key: string) => {
     setActiveTab(key);
+    setActiveBookingId(null);
     setMobileOpen(false);
   };
 
@@ -116,7 +118,6 @@ export default function AdminPage() {
     { key: 'analytics',    label: 'Analytics',      icon: BarChart3          },
     { key: 'services',     label: 'Services',       icon: Wrench             },
     { key: 'portfolio',    label: 'Portfolio',      icon: Images             },
-    { key: 'facebook',     label: 'Facebook',       icon: Facebook           },
     { key: 'content',      label: 'Content',        icon: FileText           },
     { key: 'appointments', label: 'Bookings',       icon: Calendar           },
     { key: 'products',     label: 'Products',       icon: Package            },
@@ -131,9 +132,17 @@ export default function AdminPage() {
       case 'analytics':     return <AnalyticsPanel />;
       case 'services':      return <ServicesPanel />;
       case 'portfolio':     return <PortfolioPanel />;
-      case 'facebook':      return <FacebookPanel />;
       case 'content':       return <ContentPanel />;
-      case 'appointments':  return <BookingsPanel />;
+      case 'appointments':
+        if (activeBookingId) {
+          return (
+            <AdminBookingDetail
+              bookingId={activeBookingId}
+              onBack={() => setActiveBookingId(null)}
+            />
+          );
+        }
+        return <BookingsPanel onView={id => setActiveBookingId(id)} />;
       case 'products':      return <ProductsPanel />;
       case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;

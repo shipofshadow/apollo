@@ -1,96 +1,63 @@
-/**
- * FacebookFeed
- *
- * Renders the official Facebook Page Plugin (iframe embed) instead of
- * the Graph API feed.  This requires no access token and always shows
- * the latest posts exactly as they appear on the Page timeline.
- *
- * The Facebook SDK is loaded lazily (only when the component mounts) so
- * it doesn't block the initial page render.
- */
-import { useEffect, useRef, useState } from 'react';
-import { Facebook } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Loader2, AlertCircle } from 'lucide-react';
+import type { FacebookPost } from '../types';
+import { fetchFacebookPosts } from '../services/api';
 
-const FB_PAGE_URL = 'https://www.facebook.com/1625autolab';
+function getPostUrl(postId: string): string {
+  const parts = postId.split('_');
+  return parts.length === 2
+    ? `https://www.facebook.com/${parts[0]}/posts/${parts[1]}`
+    : `https://www.facebook.com/${postId}`;
+}
 
-/** Facebook Page Plugin accepts widths between 180 and 500 px. */
-const FB_MIN_WIDTH = 180;
-const FB_MAX_WIDTH = 500;
+function getPostImages(post: FacebookPost): string[] {
+  const subattachments = post.attachments?.data?.[0]?.subattachments?.data;
+  if (subattachments && subattachments.length > 0) {
+    return subattachments
+      .map((sub) => sub.media?.image?.src)
+      .filter((src): src is string => Boolean(src));
+  }
+  const single =
+    post.full_picture ?? post.attachments?.data?.[0]?.media?.image?.src ?? null;
+  return single ? [single] : [];
+}
 
-declare global {
-  interface Window {
-    FB?: {
-      XFBML: { parse: () => void };
-      init: (options: Record<string, unknown>) => void;
-    };
-    fbAsyncInit?: () => void;
+function formatDate(isoString: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date(isoString));
+  } catch {
+    return '';
   }
 }
 
 export default function FacebookFeed() {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [pluginWidth, setPluginWidth] = useState(FB_MAX_WIDTH);
-
-  // Keep pluginWidth in sync with the wrapper's actual rendered width.
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-
-    let debounceTimer: ReturnType<typeof setTimeout>;
-
-    const update = (entries?: ResizeObserverEntry[]) => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        const w = entries ? entries[0].contentRect.width : el.clientWidth;
-        const clamped = Math.min(FB_MAX_WIDTH, Math.max(FB_MIN_WIDTH, Math.floor(w)));
-        setPluginWidth((prev) => (prev === clamped ? prev : clamped));
-      }, 100);
-    };
-
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => {
-      clearTimeout(debounceTimer);
-      ro.disconnect();
-    };
-  }, []);
-
-  // Re-parse XFBML whenever the measured width changes so the plugin resizes.
-  useEffect(() => {
-    window.FB?.XFBML.parse();
-  }, [pluginWidth]);
+  const [posts, setPosts] = useState<FacebookPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Re-parse XFBML after the SDK loads so the plugin renders
-    const parsePlugin = () => window.FB?.XFBML.parse();
-
-    if (window.FB) {
-      parsePlugin();
-      return;
-    }
-
-    // Load the SDK once
-    if (!document.getElementById('facebook-jssdk')) {
-      window.fbAsyncInit = () => {
-        window.FB?.init({ xfbml: true, version: 'v19.0' });
-        parsePlugin();
-      };
-      const script = document.createElement('script');
-      script.id = 'facebook-jssdk';
-      script.async = true;
-      script.defer = true;
-      script.crossOrigin = 'anonymous';
-      script.src = 'https://connect.facebook.net/en_US/sdk.js';
-      document.head.appendChild(script);
-    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchFacebookPosts()
+      .then(({ posts: fetched }) => {
+        if (!cancelled) setPosts(fetched);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load posts.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   return (
     <section className="py-24 bg-brand-darker border-t border-gray-800">
-      {/* Facebook root div required by the SDK */}
-      <div id="fb-root" />
-
       <div className="container mx-auto px-4 md:px-6">
         {/* Section header */}
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -103,68 +70,84 @@ export default function FacebookFeed() {
           <div className="w-24 h-1 bg-brand-orange mx-auto mt-6" />
         </div>
 
-        {/* Two-column layout on lg+ screens; stacked on mobile */}
-        <div className="flex flex-col lg:flex-row gap-10 items-start justify-center">
-          {/* Responsive embed wrapper — capped at FB_MAX_WIDTH so the plugin
-              always fills its container up to the SDK's 500 px hard limit. */}
-          <div
-            ref={wrapperRef}
-            className="w-full lg:flex-1"
-            style={{ maxWidth: FB_MAX_WIDTH }}
-          >
-            {/* Facebook Page Plugin */}
-            <div
-              className="fb-page rounded-sm overflow-hidden shadow-2xl border border-gray-800"
-              data-href={FB_PAGE_URL}
-              data-tabs="timeline"
-              data-width={String(pluginWidth)}
-              data-height="900"
-              data-small-header="false"
-              data-adapt-container-width="true"
-              data-hide-cover="false"
-              data-show-facepile="true"
-              data-colorscheme="dark"
-            />
+        {loading && (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
           </div>
+        )}
 
-          {/* Info / CTA panel */}
-          <div className="w-full lg:flex-1 flex flex-col gap-8 lg:pt-4">
-            <div className="space-y-4">
-              <h3 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter">
-                Follow Us on <span className="text-brand-orange">Facebook</span>
-              </h3>
-              <p className="text-gray-400 leading-relaxed">
-                Stay up to date with our latest custom builds, shop updates, and behind-the-scenes content. 
-                Follow our page to never miss a drop from 1625 Auto Lab.
-              </p>
-            </div>
-
-            <ul className="space-y-3 text-gray-300 text-sm">
-              {[
-                'New build reveals & progress shots',
-                'Shop announcements & specials',
-                'Customer ride features',
-                'Event coverage & giveaways',
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-brand-orange flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-
-            {/* CTA link */}
-            <a
-              href={FB_PAGE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-8 py-3 font-bold uppercase tracking-widest text-sm transition-colors rounded-sm self-start"
-            >
-              <Facebook className="w-5 h-5" />
-              View Our Facebook Page
-            </a>
+        {!loading && error && (
+          <div className="flex items-center justify-center gap-3 py-16 text-red-400">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p className="text-sm">{error}</p>
           </div>
-        </div>
+        )}
+
+        {!loading && !error && posts.length === 0 && (
+          <p className="text-center text-gray-500 py-16">No posts available at this time.</p>
+        )}
+
+        {!loading && !error && posts.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {posts.map((post) => {
+              const images = getPostImages(post);
+              const postUrl = getPostUrl(post.id);
+              return (
+                <a
+                  key={post.id}
+                  href={postUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group bg-brand-dark border border-gray-800 rounded-sm overflow-hidden hover:border-brand-orange/50 transition-colors flex flex-col"
+                >
+                  {/* Image */}
+                  {images.length > 0 && (
+                    <div className="relative overflow-hidden aspect-video bg-gray-900">
+                      <img
+                        src={images[0]}
+                        alt=""
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                      {images.length > 1 && (
+                        <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm flex items-center gap-1">
+                          <MoreHorizontal className="w-3 h-3" />
+                          {images.length}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Body */}
+                  <div className="p-4 flex flex-col gap-3 flex-1">
+                    {post.message && (
+                      <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">
+                        {post.message}
+                      </p>
+                    )}
+                    <p className="text-gray-600 text-xs mt-auto">{formatDate(post.created_time)}</p>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-4 pb-4 flex items-center gap-4 text-gray-500 text-xs border-t border-gray-800 pt-3">
+                    <span className="flex items-center gap-1">
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      {post.likes?.summary?.total_count ?? 0}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      {post.comments?.summary?.total_count ?? 0}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Share2 className="w-3.5 h-3.5" />
+                      {post.shares?.count ?? 0}
+                    </span>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

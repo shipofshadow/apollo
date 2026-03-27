@@ -20,6 +20,7 @@ import About from './pages/About';
 import BookingPage from './pages/BookingPage';
 import Blog from './pages/Blog';
 import FaqPage from './pages/Faq';
+import ContactPage from './pages/Contact';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Auth pages
@@ -30,6 +31,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import ClientLayout from './pages/client/ClientLayout';
 import ClientDashboard from './pages/client/ClientDashboard';
 import MyBookings from './pages/client/MyBookings';
+import BookingDetail from './pages/client/BookingDetail';
 import Profile from './pages/client/Profile';
 
 // Admin
@@ -68,6 +70,7 @@ export default function App() {
                 <Route path="/portfolio"    element={<Portfolio />} />
                 <Route path="/blog"         element={<Blog />} />
                 <Route path="/faq"          element={<FaqPage />} />
+                <Route path="/contact"      element={<ContactPage />} />
                 <Route path="/about"        element={<About />} />
                 <Route path="/booking"      element={<BookingPage />} />
                 <Route path="/login"        element={<LoginPage />} />
@@ -84,9 +87,10 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="dashboard" element={<ClientDashboard />} />
-                <Route path="bookings"  element={<MyBookings />} />
-                <Route path="profile"   element={<Profile />} />
+                <Route path="dashboard"     element={<ClientDashboard />} />
+                <Route path="bookings"      element={<MyBookings />} />
+                <Route path="bookings/:id"  element={<BookingDetail />} />
+                <Route path="profile"       element={<Profile />} />
               </Route>
 
               {/* ── Admin — own sidebar, no public nav ──────────────── */}

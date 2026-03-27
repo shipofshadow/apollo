@@ -132,6 +132,13 @@ class SiteSettingsService
             'map_link_url'     => 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899',
             // Booking settings
             'slot_capacity'    => '3',
+            // Contact page settings
+            'contact_heading'  => 'Contact The Lab',
+            'contact_tagline'  => 'Ready to upgrade your ride? Reach out and we\'ll get back to you within 24 hours.',
+            'contact_address'  => "NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000",
+            'contact_phone'    => '0939 330 8263',
+            'contact_email'    => '1625autolab@gmail.com',
+            'contact_hours'    => "Mon–Fri: 9:00 AM – 6:00 PM\nSat: By Appointment Only\nSun: Closed",
         ];
     }
 }

@@ -931,6 +931,135 @@ function FooterSettingsPanel() {
   );
 }
 
+// ── Sub-panel: Contact Page Settings ─────────────────────────────────────────
+
+function ContactPanel() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { token } = useAuth();
+  const { settings, status } = useSelector((s: RootState) => s.siteSettings);
+
+  const [form, setForm] = useState({
+    contact_heading: '',
+    contact_tagline: '',
+    contact_address: '',
+    contact_phone:   '',
+    contact_email:   '',
+    contact_hours:   '',
+  });
+  const [saving,      setSaving]      = useState(false);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => { dispatch(fetchSiteSettingsAsync()); }, [dispatch]);
+
+  useEffect(() => {
+    setForm({
+      contact_heading: settings.contact_heading ?? '',
+      contact_tagline: settings.contact_tagline ?? '',
+      contact_address: settings.contact_address ?? '',
+      contact_phone:   settings.contact_phone   ?? '',
+      contact_email:   settings.contact_email   ?? '',
+      contact_hours:   settings.contact_hours   ?? '',
+    });
+  }, [settings]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true); setSaveError(null); setSaveSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({ token, data: form })).unwrap();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Failed to save settings.');
+    } finally { setSaving(false); }
+  };
+
+  const inputCls = 'w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm text-sm transition-colors';
+
+  return (
+    <div>
+      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide mb-2">Contact Page</h3>
+      <p className="text-gray-500 text-sm mb-6">Edit the content shown on the public /contact page.</p>
+
+      {status === 'loading' && (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-brand-orange animate-spin" /></div>
+      )}
+
+      {status !== 'loading' && (
+        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
+          {saveError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
+            </div>
+          )}
+          {saveSuccess && (
+            <div className="bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" /> Contact page settings saved.
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Page Heading</label>
+            <input value={form.contact_heading}
+              onChange={e => setForm(f => ({ ...f, contact_heading: e.target.value }))}
+              className={inputCls} placeholder="Contact The Lab" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Tagline / Description</label>
+            <textarea rows={3} value={form.contact_tagline}
+              onChange={e => setForm(f => ({ ...f, contact_tagline: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="Short intro shown below the heading" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Address</label>
+            <textarea rows={2} value={form.contact_address}
+              onChange={e => setForm(f => ({ ...f, contact_address: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="Full shop address" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Phone</label>
+              <input value={form.contact_phone}
+                onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))}
+                className={inputCls} placeholder="0939 330 8263" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
+              <input type="email" value={form.contact_email}
+                onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
+                className={inputCls} placeholder="info@example.com" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Business Hours</label>
+            <textarea rows={3} value={form.contact_hours}
+              onChange={e => setForm(f => ({ ...f, contact_hours: e.target.value }))}
+              className={`${inputCls} resize-none`}
+              placeholder="Mon–Fri: 9AM–6PM&#10;Sat: By Appointment&#10;Sun: Closed" />
+            <p className="text-xs text-gray-600">Each line is shown as a separate entry.</p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-800">
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Changes
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 // ── Sub-panel: System Info & Migrations ───────────────────────────────────────
 
 const APP_VERSION = '1.0.0';
@@ -1145,13 +1274,14 @@ function SystemPanel() {
 
 // ── Main SiteSettingsPanel ────────────────────────────────────────────────────
 
-type Tab = 'company' | 'footer' | 'team' | 'testimonials' | 'system';
+type Tab = 'company' | 'contact' | 'footer' | 'team' | 'testimonials' | 'system';
 
 export default function SiteSettingsPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('company');
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'company',      label: 'Company Info',    icon: <Settings className="w-4 h-4" /> },
+    { key: 'contact',      label: 'Contact Page',    icon: <MessageSquare className="w-4 h-4" /> },
     { key: 'footer',       label: 'Footer',          icon: <Layout className="w-4 h-4" /> },
     { key: 'team',         label: 'Team Members',    icon: <Users className="w-4 h-4" /> },
     { key: 'testimonials', label: 'Testimonials',    icon: <MessageSquare className="w-4 h-4" /> },
@@ -1181,6 +1311,7 @@ export default function SiteSettingsPanel() {
       </div>
 
       {activeTab === 'company'      && <CompanyInfoPanel />}
+      {activeTab === 'contact'      && <ContactPanel />}
       {activeTab === 'footer'       && <FooterSettingsPanel />}
       {activeTab === 'team'         && <TeamMembersPanel />}
       {activeTab === 'testimonials' && <TestimonialsPanel />}

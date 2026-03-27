@@ -6,6 +6,9 @@ import {
   fetchAllBookingsApi,
   updateBookingStatusApi,
   cancelMyBookingApi,
+  fetchBookingByIdApi,
+  rescheduleBookingApi,
+  adminRescheduleBookingApi,
   submitBooking as submitBookingMock,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
@@ -76,6 +79,52 @@ export const cancelMyBookingAsync = createAsyncThunk(
       return booking;
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Failed to cancel booking.');
+    }
+  }
+);
+
+export const fetchBookingByIdAsync = createAsyncThunk(
+  'booking/fetchById',
+  async (arg: { token: string; id: string }, { rejectWithValue }) => {
+    try {
+      const { booking } = await fetchBookingByIdApi(arg.token, arg.id);
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to load booking.');
+    }
+  }
+);
+
+export const rescheduleMyBookingAsync = createAsyncThunk(
+  'booking/rescheduleMine',
+  async (
+    arg: { token: string; id: string; appointmentDate: string; appointmentTime: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { booking } = await rescheduleBookingApi(
+        arg.token, arg.id, arg.appointmentDate, arg.appointmentTime
+      );
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to reschedule booking.');
+    }
+  }
+);
+
+export const adminRescheduleBookingAsync = createAsyncThunk(
+  'booking/adminReschedule',
+  async (
+    arg: { token: string; id: string; appointmentDate: string; appointmentTime: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { booking } = await adminRescheduleBookingApi(
+        arg.token, arg.id, arg.appointmentDate, arg.appointmentTime
+      );
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to reschedule booking.');
     }
   }
 );
@@ -156,12 +205,11 @@ const bookingSlice = createSlice({
         state.error  = action.payload as string;
       })
       .addCase(fetchMyBookingsAsync.fulfilled, (state, action) => {
-        // Replace client-owned entries with fresh data from server
-        const fetched = action.payload;
-        const fetchedIds = new Set(fetched.map(b => b.id));
+        // Replace all real bookings with the current user's fresh data.
+        // Keep only mock/demo entries so they can still serve as UI placeholders.
         state.appointments = [
-          ...fetched,
-          ...state.appointments.filter(a => !fetchedIds.has(a.id)),
+          ...action.payload,
+          ...state.appointments.filter(a => a.id.startsWith('mock')),
         ];
       })
       .addCase(fetchAllBookingsAsync.fulfilled, (state, action) => {
@@ -172,6 +220,19 @@ const bookingSlice = createSlice({
         if (idx !== -1) state.appointments[idx] = action.payload;
       })
       .addCase(cancelMyBookingAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+      })
+      .addCase(fetchBookingByIdAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+        else state.appointments.unshift(action.payload);
+      })
+      .addCase(rescheduleMyBookingAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+      })
+      .addCase(adminRescheduleBookingAsync.fulfilled, (state, action) => {
         const idx = state.appointments.findIndex(a => a.id === action.payload.id);
         if (idx !== -1) state.appointments[idx] = action.payload;
       });

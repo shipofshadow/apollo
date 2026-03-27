@@ -256,6 +256,125 @@ class BookingService
         return $this->updateStatus($id, 'cancelled');
     }
 
+    /**
+     * Fetch a single booking by ID, verifying ownership.
+     *
+     * @return array<string, mixed>
+     */
+    public function getById(string $id, int $userId): array
+    {
+        $booking = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if ((int) ($booking['userId'] ?? 0) !== $userId) {
+            throw new RuntimeException('You are not authorized to view this booking.', 403);
+        }
+
+        return $booking;
+    }
+
+    /**
+     * Admin-only reschedule: no ownership check, bypasses client restrictions.
+     * Date must be in YYYY-MM-DD format; time must be non-empty.
+     *
+     * @return array<string, mixed>
+     */
+    public function adminReschedule(string $id, string $date, string $time): array
+    {
+        $booking = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('Invalid date format. Expected YYYY-MM-DD.', 422);
+        }
+        // Use DateTime comparison to avoid any edge-case with string comparison
+        $inputTs = strtotime($date);
+        if ($inputTs === false) {
+            throw new RuntimeException('Invalid date. Expected a valid YYYY-MM-DD date.', 422);
+        }
+        $todayTs = strtotime(date('Y-m-d'));
+        if ($inputTs < $todayTs) {
+            throw new RuntimeException('Appointment date cannot be in the past.', 422);
+        }
+        if (trim($time) === '') {
+            throw new RuntimeException('Appointment time is required.', 422);
+        }
+
+        // Skip availability check if keeping the same slot
+        $sameSlot = ($booking['appointmentDate'] === $date && $booking['appointmentTime'] === $time);
+        if (!$sameSlot && in_array($time, $this->getBookedSlots($date), true)) {
+            throw new RuntimeException(
+                'This time slot is fully booked. Please choose a different time.',
+                409
+            );
+        }
+
+        return $this->useDb
+            ? $this->dbReschedule($id, $date, $time)
+            : $this->fileReschedule($id, $date, $time);
+    }
+
+    /**
+     * Reschedule a booking's appointment date and time (client-only).
+     * Only bookings with status 'pending' or 'confirmed' can be rescheduled.
+     *
+     * @return array<string, mixed>
+     */
+    public function reschedule(string $id, int $userId, string $date, string $time): array
+    {
+        $booking = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if ((int) ($booking['userId'] ?? 0) !== $userId) {
+            throw new RuntimeException('You are not authorized to reschedule this booking.', 403);
+        }
+
+        if (!in_array($booking['status'], ['pending', 'confirmed'], true)) {
+            throw new RuntimeException(
+                'Only pending or confirmed bookings can be rescheduled.',
+                422
+            );
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('Invalid date format. Expected YYYY-MM-DD.', 422);
+        }
+        if ($date < date('Y-m-d')) {
+            throw new RuntimeException('Appointment date cannot be in the past.', 422);
+        }
+        if (trim($time) === '') {
+            throw new RuntimeException('Appointment time is required.', 422);
+        }
+
+        // Check slot availability (skip check if keeping the same slot)
+        $sameSlot = ($booking['appointmentDate'] === $date && $booking['appointmentTime'] === $time);
+        if (!$sameSlot && in_array($time, $this->getBookedSlots($date), true)) {
+            throw new RuntimeException(
+                'This time slot is fully booked. Please choose a different time.',
+                409
+            );
+        }
+
+        return $this->useDb
+            ? $this->dbReschedule($id, $date, $time)
+            : $this->fileReschedule($id, $date, $time);
+    }
+
     // -------------------------------------------------------------------------
     // DB storage
     // -------------------------------------------------------------------------
@@ -366,6 +485,53 @@ class BookingService
             }
         }
         return null;
+    }
+
+    /** @return array<string, mixed> */
+    private function dbReschedule(string $id, string $date, string $time): array
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE bookings SET appointment_date = :date, appointment_time = :time WHERE id = :id'
+        );
+        $stmt->execute([':date' => $date, ':time' => $time, ':id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $row = $db->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
+        $row->execute([':id' => $id]);
+        return $this->mapDbRow($row->fetch());
+    }
+
+    /** @return array<string, mixed> */
+    private function fileReschedule(string $id, string $date, string $time): array
+    {
+        $all   = array_reverse($this->fileGetAll());
+        $found = null;
+
+        foreach ($all as &$b) {
+            if ($b['id'] === $id) {
+                $b['appointmentDate'] = $date;
+                $b['appointmentTime'] = $time;
+                $found                = $b;
+                break;
+            }
+        }
+        unset($b);
+
+        if ($found === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->fileWrite($all);
+        return $found;
     }
 
     /** @return array<string, mixed> */
