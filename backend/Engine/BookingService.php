@@ -299,8 +299,11 @@ class BookingService
         }
         // Use DateTime comparison to avoid any edge-case with string comparison
         $inputTs = strtotime($date);
+        if ($inputTs === false) {
+            throw new RuntimeException('Invalid date. Expected a valid YYYY-MM-DD date.', 422);
+        }
         $todayTs = strtotime(date('Y-m-d'));
-        if ($inputTs === false || $inputTs < $todayTs) {
+        if ($inputTs < $todayTs) {
             throw new RuntimeException('Appointment date cannot be in the past.', 422);
         }
         if (trim($time) === '') {

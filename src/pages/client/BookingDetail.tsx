@@ -84,8 +84,18 @@ function formatDisplayDate(isoDate: string): string {
   }
 }
 
-function todayIso(): string {
-  return new Date().toISOString().split('T')[0];
+function buildRescheduleDateList(shopHours: ShopDayHours[]): Date[] {
+  const openDays = shopHours.length
+    ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
+    : new Set([1, 2, 3, 4, 5, 6]); // Mon–Sat default
+  const dates: Date[] = [];
+  const cursor = new Date();
+  cursor.setDate(cursor.getDate() + 1);
+  while (dates.length < 30) {
+    if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
 }
 
 // ── Reschedule panel ─────────────────────────────────────────────────────────
@@ -101,44 +111,56 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
   const dispatch = useDispatch<AppDispatch>();
   const { showToast } = useToast();
 
-  const [selectedDate, setSelectedDate]         = useState(booking.appointmentDate);
-  const [selectedTime, setSelectedTime]         = useState(booking.appointmentTime);
-  const [availableSlots, setAvailableSlots]     = useState<string[]>([]);
-  const [bookedSlots, setBookedSlots]           = useState<string[]>([]);
-  const [slotsLoading, setSlotsLoading]         = useState(false);
-  const [saveBusy, setSaveBusy]                 = useState(false);
+  const [shopHours,      setShopHours]      = useState<ShopDayHours[]>([]);
+  const [selectedDate,   setSelectedDate]   = useState<Date | null>(null);
+  const [selectedTime,   setSelectedTime]   = useState('');
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [bookedSlots,    setBookedSlots]    = useState<string[]>([]);
+  const [shopDayIsOpen,  setShopDayIsOpen]  = useState(true);
+  const [slotsLoading,   setSlotsLoading]   = useState(false);
+  const [saveBusy,       setSaveBusy]       = useState(false);
 
-  // Load slots whenever date changes
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load shop hours once to build the date list
   useEffect(() => {
-    if (!selectedDate) return;
-    let cancelled = false;
+    fetchShopHoursApi()
+      .then(({ hours }) => setShopHours(hours))
+      .catch(() => {});
+  }, []);
+
+  const availableDates = buildRescheduleDateList(shopHours);
+
+  // Fetch availability whenever a date is selected
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+    setSelectedTime('');
+    setAvailableSlots([]);
+    setBookedSlots([]);
+    setShopDayIsOpen(true);
+    const iso = date.toISOString().split('T')[0];
     setSlotsLoading(true);
-    fetchAvailabilityApi(selectedDate)
+    fetchAvailabilityApi(iso)
       .then(res => {
-        if (cancelled) return;
-        // Exclude already-booked slots except the booking's current slot
+        setShopDayIsOpen(res.isOpen);
+        // Exclude the booking's current slot so it stays selectable
         const booked = res.bookedSlots.filter(
-          s => !(selectedDate === booking.appointmentDate && s === booking.appointmentTime)
+          s => !(iso === booking.appointmentDate && s === booking.appointmentTime)
         );
         setAvailableSlots(res.availableSlots);
         setBookedSlots(booked);
-        // Keep previously selected time if still available, else reset
-        if (booked.includes(selectedTime) && selectedTime !== booking.appointmentTime) {
-          setSelectedTime('');
-        }
       })
-      .catch(() => { /* show all slots */ })
-      .finally(() => { if (!cancelled) setSlotsLoading(false); });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+      .catch(() => {})
+      .finally(() => setSlotsLoading(false));
+  };
 
   const handleSave = async () => {
     if (!selectedDate || !selectedTime) return;
+    const iso = selectedDate.toISOString().split('T')[0];
     setSaveBusy(true);
     try {
       const updated = await dispatch(
-        rescheduleMyBookingAsync({ token, id: booking.id, appointmentDate: selectedDate, appointmentTime: selectedTime })
+        rescheduleMyBookingAsync({ token, id: booking.id, appointmentDate: iso, appointmentTime: selectedTime })
       ).unwrap();
       showToast('Appointment rescheduled successfully.', 'success');
       onSuccess(updated);
@@ -150,6 +172,8 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
   };
 
   const openSlots = availableSlots.filter(s => !bookedSlots.includes(s));
+  const selectedIso = selectedDate?.toISOString().split('T')[0] ?? '';
+  const unchanged   = selectedIso === booking.appointmentDate && selectedTime === booking.appointmentTime;
 
   return (
     <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-5">
@@ -158,58 +182,112 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
         Reschedule Appointment
       </h3>
 
-      {/* Date picker */}
+      {/* Date carousel */}
       <div>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
-          New Date
-        </label>
-        <input
-          type="date"
-          value={selectedDate}
-          min={todayIso()}
-          onChange={e => {
-            setSelectedDate(e.target.value);
-            setSelectedTime('');
-          }}
-          className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2.5 text-sm rounded-sm focus:outline-none focus:border-brand-orange transition-colors"
-        />
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">New Date</p>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => scrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' })}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-brand-darker border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white -translate-x-3.5 shadow"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+
+          <div
+            ref={scrollRef}
+            className="flex overflow-x-auto gap-2 pb-1 snap-x px-1"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {availableDates.map((date, i) => {
+              const active     = selectedDate?.toDateString() === date.toDateString();
+              const isCurrent  = date.toISOString().split('T')[0] === booking.appointmentDate;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleDateSelect(date)}
+                  className={`snap-start shrink-0 w-[72px] p-3 border text-center transition-all rounded-sm relative ${
+                    active
+                      ? 'border-brand-orange bg-brand-orange/10'
+                      : 'border-gray-800 hover:border-gray-600 bg-brand-darker'
+                  }`}
+                >
+                  <div className="text-[10px] text-gray-400 uppercase mb-1">
+                    {date.toLocaleDateString('en-PH', { weekday: 'short' })}
+                  </div>
+                  <div className="text-xl font-display font-bold text-white">{date.getDate()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase mt-1">
+                    {date.toLocaleDateString('en-PH', { month: 'short' })}
+                  </div>
+                  {isCurrent && (
+                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-orange" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-brand-darker border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white translate-x-3.5 shadow"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {selectedDate && (
+          <p className="text-xs text-brand-orange mt-2">
+            {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+          </p>
+        )}
       </div>
 
       {/* Time slots */}
-      <div>
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
-          New Time
-        </label>
-        {slotsLoading ? (
-          <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading availability…
-          </div>
-        ) : openSlots.length === 0 ? (
-          <p className="text-gray-500 text-sm py-2">No available slots for this date. Please choose another day.</p>
-        ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {openSlots.map(slot => (
-              <button
-                key={slot}
-                onClick={() => setSelectedTime(slot)}
-                className={`px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-sm border transition-colors ${
-                  selectedTime === slot
-                    ? 'bg-brand-orange border-brand-orange text-white'
-                    : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-                }`}
-              >
-                {slot}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {selectedDate && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">
+            New Time
+            {slotsLoading && (
+              <span className="ml-2 text-gray-600 normal-case font-normal inline-flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Checking…
+              </span>
+            )}
+          </p>
+          {!slotsLoading && !shopDayIsOpen && (
+            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-sm">
+              The shop is closed on this date. Please choose a different day.
+            </p>
+          )}
+          {!slotsLoading && shopDayIsOpen && openSlots.length === 0 && (
+            <p className="text-gray-500 text-sm py-2">No available slots for this date. Please choose another day.</p>
+          )}
+          {!slotsLoading && shopDayIsOpen && openSlots.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {openSlots.map(slot => (
+                <button
+                  key={slot}
+                  type="button"
+                  onClick={() => setSelectedTime(slot)}
+                  className={`flex flex-col items-center justify-center px-2 py-2.5 rounded-sm border font-bold transition-colors text-sm ${
+                    selectedTime === slot
+                      ? 'bg-brand-orange border-brand-orange text-white'
+                      : 'bg-brand-darker border-gray-700 text-white hover:border-brand-orange hover:text-brand-orange'
+                  }`}
+                >
+                  {slot}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-3 pt-1">
         <button
           onClick={handleSave}
-          disabled={saveBusy || !selectedTime || (selectedDate === booking.appointmentDate && selectedTime === booking.appointmentTime)}
+          disabled={saveBusy || !selectedDate || !selectedTime || unchanged}
           className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm disabled:opacity-50"
         >
           {saveBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -250,7 +328,7 @@ export default function BookingDetail() {
     if (!id || !token) return;
 
     const cached = appointments.find(
-      b => b.id === id && !b.id.startsWith('mock') && user != null && b.userId === user.id
+      b => b.id === id && !b.id.startsWith('mock') && b.userId != null && b.userId === user?.id
     );
     if (cached) {
       setBooking(cached);
@@ -258,7 +336,7 @@ export default function BookingDetail() {
       // Refresh in the background for up-to-date data
       dispatch(fetchBookingByIdAsync({ token, id }))
         .unwrap()
-        .then(updated => { if (user != null && updated.userId === user.id) setBooking(updated); })
+        .then(updated => { if (updated.userId === user?.id) setBooking(updated); })
         .catch(() => {/* use cached */});
       return;
     }
