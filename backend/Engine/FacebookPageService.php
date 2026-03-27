@@ -22,16 +22,30 @@ class FacebookPageService
 
     /**
      * Build the Facebook Login URL the admin should be redirected to.
-     * The state parameter is a CSRF token stored in the PHP session.
+     *
+     * The caller (frontend) is responsible for generating a cryptographically
+     * random state value, storing it locally (e.g. sessionStorage), and
+     * validating it when the callback arrives.  The backend never touches
+     * $_SESSION for OAuth state – authentication is handled by JWT.
+     *
+     * @param string $redirectUri  The frontend URL Facebook redirects back to
+     *                             (must be registered in the Facebook App settings)
+     * @param string $state        Caller-supplied CSRF token (UUIDv4 / hex)
      */
-    public function buildAuthUrl(string $redirectUri): string
+    public function buildAuthUrl(string $redirectUri, string $state): string
     {
         if (FB_APP_ID === '') {
             throw new RuntimeException('FB_APP_ID is not configured.', 500);
         }
-
-        $state = bin2hex(random_bytes(16));
-        $_SESSION['fb_oauth_state'] = $state;
+        if (FB_APP_SECRET === '') {
+            throw new RuntimeException('FB_APP_SECRET is not configured.', 500);
+        }
+        if ($state === '') {
+            throw new RuntimeException('OAuth state is required.', 422);
+        }
+        if (filter_var($redirectUri, FILTER_VALIDATE_URL) === false) {
+            throw new RuntimeException('redirect_uri must be a valid URL.', 422);
+        }
 
         $params = http_build_query([
             'client_id'     => FB_APP_ID,
@@ -45,21 +59,16 @@ class FacebookPageService
     }
 
     /**
-     * Handle the OAuth callback: verify state, exchange the auth code for a
-     * short-lived user token, then upgrade to a long-lived token, and finally
-     * fetch all connected pages to store their Page Access Tokens.
+     * Exchange an auth code for long-lived page tokens and persist them.
+     *
+     * State validation is intentionally omitted here: the frontend validates
+     * the state against its own sessionStorage, and the caller must already be
+     * authenticated as an admin (JWT checked by the router).
      *
      * @return array<int, array<string, mixed>>  List of saved page records
      */
-    public function handleCallback(string $code, string $state, string $redirectUri): array
+    public function handleCallback(string $code, string $redirectUri): array
     {
-        // CSRF check
-        $expected = $_SESSION['fb_oauth_state'] ?? '';
-        unset($_SESSION['fb_oauth_state']);
-        if ($expected === '' || !hash_equals($expected, $state)) {
-            throw new RuntimeException('Invalid OAuth state. Please try again.', 403);
-        }
-
         // Step 1 – exchange auth code → short-lived user token
         $shortToken = $this->exchangeCodeForToken($code, $redirectUri);
 

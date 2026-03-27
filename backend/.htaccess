@@ -12,3 +12,23 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ── Security headers ─────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    # Prevent browsers from MIME-sniffing a response away from the declared
+    # Content-Type.
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Deny framing of this backend by any page (the backend serves only JSON).
+    Header always set X-Frame-Options "DENY"
+
+    # Only send the origin (no path/query) in the Referer header on cross-origin
+    # requests; send nothing when downgrading from HTTPS to HTTP.
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Restrict powerful browser features; none are needed for a JSON API.
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    # Enforce HTTPS for 1 year (uncomment in production behind TLS).
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>

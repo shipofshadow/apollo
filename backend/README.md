@@ -1,55 +1,56 @@
 # 1625 Auto Lab – PHP Backend
 
 A lightweight PHP backend that proxies the **Facebook Graph API** so that the
-page access token is never exposed in the browser.
+page access token is never exposed in the browser, and provides the full
+data API for the admin panel (bookings, services, portfolio, blog, products,
+team members, testimonials, FAQ, site settings, shop hours, vehicle data,
+and Facebook Page management).
 
-Built with **OOP / PDO-style architecture** (inspired by
-[bitress/phploginsystem](https://github.com/bitress/phploginsystem)) and
-managed with **Composer**.
+Built with **OOP / PDO-style architecture** and managed with **Composer**.
 
 ## Endpoints
 
+### Public
+
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/posts` | Return recent Facebook page posts |
 | `GET` | `/health` | Health-check |
+| `GET` | `/api/posts` | Return recent Facebook page posts (cached) |
+| `GET` | `/api/services` | List active services |
+| `GET` | `/api/portfolio` | List active portfolio items |
+| `GET` | `/api/products` | List active products |
+| `GET` | `/api/blog` | List published blog posts |
+| `GET` | `/api/testimonials` | List active testimonials |
+| `GET` | `/api/faq` | List active FAQ items |
+| `GET` | `/api/shop/hours` | Shop opening hours |
+| `GET` | `/api/site-settings` | Public site settings |
+| `GET` | `/api/team-members` | List active team members |
+| `POST` | `/api/bookings` | Create a booking (auth optional) |
+| `GET` | `/api/bookings/availability` | Available appointment slots |
+| `POST` | `/api/auth/register` | Register a client account |
+| `POST` | `/api/auth/login` | Log in and receive a JWT |
 
-### `GET /api/posts`
+### Authenticated admin routes
 
-| Query param | Type | Default | Description |
-|-------------|------|---------|-------------|
-| `limit` | int | `10` | Number of posts to return (1–100) |
-| `after` | string | _(none)_ | Pagination cursor from a previous response's `paging.cursors.after` field |
+All `/api/admin/*` and write routes on resources require an `Authorization: Bearer <token>` header with an admin-role JWT.
 
-**Example response**
-
-```json
-{
-  "data": [
-    {
-      "id": "123456789_987654321",
-      "message": "New build just dropped 🔥",
-      "created_time": "2025-06-01T12:00:00+0000",
-      "full_picture": "https://...",
-      "likes": { "summary": { "total_count": 42 } },
-      "comments": { "summary": { "total_count": 7 } },
-      "shares": { "count": 3 }
-    }
-  ],
-  "paging": {
-    "cursors": {
-      "before": "before_cursor_string",
-      "after": "after_cursor_string"
-    }
-  }
-}
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/stats` | Dashboard statistics |
+| `POST` | `/api/admin/upload` | Upload a media file |
+| `GET/POST` | `/api/admin/migrate` | Run/check DB migrations |
+| `GET` | `/api/admin/fb/auth-url` | Start Facebook OAuth flow |
+| `GET` | `/api/admin/fb/callback` | Exchange Facebook auth code for tokens |
+| `GET` | `/api/admin/fb/pages` | List connected Facebook pages |
+| `DELETE` | `/api/admin/fb/pages/{pageId}` | Disconnect a Facebook page |
+| `POST` | `/api/admin/fb/publish` | Publish a post to a Facebook page |
 
 ## Requirements
 
 - PHP 8.1 or newer
 - Composer 2.x
 - `curl` extension enabled (default in most PHP installations)
+- MySQL / MariaDB 5.7+ (or leave `DB_NAME` empty to run without a database)
 - A web server (Apache with `mod_rewrite`, or Nginx)
 
 ## Setup
@@ -62,7 +63,10 @@ composer install
 
 # 2. Configure environment variables
 cp .env.example .env
-# Edit .env and fill in FB_ACCESS_TOKEN
+# Edit .env and fill in all required values (see table below)
+
+# 3. Run database migrations
+php migrate.php
 ```
 
 ### Apache
@@ -94,15 +98,55 @@ location ~ \.php$ {
 php -S localhost:8000
 ```
 
-The API will be available at <http://localhost:8000>.
-
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `FB_ACCESS_TOKEN` | ✅ | — | Facebook page access token |
+| **Facebook feed** | | | |
+| `FB_ACCESS_TOKEN` | ✅ | — | Static page access token for `/api/posts` |
+| `CACHE_TTL_SECONDS` | ❌ | `60` | Seconds to cache first-page `/api/posts` results |
+| **Facebook Page management (admin OAuth)** | | | |
+| `FB_APP_ID` | ✅ (for Connect Page) | — | Facebook App ID |
+| `FB_APP_SECRET` | ✅ (for Connect Page) | — | Facebook App Secret – **keep private** |
+| **Database** | | | |
+| `DB_HOST` | ❌ | `localhost` | MySQL host |
+| `DB_PORT` | ❌ | `3306` | MySQL port |
+| `DB_NAME` | ✅ | — | Database name (leave empty to skip DB) |
+| `DB_USER` | ❌ | `root` | Database user |
+| `DB_PASS` | ❌ | _(empty)_ | Database password |
+| `DB_CHARSET` | ❌ | `utf8mb4` | Database charset |
+| **Authentication** | | | |
+| `JWT_SECRET` | ✅ | — | Long random string used to sign JWTs – **keep private** |
+| `JWT_ALGORITHM` | ❌ | `HS256` | JWT algorithm (`HS256`, `HS384`, `HS512`) |
+| `JWT_TTL` | ❌ | `3600` | JWT lifetime in seconds |
+| **CORS** | | | |
 | `CORS_ORIGINS` | ❌ | `http://localhost:5173,http://localhost:4173` | Comma-separated allowed origins |
-| `CACHE_TTL_SECONDS` | ❌ | `60` | Seconds to cache first-page `/api/posts` results in memory |
+| **Email** | | | |
+| `MAIL_FROM` | ❌ | _(empty)_ | From address for transactional emails |
+| `MAIL_FROM_NAME` | ❌ | `1625 Auto Lab` | From display name |
+| `MAIL_ADMIN` | ❌ | _(empty)_ | Admin notification recipient |
+| **Vehicle data (CarAPI)** | | | |
+| `CARAPI_TOKEN` | ✅ (for vehicle lookup) | — | CarAPI token |
+| `CARAPI_SECRET` | ✅ (for vehicle lookup) | — | CarAPI secret |
+| `CARAPI_MAKES_TTL` | ❌ | `86400` | Cache TTL for vehicle makes (seconds) |
+| `CARAPI_MODELS_TTL` | ❌ | `43200` | Cache TTL for vehicle models (seconds) |
+| **Media uploads** | | | |
+| `UPLOAD_MAX_MB` | ❌ | `10` | Max upload size in MB |
+| `UPLOAD_BASE_URL` | ❌ | _(empty)_ | Public base URL for local uploads |
+| **Cloudflare R2 (optional)** | | | |
+| `R2_ACCOUNT_ID` | ❌ | _(empty)_ | Cloudflare account ID (enables R2 uploads) |
+| `R2_ACCESS_KEY_ID` | ❌ | _(empty)_ | R2 API token key |
+| `R2_SECRET_ACCESS_KEY` | ❌ | _(empty)_ | R2 API token secret – **keep private** |
+| `R2_BUCKET_NAME` | ❌ | `chopaeng` | R2 bucket name |
+| `R2_KEY_PREFIX` | ❌ | `chopaeng/1625autolab` | Object-key prefix |
+| `R2_PUBLIC_URL` | ❌ | _(empty)_ | Public base URL for R2 files |
+
+### Frontend env vars (see `../.env.example`)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `VITE_BACKEND_URL` | ❌ | `http://localhost:8000` | Backend API URL |
+| `VITE_FB_REDIRECT_URI` | ✅ (for Connect Page) | `<origin>/admin` | Facebook OAuth redirect URI – must be registered in your Facebook App |
 
 ## Project Structure
 
@@ -111,44 +155,34 @@ backend/
 ├── composer.json           # Composer manifest
 ├── composer.lock           # Locked dependency versions
 ├── index.php               # Thin entry point
-├── .htaccess               # Apache mod_rewrite catch-all
+├── migrate.php             # CLI migration runner
+├── .htaccess               # Apache mod_rewrite catch-all + security headers
 ├── .env.example            # Environment variable template
 ├── config/
 │   ├── Configuration.php   # Application constants (sourced from .env)
 │   └── init.php            # Bootstrap: autoload → Dotenv → CORS → Session → DB
 ├── db/
-│   └── Database.php        # PDO singleton (mirrors bitress/phploginsystem)
+│   └── Database.php        # PDO singleton
+├── migrations/             # SQL migration files (run in order)
 └── Engine/
-    ├── Cache.php           # TTL cache (APCu when available, file fallback)
-    ├── Cors.php            # CORS header handling
-    ├── FacebookService.php # Facebook Graph API client (Guzzle)
-    ├── Router.php          # Request router (FastRoute)
-    └── Session.php         # Secure session manager
+    ├── Auth.php             # Argon2id passwords, JWT issuance/verification, blocklist
+    ├── Cache.php            # TTL cache (APCu when available, file fallback)
+    ├── Cors.php             # CORS header handling
+    ├── FacebookPageService.php # Facebook OAuth flow + page token management
+    ├── FacebookService.php  # Facebook Graph API feed client
+    ├── Router.php           # Request router (FastRoute)
+    ├── Session.php          # Secure session manager
+    └── ...                  # Service classes for each resource
 ```
 
-## Composer Dependencies
+## Security Notes
 
-| Package | Purpose |
-|---------|---------|
-| `vlucas/phpdotenv` | Loads `.env` files into `$_ENV` |
-| `guzzlehttp/guzzle` | HTTP client for Facebook Graph API requests |
-| `nikic/fast-route` | Lightweight request router |
-
-## Architecture Highlights
-
-- **OOP structure** – every concern lives in its own class; `index.php` is a
-  4-line entry point.
-- **Composer autoload** – classmap autoloading for `app/` classes; no manual
-  `require` calls needed.
-- **vlucas/phpdotenv** – safe `.env` loading; existing environment variables
-  are never overwritten.
-- **Guzzle HTTP client** – handles connection timeouts (504) and connectivity
-  errors (503) with typed exceptions.
-- **FastRoute dispatcher** – zero-overhead routing with proper 404/405
-  responses.
-- **In-memory TTL cache** – uses APCu when available, falls back to serialised
-  temp files. First-page `/api/posts` responses are cached for
-  `CACHE_TTL_SECONDS` seconds. Paginated requests (with `after`) bypass the cache.
-- **CORS** – configurable via `CORS_ORIGINS`; handles `OPTIONS` preflight.
-
-
+- **Passwords** are hashed with **Argon2id** (PHP `PASSWORD_ARGON2ID`).
+- **JWTs** are signed with `JWT_SECRET`; use a minimum 32-character random string.
+- **Token revocation** – logout invalidates tokens via a SHA-256 hash in `token_blocklist`.
+- **SQL injection** – all queries use PDO prepared statements with bound parameters.
+- **CORS** – only origins listed in `CORS_ORIGINS` receive `Access-Control-Allow-Origin`.
+- **Facebook OAuth** – state is generated by the frontend (`crypto.randomUUID()`), stored in `sessionStorage`, and validated on return to prevent CSRF. The backend callback endpoint requires a valid admin JWT.
+- **`FB_APP_SECRET`** and **`JWT_SECRET`** must never be committed or logged.
+- **Security headers** – `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy` are emitted by `.htaccess`. Enable `Strict-Transport-Security` in production.
+- **HSTS** – uncomment the `Strict-Transport-Security` line in `.htaccess` when deployed behind TLS.

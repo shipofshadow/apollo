@@ -7,6 +7,7 @@ import { useDispatch } from 'react-redux';
 import { useAuth } from '../../context/AuthContext';
 import {
   fetchFbAuthUrlApi,
+  exchangeFbCallbackApi,
   fetchFbPagesApi,
   deleteFbPageApi,
   publishFbPostApi,
@@ -14,13 +15,15 @@ import {
 import { addPortfolioItem } from '../../store/portfolioSlice';
 import type { AppDispatch } from '../../store';
 import type { FacebookPage } from '../../types';
-import { BACKEND_URL } from '../../config';
+import { FB_REDIRECT_URI } from '../../config';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-/** Build the callback URL the Facebook OAuth dialog will redirect back to. */
-function callbackUrl(): string {
-  return `${BACKEND_URL}/api/admin/fb/callback`;
+const FB_STATE_KEY = 'fb_oauth_state';
+
+/** Generate a cryptographically random state token for OAuth CSRF protection. */
+function generateState(): string {
+  return crypto.randomUUID();
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -120,25 +123,26 @@ export default function FacebookPanel() {
     try {
       const { pages: list } = await fetchFbPagesApi(token);
       setPages(list);
-      if (list.length > 0 && selectedPageId === '') {
-        setSelectedPageId(list[0].pageId);
-      }
+      // Auto-select the first page only when nothing is selected yet.
+      // selectedPageId is intentionally excluded from deps so this callback
+      // stays stable; reading stale state here is safe (only sets if empty).
+      setSelectedPageId(prev => (prev === '' && list.length > 0 ? list[0].pageId : prev));
     } catch (e: unknown) {
       setPagesError((e as Error).message ?? 'Failed to load pages.');
     } finally {
       setPagesLoading(false);
     }
-  }, [token, selectedPageId]);
+  }, [token]);
 
   useEffect(() => {
     void loadPages();
-    // loadPages is stable (memoized with useCallback on token); re-run only when token changes.
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadPages]);
 
   // ── OAuth callback redirect ─────────────────────────────────────────────────
-  // This effect runs once on mount to detect a Facebook OAuth redirect
-  // (?code=…&state=…). After consuming the params the URL is cleaned so a
-  // refresh does not re-trigger the flow.
+  // Detects a Facebook OAuth redirect (?code=…&state=…) on mount.
+  // The URL is cleaned immediately so a refresh does not re-trigger the flow.
+  // Including `token` and `loadPages` in deps handles the edge-case where the
+  // component mounts before the auth token is available in the store.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code   = params.get('code');
@@ -148,20 +152,22 @@ export default function FacebookPanel() {
     // Clean the URL so a refresh doesn't re-trigger the flow
     window.history.replaceState({}, '', window.location.pathname);
 
-    const redirectUri = callbackUrl();
-    const url = `${BACKEND_URL}/api/admin/fb/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    // Validate the state against what we stored in sessionStorage to prevent
+    // CSRF / open-redirect attacks.
+    const savedState = sessionStorage.getItem(FB_STATE_KEY);
+    sessionStorage.removeItem(FB_STATE_KEY);
+    if (!savedState || savedState !== state) {
+      setConnectErr('OAuth state mismatch. Please try again.');
+      return;
+    }
 
     setConnecting(true);
     setConnectErr(null);
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        if (data.detail) throw new Error(data.detail);
-        void loadPages();
-      })
+    exchangeFbCallbackApi(token, code, FB_REDIRECT_URI)
+      .then(() => loadPages())
       .catch((e: unknown) => setConnectErr((e as Error).message ?? 'OAuth callback failed.'))
       .finally(() => setConnecting(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, loadPages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── connect page ────────────────────────────────────────────────────────────
   const handleConnect = async () => {
@@ -169,10 +175,14 @@ export default function FacebookPanel() {
     setConnecting(true);
     setConnectErr(null);
     try {
-      const redirectUri = callbackUrl();
-      const { url } = await fetchFbAuthUrlApi(token, redirectUri);
+      // Generate a random state, store it so we can validate it on return
+      const state = generateState();
+      sessionStorage.setItem(FB_STATE_KEY, state);
+
+      const { url } = await fetchFbAuthUrlApi(token, FB_REDIRECT_URI, state);
       window.location.href = url;
     } catch (e: unknown) {
+      sessionStorage.removeItem(FB_STATE_KEY);
       setConnectErr((e as Error).message ?? 'Could not start Facebook Login.');
       setConnecting(false);
     }

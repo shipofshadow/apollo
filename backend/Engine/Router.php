@@ -1031,30 +1031,36 @@ class Router
     {
         $this->requireAuth('admin');
         $redirectUri = trim((string) ($_GET['redirect_uri'] ?? ''));
+        $state       = trim((string) ($_GET['state']        ?? ''));
         if ($redirectUri === '') {
             throw new RuntimeException('redirect_uri query parameter is required.', 422);
         }
-        $url = (new FacebookPageService())->buildAuthUrl($redirectUri);
+        if ($state === '') {
+            throw new RuntimeException('state query parameter is required.', 422);
+        }
+        $url = (new FacebookPageService())->buildAuthUrl($redirectUri, $state);
         echo json_encode(['url' => $url]);
     }
 
     /** @param array<string, string> $vars */
     private function handleFbCallback(array $vars = []): void
     {
-        // Callback is browser-initiated (no Bearer token), but we still want
-        // it gated – state CSRF check inside the service handles this.
+        // The frontend validates the CSRF state (via sessionStorage) before
+        // calling this endpoint. JWT authentication ensures only an admin can
+        // exchange the code for page tokens.
+        $this->requireAuth('admin');
+
         $code        = trim((string) ($_GET['code']         ?? ''));
-        $state       = trim((string) ($_GET['state']        ?? ''));
         $redirectUri = trim((string) ($_GET['redirect_uri'] ?? ''));
 
-        if ($code === '' || $state === '') {
-            throw new RuntimeException('Missing code or state parameter.', 422);
+        if ($code === '') {
+            throw new RuntimeException('Missing code parameter.', 422);
         }
         if ($redirectUri === '') {
             throw new RuntimeException('redirect_uri query parameter is required.', 422);
         }
 
-        $pages = (new FacebookPageService())->handleCallback($code, $state, $redirectUri);
+        $pages = (new FacebookPageService())->handleCallback($code, $redirectUri);
         // Strip page_access_token from the public response
         $safe = array_map(static function (array $p): array {
             unset($p['pageAccessToken']);

@@ -513,9 +513,16 @@ export const fetchFacebookPosts = async (after?: string): Promise<FacebookPostsP
 
 // ── Facebook Page management (admin) ─────────────────────────────────────────
 
-export const fetchFbAuthUrlApi = (token: string, redirectUri: string) =>
+export const fetchFbAuthUrlApi = (token: string, redirectUri: string, state: string) =>
   apiFetch<{ url: string }>(
-    `/api/admin/fb/auth-url?redirect_uri=${encodeURIComponent(redirectUri)}`,
+    `/api/admin/fb/auth-url?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`,
+    {},
+    token
+  );
+
+export const exchangeFbCallbackApi = (token: string, code: string, redirectUri: string) =>
+  apiFetch<{ pages: FacebookPage[] }>(
+    `/api/admin/fb/callback?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`,
     {},
     token
   );
