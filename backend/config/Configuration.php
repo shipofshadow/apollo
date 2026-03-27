@@ -12,13 +12,20 @@ define('FB_GRAPH_BASE', 'https://graph.facebook.com/v25.0');
 define(
     'FB_POST_FIELDS',
     'id,message,created_time,full_picture,'
-    . 'attachments{description,media,url,subattachments},'
+    . 'attachments{type,description,media,url,subattachments{type,media,url,description}},'
     . 'likes.summary(true).limit(0),'
     . 'comments.summary(true).limit(0),'
     . 'shares'
 );
 
 define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN'] ?? '');
+
+// ---------------------------------------------------------------------------
+// Facebook App credentials – required for OAuth token exchange
+// ---------------------------------------------------------------------------
+
+define('FB_APP_ID',     $_ENV['FB_APP_ID']     ?? '');
+define('FB_APP_SECRET', $_ENV['FB_APP_SECRET'] ?? '');
 
 define('CACHE_TTL_SECONDS', (int)($_ENV['CACHE_TTL_SECONDS'] ?? 60));
 

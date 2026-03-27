@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 import type { PortfolioItem, PortfolioState } from '../types';
 import {
   fetchPortfolioApi,
@@ -79,6 +80,10 @@ const portfolioSlice = createSlice({
       state.status = 'idle';
       state.error  = null;
     },
+    /** Push an already-created item into the store without an API round-trip. */
+    addPortfolioItem: (state, action: PayloadAction<PortfolioItem>) => {
+      state.items.push(action.payload);
+    },
   },
   extraReducers: (builder) => {
     // fetchAll
@@ -144,5 +149,5 @@ const portfolioSlice = createSlice({
   },
 });
 
-export const { resetPortfolioStatus } = portfolioSlice.actions;
+export const { resetPortfolioStatus, addPortfolioItem } = portfolioSlice.actions;
 export default portfolioSlice.reducer;
