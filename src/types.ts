@@ -288,34 +288,4 @@ export interface FaqState {
   error: string | null;
 }
 
-// ── Facebook Page Management ──────────────────────────────────────────────────
-
-export interface FacebookPage {
-  id: number;
-  pageId: string;
-  pageName: string;
-  tokenValid: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface FbPublishPayload {
-  pageId: string;
-  message: string;
-  /** Optional ✔ checkmark features appended to the post body */
-  features?: string[];
-  /** Optional call-to-action line appended after features (e.g. "Planning to upgrade?") */
-  callToAction?: string;
-  /** Optional contact/location footer appended at the end of the post */
-  contactFooter?: string;
-  /** When true, also saves the post as a portfolio item */
-  isPortfolio?: boolean;
-  /** Required when isPortfolio is true */
-  portfolioTitle?: string;
-  portfolioCategory?: string;
-  /** Explicit portfolio cover image URL; falls back to first imageUrl when omitted */
-  portfolioImageUrl?: string;
-  /** Public image URLs to attach to the Facebook post (max 10) */
-  imageUrls?: string[];
-}
 

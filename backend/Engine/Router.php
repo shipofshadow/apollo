@@ -100,13 +100,6 @@ class Router
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
 
-            // ── Facebook Page management (admin only) ────────────────────────
-            $r->addRoute('GET',    '/api/admin/fb/auth-url',            'handleFbAuthUrl');
-            $r->addRoute('GET',    '/api/admin/fb/callback',            'handleFbCallback');
-            $r->addRoute('GET',    '/api/admin/fb/pages',               'handleFbPageList');
-            $r->addRoute('DELETE', '/api/admin/fb/pages/{pageId}',      'handleFbPageDelete');
-            $r->addRoute('POST',   '/api/admin/fb/publish',             'handleFbPublish');
-
             // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
             $r->addRoute('GET', '/api/vehicles/models', 'handleVehicleModels');
@@ -608,7 +601,7 @@ class Router
     {
         $this->requireAuth('admin');
 
-        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio', 'facebook'];
+        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio'];
         $type = $_POST['type'] ?? '';
         if (!in_array($type, $allowed_types, true)) {
             throw new RuntimeException('Invalid upload type. Must be one of: ' . implode(', ', $allowed_types) . '.', 422);
@@ -1020,165 +1013,6 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new FaqService())->delete($id);
         echo json_encode(['message' => 'FAQ deleted.']);
-    }
-
-    // -------------------------------------------------------------------------
-    // Facebook Page management handlers
-    // -------------------------------------------------------------------------
-
-    /** @param array<string, string> $vars */
-    private function handleFbAuthUrl(array $vars = []): void
-    {
-        $this->requireAuth('admin');
-        $redirectUri = trim((string) ($_GET['redirect_uri'] ?? ''));
-        $state       = trim((string) ($_GET['state']        ?? ''));
-        if ($redirectUri === '') {
-            throw new RuntimeException('redirect_uri query parameter is required.', 422);
-        }
-        if ($state === '') {
-            throw new RuntimeException('state query parameter is required.', 422);
-        }
-        $url = (new FacebookPageService())->buildAuthUrl($redirectUri, $state);
-        echo json_encode(['url' => $url]);
-    }
-
-    /** @param array<string, string> $vars */
-    private function handleFbCallback(array $vars = []): void
-    {
-        // The frontend validates the CSRF state (via sessionStorage) before
-        // calling this endpoint. JWT authentication ensures only an admin can
-        // exchange the code for page tokens.
-        $this->requireAuth('admin');
-
-        $code        = trim((string) ($_GET['code']         ?? ''));
-        $redirectUri = trim((string) ($_GET['redirect_uri'] ?? ''));
-
-        if ($code === '') {
-            throw new RuntimeException('Missing code parameter.', 422);
-        }
-        if ($redirectUri === '') {
-            throw new RuntimeException('redirect_uri query parameter is required.', 422);
-        }
-
-        $pages = (new FacebookPageService())->handleCallback($code, $redirectUri);
-        // Strip page_access_token from the public response
-        $safe = array_map(static function (array $p): array {
-            unset($p['pageAccessToken']);
-            return $p;
-        }, $pages);
-        echo json_encode(['pages' => array_values($safe)]);
-    }
-
-    /** @param array<string, string> $vars */
-    private function handleFbPageList(array $vars = []): void
-    {
-        $this->requireAuth('admin');
-        $pages = (new FacebookPageService())->listPages();
-        // Strip page_access_token from the API response
-        $safe = array_map(static function (array $p): array {
-            unset($p['pageAccessToken']);
-            return $p;
-        }, $pages);
-        echo json_encode(['pages' => array_values($safe)]);
-    }
-
-    /** @param array<string, string> $vars */
-    private function handleFbPageDelete(array $vars = []): void
-    {
-        $this->requireAuth('admin');
-        $pageId = $vars['pageId'] ?? '';
-        (new FacebookPageService())->deletePage($pageId);
-        echo json_encode(['message' => 'Facebook page disconnected.']);
-    }
-
-    /** @param array<string, string> $vars */
-    private function handleFbPublish(array $vars = []): void
-    {
-        $this->requireAuth('admin');
-        $data          = $this->jsonBody();
-        $pageId        = trim((string) ($data['pageId']        ?? ''));
-        $message       = trim((string) ($data['message']       ?? ''));
-        $features      = is_array($data['features'] ?? null) ? $data['features'] : [];
-        $callToAction  = trim((string) ($data['callToAction']  ?? ''));
-        $contactFooter = trim((string) ($data['contactFooter'] ?? ''));
-        $isPortfolio   = (bool) ($data['isPortfolio'] ?? false);
-        $imageUrls     = $this->sanitizeImageUrls($data['imageUrls'] ?? null);
-
-        if ($pageId === '') {
-            throw new RuntimeException('pageId is required.', 422);
-        }
-        if ($message === '') {
-            throw new RuntimeException('message is required.', 422);
-        }
-
-        // Publish to Facebook (with optional image attachments and formatting fields)
-        $postId = (new FacebookPageService())->publishPost(
-            $pageId, $message, $features, $isPortfolio, $imageUrls, $callToAction, $contactFooter
-        );
-
-        // When marked as a portfolio post, also save it to the portfolio table
-        $portfolioItem = null;
-        if ($isPortfolio) {
-            $title    = trim((string) ($data['portfolioTitle']    ?? ''));
-            $category = trim((string) ($data['portfolioCategory'] ?? ''));
-            // Prefer the first attached image URL as the portfolio image when no
-            // explicit portfolioImageUrl is provided.
-            $imageUrl = trim((string) ($data['portfolioImageUrl'] ?? ''));
-            if ($imageUrl === '' && !empty($imageUrls)) {
-                $imageUrl = $imageUrls[0];
-            }
-
-            if ($title === '') {
-                throw new RuntimeException('portfolioTitle is required when isPortfolio is true.', 422);
-            }
-
-            // Build description: message + ✔ checkmark features (same style as the Facebook post)
-            $description = $message;
-            $cleanFeatures = array_values(array_filter(
-                array_map('trim', $features),
-                fn ($f) => $f !== ''
-            ));
-            if (!empty($cleanFeatures)) {
-                $description .= "\n\n" . implode("\n", array_map(fn ($f) => '✔ ' . $f, $cleanFeatures));
-            }
-
-            $portfolioItem = (new PortfolioService())->create([
-                'title'       => $title,
-                'category'    => $category,
-                'description' => $description,
-                'imageUrl'    => $imageUrl,
-                'sortOrder'   => 0,
-                'isActive'    => true,
-            ]);
-        }
-
-        echo json_encode([
-            'postId'        => $postId,
-            'portfolioItem' => $portfolioItem,
-        ]);
-    }
-
-    /**
-     * Validate and normalise an array of image URLs supplied in a request body.
-     * Strips blank entries, validates each as a URL, and caps the list at 10
-     * (Facebook's attached_media hard limit).
-     *
-     * @param  mixed $raw  The raw value from the decoded JSON body
-     * @return string[]    Validated, trimmed URLs
-     */
-    private function sanitizeImageUrls(mixed $raw): array
-    {
-        if (!is_array($raw)) {
-            return [];
-        }
-        return array_values(array_filter(
-            array_slice(
-                array_map(fn ($u) => trim((string) $u), $raw),
-                0,
-                10
-            ),
-            fn ($u) => $u !== '' && filter_var($u, FILTER_VALIDATE_URL) !== false
-        ));
     }
 }
 

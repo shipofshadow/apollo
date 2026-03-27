@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Images,
-  Menu, X, ChevronLeft, ChevronRight, Facebook,
+  Menu, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +17,6 @@ import ShopHoursPanel      from './admin/ShopHoursPanel';
 import SiteSettingsPanel   from './admin/SiteSettingsPanel';
 import FaqPanel            from './admin/FaqPanel';
 import PortfolioPanel      from './admin/PortfolioPanel';
-import FacebookPanel       from './admin/FacebookPanel';
 
 // ── Admin login screen ────────────────────────────────────────────────────────
 function AdminLogin() {
@@ -116,7 +115,6 @@ export default function AdminPage() {
     { key: 'analytics',    label: 'Analytics',      icon: BarChart3          },
     { key: 'services',     label: 'Services',       icon: Wrench             },
     { key: 'portfolio',    label: 'Portfolio',      icon: Images             },
-    { key: 'facebook',     label: 'Facebook',       icon: Facebook           },
     { key: 'content',      label: 'Content',        icon: FileText           },
     { key: 'appointments', label: 'Bookings',       icon: Calendar           },
     { key: 'products',     label: 'Products',       icon: Package            },
@@ -131,7 +129,6 @@ export default function AdminPage() {
       case 'analytics':     return <AnalyticsPanel />;
       case 'services':      return <ServicesPanel />;
       case 'portfolio':     return <PortfolioPanel />;
-      case 'facebook':      return <FacebookPanel />;
       case 'content':       return <ContentPanel />;
       case 'appointments':  return <BookingsPanel />;
       case 'products':      return <ProductsPanel />;
