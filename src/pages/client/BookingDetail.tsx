@@ -263,7 +263,7 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
             <p className="text-gray-500 text-sm py-2">No available slots for this date. Please choose another day.</p>
           )}
           {!slotsLoading && shopDayIsOpen && openSlots.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {openSlots.map(slot => (
                 <button
                   key={slot}
