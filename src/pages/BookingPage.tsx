@@ -424,7 +424,7 @@ export default function BookingPage() {
                         <p className="text-xs text-gray-600 mb-3">
                           Closes at {shopCloseTime} · Slots that won't fit your job duration are hidden.
                         </p>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                           {visibleSlots.length === 0 && (
                             <p className="col-span-full text-sm text-gray-500 py-2">No available slots for this date.</p>
                           )}
