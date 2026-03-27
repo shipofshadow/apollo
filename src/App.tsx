@@ -30,6 +30,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import ClientLayout from './pages/client/ClientLayout';
 import ClientDashboard from './pages/client/ClientDashboard';
 import MyBookings from './pages/client/MyBookings';
+import BookingDetail from './pages/client/BookingDetail';
 import Profile from './pages/client/Profile';
 
 // Admin
@@ -84,9 +85,10 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="dashboard" element={<ClientDashboard />} />
-                <Route path="bookings"  element={<MyBookings />} />
-                <Route path="profile"   element={<Profile />} />
+                <Route path="dashboard"     element={<ClientDashboard />} />
+                <Route path="bookings"      element={<MyBookings />} />
+                <Route path="bookings/:id"  element={<BookingDetail />} />
+                <Route path="profile"       element={<Profile />} />
               </Route>
 
               {/* ── Admin — own sidebar, no public nav ──────────────── */}

@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Calendar, Loader2, PlusCircle, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
-import { fetchMyBookingsAsync, cancelMyBookingAsync } from '../../store/bookingSlice';
+import { Calendar, Loader2, PlusCircle, ChevronRight } from 'lucide-react';
+import { fetchMyBookingsAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 
 type Filter = 'all' | Booking['status'];
@@ -31,12 +30,8 @@ export default function MyBookings() {
   const dispatch               = useDispatch<AppDispatch>();
   const { token }              = useAuth();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
-  const { showToast }          = useToast();
 
-  const [filter,        setFilter]        = useState<Filter>('all');
-  const [expanded,      setExpanded]      = useState<string | null>(null);
-  const [cancelTarget,  setCancelTarget]  = useState<string | null>(null);
-  const [cancelBusy,    setCancelBusy]    = useState(false);
+  const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
     if (token) dispatch(fetchMyBookingsAsync(token));
@@ -56,20 +51,6 @@ export default function MyBookings() {
     { key: 'completed',      label: 'Completed' },
     { key: 'cancelled',      label: 'Cancelled' },
   ];
-
-  const handleCancelConfirm = async () => {
-    if (!token || !cancelTarget) return;
-    setCancelBusy(true);
-    try {
-      await dispatch(cancelMyBookingAsync({ token, id: cancelTarget })).unwrap();
-      showToast('Booking cancelled successfully.', 'success');
-    } catch (e: unknown) {
-      showToast((e as Error).message ?? 'Failed to cancel booking.', 'error');
-    } finally {
-      setCancelBusy(false);
-      setCancelTarget(null);
-    }
-  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -137,115 +118,43 @@ export default function MyBookings() {
         </div>
       )}
 
-      {/* Booking cards */}
+      {/* Booking cards — each is a link to the detail page */}
       {filtered.length > 0 && (
         <div className="space-y-2">
           {filtered.map(b => (
-            <div key={b.id} className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-              {/* Card header */}
-              <button
-                onClick={() => setExpanded(expanded === b.id ? null : b.id)}
-                className="w-full flex items-center justify-between p-4 md:p-5 text-left hover:bg-gray-900/30 transition-colors"
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  {/* Status strip */}
-                  <div className={`shrink-0 w-1 self-stretch rounded-full ${STATUS_STRIP[b.status]}`} />
-                  {/* Date badge */}
-                  <div className="shrink-0 w-10 h-10 bg-brand-darker border border-gray-800 rounded-sm flex flex-col items-center justify-center">
-                    <span className="text-white text-xs font-black leading-none">
-                      {b.appointmentDate.split('-')[2]}
-                    </span>
-                    <span className="text-gray-500 text-[9px] uppercase leading-none mt-0.5">
-                      {new Date(b.appointmentDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short' })}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-white font-bold text-sm truncate">{b.serviceName}</p>
-                    <p className="text-gray-500 text-xs truncate">{b.appointmentTime} · {b.vehicleInfo}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0 ml-4">
-                  <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
-                    {formatStatus(b.status)}
+            <Link
+              key={b.id}
+              to={`/client/bookings/${b.id}`}
+              className="group bg-brand-dark border border-gray-800 rounded-sm overflow-hidden hover:border-gray-700 transition-colors flex items-center"
+            >
+              {/* Status strip */}
+              <div className={`shrink-0 w-1 self-stretch ${STATUS_STRIP[b.status]}`} />
+
+              <div className="flex items-center gap-4 min-w-0 flex-1 p-4 md:p-5">
+                {/* Date badge */}
+                <div className="shrink-0 w-10 h-10 bg-brand-darker border border-gray-800 rounded-sm flex flex-col items-center justify-center">
+                  <span className="text-white text-xs font-black leading-none">
+                    {b.appointmentDate.split('-')[2]}
                   </span>
-                  {expanded === b.id
-                    ? <ChevronUp className="w-4 h-4 text-gray-600" />
-                    : <ChevronDown className="w-4 h-4 text-gray-600" />}
+                  <span className="text-gray-500 text-[9px] uppercase leading-none mt-0.5">
+                    {new Date(b.appointmentDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short' })}
+                  </span>
                 </div>
-              </button>
 
-              {/* Expanded details */}
-              {expanded === b.id && (
-                <div className="border-t border-gray-800 bg-brand-darker/40 px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-                  {[
-                    { label: 'Name',    value: b.name },
-                    { label: 'Email',   value: b.email },
-                    { label: 'Phone',   value: b.phone },
-                    { label: 'Vehicle', value: b.vehicleInfo },
-                    { label: 'Time',    value: `${b.appointmentDate} · ${b.appointmentTime}` },
-                    ...(b.notes ? [{ label: 'Notes', value: b.notes }] : []),
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600 block mb-0.5">{label}</span>
-                      <span className="text-gray-300 text-xs">{value}</span>
-                    </div>
-                  ))}
-                  {b.status === 'awaiting_parts' && b.partsNotes && (
-                    <div className="col-span-2 sm:col-span-3 bg-purple-500/5 border border-purple-500/20 rounded-sm px-4 py-3">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-purple-500 block mb-1">📦 Awaiting Parts</span>
-                      <span className="text-purple-300 text-xs">{b.partsNotes}</span>
-                    </div>
-                  )}
-                  <div className="col-span-2 sm:col-span-3 pt-2 border-t border-gray-800 flex items-center gap-3 flex-wrap">
-                    <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
-                      {formatStatus(b.status)}
-                    </span>
-                    <span className="text-gray-600 font-mono text-[10px]">#{b.id}</span>
-                    {(b.status === 'pending' || b.status === 'confirmed') && (
-                      <button
-                        onClick={() => setCancelTarget(b.id)}
-                        className="ml-auto flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors border border-red-500/30 hover:border-red-400/50 px-3 py-1 rounded-sm"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Cancel
-                      </button>
-                    )}
-                  </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-white font-bold text-sm truncate">{b.serviceName}</p>
+                  <p className="text-gray-500 text-xs truncate">{b.appointmentTime} · {b.vehicleInfo}</p>
                 </div>
-              )}
-            </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0 pr-4 md:pr-5">
+                <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
+                  {formatStatus(b.status)}
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" />
+              </div>
+            </Link>
           ))}
-        </div>
-      )}
-
-      {/* Cancel confirmation modal */}
-      {cancelTarget && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-brand-dark border border-gray-700 rounded-sm p-6 max-w-sm w-full space-y-4">
-            <div className="flex items-center gap-2">
-              <XCircle className="w-5 h-5 text-red-400" />
-              <h3 className="text-white font-bold uppercase tracking-wide text-sm">Cancel Booking?</h3>
-            </div>
-            <p className="text-gray-400 text-sm">
-              Are you sure you want to cancel this appointment? This can't be undone, but you can always book a new one.
-            </p>
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={handleCancelConfirm}
-                disabled={cancelBusy}
-                className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
-              >
-                {cancelBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                Yes, Cancel It
-              </button>
-              <button
-                onClick={() => setCancelTarget(null)}
-                disabled={cancelBusy}
-                className="flex-1 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
-              >
-                No, Keep It
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

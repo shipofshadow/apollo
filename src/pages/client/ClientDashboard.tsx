@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Calendar, Clock, CheckCircle2, BadgeCheck, PlusCircle, Loader2, Zap } from 'lucide-react';
 import { fetchMyBookingsAsync } from '../../store/bookingSlice';
@@ -25,6 +25,7 @@ const STAT_LEFT_BORDER: Record<string, string> = {
 
 export default function ClientDashboard() {
   const dispatch               = useDispatch<AppDispatch>();
+  const navigate               = useNavigate();
   const { user, token }        = useAuth();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
 
@@ -121,7 +122,11 @@ export default function ClientDashboard() {
               </thead>
               <tbody>
                 {recent.map(b => (
-                  <tr key={b.id} className="border-b border-gray-800/60 last:border-0 hover:bg-gray-900/30 transition-colors">
+                  <tr
+                    key={b.id}
+                    className="border-b border-gray-800/60 last:border-0 hover:bg-gray-900/30 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/client/bookings/${b.id}`)}
+                  >
                     <td className="px-6 py-4 text-white font-semibold text-sm">{b.serviceName}</td>
                     <td className="px-6 py-4 text-gray-500 text-sm tabular-nums">
                       {b.appointmentDate} · {b.appointmentTime}

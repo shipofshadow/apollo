@@ -6,6 +6,8 @@ import {
   fetchAllBookingsApi,
   updateBookingStatusApi,
   cancelMyBookingApi,
+  fetchBookingByIdApi,
+  rescheduleBookingApi,
   submitBooking as submitBookingMock,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
@@ -76,6 +78,35 @@ export const cancelMyBookingAsync = createAsyncThunk(
       return booking;
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Failed to cancel booking.');
+    }
+  }
+);
+
+export const fetchBookingByIdAsync = createAsyncThunk(
+  'booking/fetchById',
+  async (arg: { token: string; id: string }, { rejectWithValue }) => {
+    try {
+      const { booking } = await fetchBookingByIdApi(arg.token, arg.id);
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to load booking.');
+    }
+  }
+);
+
+export const rescheduleMyBookingAsync = createAsyncThunk(
+  'booking/rescheduleMine',
+  async (
+    arg: { token: string; id: string; appointmentDate: string; appointmentTime: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { booking } = await rescheduleBookingApi(
+        arg.token, arg.id, arg.appointmentDate, arg.appointmentTime
+      );
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to reschedule booking.');
     }
   }
 );
@@ -172,6 +203,15 @@ const bookingSlice = createSlice({
         if (idx !== -1) state.appointments[idx] = action.payload;
       })
       .addCase(cancelMyBookingAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+      })
+      .addCase(fetchBookingByIdAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+        else state.appointments.unshift(action.payload);
+      })
+      .addCase(rescheduleMyBookingAsync.fulfilled, (state, action) => {
         const idx = state.appointments.findIndex(a => a.id === action.payload.id);
         if (idx !== -1) state.appointments[idx] = action.payload;
       });

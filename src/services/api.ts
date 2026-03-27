@@ -176,6 +176,20 @@ export const cancelMyBookingApi = (token: string, id: string) =>
     method: 'PATCH',
   }, token);
 
+export const fetchBookingByIdApi = (token: string, id: string) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${encodeURIComponent(id)}`, {}, token);
+
+export const rescheduleBookingApi = (
+  token: string,
+  id: string,
+  appointmentDate: string,
+  appointmentTime: string,
+) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${encodeURIComponent(id)}/reschedule`, {
+    method: 'PATCH',
+    body: JSON.stringify({ appointmentDate, appointmentTime }),
+  }, token);
+
 // ── Vehicle data API (API Ninjas proxy) ───────────────────────────────────────
 
 export interface CarTrim {

@@ -43,8 +43,10 @@ class Router
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
             $r->addRoute('POST',  '/api/bookings/media',            'handleBookingMediaUpload');
+            $r->addRoute('GET',   '/api/bookings/{id}',             'handleBookingGet');
             $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/cancel',      'handleBookingCancel');
+            $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',  'handleBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',       'handleBookingPartsUpdate');
 
             // ── Blog posts (public read, admin write) ───────────────────────
@@ -294,6 +296,39 @@ class Router
         $payload  = $this->requireAuth();
         $bookings = (new BookingService())->getByUserId((int) $payload['sub']);
         echo json_encode(['bookings' => $bookings]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingGet(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $id      = $vars['id'] ?? '';
+        $userId  = (int) ($payload['sub'] ?? 0);
+
+        $booking = (new BookingService())->getById($id, $userId);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingReschedule(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $id      = $vars['id'] ?? '';
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $data    = $this->jsonBody();
+
+        $date = trim((string) ($data['appointmentDate'] ?? ''));
+        $time = trim((string) ($data['appointmentTime'] ?? ''));
+
+        if ($date === '') {
+            throw new RuntimeException('appointmentDate is required.', 422);
+        }
+        if ($time === '') {
+            throw new RuntimeException('appointmentTime is required.', 422);
+        }
+
+        $booking = (new BookingService())->reschedule($id, $userId, $date, $time);
+        echo json_encode(['booking' => $booking]);
     }
 
     /** @param array<string, string> $vars */
