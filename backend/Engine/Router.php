@@ -186,10 +186,6 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePosts(array $vars = []): void
     {
-        if (FB_ACCESS_TOKEN === '') {
-            throw new RuntimeException('FB_ACCESS_TOKEN is not configured on the server.', 500);
-        }
-
         $limit = max(1, min(100, (int) ($_GET['limit'] ?? 10)));
         $after = (isset($_GET['after']) && $_GET['after'] !== '') ? (string) $_GET['after'] : null;
 
@@ -202,8 +198,14 @@ class Router
             }
         }
 
-        $service = new FacebookService();
-        $result  = $service->getPosts($limit, $after);
+        // Prefer the static FB_ACCESS_TOKEN env var when configured (legacy);
+        // otherwise fall back to the page access token stored in the DB via the
+        // admin OAuth flow (FacebookPageService).
+        if (FB_ACCESS_TOKEN !== '') {
+            $result = (new FacebookService())->getPosts($limit, $after);
+        } else {
+            $result = (new FacebookPageService())->getPagePosts($limit, $after);
+        }
 
         if ($after === null && CACHE_TTL_SECONDS > 0) {
             Cache::set($cacheKey, $result, CACHE_TTL_SECONDS);

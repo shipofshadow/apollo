@@ -220,6 +220,66 @@ class FacebookPageService
     }
 
     // -------------------------------------------------------------------------
+    // Post reading
+    // -------------------------------------------------------------------------
+
+    /**
+     * Fetch the most recent posts from the first valid connected Facebook page.
+     *
+     * Uses the stored page access token from the `facebook_pages` table.
+     * Returns the same envelope shape as FacebookService::getPosts() so that
+     * the router and frontend can consume both sources identically.
+     *
+     * @return array{data: list<array<string, mixed>>, paging: array<string, mixed>|null}
+     * @throws RuntimeException  When no valid page is connected or the Graph API returns an error.
+     */
+    public function getPagePosts(int $limit = 10, ?string $after = null): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT id, page_id, page_name, page_access_token, token_valid, created_at, updated_at
+               FROM facebook_pages
+              WHERE token_valid = 1
+              ORDER BY created_at ASC
+              LIMIT 1'
+        );
+        $stmt->execute();
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            throw new RuntimeException(
+                'No connected Facebook page found. Please connect a page in the admin panel.',
+                503
+            );
+        }
+
+        $page        = $this->mapRow($row);
+        $pageId      = (string) $page['pageId'];
+        $accessToken = (string) $page['pageAccessToken'];
+
+        $queryParams = ['fields' => FB_POST_FIELDS, 'limit' => $limit, 'access_token' => $accessToken];
+        if ($after !== null && $after !== '') {
+            $queryParams['after'] = $after;
+        }
+
+        $url  = FB_GRAPH_BASE . '/' . urlencode($pageId) . '/posts?' . http_build_query($queryParams);
+        $body = $this->curlGet($url);
+        $data = json_decode($body, true);
+
+        if (!is_array($data)) {
+            throw new RuntimeException('Unexpected response from the Facebook API.', 502);
+        }
+
+        if (isset($data['error'])) {
+            $this->handleGraphError($data['error'], $pageId);
+        }
+
+        return [
+            'data'   => $data['data']   ?? [],
+            'paging' => $data['paging'] ?? null,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
     // Post publishing
     // -------------------------------------------------------------------------
 
