@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   ArrowLeft, Calendar, Clock, Car, User, Mail, Phone,
   FileText, CheckCircle2, XCircle, Loader2, AlertCircle,
   Edit3, ChevronDown, ChevronUp, Image as ImageIcon,
-  Package, BadgeCheck,
+  Package, BadgeCheck, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import {
   fetchBookingByIdAsync,
   cancelMyBookingAsync,
   rescheduleMyBookingAsync,
 } from '../../store/bookingSlice';
-import { fetchAvailabilityApi } from '../../services/api';
+import { fetchAvailabilityApi, fetchShopHoursApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking } from '../../types';
+import type { Booking, ShopDayHours } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
