@@ -20,6 +20,7 @@ export interface AuthState {
 
 export interface Service {
   id: number;
+  slug: string;              // URL-safe identifier, e.g. "headlight-retrofits"
   title: string;
   description: string;       // short, shown on cards
   fullDescription: string;   // long, shown on detail page

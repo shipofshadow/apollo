@@ -24,11 +24,13 @@ type ServiceForm = {
   title: string; description: string; fullDescription: string;
   icon: string; imageUrl: string; duration: string;
   startingPrice: string; features: string; sortOrder: number; isActive: boolean;
+  slug: string;
 };
 
 const EMPTY_FORM: ServiceForm = {
   title: '', description: '', fullDescription: '', icon: 'Wrench',
   imageUrl: '', duration: '', startingPrice: '', features: '', sortOrder: 0, isActive: true,
+  slug: '',
 };
 
 function serviceToForm(s: Service): ServiceForm {
@@ -38,7 +40,12 @@ function serviceToForm(s: Service): ServiceForm {
     startingPrice: s.startingPrice,
     features: s.features.join('\n'),
     sortOrder: s.sortOrder, isActive: s.isActive,
+    slug: s.slug,
   };
+}
+
+function toSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function formToPayload(f: ServiceForm) {
@@ -56,6 +63,7 @@ export default function ServicesPanel() {
   const [editing,      setEditing]      = useState(false);
   const [editId,       setEditId]       = useState<number | null>(null);
   const [form,         setForm]         = useState<ServiceForm>(EMPTY_FORM);
+  const [slugEdited,   setSlugEdited]   = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [saveError,    setSaveError]    = useState<string | null>(null);
   const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
@@ -65,13 +73,23 @@ export default function ServicesPanel() {
     if (token) dispatch(fetchServicesAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = () => { setForm(EMPTY_FORM); setEditId(null); setSaveError(null); setEditing(true); };
-  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSaveError(null); setEditing(true); };
-  const cancel   = () => { setEditing(false); setEditId(null); setSaveError(null); };
+  const openNew  = () => { setForm(EMPTY_FORM); setEditId(null); setSlugEdited(false); setSaveError(null); setEditing(true); };
+  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSlugEdited(true); setSaveError(null); setEditing(true); };
+  const cancel   = () => { setEditing(false); setEditId(null); setSlugEdited(false); setSaveError(null); };
 
   const set = (field: keyof ServiceForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm(p => ({ ...p, [field]: e.target.value }));
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const value = e.target.value;
+      if (field === 'slug') setSlugEdited(true);
+      setForm(p => {
+        const next = { ...p, [field]: value };
+        // Auto-generate slug from title when creating a new service and slug hasn't been manually edited
+        if (field === 'title' && !slugEdited && editId === null) {
+          next.slug = toSlug(value);
+        }
+        return next;
+      });
+    };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +142,16 @@ export default function ServicesPanel() {
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Title *</label>
               <input required value={form.title} onChange={set('title')}
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                Slug * <span className="font-normal text-gray-600">(URL identifier, e.g. headlight-retrofits)</span>
+              </label>
+              <input required value={form.slug} onChange={set('slug')}
+                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                title="Lowercase letters, digits and hyphens only (e.g. headlight-retrofits)"
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm font-mono" />
             </div>
 
             <div className="md:col-span-2 space-y-2">

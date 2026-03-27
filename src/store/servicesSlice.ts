@@ -3,6 +3,7 @@ import type { Service, ServicesState } from '../types';
 import {
   fetchServicesApi,
   fetchServiceByIdApi,
+  fetchServiceBySlugApi,
   createServiceApi,
   updateServiceApi,
   deleteServiceApi,
@@ -30,6 +31,21 @@ export const fetchServiceByIdAsync = createAsyncThunk(
   ) => {
     try {
       const { service } = await fetchServiceByIdApi(arg.id, arg.token);
+      return service;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to load service.');
+    }
+  }
+);
+
+export const fetchServiceBySlugAsync = createAsyncThunk(
+  'services/fetchBySlug',
+  async (
+    arg: { slug: string; token?: string | null },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { service } = await fetchServiceBySlugApi(arg.slug, arg.token);
       return service;
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Failed to load service.');
@@ -115,6 +131,13 @@ const servicesSlice = createSlice({
 
       // fetchById – upsert into items
       .addCase(fetchServiceByIdAsync.fulfilled, (state, action) => {
+        const idx = state.items.findIndex(s => s.id === action.payload.id);
+        if (idx !== -1) state.items[idx] = action.payload;
+        else state.items.push(action.payload);
+      })
+
+      // fetchBySlug – upsert into items
+      .addCase(fetchServiceBySlugAsync.fulfilled, (state, action) => {
         const idx = state.items.findIndex(s => s.id === action.payload.id);
         if (idx !== -1) state.items[idx] = action.payload;
         else state.items.push(action.payload);
