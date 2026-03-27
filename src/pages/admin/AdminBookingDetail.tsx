@@ -589,7 +589,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 <AdminReschedulePanel
                   booking={booking}
                   token={token}
-                  onSuccess={(updated, entry) => {
+                  // TypeScript fix is here!
+                  onSuccess={(_updated, entry) => {
                     addLog(entry);
                     setRescheduling(false);
                   }}
