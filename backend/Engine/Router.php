@@ -46,8 +46,9 @@ class Router
             $r->addRoute('GET',   '/api/bookings/{id}',             'handleBookingGet');
             $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/cancel',      'handleBookingCancel');
-            $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',  'handleBookingReschedule');
-            $r->addRoute('PATCH', '/api/bookings/{id}/parts',       'handleBookingPartsUpdate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',        'handleBookingReschedule');
+            $r->addRoute('PATCH', '/api/bookings/{id}/admin-reschedule', 'handleAdminBookingReschedule');
+            $r->addRoute('PATCH', '/api/bookings/{id}/parts',             'handleBookingPartsUpdate');
 
             // ── Blog posts (public read, admin write) ───────────────────────
             $r->addRoute('GET',    '/api/blog',              'handleBlogList');
@@ -328,6 +329,27 @@ class Router
         }
 
         $booking = (new BookingService())->reschedule($id, $userId, $date, $time);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBookingReschedule(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id   = $vars['id'] ?? '';
+        $data = $this->jsonBody();
+
+        $date = trim((string) ($data['appointmentDate'] ?? ''));
+        $time = trim((string) ($data['appointmentTime'] ?? ''));
+
+        if ($date === '') {
+            throw new RuntimeException('appointmentDate is required.', 422);
+        }
+        if ($time === '') {
+            throw new RuntimeException('appointmentTime is required.', 422);
+        }
+
+        $booking = (new BookingService())->adminReschedule($id, $date, $time);
         echo json_encode(['booking' => $booking]);
     }
 

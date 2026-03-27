@@ -250,7 +250,7 @@ export default function BookingDetail() {
     if (!id || !token) return;
 
     const cached = appointments.find(
-      b => b.id === id && !b.id.startsWith('mock') && b.userId === user?.id
+      b => b.id === id && !b.id.startsWith('mock') && user != null && b.userId === user.id
     );
     if (cached) {
       setBooking(cached);
@@ -258,7 +258,7 @@ export default function BookingDetail() {
       // Refresh in the background for up-to-date data
       dispatch(fetchBookingByIdAsync({ token, id }))
         .unwrap()
-        .then(updated => { if (updated.userId === user?.id) setBooking(updated); })
+        .then(updated => { if (user != null && updated.userId === user.id) setBooking(updated); })
         .catch(() => {/* use cached */});
       return;
     }
@@ -269,7 +269,7 @@ export default function BookingDetail() {
       .then(fetched => {
         // The backend already enforces ownership (returns 403 for other users),
         // but guard here too for defense in depth.
-        if (fetched.userId !== user?.id) {
+        if (user == null || fetched.userId !== user.id) {
           setLoadError('You are not authorized to view this booking.');
         } else {
           setBooking(fetched);

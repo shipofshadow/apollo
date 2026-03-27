@@ -279,6 +279,49 @@ class BookingService
     }
 
     /**
+     * Admin-only reschedule: no ownership check, bypasses client restrictions.
+     * Date must be in YYYY-MM-DD format; time must be non-empty.
+     *
+     * @return array<string, mixed>
+     */
+    public function adminReschedule(string $id, string $date, string $time): array
+    {
+        $booking = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('Invalid date format. Expected YYYY-MM-DD.', 422);
+        }
+        // Use DateTime comparison to avoid any edge-case with string comparison
+        $inputTs = strtotime($date);
+        $todayTs = strtotime(date('Y-m-d'));
+        if ($inputTs === false || $inputTs < $todayTs) {
+            throw new RuntimeException('Appointment date cannot be in the past.', 422);
+        }
+        if (trim($time) === '') {
+            throw new RuntimeException('Appointment time is required.', 422);
+        }
+
+        // Skip availability check if keeping the same slot
+        $sameSlot = ($booking['appointmentDate'] === $date && $booking['appointmentTime'] === $time);
+        if (!$sameSlot && in_array($time, $this->getBookedSlots($date), true)) {
+            throw new RuntimeException(
+                'This time slot is fully booked. Please choose a different time.',
+                409
+            );
+        }
+
+        return $this->useDb
+            ? $this->dbReschedule($id, $date, $time)
+            : $this->fileReschedule($id, $date, $time);
+    }
+
+    /**
      * Reschedule a booking's appointment date and time (client-only).
      * Only bookings with status 'pending' or 'confirmed' can be rescheduled.
      *

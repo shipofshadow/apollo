@@ -8,6 +8,7 @@ import {
   cancelMyBookingApi,
   fetchBookingByIdApi,
   rescheduleBookingApi,
+  adminRescheduleBookingApi,
   submitBooking as submitBookingMock,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
@@ -102,6 +103,23 @@ export const rescheduleMyBookingAsync = createAsyncThunk(
   ) => {
     try {
       const { booking } = await rescheduleBookingApi(
+        arg.token, arg.id, arg.appointmentDate, arg.appointmentTime
+      );
+      return booking;
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Failed to reschedule booking.');
+    }
+  }
+);
+
+export const adminRescheduleBookingAsync = createAsyncThunk(
+  'booking/adminReschedule',
+  async (
+    arg: { token: string; id: string; appointmentDate: string; appointmentTime: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const { booking } = await adminRescheduleBookingApi(
         arg.token, arg.id, arg.appointmentDate, arg.appointmentTime
       );
       return booking;
@@ -211,6 +229,10 @@ const bookingSlice = createSlice({
         else state.appointments.unshift(action.payload);
       })
       .addCase(rescheduleMyBookingAsync.fulfilled, (state, action) => {
+        const idx = state.appointments.findIndex(a => a.id === action.payload.id);
+        if (idx !== -1) state.appointments[idx] = action.payload;
+      })
+      .addCase(adminRescheduleBookingAsync.fulfilled, (state, action) => {
         const idx = state.appointments.findIndex(a => a.id === action.payload.id);
         if (idx !== -1) state.appointments[idx] = action.payload;
       });

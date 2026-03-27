@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Calendar, Clock, Package, Loader2,
-  CheckCircle2, XCircle, Eye, X, Car, User, Mail, Phone,
-  Wrench, FileText, Image as ImageIcon, PenLine, Hash,
+  CheckCircle2, XCircle, Eye,
 } from 'lucide-react';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../../store/bookingSlice';
 import { updateBookingPartsApi } from '../../services/api';
@@ -21,7 +20,11 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
   awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
-export default function BookingsPanel() {
+interface Props {
+  onView: (bookingId: string) => void;
+}
+
+export default function BookingsPanel({ onView }: Props) {
   const dispatch = useDispatch<AppDispatch>();
   const { token } = useAuth();
   const { showToast } = useToast();
@@ -31,9 +34,6 @@ export default function BookingsPanel() {
   const [partsModal, setPartsModal] = useState<string | null>(null);
   const [partsNotes, setPartsNotes] = useState('');
   const [partsBusy,  setPartsBusy]  = useState(false);
-
-  const [viewBooking, setViewBooking] = useState<Booking | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));
@@ -103,167 +103,6 @@ export default function BookingsPanel() {
         </div>
       )}
 
-      {/* Booking Detail Modal */}
-      {viewBooking && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-brand-dark border border-gray-700 rounded-sm w-full max-w-2xl my-auto space-y-0 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-brand-darker/60">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-brand-orange" />
-                <h3 className="text-white font-bold uppercase tracking-wide">Booking Details</h3>
-              </div>
-              <button onClick={() => setViewBooking(null)} className="text-gray-400 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-6 max-h-[80vh] overflow-y-auto">
-
-              {/* Status row */}
-              <div className="flex items-center justify-between">
-                <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[viewBooking.status]}`}>
-                  {formatStatus(viewBooking.status)}
-                </span>
-                <span className="text-gray-500 text-xs flex items-center gap-1">
-                  <Hash className="w-3 h-3" />{viewBooking.id}
-                </span>
-              </div>
-
-              {/* Customer */}
-              <section>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Customer
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><User className="w-3 h-3" /> Name</p>
-                    <p className="text-white text-sm font-semibold">{viewBooking.name}</p>
-                  </div>
-                  <div className="bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><Mail className="w-3 h-3" /> Email</p>
-                    <p className="text-gray-200 text-sm break-all">{viewBooking.email}</p>
-                  </div>
-                  <div className="bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><Phone className="w-3 h-3" /> Phone</p>
-                    <p className="text-gray-200 text-sm">{viewBooking.phone}</p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Vehicle */}
-              <section>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                  <Car className="w-3.5 h-3.5" /> Vehicle
-                </p>
-                <div className="bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                  <p className="text-white text-sm font-semibold">{viewBooking.vehicleInfo}</p>
-                  {(viewBooking.vehicleYear || viewBooking.vehicleMake || viewBooking.vehicleModel) && (
-                    <p className="text-gray-500 text-xs mt-1">
-                      {[viewBooking.vehicleYear, viewBooking.vehicleMake, viewBooking.vehicleModel].filter(Boolean).join(' · ')}
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              {/* Service & Appointment */}
-              <section>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5" /> Service & Appointment
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-1 bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><Calendar className="w-3 h-3" /> Date</p>
-                    <p className="text-gray-200 text-sm">{viewBooking.appointmentDate}</p>
-                  </div>
-                  <div className="bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><Clock className="w-3 h-3" /> Time</p>
-                    <p className="text-gray-200 text-sm">{viewBooking.appointmentTime}</p>
-                  </div>
-                  <div className="sm:col-span-3 bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mb-1"><Wrench className="w-3 h-3" /> Service(s)</p>
-                    <p className="text-gray-200 text-sm">{viewBooking.serviceName}</p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Notes */}
-              {viewBooking.notes && (
-                <section>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5" /> Notes
-                  </p>
-                  <div className="bg-brand-darker/60 border border-gray-800 rounded-sm px-4 py-3">
-                    <p className="text-gray-200 text-sm whitespace-pre-wrap">{viewBooking.notes}</p>
-                  </div>
-                </section>
-              )}
-
-              {/* Parts Notes */}
-              {viewBooking.partsNotes && (
-                <section>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5 text-purple-400" /> <span className="text-purple-400">Parts / Awaiting</span>
-                  </p>
-                  <div className="bg-purple-500/5 border border-purple-500/30 rounded-sm px-4 py-3">
-                    <p className="text-purple-200 text-sm whitespace-pre-wrap">{viewBooking.partsNotes}</p>
-                  </div>
-                </section>
-              )}
-
-              {/* Reference Photos */}
-              {viewBooking.mediaUrls && viewBooking.mediaUrls.length > 0 && (
-                <section>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5" /> Reference Photos ({viewBooking.mediaUrls.length})
-                  </p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {viewBooking.mediaUrls.map((url, i) => (
-                      <button key={i} onClick={() => setLightboxUrl(url)}
-                        className="aspect-square overflow-hidden rounded-sm border border-gray-700 hover:border-brand-orange transition-colors">
-                        <img src={url} alt={`Photo ${i + 1}`}
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer" />
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* Signature */}
-              {viewBooking.signatureData && (
-                <section>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
-                    <PenLine className="w-3.5 h-3.5" /> Waiver Signature
-                  </p>
-                  <div className="bg-brand-darker/60 border border-gray-800 rounded-sm p-3 flex items-center justify-center">
-                    <img src={viewBooking.signatureData} alt="Customer signature"
-                      className="max-w-full h-20 object-contain" />
-                  </div>
-                </section>
-              )}
-
-              {/* Booking meta */}
-              <p className="text-xs text-gray-600 text-right">
-                Submitted {new Date(viewBooking.createdAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
-          onClick={() => setLightboxUrl(null)}>
-          <button className="absolute top-4 right-4 text-white/70 hover:text-white" onClick={() => setLightboxUrl(null)}>
-            <X className="w-7 h-7" />
-          </button>
-          <img src={lightboxUrl} alt="Full size" className="max-w-full max-h-[90vh] object-contain rounded-sm"
-            referrerPolicy="no-referrer" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
-
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
         {filters.map(({ key, label }) => (
@@ -306,7 +145,11 @@ export default function BookingsPanel() {
             </thead>
             <tbody>
               {filtered.map(b => (
-                <tr key={b.id} className="border-b border-gray-800 hover:bg-brand-darker/40 transition-colors">
+                <tr
+                  key={b.id}
+                  className="border-b border-gray-800 hover:bg-brand-darker/40 transition-colors cursor-pointer"
+                  onClick={() => onView(b.id)}
+                >
                   <td className="px-5 py-4">
                     <p className="text-white font-semibold">{b.name}</p>
                     <p className="text-gray-500 text-xs">{b.phone}</p>
@@ -326,11 +169,11 @@ export default function BookingsPanel() {
                       {formatStatus(b.status)}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button onClick={() => setViewBooking(b)}
+                      <button onClick={() => onView(b.id)}
                         title="View full booking details"
-                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-700/50 border border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white text-xs font-bold uppercase rounded-sm transition-colors">
+                        className="flex items-center gap-1 px-3 py-1.5 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange hover:bg-brand-orange/20 text-xs font-bold uppercase rounded-sm transition-colors">
                         <Eye className="w-3 h-3" /> View
                       </button>
                       {b.status === 'pending' && (
@@ -367,23 +210,6 @@ export default function BookingsPanel() {
                           className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> Complete
                         </button>
-                      )}
-                      {b.partsNotes && (
-                        <span className="text-xs text-purple-400 italic truncate max-w-[120px]" title={b.partsNotes}>
-                          📦 {b.partsNotes}
-                        </span>
-                      )}
-                      {b.mediaUrls && b.mediaUrls.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-800">
-                          {b.mediaUrls.map((url, i) => (
-                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                              <img src={url} alt={`Photo ${i + 1}`}
-                                className="w-10 h-10 object-cover rounded-sm border border-gray-700 hover:border-brand-orange transition-colors"
-                                referrerPolicy="no-referrer"
-                              />
-                            </a>
-                          ))}
-                        </div>
                       )}
                     </div>
                   </td>

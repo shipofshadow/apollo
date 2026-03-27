@@ -34,9 +34,12 @@ export default function ClientDashboard() {
   }, [token, dispatch]);
 
   // Only show bookings that belong to the current user.
-  const myBookings = appointments.filter(
-    b => !b.id.startsWith('mock') && b.userId === user?.id
-  );
+  // Guard against null user — if user isn't loaded yet, show nothing.
+  const myBookings = !user
+    ? []
+    : appointments.filter(
+        b => !b.id.startsWith('mock') && b.userId === user.id
+      );
   const recent     = myBookings.slice(0, 5);
 
   const counts = {

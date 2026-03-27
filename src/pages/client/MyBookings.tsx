@@ -38,11 +38,12 @@ export default function MyBookings() {
   }, [token, dispatch]);
 
   // Only show real bookings that belong to the logged-in user.
-  // The userId check is a safety net: even if the Redux store were to contain
-  // bookings from another session, they will never appear here.
-  const myBookings = appointments.filter(
-    b => !b.id.startsWith('mock') && b.userId === user?.id
-  );
+  // Guard against null user — if user isn't loaded yet, show nothing.
+  const myBookings = !user
+    ? []
+    : appointments.filter(
+        b => !b.id.startsWith('mock') && b.userId === user.id
+      );
 
   const filtered = filter === 'all'
     ? myBookings

@@ -190,6 +190,17 @@ export const rescheduleBookingApi = (
     body: JSON.stringify({ appointmentDate, appointmentTime }),
   }, token);
 
+export const adminRescheduleBookingApi = (
+  token: string,
+  id: string,
+  appointmentDate: string,
+  appointmentTime: string,
+) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${encodeURIComponent(id)}/admin-reschedule`, {
+    method: 'PATCH',
+    body: JSON.stringify({ appointmentDate, appointmentTime }),
+  }, token);
+
 // ── Vehicle data API (API Ninjas proxy) ───────────────────────────────────────
 
 export interface CarTrim {
