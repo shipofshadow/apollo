@@ -226,6 +226,14 @@ class FacebookPageService
     /**
      * Publish a post to a Facebook Page, optionally with attached images.
      *
+     * Post body format:
+     *   [message / headline]
+     *   ✔ Feature 1
+     *   ✔ Feature 2
+     *   [callToAction]
+     *   [contactFooter]
+     *   [#Portfolio #1625AutoLab  – when isPortfolio is true]
+     *
      * Flow when images are supplied (Facebook multi-photo post):
      *   1. Upload each image URL as an unpublished photo via /{page-id}/photos
      *      to obtain a Photo ID.
@@ -233,19 +241,23 @@ class FacebookPageService
      *      those Photo IDs.
      * Flow with no images: POST to /{page-id}/feed with message only.
      *
-     * @param  string   $pageId      The Facebook page ID
-     * @param  string   $message     The post body text
-     * @param  string[] $features    Optional bullet-point features appended to the message
-     * @param  bool     $isPortfolio Whether this post should be tagged as a portfolio item
-     * @param  string[] $imageUrls   Public image URLs to attach (max 10, Facebook's limit)
-     * @return string                The new Facebook post ID
+     * @param  string   $pageId        The Facebook page ID
+     * @param  string   $message       The post headline / body text
+     * @param  string[] $features      Optional ✔ checkmark features appended after the message
+     * @param  bool     $isPortfolio   Whether this post should be tagged as a portfolio item
+     * @param  string[] $imageUrls     Public image URLs to attach (max 10, Facebook's limit)
+     * @param  string   $callToAction  Optional CTA line appended after features
+     * @param  string   $contactFooter Optional contact/location block appended at the end
+     * @return string                  The new Facebook post ID
      */
     public function publishPost(
         string $pageId,
         string $message,
-        array  $features    = [],
-        bool   $isPortfolio = false,
-        array  $imageUrls   = []
+        array  $features      = [],
+        bool   $isPortfolio   = false,
+        array  $imageUrls     = [],
+        string $callToAction  = '',
+        string $contactFooter = ''
     ): string {
         $page = $this->getPageById($pageId);
 
@@ -261,15 +273,28 @@ class FacebookPageService
         // Build the full post body
         $body = trim($message);
 
+        // ✔ checkmark features (line break before first feature, matching sample post format)
         if (!empty($features)) {
-            $body .= "\n\n";
+            $body .= "\n";
             foreach ($features as $feature) {
                 $feature = trim((string) $feature);
                 if ($feature !== '') {
-                    $body .= '• ' . $feature . "\n";
+                    $body .= '✔ ' . $feature . "\n";
                 }
             }
             $body = rtrim($body);
+        }
+
+        // Call-to-action line
+        $callToAction = trim($callToAction);
+        if ($callToAction !== '') {
+            $body .= "\n" . $callToAction;
+        }
+
+        // Contact / location footer
+        $contactFooter = trim($contactFooter);
+        if ($contactFooter !== '') {
+            $body .= "\n" . $contactFooter;
         }
 
         if ($isPortfolio) {

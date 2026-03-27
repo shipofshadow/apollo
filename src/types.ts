@@ -302,8 +302,12 @@ export interface FacebookPage {
 export interface FbPublishPayload {
   pageId: string;
   message: string;
-  /** Optional bullet-point features appended to the post body */
+  /** Optional ✔ checkmark features appended to the post body */
   features?: string[];
+  /** Optional call-to-action line appended after features (e.g. "Planning to upgrade?") */
+  callToAction?: string;
+  /** Optional contact/location footer appended at the end of the post */
+  contactFooter?: string;
   /** When true, also saves the post as a portfolio item */
   isPortfolio?: boolean;
   /** Required when isPortfolio is true */

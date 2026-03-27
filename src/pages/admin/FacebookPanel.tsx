@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Facebook, Link2, Link2Off, Loader2, AlertCircle, CheckCircle2,
-  Plus, Send, X, ChevronDown, ChevronUp, ImageIcon, Upload,
+  Plus, Send, X, ChevronDown, ChevronUp, ImageIcon, Upload, Eye,
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +25,46 @@ const FB_STATE_KEY = 'fb_oauth_state';
 /** Generate a cryptographically random state token for OAuth CSRF protection. */
 function generateState(): string {
   return crypto.randomUUID();
+}
+
+// ── constants ─────────────────────────────────────────────────────────────────
+
+/** Default shop contact footer pre-filled in the composer. */
+const DEFAULT_CONTACT_FOOTER =
+  '📩 Message us today to schedule your installation.\n' +
+  '📞 0939 330 8263 | 0956 450 0292\n' +
+  '📍 NKKS Arcade, Brgy. Alasas, San Fernando Pampanga\n' +
+  '📍 Waze: 1625 Autolab';
+
+/**
+ * Reproduce (client-side) the same post body the backend builds, so the
+ * admin can see an accurate preview before publishing.
+ */
+function buildPreview(
+  message:       string,
+  features:      string[],
+  callToAction:  string,
+  contactFooter: string,
+  isPortfolio:   boolean,
+): string {
+  let body = message.trim();
+
+  const cleanFeatures = features.map(f => f.trim()).filter(Boolean);
+  if (cleanFeatures.length > 0) {
+    body += '\n';
+    for (const f of cleanFeatures) body += '✔ ' + f + '\n';
+    body = body.trimEnd();
+  }
+
+  const cta = callToAction.trim();
+  if (cta) body += '\n' + cta;
+
+  const footer = contactFooter.trim();
+  if (footer) body += '\n' + footer;
+
+  if (isPortfolio) body += '\n\n#Portfolio #1625AutoLab';
+
+  return body;
 }
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -121,6 +161,9 @@ export default function FacebookPanel() {
   const [selectedPageId,  setSelectedPageId]  = useState('');
   const [message,         setMessage]         = useState('');
   const [features,        setFeatures]        = useState<string[]>(['']);
+  const [callToAction,    setCallToAction]    = useState('');
+  const [includeFooter,   setIncludeFooter]   = useState(false);
+  const [contactFooter,   setContactFooter]   = useState(DEFAULT_CONTACT_FOOTER);
   const [isPortfolio,     setIsPortfolio]     = useState(false);
   const [portfolioTitle,  setPortfolioTitle]  = useState('');
   const [portfolioCategory, setPortfolioCategory] = useState('');
@@ -128,6 +171,7 @@ export default function FacebookPanel() {
   const [publishing,      setPublishing]      = useState(false);
   const [publishResult,   setPublishResult]   = useState<{ postId: string; savedToPortfolio: boolean } | null>(null);
   const [publishError,    setPublishError]    = useState<string | null>(null);
+  const [previewOpen,     setPreviewOpen]     = useState(false);
 
   // ── image attachments ──
   const [imagePreviews,   setImagePreviews]   = useState<ImagePreviewEntry[]>([]);
@@ -274,14 +318,30 @@ export default function FacebookPanel() {
     setImagePreviews([]);
     setMessage('');
     setFeatures(['']);
+    setCallToAction('');
+    setIncludeFooter(false);
+    setContactFooter(DEFAULT_CONTACT_FOOTER);
     setIsPortfolio(false);
     setPortfolioTitle('');
     setPortfolioCategory('');
     setPortfolioImageUrl('');
     setPublishError(null);
     setPublishResult(null);
+    setPreviewOpen(false);
     setComposerOpen(false);
   }, []);
+
+  // ── live preview ─────────────────────────────────────────────────────────────
+  const previewText = useMemo(
+    () => buildPreview(
+      message,
+      features,
+      callToAction,
+      includeFooter ? contactFooter : '',
+      isPortfolio,
+    ),
+    [message, features, callToAction, includeFooter, contactFooter, isPortfolio],
+  );
 
   // ── publish ─────────────────────────────────────────────────────────────────
   const handlePublish = async (e: React.FormEvent) => {
@@ -306,6 +366,8 @@ export default function FacebookPanel() {
         pageId:  selectedPageId,
         message,
         features: cleanFeatures,
+        callToAction: callToAction.trim(),
+        contactFooter: includeFooter ? contactFooter.trim() : '',
         isPortfolio,
         imageUrls: finalImageUrls,
         ...(isPortfolio && {
@@ -456,17 +518,17 @@ export default function FacebookPanel() {
                 </select>
               </div>
 
-              {/* Message */}
+              {/* Message (headline) */}
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Message *
+                  Headline / Message *
                 </label>
                 <textarea
                   required
-                  rows={4}
+                  rows={3}
                   value={message}
                   onChange={e => setMessage(e.target.value)}
-                  placeholder="Write your post message here…"
+                  placeholder="e.g. Mazda 3 2015 now equipped with X2 Bi-LED Projector Headlights 🔥"
                   className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none text-sm"
                 />
               </div>
@@ -476,13 +538,13 @@ export default function FacebookPanel() {
                 <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
                   Features / Highlights
                   <span className="ml-2 text-gray-600 normal-case font-normal">
-                    (appended as bullet points)
+                    (appended as ✔ checkmarks)
                   </span>
                 </label>
                 <div className="space-y-2">
                   {features.map((feat, idx) => (
                     <div key={idx} className="flex gap-2 items-center">
-                      <span className="text-brand-orange text-sm select-none shrink-0">•</span>
+                      <span className="text-brand-orange text-sm select-none shrink-0">✔</span>
                       <input
                         type="text"
                         value={feat}
@@ -508,6 +570,86 @@ export default function FacebookPanel() {
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Feature
                 </button>
+              </div>
+
+              {/* Call to Action */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                  Call to Action
+                  <span className="ml-2 text-gray-600 normal-case font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={callToAction}
+                  onChange={e => setCallToAction(e.target.value)}
+                  placeholder="e.g. Planning to upgrade your headlights?"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm text-sm"
+                />
+              </div>
+
+              {/* Contact / Location Footer */}
+              <div className="border-t border-gray-800 pt-5 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeFooter}
+                    onChange={e => setIncludeFooter(e.target.checked)}
+                    className="accent-brand-orange w-4 h-4"
+                  />
+                  <span className="text-sm font-bold uppercase tracking-widest text-white">
+                    Append Contact &amp; Location Info
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 -mt-1 pl-7">
+                  Adds your shop contact details (📩 📞 📍) at the end of the post.
+                </p>
+
+                {includeFooter && (
+                  <div className="pl-7">
+                    <textarea
+                      rows={4}
+                      value={contactFooter}
+                      onChange={e => setContactFooter(e.target.value)}
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setContactFooter(DEFAULT_CONTACT_FOOTER)}
+                      className="mt-1 text-xs text-gray-500 hover:text-brand-orange transition-colors"
+                    >
+                      Reset to default
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Live Post Preview ── */}
+              <div className="border-t border-gray-800 pt-5 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(v => !v)}
+                  className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  {previewOpen ? 'Hide Preview' : 'Show Post Preview'}
+                </button>
+
+                {previewOpen && (
+                  <div className="bg-[#18191a] border border-gray-700 rounded-sm p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">
+                      Post Preview
+                    </p>
+                    {previewText ? (
+                      <pre className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">
+                        {previewText}
+                      </pre>
+                    ) : (
+                      <p className="text-xs text-gray-600 italic">
+                        Start typing to see a preview…
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* ── Attached Images ── */}

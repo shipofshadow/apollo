@@ -1095,12 +1095,14 @@ class Router
     private function handleFbPublish(array $vars = []): void
     {
         $this->requireAuth('admin');
-        $data        = $this->jsonBody();
-        $pageId      = trim((string) ($data['pageId']      ?? ''));
-        $message     = trim((string) ($data['message']     ?? ''));
-        $features    = is_array($data['features'] ?? null) ? $data['features'] : [];
-        $isPortfolio = (bool) ($data['isPortfolio'] ?? false);
-        $imageUrls   = $this->sanitizeImageUrls($data['imageUrls'] ?? null);
+        $data          = $this->jsonBody();
+        $pageId        = trim((string) ($data['pageId']        ?? ''));
+        $message       = trim((string) ($data['message']       ?? ''));
+        $features      = is_array($data['features'] ?? null) ? $data['features'] : [];
+        $callToAction  = trim((string) ($data['callToAction']  ?? ''));
+        $contactFooter = trim((string) ($data['contactFooter'] ?? ''));
+        $isPortfolio   = (bool) ($data['isPortfolio'] ?? false);
+        $imageUrls     = $this->sanitizeImageUrls($data['imageUrls'] ?? null);
 
         if ($pageId === '') {
             throw new RuntimeException('pageId is required.', 422);
@@ -1109,9 +1111,9 @@ class Router
             throw new RuntimeException('message is required.', 422);
         }
 
-        // Publish to Facebook (with optional image attachments)
+        // Publish to Facebook (with optional image attachments and formatting fields)
         $postId = (new FacebookPageService())->publishPost(
-            $pageId, $message, $features, $isPortfolio, $imageUrls
+            $pageId, $message, $features, $isPortfolio, $imageUrls, $callToAction, $contactFooter
         );
 
         // When marked as a portfolio post, also save it to the portfolio table
@@ -1130,14 +1132,14 @@ class Router
                 throw new RuntimeException('portfolioTitle is required when isPortfolio is true.', 422);
             }
 
-            // Build description: message + bullet features
+            // Build description: message + ✔ checkmark features (same style as the Facebook post)
             $description = $message;
             $cleanFeatures = array_values(array_filter(
                 array_map('trim', $features),
                 fn ($f) => $f !== ''
             ));
             if (!empty($cleanFeatures)) {
-                $description .= "\n\n" . implode("\n", array_map(fn ($f) => '• ' . $f, $cleanFeatures));
+                $description .= "\n\n" . implode("\n", array_map(fn ($f) => '✔ ' . $f, $cleanFeatures));
             }
 
             $portfolioItem = (new PortfolioService())->create([
