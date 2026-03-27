@@ -224,19 +224,28 @@ class FacebookPageService
     // -------------------------------------------------------------------------
 
     /**
-     * Publish a text post to a Facebook Page.
+     * Publish a post to a Facebook Page, optionally with attached images.
+     *
+     * Flow when images are supplied (Facebook multi-photo post):
+     *   1. Upload each image URL as an unpublished photo via /{page-id}/photos
+     *      to obtain a Photo ID.
+     *   2. POST to /{page-id}/feed with message + attached_media[] referencing
+     *      those Photo IDs.
+     * Flow with no images: POST to /{page-id}/feed with message only.
      *
      * @param  string   $pageId      The Facebook page ID
      * @param  string   $message     The post body text
      * @param  string[] $features    Optional bullet-point features appended to the message
      * @param  bool     $isPortfolio Whether this post should be tagged as a portfolio item
+     * @param  string[] $imageUrls   Public image URLs to attach (max 10, Facebook's limit)
      * @return string                The new Facebook post ID
      */
     public function publishPost(
         string $pageId,
         string $message,
-        array  $features = [],
-        bool   $isPortfolio = false
+        array  $features    = [],
+        bool   $isPortfolio = false,
+        array  $imageUrls   = []
     ): string {
         $page = $this->getPageById($pageId);
 
@@ -246,6 +255,8 @@ class FacebookPageService
                 401
             );
         }
+
+        $accessToken = (string) $page['pageAccessToken'];
 
         // Build the full post body
         $body = trim($message);
@@ -265,14 +276,52 @@ class FacebookPageService
             $body .= "\n\n#Portfolio #1625AutoLab";
         }
 
-        // POST to /{page-id}/feed
+        // Normalise image list: strip blanks, cap at 10 (Facebook's hard limit)
+        $cleanUrls = array_values(array_filter(
+            array_slice($imageUrls, 0, 10),
+            fn ($u) => is_string($u) && $u !== ''
+        ));
+
+        if (empty($cleanUrls)) {
+            // ── Text-only post ──────────────────────────────────────────────
+            $endpoint = FB_GRAPH_BASE . '/' . urlencode($pageId) . '/feed';
+            $postData = [
+                'message'      => $body,
+                'access_token' => $accessToken,
+            ];
+
+            $response = $this->curlPostMultipart($endpoint, $postData);
+            $result   = json_decode($response, true);
+
+            if (isset($result['error'])) {
+                $this->handleGraphError($result['error'], $pageId);
+            }
+
+            if (empty($result['id'])) {
+                throw new RuntimeException('Post was not created (no ID returned).', 502);
+            }
+
+            return (string) $result['id'];
+        }
+
+        // ── Post with attached images ───────────────────────────────────────
+        // Step 1: upload each image as an unpublished photo to get a Photo ID
+        $photoIds = [];
+        foreach ($cleanUrls as $imgUrl) {
+            $photoIds[] = $this->uploadUnpublishedPhoto($pageId, $imgUrl, $accessToken);
+        }
+
+        // Step 2: publish the feed post with attached_media referencing those IDs
         $endpoint = FB_GRAPH_BASE . '/' . urlencode($pageId) . '/feed';
         $postData = [
             'message'      => $body,
-            'access_token' => (string) $page['pageAccessToken'],
+            'access_token' => $accessToken,
         ];
+        foreach ($photoIds as $idx => $photoId) {
+            $postData["attached_media[$idx]"] = json_encode(['media_fbid' => $photoId]);
+        }
 
-        $response = $this->curlPost($endpoint, $postData);
+        $response = $this->curlPostMultipart($endpoint, $postData);
         $result   = json_decode($response, true);
 
         if (isset($result['error'])) {
@@ -284,6 +333,39 @@ class FacebookPageService
         }
 
         return (string) $result['id'];
+    }
+
+    /**
+     * Upload a single image URL as an unpublished photo and return its Photo ID.
+     * The photo is not visible on the Page until it is referenced via attached_media
+     * in a subsequent feed post.
+     *
+     * @throws RuntimeException  On Graph API error.
+     */
+    private function uploadUnpublishedPhoto(
+        string $pageId,
+        string $imageUrl,
+        string $accessToken
+    ): string {
+        $endpoint = FB_GRAPH_BASE . '/' . urlencode($pageId) . '/photos';
+        $response = $this->curlPostMultipart($endpoint, [
+            'url'          => $imageUrl,
+            'published'    => 'false',
+            'access_token' => $accessToken,
+        ]);
+
+        $data = json_decode($response, true);
+
+        if (isset($data['error'])) {
+            $msg = (string) ($data['error']['message'] ?? 'Failed to upload photo to Facebook.');
+            throw new RuntimeException($msg, 502);
+        }
+
+        if (empty($data['id'])) {
+            throw new RuntimeException('Photo upload succeeded but no ID was returned.', 502);
+        }
+
+        return (string) $data['id'];
     }
 
     // -------------------------------------------------------------------------
@@ -394,6 +476,7 @@ class FacebookPageService
 
     /**
      * Perform a POST request using raw cURL and return the response body.
+     * Fields are sent as application/x-www-form-urlencoded.
      *
      * @param array<string, string> $fields
      */
@@ -405,6 +488,38 @@ class FacebookPageService
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query($fields),
             CURLOPT_TIMEOUT        => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $body  = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($errno !== 0 || $body === false) {
+            throw new RuntimeException('Facebook API request failed: ' . $error, 503);
+        }
+
+        return (string) $body;
+    }
+
+    /**
+     * Perform a POST request using multipart/form-data (required by the
+     * Graph API for endpoints that accept both scalar fields and JSON-encoded
+     * sub-fields such as attached_media[n]).
+     *
+     * Passing an array to CURLOPT_POSTFIELDS causes cURL to automatically
+     * encode the request as multipart/form-data.
+     *
+     * @param array<string, string> $fields
+     */
+    private function curlPostMultipart(string $url, array $fields): string
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $fields,   // array → multipart/form-data
+            CURLOPT_TIMEOUT        => 60,         // generous for sequential photo uploads
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
         $body  = curl_exec($ch);

@@ -540,3 +540,26 @@ export const publishFbPostApi = (token: string, payload: FbPublishPayload) =>
     method: 'POST',
     body: JSON.stringify(payload),
   }, token);
+
+/**
+ * Upload a single image file for use as a Facebook post attachment.
+ * Files are stored under the `facebook/` sub-directory in the configured
+ * storage backend (R2 or local).  The returned public URL can then be
+ * included in `imageUrls` when calling publishFbPostApi.
+ */
+export const uploadFbImageApi = async (token: string, file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('type', 'facebook');
+  form.append('file', file);
+
+  const response = await fetch(`${BACKEND_URL}/api/admin/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+
+  const data = await response.json() as { url?: string; detail?: string };
+  if (!response.ok) throw new Error(data.detail ?? 'Image upload failed.');
+  if (!data.url) throw new Error('No URL returned from upload.');
+  return data.url;
+};

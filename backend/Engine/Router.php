@@ -608,7 +608,7 @@ class Router
     {
         $this->requireAuth('admin');
 
-        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio'];
+        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio', 'facebook'];
         $type = $_POST['type'] ?? '';
         if (!in_array($type, $allowed_types, true)) {
             throw new RuntimeException('Invalid upload type. Must be one of: ' . implode(', ', $allowed_types) . '.', 422);
@@ -1100,6 +1100,7 @@ class Router
         $message     = trim((string) ($data['message']     ?? ''));
         $features    = is_array($data['features'] ?? null) ? $data['features'] : [];
         $isPortfolio = (bool) ($data['isPortfolio'] ?? false);
+        $imageUrls   = $this->sanitizeImageUrls($data['imageUrls'] ?? null);
 
         if ($pageId === '') {
             throw new RuntimeException('pageId is required.', 422);
@@ -1108,15 +1109,22 @@ class Router
             throw new RuntimeException('message is required.', 422);
         }
 
-        // Publish to Facebook
-        $postId = (new FacebookPageService())->publishPost($pageId, $message, $features, $isPortfolio);
+        // Publish to Facebook (with optional image attachments)
+        $postId = (new FacebookPageService())->publishPost(
+            $pageId, $message, $features, $isPortfolio, $imageUrls
+        );
 
         // When marked as a portfolio post, also save it to the portfolio table
         $portfolioItem = null;
         if ($isPortfolio) {
             $title    = trim((string) ($data['portfolioTitle']    ?? ''));
             $category = trim((string) ($data['portfolioCategory'] ?? ''));
+            // Prefer the first attached image URL as the portfolio image when no
+            // explicit portfolioImageUrl is provided.
             $imageUrl = trim((string) ($data['portfolioImageUrl'] ?? ''));
+            if ($imageUrl === '' && !empty($imageUrls)) {
+                $imageUrl = $imageUrls[0];
+            }
 
             if ($title === '') {
                 throw new RuntimeException('portfolioTitle is required when isPortfolio is true.', 422);
@@ -1146,6 +1154,29 @@ class Router
             'postId'        => $postId,
             'portfolioItem' => $portfolioItem,
         ]);
+    }
+
+    /**
+     * Validate and normalise an array of image URLs supplied in a request body.
+     * Strips blank entries, validates each as a URL, and caps the list at 10
+     * (Facebook's attached_media hard limit).
+     *
+     * @param  mixed $raw  The raw value from the decoded JSON body
+     * @return string[]    Validated, trimmed URLs
+     */
+    private function sanitizeImageUrls(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        return array_values(array_filter(
+            array_slice(
+                array_map(fn ($u) => trim((string) $u), $raw),
+                0,
+                10
+            ),
+            fn ($u) => $u !== '' && filter_var($u, FILTER_VALIDATE_URL) !== false
+        ));
     }
 }
 

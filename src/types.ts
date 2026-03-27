@@ -309,6 +309,9 @@ export interface FbPublishPayload {
   /** Required when isPortfolio is true */
   portfolioTitle?: string;
   portfolioCategory?: string;
+  /** Explicit portfolio cover image URL; falls back to first imageUrl when omitted */
   portfolioImageUrl?: string;
+  /** Public image URLs to attach to the Facebook post (max 10) */
+  imageUrls?: string[];
 }
 

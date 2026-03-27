@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Facebook, Link2, Link2Off, Loader2, AlertCircle, CheckCircle2,
-  Plus, Send, X, ChevronDown, ChevronUp, ImageIcon,
+  Plus, Send, X, ChevronDown, ChevronUp, ImageIcon, Upload,
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ import {
   fetchFbPagesApi,
   deleteFbPageApi,
   publishFbPostApi,
+  uploadFbImageApi,
 } from '../../services/api';
 import { addPortfolioItem } from '../../store/portfolioSlice';
 import type { AppDispatch } from '../../store';
@@ -24,6 +25,19 @@ const FB_STATE_KEY = 'fb_oauth_state';
 /** Generate a cryptographically random state token for OAuth CSRF protection. */
 function generateState(): string {
   return crypto.randomUUID();
+}
+
+// ── types ─────────────────────────────────────────────────────────────────────
+
+/** Tracks a single image chosen for attachment in the post composer. */
+interface ImagePreviewEntry {
+  file: File;
+  /** Object URL created from the File for local preview rendering. */
+  preview: string;
+  /** Public URL returned after successful upload to the backend. null while uploading. */
+  url: string | null;
+  uploading: boolean;
+  error: string | null;
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -114,6 +128,10 @@ export default function FacebookPanel() {
   const [publishing,      setPublishing]      = useState(false);
   const [publishResult,   setPublishResult]   = useState<{ postId: string; savedToPortfolio: boolean } | null>(null);
   const [publishError,    setPublishError]    = useState<string | null>(null);
+
+  // ── image attachments ──
+  const [imagePreviews,   setImagePreviews]   = useState<ImagePreviewEntry[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── load pages ──────────────────────────────────────────────────────────────
   const loadPages = useCallback(async () => {
@@ -210,21 +228,86 @@ export default function FacebookPanel() {
   const removeFeature = (idx: number) =>
     setFeatures(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : ['']);
 
+  // ── image attachment helpers ────────────────────────────────────────────────
+  const MAX_IMAGES = 10;
+
+  const handleImageFiles = (files: FileList | null) => {
+    if (!files || !token) return;
+    const remaining = MAX_IMAGES - imagePreviews.length;
+    if (remaining <= 0) return;
+    const accepted = Array.from(files).slice(0, remaining);
+
+    accepted.forEach(file => {
+      const preview = URL.createObjectURL(file);
+      // Add a pending entry immediately so the UI shows the preview
+      const entry = { file, preview, url: null, uploading: true, error: null };
+      setImagePreviews(prev => [...prev, entry]);
+
+      uploadFbImageApi(token, file)
+        .then(url => {
+          setImagePreviews(prev =>
+            prev.map(e => e.file === file ? { ...e, url, uploading: false } : e)
+          );
+        })
+        .catch((err: unknown) => {
+          setImagePreviews(prev =>
+            prev.map(e => e.file === file
+              ? { ...e, uploading: false, error: (err as Error).message ?? 'Upload failed.' }
+              : e
+            )
+          );
+        });
+    });
+  };
+
+  const removeImage = (idx: number) => {
+    setImagePreviews(prev => {
+      const entry = prev[idx];
+      if (entry) URL.revokeObjectURL(entry.preview);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  /** Reset the composer to its initial empty state and close it. */
+  const resetComposer = useCallback((previews: ImagePreviewEntry[]) => {
+    previews.forEach(e => URL.revokeObjectURL(e.preview));
+    setImagePreviews([]);
+    setMessage('');
+    setFeatures(['']);
+    setIsPortfolio(false);
+    setPortfolioTitle('');
+    setPortfolioCategory('');
+    setPortfolioImageUrl('');
+    setPublishError(null);
+    setPublishResult(null);
+    setComposerOpen(false);
+  }, []);
+
   // ── publish ─────────────────────────────────────────────────────────────────
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !selectedPageId) return;
+
+    // Block if any image is still uploading
+    if (imagePreviews.some(entry => entry.uploading)) return;
+
     setPublishing(true);
     setPublishError(null);
     setPublishResult(null);
 
     try {
       const cleanFeatures = features.map(f => f.trim()).filter(Boolean);
+      // Collect successfully uploaded URLs in display order
+      const finalImageUrls = imagePreviews
+        .filter(e => e.url !== null)
+        .map(e => e.url as string);
+
       const payload = {
         pageId:  selectedPageId,
         message,
         features: cleanFeatures,
         isPortfolio,
+        imageUrls: finalImageUrls,
         ...(isPortfolio && {
           portfolioTitle:    portfolioTitle.trim(),
           portfolioCategory: portfolioCategory.trim(),
@@ -245,14 +328,8 @@ export default function FacebookPanel() {
         savedToPortfolio: result.portfolioItem !== null,
       });
 
-      // Reset form
-      setMessage('');
-      setFeatures(['']);
-      setIsPortfolio(false);
-      setPortfolioTitle('');
-      setPortfolioCategory('');
-      setPortfolioImageUrl('');
-      setComposerOpen(false);
+      // Reset form and revoke preview object URLs only on success
+      resetComposer(imagePreviews);
     } catch (e: unknown) {
       setPublishError((e as Error).message ?? 'Failed to publish post.');
     } finally {
@@ -433,6 +510,111 @@ export default function FacebookPanel() {
                 </button>
               </div>
 
+              {/* ── Attached Images ── */}
+              <div className="border-t border-gray-800 pt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                    Attached Images
+                    <span className="ml-2 text-gray-600 normal-case font-normal">
+                      (up to {MAX_IMAGES})
+                    </span>
+                  </label>
+                  {imagePreviews.length < MAX_IMAGES && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" /> Add Images
+                    </button>
+                  )}
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="hidden"
+                  onChange={e => { handleImageFiles(e.target.files); e.target.value = ''; }}
+                />
+
+                {/* Image grid */}
+                {imagePreviews.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {imagePreviews.map((entry, idx) => (
+                      <div key={idx} className="relative group aspect-square rounded-sm overflow-hidden border border-gray-700 bg-brand-darker">
+                        <img
+                          src={entry.preview}
+                          alt={`Attachment ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Uploading overlay */}
+                        {entry.uploading && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 text-brand-orange animate-spin" />
+                          </div>
+                        )}
+                        {/* Error overlay */}
+                        {entry.error && (
+                          <div className="absolute inset-0 bg-red-900/70 flex flex-col items-center justify-center p-1">
+                            <AlertCircle className="w-4 h-4 text-red-300 mb-0.5" />
+                            <span className="text-red-200 text-[10px] text-center leading-tight">
+                              {entry.error}
+                            </span>
+                          </div>
+                        )}
+                        {/* Remove button */}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 right-1 bg-black/70 hover:bg-red-600/80 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remove image"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Add-more tile */}
+                    {imagePreviews.length < MAX_IMAGES && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square rounded-sm border border-dashed border-gray-700 hover:border-brand-orange flex flex-col items-center justify-center text-gray-600 hover:text-brand-orange transition-colors"
+                        title="Add more images"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {imagePreviews.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border border-dashed border-gray-700 hover:border-brand-orange rounded-sm py-6 flex flex-col items-center justify-center gap-2 text-gray-600 hover:text-brand-orange transition-colors"
+                  >
+                    <ImageIcon className="w-6 h-6" />
+                    <span className="text-xs font-bold uppercase tracking-widest">
+                      Click to add images
+                    </span>
+                    <span className="text-xs text-gray-700 normal-case">
+                      JPEG, PNG, WebP, GIF · max {MAX_IMAGES} files
+                    </span>
+                  </button>
+                )}
+
+                {imagePreviews.some(e => e.uploading) && (
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Uploading images… Please wait before publishing.
+                  </p>
+                )}
+              </div>
+
               {/* Portfolio checkbox */}
               <div className="border-t border-gray-800 pt-5 space-y-4">
                 <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -507,7 +689,7 @@ export default function FacebookPanel() {
               <div className="flex gap-3 pt-2 border-t border-gray-800">
                 <button
                   type="submit"
-                  disabled={publishing || !selectedPageId}
+                  disabled={publishing || !selectedPageId || imagePreviews.some(e => e.uploading)}
                   className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm text-sm"
                 >
                   {publishing
@@ -517,11 +699,7 @@ export default function FacebookPanel() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setComposerOpen(false);
-                    setPublishError(null);
-                    setPublishResult(null);
-                  }}
+                  onClick={() => resetComposer(imagePreviews)}
                   className="px-5 py-3 border border-gray-700 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-colors rounded-sm text-sm"
                 >
                   Cancel
