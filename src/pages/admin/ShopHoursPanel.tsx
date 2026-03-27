@@ -25,12 +25,13 @@ function buildDefaults(existing: ShopDayHours[]): ShopDayHours[] {
 export default function ShopHoursPanel() {
   const { token } = useAuth();
 
-  const [hours,        setHours]        = useState<ShopDayHours[]>([]);
-  const [slotCapacity, setSlotCapacity] = useState(3);
-  const [loading,      setLoading]      = useState(true);
-  const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState<string | null>(null);
-  const [saved,        setSaved]        = useState(false);
+  const [hours,           setHours]           = useState<ShopDayHours[]>([]);
+  const [slotCapacity,    setSlotCapacity]    = useState(3);
+  const [loading,         setLoading]         = useState(true);
+  const [savingHours,     setSavingHours]     = useState(false);
+  const [savingCapacity,  setSavingCapacity]  = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+  const [saved,           setSaved]           = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -61,7 +62,7 @@ export default function ShopHoursPanel() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    setSaving(true);
+    setSavingHours(true);
     setError(null);
     setSaved(false);
     try {
@@ -71,7 +72,7 @@ export default function ShopHoursPanel() {
     } catch (err: unknown) {
       setError((err as Error)?.message ?? 'Failed to save shop hours.');
     } finally {
-      setSaving(false);
+      setSavingHours(false);
     }
   };
 
@@ -200,11 +201,11 @@ export default function ShopHoursPanel() {
         <div className="flex justify-end mt-5">
           <button
             type="submit"
-            disabled={saving}
+            disabled={savingHours}
             className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? 'Saving…' : 'Save Hours'}
+            {savingHours ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {savingHours ? 'Saving…' : 'Save Hours'}
           </button>
         </div>
       </form>
@@ -242,10 +243,10 @@ export default function ShopHoursPanel() {
       <div className="flex justify-end">
         <button
           type="button"
-          disabled={saving}
+          disabled={savingCapacity}
           onClick={async () => {
             if (!token) return;
-            setSaving(true);
+            setSavingCapacity(true);
             setError(null);
             setSaved(false);
             try {
@@ -254,13 +255,13 @@ export default function ShopHoursPanel() {
             } catch (err: unknown) {
               setError((err as Error)?.message ?? 'Failed to save capacity.');
             } finally {
-              setSaving(false);
+              setSavingCapacity(false);
             }
           }}
           className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? 'Saving…' : 'Save Capacity'}
+          {savingCapacity ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {savingCapacity ? 'Saving…' : 'Save Capacity'}
         </button>
       </div>
     </div>
