@@ -100,6 +100,13 @@ class Router
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
 
+            // ── Facebook Page management (admin only) ────────────────────────
+            $r->addRoute('GET',    '/api/admin/fb/auth-url',            'handleFbAuthUrl');
+            $r->addRoute('GET',    '/api/admin/fb/callback',            'handleFbCallback');
+            $r->addRoute('GET',    '/api/admin/fb/pages',               'handleFbPageList');
+            $r->addRoute('DELETE', '/api/admin/fb/pages/{pageId}',      'handleFbPageDelete');
+            $r->addRoute('POST',   '/api/admin/fb/publish',             'handleFbPublish');
+
             // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
             $r->addRoute('GET', '/api/vehicles/models', 'handleVehicleModels');
@@ -1013,6 +1020,126 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new FaqService())->delete($id);
         echo json_encode(['message' => 'FAQ deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Facebook Page management handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleFbAuthUrl(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $redirectUri = trim((string) ($_GET['redirect_uri'] ?? ''));
+        if ($redirectUri === '') {
+            throw new RuntimeException('redirect_uri query parameter is required.', 422);
+        }
+        $url = (new FacebookPageService())->buildAuthUrl($redirectUri);
+        echo json_encode(['url' => $url]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFbCallback(array $vars = []): void
+    {
+        // Callback is browser-initiated (no Bearer token), but we still want
+        // it gated – state CSRF check inside the service handles this.
+        $code        = trim((string) ($_GET['code']         ?? ''));
+        $state       = trim((string) ($_GET['state']        ?? ''));
+        $redirectUri = trim((string) ($_GET['redirect_uri'] ?? ''));
+
+        if ($code === '' || $state === '') {
+            throw new RuntimeException('Missing code or state parameter.', 422);
+        }
+        if ($redirectUri === '') {
+            throw new RuntimeException('redirect_uri query parameter is required.', 422);
+        }
+
+        $pages = (new FacebookPageService())->handleCallback($code, $state, $redirectUri);
+        // Strip page_access_token from the public response
+        $safe = array_map(static function (array $p): array {
+            unset($p['pageAccessToken']);
+            return $p;
+        }, $pages);
+        echo json_encode(['pages' => array_values($safe)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFbPageList(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $pages = (new FacebookPageService())->listPages();
+        // Strip page_access_token from the API response
+        $safe = array_map(static function (array $p): array {
+            unset($p['pageAccessToken']);
+            return $p;
+        }, $pages);
+        echo json_encode(['pages' => array_values($safe)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFbPageDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $pageId = $vars['pageId'] ?? '';
+        (new FacebookPageService())->deletePage($pageId);
+        echo json_encode(['message' => 'Facebook page disconnected.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleFbPublish(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data        = $this->jsonBody();
+        $pageId      = trim((string) ($data['pageId']      ?? ''));
+        $message     = trim((string) ($data['message']     ?? ''));
+        $features    = is_array($data['features'] ?? null) ? $data['features'] : [];
+        $isPortfolio = (bool) ($data['isPortfolio'] ?? false);
+
+        if ($pageId === '') {
+            throw new RuntimeException('pageId is required.', 422);
+        }
+        if ($message === '') {
+            throw new RuntimeException('message is required.', 422);
+        }
+
+        // Publish to Facebook
+        $postId = (new FacebookPageService())->publishPost($pageId, $message, $features, $isPortfolio);
+
+        // When marked as a portfolio post, also save it to the portfolio table
+        $portfolioItem = null;
+        if ($isPortfolio) {
+            $title    = trim((string) ($data['portfolioTitle']    ?? ''));
+            $category = trim((string) ($data['portfolioCategory'] ?? ''));
+            $imageUrl = trim((string) ($data['portfolioImageUrl'] ?? ''));
+
+            if ($title === '') {
+                throw new RuntimeException('portfolioTitle is required when isPortfolio is true.', 422);
+            }
+
+            // Build description: message + bullet features
+            $description = $message;
+            $cleanFeatures = array_values(array_filter(
+                array_map('trim', $features),
+                fn ($f) => $f !== ''
+            ));
+            if (!empty($cleanFeatures)) {
+                $description .= "\n\n" . implode("\n", array_map(fn ($f) => '• ' . $f, $cleanFeatures));
+            }
+
+            $portfolioItem = (new PortfolioService())->create([
+                'title'       => $title,
+                'category'    => $category,
+                'description' => $description,
+                'imageUrl'    => $imageUrl,
+                'sortOrder'   => 0,
+                'isActive'    => true,
+            ]);
+        }
+
+        echo json_encode([
+            'postId'        => $postId,
+            'portfolioItem' => $portfolioItem,
+        ]);
     }
 }
 

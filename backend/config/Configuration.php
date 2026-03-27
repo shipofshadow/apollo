@@ -20,6 +20,13 @@ define(
 
 define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN'] ?? '');
 
+// ---------------------------------------------------------------------------
+// Facebook App credentials – required for OAuth token exchange
+// ---------------------------------------------------------------------------
+
+define('FB_APP_ID',     $_ENV['FB_APP_ID']     ?? '');
+define('FB_APP_SECRET', $_ENV['FB_APP_SECRET'] ?? '');
+
 define('CACHE_TTL_SECONDS', (int)($_ENV['CACHE_TTL_SECONDS'] ?? 60));
 
 define(

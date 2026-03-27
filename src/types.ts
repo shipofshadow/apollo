@@ -286,3 +286,27 @@ export interface FaqState {
   error: string | null;
 }
 
+// ── Facebook Page Management ──────────────────────────────────────────────────
+
+export interface FacebookPage {
+  id: number;
+  pageId: string;
+  pageName: string;
+  tokenValid: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FbPublishPayload {
+  pageId: string;
+  message: string;
+  /** Optional bullet-point features appended to the post body */
+  features?: string[];
+  /** When true, also saves the post as a portfolio item */
+  isPortfolio?: boolean;
+  /** Required when isPortfolio is true */
+  portfolioTitle?: string;
+  portfolioCategory?: string;
+  portfolioImageUrl?: string;
+}
+

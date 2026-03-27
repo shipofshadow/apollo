@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem } from '../types';
+import type { BookingPayload, Booking, FacebookPost, FacebookPage, FbPublishPayload, User, Service, Product, PortfolioItem } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -510,3 +510,26 @@ export const fetchFacebookPosts = async (after?: string): Promise<FacebookPostsP
     nextCursor: hasNext ? nextCursor : null,
   };
 };
+
+// ── Facebook Page management (admin) ─────────────────────────────────────────
+
+export const fetchFbAuthUrlApi = (token: string, redirectUri: string) =>
+  apiFetch<{ url: string }>(
+    `/api/admin/fb/auth-url?redirect_uri=${encodeURIComponent(redirectUri)}`,
+    {},
+    token
+  );
+
+export const fetchFbPagesApi = (token: string) =>
+  apiFetch<{ pages: FacebookPage[] }>('/api/admin/fb/pages', {}, token);
+
+export const deleteFbPageApi = (token: string, pageId: string) =>
+  apiFetch<{ message: string }>(`/api/admin/fb/pages/${encodeURIComponent(pageId)}`, {
+    method: 'DELETE',
+  }, token);
+
+export const publishFbPostApi = (token: string, payload: FbPublishPayload) =>
+  apiFetch<{ postId: string; portfolioItem: PortfolioItem | null }>('/api/admin/fb/publish', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, token);
