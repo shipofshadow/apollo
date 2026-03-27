@@ -153,12 +153,14 @@ export interface FacebookAttachmentMedia {
 }
 
 export interface FacebookSubAttachment {
+  type?: string;
   media?: FacebookAttachmentMedia;
   url?: string;
   description?: string;
 }
 
 export interface FacebookAttachment {
+  type?: string;
   description?: string;
   media?: FacebookAttachmentMedia;
   url?: string;
