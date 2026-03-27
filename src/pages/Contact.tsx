@@ -5,6 +5,16 @@ import { MapPin, Phone, Mail, Clock, ExternalLink, Calendar } from 'lucide-react
 import { fetchSiteSettingsAsync } from '../store/siteSettingsSlice';
 import type { AppDispatch, RootState } from '../store';
 
+// Define the shape so TypeScript stops panicking
+type InfoItem = {
+  icon: React.ElementType;
+  label: string;
+  content?: string | null;
+  multiline?: boolean;
+  href?: string;
+  lines?: string[];
+};
+
 export default function ContactPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { settings } = useSelector((s: RootState) => s.siteSettings);
@@ -27,7 +37,8 @@ export default function ContactPage() {
 
   const hoursLines = hours.split('\n').filter(Boolean);
 
-  const infoItems = [
+  // Apply the type to the array
+  const infoItems: InfoItem[] = [
     {
       icon: MapPin,
       label: 'Location',
@@ -96,13 +107,13 @@ export default function ContactPage() {
                       ) : href ? (
                         <a href={href} className="text-gray-300 text-sm hover:text-brand-orange transition-colors">
                           {multiline
-                            ? content?.split('\n').map((ln, i) => <div key={i}>{ln}</div>)
+                            ? content?.split('\n').map((ln: string, i: number) => <div key={i}>{ln}</div>)
                             : content}
                         </a>
                       ) : (
                         <p className="text-gray-300 text-sm">
                           {multiline
-                            ? content?.split('\n').map((ln, i) => <div key={i}>{ln}</div>)
+                            ? content?.split('\n').map((ln: string, i: number) => <div key={i}>{ln}</div>)
                             : content}
                         </p>
                       )}
