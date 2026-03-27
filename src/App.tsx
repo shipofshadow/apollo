@@ -62,7 +62,7 @@ export default function App() {
               <Route element={<PublicLayout />}>
                 <Route path="/"             element={<Home />} />
                 <Route path="/services"     element={<ServicesPage />} />
-                <Route path="/services/:id" element={<ServiceDetail />} />
+                <Route path="/services/:slug" element={<ServiceDetail />} />
                 <Route path="/products"     element={<Products />} />
                 <Route path="/products/:id" element={<ProductDetail />} />
                 <Route path="/portfolio"    element={<Portfolio />} />

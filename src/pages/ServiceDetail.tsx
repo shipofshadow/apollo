@@ -2,26 +2,25 @@ import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
-import { fetchServiceByIdAsync } from '../store/servicesSlice';
+import { fetchServiceBySlugAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 
 export default function ServiceDetail() {
-  const { id }    = useParams<{ id: string }>();
+  const { slug }  = useParams<{ slug: string }>();
   const dispatch  = useDispatch<AppDispatch>();
   const { token } = useSelector((s: RootState) => s.auth);
 
-  const numId   = id ? parseInt(id, 10) : 0;
   const service = useSelector((s: RootState) =>
-    s.services.items.find(sv => sv.id === numId)
+    s.services.items.find(sv => sv.slug === slug)
   );
   const loadStatus = useSelector((s: RootState) => s.services.status);
 
   // Fetch this service if not yet in store
   useEffect(() => {
-    if (numId && !service) {
-      dispatch(fetchServiceByIdAsync({ id: numId, token }));
+    if (slug && !service) {
+      dispatch(fetchServiceBySlugAsync({ slug, token }));
     }
-  }, [numId, service, token, dispatch]);
+  }, [slug, service, token, dispatch]);
 
   if (loadStatus === 'loading' && !service) {
     return (

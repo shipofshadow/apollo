@@ -53,6 +53,18 @@ class ServiceCrudService
     }
 
     /**
+     * Single service by slug (any active state for admin, active-only for public).
+     *
+     * @return array<string, mixed>
+     */
+    public function getBySlug(string $slug, bool $requireActive = true): array
+    {
+        return $this->useDb
+            ? $this->dbGetBySlug($slug, $requireActive)
+            : $this->fileGetBySlug($slug, $requireActive);
+    }
+
+    /**
      * Create a new service. Returns the created record.
      *
      * @param  array<string, mixed> $data
@@ -118,6 +130,21 @@ class ServiceCrudService
         return $this->mapRow($row, $this->dbFetchFeatures($id));
     }
 
+    /** @return array<string, mixed> */
+    private function dbGetBySlug(string $slug, bool $requireActive): array
+    {
+        $cond = $requireActive ? 'AND is_active = 1' : '';
+        $stmt = Database::getInstance()->prepare(
+            "SELECT * FROM services WHERE slug = :slug $cond LIMIT 1"
+        );
+        $stmt->execute([':slug' => $slug]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('Service not found.', 404);
+        }
+        return $this->mapRow($row, $this->dbFetchFeatures((int) $row['id']));
+    }
+
     // -------------------------------------------------------------------------
     // DB – write
     // -------------------------------------------------------------------------
@@ -128,10 +155,10 @@ class ServiceCrudService
         $db   = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO services
-             (title, description, full_description, icon, image_url,
+             (title, slug, description, full_description, icon, image_url,
               duration, starting_price, sort_order, is_active)
              VALUES
-             (:title, :description, :full_description, :icon, :image_url,
+             (:title, :slug, :description, :full_description, :icon, :image_url,
               :duration, :starting_price, :sort_order, :is_active)'
         );
         $stmt->execute($this->bindParams($data));
@@ -148,6 +175,7 @@ class ServiceCrudService
 
         $merged = array_merge([
             'title'           => $current['title'],
+            'slug'            => $current['slug'],
             'description'     => $current['description'],
             'fullDescription' => $current['fullDescription'],
             'icon'            => $current['icon'],
@@ -163,6 +191,7 @@ class ServiceCrudService
         $stmt = $db->prepare(
             'UPDATE services SET
                title            = :title,
+               slug             = :slug,
                description      = :description,
                full_description = :full_description,
                icon             = :icon,
@@ -281,6 +310,20 @@ class ServiceCrudService
         throw new RuntimeException('Service not found.', 404);
     }
 
+    /** @return array<string, mixed> */
+    private function fileGetBySlug(string $slug, bool $requireActive): array
+    {
+        foreach ($this->fileRead() as $s) {
+            if (($s['slug'] ?? '') === $slug) {
+                if ($requireActive && !($s['isActive'] ?? true)) {
+                    throw new RuntimeException('Service not found.', 404);
+                }
+                return $s;
+            }
+        }
+        throw new RuntimeException('Service not found.', 404);
+    }
+
     /** @param array<string, mixed> $data @return array<string, mixed> */
     private function fileCreate(array $data): array
     {
@@ -347,7 +390,7 @@ class ServiceCrudService
     {
         $defaults = [
             [
-                'id' => 1, 'title' => 'Headlight Retrofits',
+                'id' => 1, 'slug' => 'headlight-retrofits', 'title' => 'Headlight Retrofits',
                 'description'     => 'Custom projector retrofits, demon eyes, halos, and sequential turn signals for maximum visibility and aggressive styling.',
                 'fullDescription' => 'Our headlight retrofitting service is where art meets engineering. We don\'t just install bulbs; we completely rebuild your headlight housings with state-of-the-art bi-LED or HID projectors.',
                 'icon'            => 'Lightbulb',
@@ -357,7 +400,7 @@ class ServiceCrudService
                 'sortOrder' => 1, 'isActive' => true, 'createdAt' => date('c'), 'updatedAt' => date('c'),
             ],
             [
-                'id' => 2, 'title' => 'Android Headunits',
+                'id' => 2, 'slug' => 'android-headunits', 'title' => 'Android Headunits',
                 'description'     => 'Modernize your dash with high-resolution Android screens featuring Apple CarPlay, Android Auto, and custom bezels.',
                 'fullDescription' => 'Upgrade your vehicle\'s infotainment system with our premium Android Headunit installations. We seamlessly integrate modern technology into older vehicles.',
                 'icon'            => 'MonitorPlay',
@@ -367,7 +410,7 @@ class ServiceCrudService
                 'sortOrder' => 2, 'isActive' => true, 'createdAt' => date('c'), 'updatedAt' => date('c'),
             ],
             [
-                'id' => 3, 'title' => 'Security Systems',
+                'id' => 3, 'slug' => 'security-systems', 'title' => 'Security Systems',
                 'description'     => 'Advanced alarm systems, GPS tracking, and kill switches to protect your investment.',
                 'fullDescription' => 'Protect your investment with our advanced security system installations. We go beyond basic alarms, offering comprehensive security solutions that deter theft and provide peace of mind.',
                 'icon'            => 'ShieldAlert',
@@ -377,7 +420,7 @@ class ServiceCrudService
                 'sortOrder' => 3, 'isActive' => true, 'createdAt' => date('c'), 'updatedAt' => date('c'),
             ],
             [
-                'id' => 4, 'title' => 'Aesthetic Upgrades',
+                'id' => 4, 'slug' => 'aesthetic-upgrades', 'title' => 'Aesthetic Upgrades',
                 'description'     => 'Transform the look of your vehicle inside and out with custom grilles, ambient lighting, vinyl wraps, and more.',
                 'fullDescription' => 'Transform the look and feel of your vehicle with our aesthetic upgrades. We offer a wide range of services to personalize your ride, both inside and out.',
                 'icon'            => 'CarFront',
@@ -403,6 +446,7 @@ class ServiceCrudService
     {
         return [
             'id'              => (int) $row['id'],
+            'slug'            => $row['slug'],
             'title'           => $row['title'],
             'description'     => $row['description'],
             'fullDescription' => $row['full_description'],
@@ -421,8 +465,14 @@ class ServiceCrudService
     /** Build PDO bind params from camelCase $data. @return array<string, mixed> */
     private function bindParams(array $data): array
     {
+        $title = $data['title'] ?? '';
+        $slug  = trim($data['slug'] ?? '');
+        if ($slug === '') {
+            $slug = $this->makeSlug($title);
+        }
         return [
-            ':title'            => $data['title']           ?? '',
+            ':title'            => $title,
+            ':slug'             => $slug,
             ':description'      => $data['description']     ?? '',
             ':full_description' => $data['fullDescription'] ?? ($data['full_description'] ?? ''),
             ':icon'             => $data['icon']            ?? 'Wrench',
@@ -434,6 +484,14 @@ class ServiceCrudService
         ];
     }
 
+    /** Convert a title to a URL-safe slug. */
+    private function makeSlug(string $title): string
+    {
+        $slug = strtolower($title);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? $slug;
+        return trim($slug, '-');
+    }
+
     /** Build a camelCase record for file storage. @return array<string, mixed> */
     private function buildRecord(int $id, array $data): array
     {
@@ -442,9 +500,16 @@ class ServiceCrudService
             $features = json_decode($features, true) ?? [];
         }
 
+        $title = $data['title'] ?? '';
+        $slug  = trim($data['slug'] ?? '');
+        if ($slug === '') {
+            $slug = $this->makeSlug($title);
+        }
+
         return [
             'id'              => $id,
-            'title'           => $data['title']           ?? '',
+            'slug'            => $slug,
+            'title'           => $title,
             'description'     => $data['description']     ?? '',
             'fullDescription' => $data['fullDescription'] ?? ($data['full_description'] ?? ''),
             'icon'            => $data['icon']            ?? 'Wrench',

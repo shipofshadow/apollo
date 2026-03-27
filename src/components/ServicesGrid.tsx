@@ -49,7 +49,7 @@ export default function ServicesGrid() {
               const Icon = IconMap[service.icon] ?? Wrench;
               return (
                 <Link
-                  to={`/services/${service.id}`}
+                  to={`/services/${service.slug}`}
                   key={service.id}
                   className="group relative bg-brand-darker/80 backdrop-blur-sm border border-gray-800 p-8 transition-all duration-300 hover:scale-[1.02] hover:border-brand-orange hover:bg-brand-dark hover:shadow-[0_0_20px_rgba(243,111,33,0.4)]"
                 >

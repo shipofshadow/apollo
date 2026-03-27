@@ -98,7 +98,7 @@ export default function Footer() {
               {footerServices.length > 0
                 ? footerServices.map(svc => (
                   <li key={svc.id}>
-                    <Link to={`/services/${svc.id}`} className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2">
+                    <Link to={`/services/${svc.slug}`} className="text-gray-400 hover:text-brand-orange transition-colors flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-brand-orange rounded-full"></span>
                       {svc.title}
                     </Link>

@@ -23,11 +23,12 @@ class Router
             $r->addRoute('GET',  '/api/posts',          'handlePosts');
 
             // ── Services (public read, admin write) ─────────────────────────
-            $r->addRoute('GET',    '/api/services',          'handleServiceList');
-            $r->addRoute('GET',    '/api/services/{id:\d+}', 'handleServiceGet');
-            $r->addRoute('POST',   '/api/services',          'handleServiceCreate');
-            $r->addRoute('PUT',    '/api/services/{id:\d+}', 'handleServiceUpdate');
-            $r->addRoute('DELETE', '/api/services/{id:\d+}', 'handleServiceDelete');
+            $r->addRoute('GET',    '/api/services',                   'handleServiceList');
+            $r->addRoute('GET',    '/api/services/{id:\d+}',          'handleServiceGet');
+            $r->addRoute('GET',    '/api/services/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}', 'handleServiceGetBySlug');
+            $r->addRoute('POST',   '/api/services',                   'handleServiceCreate');
+            $r->addRoute('PUT',    '/api/services/{id:\d+}',          'handleServiceUpdate');
+            $r->addRoute('DELETE', '/api/services/{id:\d+}',          'handleServiceDelete');
 
             // ── Auth ────────────────────────────────────────────────────────
             $r->addRoute('POST', '/api/auth/register',  'handleAuthRegister');
@@ -472,6 +473,23 @@ class Router
         }
 
         $service = (new ServiceCrudService())->getById($id, $requireActive);
+        echo json_encode(['service' => $service]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceGetBySlug(array $vars = []): void
+    {
+        $slug          = $vars['slug'] ?? '';
+        $requireActive = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $requireActive = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* stay public */ }
+        }
+
+        $service = (new ServiceCrudService())->getBySlug($slug, $requireActive);
         echo json_encode(['service' => $service]);
     }
 

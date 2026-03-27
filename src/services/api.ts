@@ -65,6 +65,9 @@ export const fetchServicesApi = (token?: string | null) =>
 export const fetchServiceByIdApi = (id: number, token?: string | null) =>
   apiFetch<{ service: Service }>(`/api/services/${id}`, {}, token);
 
+export const fetchServiceBySlugApi = (slug: string, token?: string | null) =>
+  apiFetch<{ service: Service }>(`/api/services/${slug}`, {}, token);
+
 export const createServiceApi = (
   token: string,
   data: Partial<Omit<Service, 'id' | 'createdAt' | 'updatedAt'>>
