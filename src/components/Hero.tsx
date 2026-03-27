@@ -25,7 +25,7 @@ export default function Hero() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-display font-black leading-[0.85] text-brand-orange text-outline-thick uppercase tracking-tighter">
-            1625 <br />
+            <span className="font-fasthand">1625</span> <br />
             <span className="text-white text-outline-none tracking-tight">
               AUTOLAB
             </span>
@@ -60,7 +60,7 @@ export default function Hero() {
       <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-brand-dark to-transparent z-10"></div>
       <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/3 opacity-5 pointer-events-none overflow-hidden">
         <span className="font-display text-[20rem] font-bold leading-none text-white whitespace-nowrap">
-          1625
+          <span className="font-fasthand">1625</span>
         </span>
       </div>
     </section>

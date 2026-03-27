@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'FastHand';
+  src: url('https://cdn.chopaeng.com/1625autolab/fonts/Fast%20Hand.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-brand-orange: #F36F21; /* Logo Orange */
   --color-brand-dark: #151515; /* Asphalt Dark */
@@ -9,6 +17,7 @@
   
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Oswald", "Impact", sans-serif;
+  --font-fasthand: "FastHand", cursive, sans-serif;
 }
 
 @layer base {
