@@ -123,6 +123,7 @@ export default function FacebookFeed() {
               data-adapt-container-width="true"
               data-hide-cover="false"
               data-show-facepile="true"
+              data-colorscheme="dark"
             />
           </div>
 
