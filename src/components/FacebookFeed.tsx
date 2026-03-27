@@ -103,12 +103,13 @@ export default function FacebookFeed() {
           <div className="w-24 h-1 bg-brand-orange mx-auto mt-6" />
         </div>
 
-        {/* Responsive embed wrapper — capped at FB_MAX_WIDTH so the plugin
-            always fills its container up to the SDK's 500 px hard limit. */}
-        <div className="flex flex-col items-center gap-8">
+        {/* Two-column layout on lg+ screens; stacked on mobile */}
+        <div className="flex flex-col lg:flex-row gap-10 items-start justify-center">
+          {/* Responsive embed wrapper — capped at FB_MAX_WIDTH so the plugin
+              always fills its container up to the SDK's 500 px hard limit. */}
           <div
             ref={wrapperRef}
-            className="w-full"
+            className="w-full lg:flex-1"
             style={{ maxWidth: FB_MAX_WIDTH }}
           >
             {/* Facebook Page Plugin */}
@@ -117,7 +118,7 @@ export default function FacebookFeed() {
               data-href={FB_PAGE_URL}
               data-tabs="timeline"
               data-width={String(pluginWidth)}
-              data-height="700"
+              data-height="900"
               data-small-header="false"
               data-adapt-container-width="true"
               data-hide-cover="false"
@@ -125,16 +126,43 @@ export default function FacebookFeed() {
             />
           </div>
 
-          {/* Fallback / CTA link */}
-          <a
-            href={FB_PAGE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-8 py-3 font-bold uppercase tracking-widest text-sm transition-colors rounded-sm"
-          >
-            <Facebook className="w-5 h-5" />
-            View Our Facebook Page
-          </a>
+          {/* Info / CTA panel */}
+          <div className="w-full lg:flex-1 flex flex-col gap-8 lg:pt-4">
+            <div className="space-y-4">
+              <h3 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter">
+                Follow Us on <span className="text-brand-orange">Facebook</span>
+              </h3>
+              <p className="text-gray-400 leading-relaxed">
+                Stay up to date with our latest custom builds, shop updates, and behind-the-scenes content. 
+                Follow our page to never miss a drop from 1625 Auto Lab.
+              </p>
+            </div>
+
+            <ul className="space-y-3 text-gray-300 text-sm">
+              {[
+                'New build reveals & progress shots',
+                'Shop announcements & specials',
+                'Customer ride features',
+                'Event coverage & giveaways',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-brand-orange flex-shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            {/* CTA link */}
+            <a
+              href={FB_PAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-8 py-3 font-bold uppercase tracking-widest text-sm transition-colors rounded-sm self-start"
+            >
+              <Facebook className="w-5 h-5" />
+              View Our Facebook Page
+            </a>
+          </div>
         </div>
       </div>
     </section>
