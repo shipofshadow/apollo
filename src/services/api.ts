@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -228,6 +228,48 @@ export const adminRescheduleBookingApi = (
     method: 'PATCH',
     body: JSON.stringify({ appointmentDate, appointmentTime }),
   }, token);
+
+// ── Build Update API ──────────────────────────────────────────────────────────
+
+export const fetchBuildUpdatesApi = (token: string, bookingId: string) =>
+  apiFetch<{ updates: BuildUpdate[] }>(
+    `/api/bookings/${encodeURIComponent(bookingId)}/build-updates`,
+    {},
+    token
+  );
+
+export const createBuildUpdateApi = (
+  token: string,
+  bookingId: string,
+  data: { note: string; photoUrls: string[] }
+) =>
+  apiFetch<{ update: BuildUpdate }>(
+    `/api/bookings/${encodeURIComponent(bookingId)}/build-updates`,
+    { method: 'POST', body: JSON.stringify(data) },
+    token
+  );
+
+export const uploadBuildUpdateMediaApi = async (
+  token: string,
+  bookingId: string,
+  files: File[]
+): Promise<string[]> => {
+  const form = new FormData();
+  files.forEach(f => form.append('files[]', f));
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${BACKEND_URL}/api/bookings/${encodeURIComponent(bookingId)}/build-updates/media`,
+      { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
+    );
+  } catch {
+    throw new Error('Unable to reach the backend server.');
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  return (data as { urls: string[] }).urls;
+};
 
 // ── Vehicle data API (API Ninjas proxy) ───────────────────────────────────────
 

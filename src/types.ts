@@ -365,3 +365,13 @@ export interface OfferState {
   error: string | null;
 }
 
+// ── Build Update ───────────────────────────────────────────────────────────────
+
+export interface BuildUpdate {
+  id: number;
+  bookingId: string;
+  note: string;
+  photoUrls: string[];
+  createdAt: string;
+}
+

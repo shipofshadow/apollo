@@ -5,16 +5,23 @@ import {
   FileText, Hash, Image as ImageIcon, Loader2, Mail,
   Package, PenLine, Phone, User, Wrench, X, XCircle,
   ChevronLeft, ChevronRight, AlertTriangle, RefreshCw,
-  ClipboardList, BadgeCheck,
+  ClipboardList, BadgeCheck, Camera, Plus,
 } from 'lucide-react';
 import {
   fetchAllBookingsAsync,
   updateBookingStatusAsync,
   adminRescheduleBookingAsync,
 } from '../../store/bookingSlice';
-import { updateBookingPartsApi, fetchAvailabilityApi, fetchShopHoursApi } from '../../services/api';
+import {
+  updateBookingPartsApi,
+  fetchAvailabilityApi,
+  fetchShopHoursApi,
+  fetchBuildUpdatesApi,
+  createBuildUpdateApi,
+  uploadBuildUpdateMediaApi,
+} from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, ShopDayHours } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -300,6 +307,15 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
   const [log,           setLog]           = useState<LogEntry[]>([]);
 
+  // Build updates state
+  const [buildUpdates,      setBuildUpdates]      = useState<BuildUpdate[]>([]);
+  const [buildUpdateOpen,   setBuildUpdateOpen]   = useState(false);
+  const [buildUpdateNote,   setBuildUpdateNote]   = useState('');
+  const [buildUpdatePhotos, setBuildUpdatePhotos] = useState<string[]>([]);
+  const [buildUpdateBusy,   setBuildUpdateBusy]   = useState(false);
+  const [photoUploading,    setPhotoUploading]    = useState(false);
+  const buildPhotoInputRef = useRef<HTMLInputElement>(null);
+
   // Seed the log with the booking's submission time on mount
   useEffect(() => {
     if (!token) return;
@@ -319,6 +335,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   // only run once when booking first loads
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]);
+
+  // Load build updates whenever the booking changes
+  useEffect(() => {
+    if (!token || !bookingId) return;
+    fetchBuildUpdatesApi(token, bookingId)
+      .then(({ updates }) => setBuildUpdates(updates))
+      .catch(() => {});
+  }, [token, bookingId]);
 
   const addLog = (entry: LogEntry) => setLog(prev => [...prev, entry]);
 
@@ -357,6 +381,47 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       showToast((e as Error).message ?? 'Failed to save parts info.', 'error');
     } finally {
       setPartsBusy(false); }
+  };
+
+  const handleBuildPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!token || !e.target.files?.length) return;
+    const files = Array.from(e.target.files);
+    setPhotoUploading(true);
+    try {
+      const urls = await uploadBuildUpdateMediaApi(token, booking!.id, files);
+      setBuildUpdatePhotos(prev => [...prev, ...urls]);
+    } catch (err: unknown) {
+      showToast((err as Error).message ?? 'Photo upload failed.', 'error');
+    } finally {
+      setPhotoUploading(false);
+      if (buildPhotoInputRef.current) buildPhotoInputRef.current.value = '';
+    }
+  };
+
+  const handleBuildUpdateSubmit = async () => {
+    if (!token || !booking) return;
+    if (!buildUpdateNote.trim() && buildUpdatePhotos.length === 0) return;
+    setBuildUpdateBusy(true);
+    try {
+      const { update } = await createBuildUpdateApi(token, booking.id, {
+        note: buildUpdateNote.trim(),
+        photoUrls: buildUpdatePhotos,
+      });
+      setBuildUpdates(prev => [...prev, update]);
+      setBuildUpdateNote('');
+      setBuildUpdatePhotos([]);
+      setBuildUpdateOpen(false);
+      showToast('Build update posted.', 'success');
+      addLog({
+        timestamp: new Date().toISOString(),
+        action: 'Build update posted',
+        detail: buildUpdateNote.trim() || `${buildUpdatePhotos.length} photo(s)`,
+      });
+    } catch (err: unknown) {
+      showToast((err as Error).message ?? 'Failed to post update.', 'error');
+    } finally {
+      setBuildUpdateBusy(false);
+    }
   };
 
   if (!booking) {
@@ -624,6 +689,134 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               </div>
             </section>
           )}
+
+          {/* Build Updates */}
+          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5" /> Build Progress Updates
+              </p>
+              {!buildUpdateOpen && (
+                <button
+                  onClick={() => setBuildUpdateOpen(true)}
+                  className="text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add Update
+                </button>
+              )}
+            </div>
+
+            {/* Post new update form */}
+            {buildUpdateOpen && (
+              <div className="mb-5 space-y-3 border border-brand-orange/20 bg-brand-orange/5 rounded-sm p-4">
+                <textarea
+                  rows={3}
+                  value={buildUpdateNote}
+                  onChange={e => setBuildUpdateNote(e.target.value)}
+                  placeholder="e.g. Projectors mounted and aimed. Wiring harness completed."
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors resize-none rounded-sm text-sm"
+                />
+
+                {/* Photo upload */}
+                <div>
+                  <input
+                    ref={buildPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleBuildPhotoUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => buildPhotoInputRef.current?.click()}
+                    disabled={photoUploading}
+                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                  >
+                    {photoUploading
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</>
+                      : <><Camera className="w-3.5 h-3.5" /> Add Photos</>
+                    }
+                  </button>
+                  {buildUpdatePhotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {buildUpdatePhotos.map((url, i) => (
+                        <div key={i} className="relative w-16 h-16">
+                          <img
+                            src={url}
+                            alt={`Upload ${i + 1}`}
+                            className="w-full h-full object-cover rounded-sm border border-gray-700"
+                            referrerPolicy="no-referrer"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setBuildUpdatePhotos(prev => prev.filter((_, j) => j !== i))}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                          >
+                            <X className="w-2.5 h-2.5 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleBuildUpdateSubmit}
+                    disabled={buildUpdateBusy || photoUploading || (!buildUpdateNote.trim() && buildUpdatePhotos.length === 0)}
+                    className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
+                  >
+                    {buildUpdateBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                    Post Update
+                  </button>
+                  <button
+                    onClick={() => { setBuildUpdateOpen(false); setBuildUpdateNote(''); setBuildUpdatePhotos([]); }}
+                    disabled={buildUpdateBusy}
+                    className="border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Existing updates */}
+            {buildUpdates.length === 0 && !buildUpdateOpen ? (
+              <p className="text-gray-600 text-sm italic">No progress updates posted yet.</p>
+            ) : (
+              <ol className="space-y-4">
+                {buildUpdates.slice().reverse().map(upd => (
+                  <li key={upd.id} className="border border-gray-800 rounded-sm p-4 space-y-3">
+                    <p className="text-[10px] text-gray-500 font-mono">
+                      {new Date(upd.createdAt).toLocaleString()}
+                    </p>
+                    {upd.note && (
+                      <p className="text-gray-200 text-sm whitespace-pre-wrap">{upd.note}</p>
+                    )}
+                    {upd.photoUrls.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {upd.photoUrls.map((url, j) => (
+                          <button
+                            key={j}
+                            onClick={() => setLightboxUrl(url)}
+                            className="aspect-square overflow-hidden rounded-sm border border-gray-700 hover:border-brand-orange transition-colors"
+                          >
+                            <img
+                              src={url}
+                              alt={`Progress photo ${j + 1}`}
+                              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                              referrerPolicy="no-referrer"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
 
           {/* Signature */}
           {booking.signatureData && (

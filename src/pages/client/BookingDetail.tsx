@@ -5,16 +5,16 @@ import {
   ArrowLeft, Calendar, Clock, Car, User, Mail, Phone,
   FileText, CheckCircle2, XCircle, Loader2, AlertCircle,
   Edit3, ChevronDown, ChevronUp, Image as ImageIcon,
-  Package, BadgeCheck, ChevronLeft, ChevronRight,
+  Package, BadgeCheck, ChevronLeft, ChevronRight, Camera,
 } from 'lucide-react';
 import {
   fetchBookingByIdAsync,
   cancelMyBookingAsync,
   rescheduleMyBookingAsync,
 } from '../../store/bookingSlice';
-import { fetchAvailabilityApi, fetchShopHoursApi } from '../../services/api';
+import { fetchAvailabilityApi, fetchShopHoursApi, fetchBuildUpdatesApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, ShopDayHours } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -322,6 +322,8 @@ export default function BookingDetail() {
   const [cancelTarget, setCancelTarget]   = useState(false);
   const [cancelBusy, setCancelBusy]       = useState(false);
   const [mediaExpanded, setMediaExpanded] = useState(false);
+  const [buildUpdates,  setBuildUpdates]  = useState<BuildUpdate[]>([]);
+  const [lightboxUrl,   setLightboxUrl]   = useState<string | null>(null);
 
   // Try redux cache first (only if it belongs to the current user), then fetch
   useEffect(() => {
@@ -373,6 +375,15 @@ export default function BookingDetail() {
     }
   };
 
+  // Load build updates after booking is known
+  useEffect(() => {
+    if (!token || !booking) return;
+    fetchBuildUpdatesApi(token, booking.id)
+      .then(({ updates }) => setBuildUpdates(updates))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, booking?.id]);
+
   // ── Loading / Error ──────────────────────────────────────────────────────────
 
   if (loading && !booking) {
@@ -410,6 +421,28 @@ export default function BookingDetail() {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <XCircle className="w-7 h-7" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Full size"
+            className="max-w-full max-h-[90vh] object-contain rounded-sm"
+            referrerPolicy="no-referrer"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Back link */}
       <Link
         to="/client/bookings"
@@ -612,6 +645,52 @@ export default function BookingDetail() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Build Progress Feed */}
+      {buildUpdates.length > 0 && (
+        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-2">
+            <Camera className="w-4 h-4 text-brand-orange" />
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-300">
+              Build Progress ({buildUpdates.length} update{buildUpdates.length !== 1 ? 's' : ''})
+            </span>
+          </div>
+          <ol className="divide-y divide-gray-800">
+            {buildUpdates.slice().reverse().map(upd => (
+              <li key={upd.id} className="px-6 py-5 space-y-3">
+                <p className="text-[10px] font-mono text-gray-500">
+                  {new Date(upd.createdAt).toLocaleString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: 'numeric', minute: '2-digit',
+                  })}
+                </p>
+                {upd.note && (
+                  <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">{upd.note}</p>
+                )}
+                {upd.photoUrls.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {upd.photoUrls.map((url, j) => (
+                      <button
+                        key={j}
+                        onClick={() => setLightboxUrl(url)}
+                        className="group block aspect-video bg-brand-darker rounded-sm overflow-hidden border border-gray-700 hover:border-brand-orange/50 transition-colors"
+                      >
+                        <img
+                          src={url}
+                          alt={`Progress photo ${j + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
