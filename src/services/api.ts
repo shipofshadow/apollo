@@ -671,10 +671,11 @@ export interface FacebookPostsPage {
   nextCursor: string | null;
 }
 
-export const fetchFacebookPosts = async (after?: string): Promise<FacebookPostsPage> => {
+export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<FacebookPostsPage> => {
   const params = new URLSearchParams();
   if (after) params.set('after', after);
-  const url = `${BACKEND_URL}/api/posts${params.size ? `?${params}` : ''}`;
+  params.set('limit', String(limit));
+  const url = `${BACKEND_URL}/api/posts?${params}`;
 
   let response: Response;
   try {
@@ -693,6 +694,20 @@ export const fetchFacebookPosts = async (after?: string): Promise<FacebookPostsP
     posts: (data.data ?? []) as FacebookPost[],
     nextCursor: hasNext ? nextCursor : null,
   };
+};
+
+export const fetchAllFacebookPosts = async (): Promise<FacebookPost[]> => {
+  const allPosts: FacebookPost[] = [];
+  let cursor: string | undefined;
+
+  while (true) {
+    const page = await fetchFacebookPosts(cursor, 100);
+    allPosts.push(...page.posts);
+    if (!page.nextCursor) break;
+    cursor = page.nextCursor;
+  }
+
+  return allPosts;
 };
 
 // ── Contact ──────────────────────────────────────────────────────────────────
