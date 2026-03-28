@@ -142,6 +142,7 @@ export default function ServicesPanel() {
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
             <div className="md:col-span-2 space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Title *</label>
               <input required value={form.title} onChange={set('title')}
@@ -265,23 +266,6 @@ export default function ServicesPanel() {
             </div>
           </div>
 
-          {/* Variations – only shown when editing an existing service */}
-          {editId !== null && token && (
-            <div className="pt-2 border-t border-gray-800">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block mb-3">
-                Package Variations
-                <span className="ml-2 font-normal text-gray-600">(each with its own images &amp; specs)</span>
-              </label>
-              <VariationsManager
-                variations={variations}
-                parentId={editId}
-                parentType="service"
-                token={token}
-                onSaved={v => setVariations(v as ServiceVariation[])}
-              />
-            </div>
-          )}
-
           <div className="flex gap-4 pt-4 border-t border-gray-800">
             <button type="submit" disabled={saving}
               className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
@@ -294,6 +278,23 @@ export default function ServicesPanel() {
             </button>
           </div>
         </form>
+
+        {/* Variations – rendered outside the form to avoid nested <form> elements */}
+        {editId !== null && token && (
+          <div className="mt-6 bg-brand-dark border border-gray-800 rounded-sm p-6">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block mb-3">
+              Package Variations
+              <span className="ml-2 font-normal text-gray-600">(each with its own images &amp; specs)</span>
+            </label>
+            <VariationsManager
+              variations={variations}
+              parentId={editId}
+              parentType="service"
+              token={token}
+              onSaved={v => setVariations(v as ServiceVariation[])}
+            />
+          </div>
+        )}
       </div>
     );
   }
