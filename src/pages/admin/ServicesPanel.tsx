@@ -77,7 +77,7 @@ export default function ServicesPanel() {
 
   const openNew  = () => { setForm(EMPTY_FORM); setEditId(null); setSlugEdited(false); setSaveError(null); setVariations([]); setEditing(true); };
   const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSlugEdited(false); setSaveError(null); setVariations(s.variations ?? []); setEditing(true); };
-  const cancel   = () => { setEditing(false); setEditId(null); setSlugEdited(false); setSaveError(null); setVariations([]); };
+  const cancel   = () => { setEditing(false); setEditId(null); setSlugEdited(false); setSaveError(null); setVariations([]); if (token) dispatch(fetchServicesAsync(token)); };
 
   const set = (field: keyof ServiceForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -101,11 +101,14 @@ export default function ServicesPanel() {
     try {
       if (editId !== null) {
         await dispatch(updateServiceAsync({ token, id: editId, data: payload })).unwrap();
+        setEditing(false);
+        setEditId(null);
+        setVariations([]);
       } else {
-        await dispatch(createServiceAsync({ token, data: payload })).unwrap();
+        const newService = await dispatch(createServiceAsync({ token, data: payload })).unwrap();
+        setEditId(newService.id);
+        setVariations(newService.variations ?? []);
       }
-      setEditing(false);
-      setEditId(null);
     } catch (err: unknown) {
       setSaveError((err as Error)?.message ?? 'Failed to save service.');
     } finally {

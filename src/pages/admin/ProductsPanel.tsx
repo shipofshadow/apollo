@@ -81,7 +81,7 @@ export default function ProductsPanel() {
 
   const openNew  = () => { setForm(EMPTY_PRODUCT_FORM); setEditId(null); setSaveError(null); setVariations([]); setEditing(true); };
   const openEdit = (p: Product) => { setForm(productToForm(p)); setEditId(p.id); setSaveError(null); setVariations(p.variations ?? []); setEditing(true); };
-  const cancel   = () => { setEditing(false); setEditId(null); setSaveError(null); setVariations([]); };
+  const cancel   = () => { setEditing(false); setEditId(null); setSaveError(null); setVariations([]); if (token) dispatch(fetchProductsAsync(token)); };
 
   const set = (field: keyof ProductForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -96,11 +96,14 @@ export default function ProductsPanel() {
     try {
       if (editId !== null) {
         await dispatch(updateProductAsync({ token, id: editId, data: payload })).unwrap();
+        setEditing(false);
+        setEditId(null);
+        setVariations([]);
       } else {
-        await dispatch(createProductAsync({ token, data: payload })).unwrap();
+        const newProduct = await dispatch(createProductAsync({ token, data: payload })).unwrap();
+        setEditId(newProduct.id);
+        setVariations(newProduct.variations ?? []);
       }
-      setEditing(false);
-      setEditId(null);
     } catch (err: unknown) {
       setSaveError((err as Error)?.message ?? 'Failed to save product.');
     } finally {
