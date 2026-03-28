@@ -29,12 +29,12 @@ export function getPostUrl(postId: string): string {
 
 /**
  * Returns true when a Facebook post qualifies for the portfolio:
- *  - more than 2 images attached
+ *  - more than 2 images attached, OR
  *  - message body is longer than 150 characters
  */
 export function isPortfolioPost(post: FacebookPost): boolean {
   return (
-    getPostImages(post).length > 2 &&
+    getPostImages(post).length > 2 ||
     (post.message?.length ?? 0) > 150
   );
 }
