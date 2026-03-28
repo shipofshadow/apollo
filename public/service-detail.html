@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Headlight Retrofit | Service Details | 1625 Auto Lab</title>
+
+  <!-- Google Fonts: Inter (body) + Oswald (display) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ─── Brand tokens ─────────────────────────────────────────────────────── */
+    :root {
+      --orange:   #F36F21;
+      --darker:   #080808;
+      --dark:     #151515;
+      --gray:     #222222;
+      --light:    #F0F0F0;
+    }
+
+    /* ─── Reset / base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+      background-color: var(--darker);
+      color: var(--light);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+
+    /* ─── Typography ───────────────────────────────────────────────────────── */
+    .font-display { font-family: "Oswald", "Impact", sans-serif; }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-family: "Oswald", "Impact", sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: -0.025em;
+    }
+
+    /* ─── Layout helpers ───────────────────────────────────────────────────── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    @media (min-width: 768px) { .container { padding: 0 1.5rem; } }
+
+    /* ─── HEADER ───────────────────────────────────────────────────────────── */
+    .header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 40;
+      transition: background 0.3s, padding 0.3s, box-shadow 0.3s;
+      background: transparent;
+      padding: 1.5rem 0;
+    }
+
+    .header.scrolled {
+      background: rgba(8, 8, 8, 0.95);
+      backdrop-filter: blur(12px);
+      padding: 1rem 0;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.4);
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-logo img {
+      height: 2.5rem;
+      width: auto;
+      max-width: 180px;
+      object-fit: contain;
+      transition: opacity 0.2s;
+    }
+
+    @media (min-width: 768px) {
+      .header-logo img { height: 3rem; max-width: 220px; }
+    }
+
+    .header-logo:hover img { opacity: 0.8; }
+
+    .nav-desktop {
+      display: none;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    @media (min-width: 768px) { .nav-desktop { display: flex; } }
+
+    .nav-link {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      color: #d1d5db;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover, .nav-link.active { color: var(--orange); }
+
+    .btn-book {
+      display: inline-block;
+      background: var(--orange);
+      color: #fff;
+      font-family: "Oswald", sans-serif;
+      font-weight: 700;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 2px;
+      transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-book:hover {
+      background: #ea6012;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(243,111,33,0.3);
+    }
+
+    /* ─── MAIN / PAGE WRAPPER ──────────────────────────────────────────────── */
+    .page {
+      padding-top: 8rem;
+      padding-bottom: 6rem;
+      min-height: 100vh;
+    }
+
+    /* ─── BACK LINK ────────────────────────────────────────────────────────── */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      color: #9ca3af;
+      transition: color 0.2s;
+      margin-bottom: 2rem;
+    }
+
+    .back-link:hover { color: var(--orange); }
+
+    .back-link svg { width: 1rem; height: 1rem; }
+
+    /* ─── SERVICE DETAIL GRID ──────────────────────────────────────────────── */
+    .service-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+
+    @media (min-width: 1024px) {
+      .service-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ─── IMAGE PANEL ──────────────────────────────────────────────────────── */
+    .image-panel {
+      background: var(--dark);
+      border: 1px solid #1f2937;
+      border-radius: 2px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px rgba(243,111,33,0.05);
+    }
+
+    .image-panel img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      aspect-ratio: 16/9;
+    }
+
+    @media (min-width: 1024px) {
+      .image-panel img { aspect-ratio: 1/1; }
+    }
+
+    /* ─── CONTENT PANEL ────────────────────────────────────────────────────── */
+    .content-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* label above title */
+    .service-eyebrow {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--orange);
+      margin-bottom: 0.5rem;
+    }
+
+    .service-title {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-family: "Oswald", sans-serif;
+      font-weight: 900;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+
+    /* ─── PRICE / DURATION BADGES ──────────────────────────────────────────── */
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .badge-price {
+      background: rgba(243,111,33,0.1);
+      border: 1px solid rgba(243,111,33,0.3);
+      color: var(--orange);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 1rem;
+      border-radius: 2px;
+    }
+
+    .badge-duration {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #d1d5db;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 1rem;
+      border-radius: 2px;
+    }
+
+    /* ─── ORANGE DIVIDER ───────────────────────────────────────────────────── */
+    .divider { width: 5rem; height: 4px; background: var(--orange); margin-bottom: 2rem; }
+
+    /* ─── DESCRIPTION ──────────────────────────────────────────────────────── */
+    .service-description {
+      color: #d1d5db;
+      font-size: 1.125rem;
+      line-height: 1.75;
+    }
+
+    /* ─── FEATURES CARD ────────────────────────────────────────────────────── */
+    .features-card {
+      background: rgba(34,34,34,0.3);
+      border: 1px solid #1f2937;
+      padding: 2rem;
+      border-radius: 2px;
+    }
+
+    .features-card h3 {
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 1.5rem;
+    }
+
+    .features-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .features-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      color: #d1d5db;
+    }
+
+    .features-list li svg {
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--orange);
+      flex-shrink: 0;
+      margin-top: 0.125rem;
+    }
+
+    /* ─── BOOK CTA ─────────────────────────────────────────────────────────── */
+    .cta-area {
+      padding-top: 2rem;
+      border-top: 1px solid #1f2937;
+    }
+
+    .btn-book-lg {
+      display: inline-block;
+      background: var(--orange);
+      color: #fff;
+      font-family: "Oswald", sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      padding: 1rem 2rem;
+      border-radius: 2px;
+      transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-book-lg:hover {
+      background: #ea6012;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(243,111,33,0.3);
+    }
+
+    /* ─── VARIATION GALLERY ────────────────────────────────────────────────── */
+    .variations-section { margin-top: 3rem; }
+
+    .variations-section h2 {
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Tab bar */
+    .var-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .var-tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid #374151;
+      border-radius: 2px;
+      background: transparent;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .var-tab:hover { border-color: var(--orange); color: #fff; }
+
+    .var-tab.active {
+      background: var(--orange);
+      border-color: var(--orange);
+      color: #fff;
+    }
+
+    /* Variation body */
+    .var-body { display: none; flex-direction: column; gap: 1.5rem; }
+    .var-body.visible { display: flex; }
+
+    /* Price + description row */
+    .var-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .var-price {
+      background: rgba(243,111,33,0.1);
+      border: 1px solid rgba(243,111,33,0.3);
+      color: var(--orange);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 1rem;
+      border-radius: 2px;
+    }
+
+    .var-desc { color: #9ca3af; font-size: 0.875rem; line-height: 1.6; }
+
+    /* Image carousel */
+    .carousel { position: relative; border-radius: 2px; overflow: hidden; border: 1px solid #1f2937; background: var(--dark); }
+    .carousel-track { position: relative; aspect-ratio: 16/9; }
+    @media (min-width: 768px) { .carousel-track { aspect-ratio: 1/1; } }
+
+    .carousel-img {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .carousel-img.visible { opacity: 1; }
+
+    .carousel-btn {
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      width: 2.25rem; height: 2.25rem;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+      opacity: 0;
+      z-index: 2;
+    }
+
+    .carousel:hover .carousel-btn { opacity: 1; }
+    .carousel-btn:hover { background: var(--orange); }
+    .carousel-btn svg { width: 1.25rem; height: 1.25rem; }
+    .carousel-btn.prev { left: 0.5rem; }
+    .carousel-btn.next { right: 0.5rem; }
+
+    /* Dots */
+    .carousel-dots {
+      position: absolute;
+      bottom: 0.75rem; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 0.375rem;
+      z-index: 2;
+    }
+
+    .dot {
+      width: 0.5rem; height: 0.5rem;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .dot.active { background: var(--orange); }
+
+    /* Counter */
+    .carousel-counter {
+      position: absolute;
+      top: 0.75rem; right: 0.75rem;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.5rem;
+      border-radius: 2px;
+      z-index: 2;
+    }
+
+    /* Thumbnails */
+    .thumbnails {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+    }
+
+    .thumb-btn {
+      flex-shrink: 0;
+      width: 4rem; height: 4rem;
+      border-radius: 2px;
+      overflow: hidden;
+      border: 2px solid #374151;
+      background: none;
+      cursor: pointer;
+      padding: 0;
+      transition: border-color 0.2s;
+    }
+
+    .thumb-btn.active { border-color: var(--orange); }
+    .thumb-btn:hover:not(.active) { border-color: #6b7280; }
+    .thumb-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* Specs table */
+    .specs-table {
+      background: rgba(34,34,34,0.2);
+      border: 1px solid #1f2937;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .specs-header {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .specs-header h4 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #fff;
+    }
+
+    .specs-table table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+
+    .specs-table tr:nth-child(even) { background: rgba(21,21,21,0.4); }
+
+    .specs-table td { padding: 0.75rem 1.25rem; }
+    .specs-table td:first-child { color: #9ca3af; font-weight: 700; width: 40%; }
+    .specs-table td:last-child { color: #fff; }
+
+    /* ─── FOOTER ───────────────────────────────────────────────────────────── */
+    footer {
+      background: var(--darker);
+      border-top: 1px solid #1f2937;
+      padding: 5rem 0 2.5rem;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 3rem;
+      margin-bottom: 4rem;
+    }
+
+    @media (min-width: 768px) {
+      .footer-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (min-width: 1024px) {
+      .footer-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .footer-logo { height: 4rem; width: auto; max-width: 240px; object-fit: contain; }
+
+    .footer-tagline { color: #6b7280; line-height: 1.6; margin-top: 1.5rem; }
+
+    .footer-socials {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .social-btn {
+      width: 2.5rem; height: 2.5rem;
+      background: var(--gray);
+      border: none;
+      border-radius: 2px;
+      display: flex; align-items: center; justify-content: center;
+      color: #9ca3af;
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .social-btn:hover { background: var(--orange); color: #fff; }
+    .social-btn svg { width: 1.25rem; height: 1.25rem; }
+
+    .footer-col h4 {
+      font-size: 1.25rem;
+      color: #fff;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 1rem; }
+
+    .footer-col li { display: flex; align-items: center; gap: 0.5rem; }
+
+    .footer-col li::before {
+      content: '';
+      display: inline-block;
+      width: 0.375rem; height: 0.375rem;
+      background: var(--orange);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .footer-col a {
+      color: #6b7280;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-col a:hover { color: var(--orange); }
+
+    .contact-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .contact-item svg { width: 1.25rem; height: 1.25rem; color: var(--orange); flex-shrink: 0; margin-top: 0.125rem; }
+    .contact-item a, .contact-item span { color: #6b7280; text-decoration: none; font-size: 0.875rem; }
+    .contact-item a:hover { color: var(--orange); }
+    /* override bullet for contact items */
+    .contact-col li::before { display: none; }
+    .contact-col li { align-items: flex-start; gap: 0; }
+
+    .footer-bottom {
+      border-top: 1px solid #1f2937;
+      padding-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    @media (min-width: 768px) { .footer-bottom { flex-direction: row; } }
+
+    .footer-bottom a { color: #6b7280; text-decoration: none; transition: color 0.2s; }
+    .footer-bottom a:hover { color: var(--orange); }
+    .footer-bottom-links { display: flex; gap: 1.5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════ -->
+  <header class="header" id="header">
+    <div class="container header-inner">
+
+      <!-- Logo -->
+      <a href="/" class="header-logo">
+        <img src="https://cdn.1625autolab.com/1625autolab/logos/logo.png"
+             alt="1625 Autolab Logo" referrerpolicy="no-referrer" />
+      </a>
+
+      <!-- Desktop nav -->
+      <nav class="nav-desktop" aria-label="Main navigation">
+        <a href="/"          class="nav-link">Home</a>
+        <a href="/services"  class="nav-link active">Services</a>
+        <a href="/portfolio" class="nav-link">Portfolio</a>
+        <a href="/blog"      class="nav-link">Blog</a>
+        <a href="/about"     class="nav-link">About</a>
+        <a href="/contact"   class="nav-link">Contact</a>
+      </nav>
+
+      <!-- CTA -->
+      <div style="display:none" class="header-cta-desktop">
+        <!-- shown via media query override below -->
+      </div>
+      <a href="/booking" class="btn-book" style="display:none" id="header-cta">Book Appointment</a>
+    </div>
+  </header>
+
+  <style>
+    @media (min-width: 768px) { #header-cta { display: inline-block !important; } }
+  </style>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       MAIN PAGE CONTENT
+  ═══════════════════════════════════════════════════════════════ -->
+  <main class="page">
+    <div class="container">
+
+      <!-- Back link -->
+      <a href="/services" class="back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        Back to Services
+      </a>
+
+      <!-- ── Two-column grid ─────────────────────────────────────────────── -->
+      <div class="service-grid">
+
+        <!-- Left: service image -->
+        <div>
+          <div class="image-panel">
+            <img
+              src="https://images.unsplash.com/photo-1632823471565-1ecdf5c6da11?w=900&auto=format&fit=crop"
+              alt="Headlight Retrofit"
+              referrerpolicy="no-referrer"
+            />
+          </div>
+        </div>
+
+        <!-- Right: content -->
+        <div class="content-panel">
+
+          <div>
+            <span class="service-eyebrow">Service Details</span>
+            <h1 class="service-title">Headlight Retrofit</h1>
+
+            <div class="badges">
+              <span class="badge-price">Starting at ₱18,000</span>
+              <span class="badge-duration">3 – 5 Days</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <p class="service-description">
+              Upgrade your factory headlights with high-performance projector or bi-LED retrofit
+              assemblies. Our certified technicians meticulously disassemble, retrofit, reseal,
+              and re-aim your headlights for a cleaner, brighter beam pattern — dramatically
+              improving night-time visibility and giving your vehicle a distinctive, modern
+              aesthetic without sacrificing OEM fitment quality.
+            </p>
+          </div>
+
+          <!-- Features card -->
+          <div class="features-card">
+            <h3>Key Features &amp; Benefits</h3>
+            <ul class="features-list">
+              <li>
+                <!-- check-circle icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--orange)" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Up to 3× brighter output versus factory halogen bulbs</span>
+              </li>
+              <li>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--orange)" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Precise HID or bi-LED projector for a sharp, focused cutoff line</span>
+              </li>
+              <li>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--orange)" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>OEM-quality re-sealing with butyl glue — weatherproof &amp; long-lasting</span>
+              </li>
+              <li>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--orange)" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Professional beam aiming included — no blinding oncoming traffic</span>
+              </li>
+              <li>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--orange)" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Available with DRL halos, sequential turn signals, and custom shrouds</span>
+              </li>
+              <li>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="color:var(--orange)" aria-hidden="true">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>1-year workmanship warranty on all retrofit installations</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Book CTA -->
+          <div class="cta-area">
+            <a href="/booking" class="btn-book-lg">Book This Service</a>
+          </div>
+
+        </div><!-- /content-panel -->
+      </div><!-- /service-grid -->
+
+      <!-- ── Variation gallery ───────────────────────────────────────────── -->
+      <div class="variations-section">
+        <h2>Available Packages</h2>
+
+        <!-- Tabs -->
+        <div class="var-tabs" id="var-tabs" role="tablist">
+          <button class="var-tab active" role="tab" aria-selected="true"  data-target="var-0">HID Retrofit</button>
+          <button class="var-tab"        role="tab" aria-selected="false" data-target="var-1">Bi-LED Retrofit</button>
+          <button class="var-tab"        role="tab" aria-selected="false" data-target="var-2">Tri-LED Retrofit</button>
+        </div>
+
+        <!-- ── Package 1: HID Retrofit ─────────────────────────────────── -->
+        <div class="var-body visible" id="var-0" role="tabpanel">
+          <div class="var-meta">
+            <span class="var-price">From ₱18,000</span>
+            <p class="var-desc">
+              Classic HID D-series projector retrofit — tried-and-tested technology with
+              excellent colour rendering and a sharp cutoff line.
+            </p>
+          </div>
+
+          <!-- Image carousel -->
+          <div class="carousel" id="carousel-0">
+            <div class="carousel-track">
+              <img class="carousel-img visible"
+                   src="https://images.unsplash.com/photo-1635274605638-d44babc08a4f?w=900&auto=format&fit=crop"
+                   alt="HID Retrofit — image 1" referrerpolicy="no-referrer" />
+              <img class="carousel-img"
+                   src="https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=900&auto=format&fit=crop"
+                   alt="HID Retrofit — image 2" referrerpolicy="no-referrer" />
+              <img class="carousel-img"
+                   src="https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=900&auto=format&fit=crop"
+                   alt="HID Retrofit — image 3" referrerpolicy="no-referrer" />
+            </div>
+
+            <button class="carousel-btn prev" aria-label="Previous image" data-carousel="carousel-0" data-dir="-1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <button class="carousel-btn next" aria-label="Next image" data-carousel="carousel-0" data-dir="1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+
+            <div class="carousel-dots" id="dots-carousel-0">
+              <button class="dot active" aria-label="Go to image 1" data-carousel="carousel-0" data-idx="0"></button>
+              <button class="dot"        aria-label="Go to image 2" data-carousel="carousel-0" data-idx="1"></button>
+              <button class="dot"        aria-label="Go to image 3" data-carousel="carousel-0" data-idx="2"></button>
+            </div>
+
+            <span class="carousel-counter" id="counter-carousel-0">1 / 3</span>
+          </div>
+
+          <!-- Thumbnails -->
+          <div class="thumbnails" id="thumbs-carousel-0">
+            <button class="thumb-btn active" data-carousel="carousel-0" data-idx="0">
+              <img src="https://images.unsplash.com/photo-1635274605638-d44babc08a4f?w=200&auto=format&fit=crop"
+                   alt="" referrerpolicy="no-referrer" />
+            </button>
+            <button class="thumb-btn" data-carousel="carousel-0" data-idx="1">
+              <img src="https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=200&auto=format&fit=crop"
+                   alt="" referrerpolicy="no-referrer" />
+            </button>
+            <button class="thumb-btn" data-carousel="carousel-0" data-idx="2">
+              <img src="https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=200&auto=format&fit=crop"
+                   alt="" referrerpolicy="no-referrer" />
+            </button>
+          </div>
+
+          <!-- Specs -->
+          <div class="specs-table">
+            <div class="specs-header"><h4>Specifications</h4></div>
+            <table>
+              <tbody>
+                <tr><td>Projector Type</td><td>Koito Q5 / Hella 3R / Morimoto Mini D2S</td></tr>
+                <tr><td>Bulb Technology</td><td>HID D2S / D4S (35W)</td></tr>
+                <tr><td>Color Temperature</td><td>5000 K – 6000 K</td></tr>
+                <tr><td>Lumen Output</td><td>~3200 lm per projector</td></tr>
+                <tr><td>Warranty</td><td>1 year workmanship</td></tr>
+                <tr><td>Lead Time</td><td>3 – 4 working days</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- /var-0 -->
+
+        <!-- ── Package 2: Bi-LED Retrofit ──────────────────────────────── -->
+        <div class="var-body" id="var-1" role="tabpanel">
+          <div class="var-meta">
+            <span class="var-price">From ₱28,000</span>
+            <p class="var-desc">
+              Dual-function LED module with separate high and low beam — the modern choice
+              for clarity, efficiency, and plug-and-play convenience.
+            </p>
+          </div>
+
+          <div class="carousel" id="carousel-1">
+            <div class="carousel-track">
+              <img class="carousel-img visible"
+                   src="https://images.unsplash.com/photo-1596720426673-e4e14290f0cc?w=900&auto=format&fit=crop"
+                   alt="Bi-LED — image 1" referrerpolicy="no-referrer" />
+              <img class="carousel-img"
+                   src="https://images.unsplash.com/photo-1593697820826-e4e814a98bd6?w=900&auto=format&fit=crop"
+                   alt="Bi-LED — image 2" referrerpolicy="no-referrer" />
+            </div>
+
+            <button class="carousel-btn prev" aria-label="Previous image" data-carousel="carousel-1" data-dir="-1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <button class="carousel-btn next" aria-label="Next image" data-carousel="carousel-1" data-dir="1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+
+            <div class="carousel-dots" id="dots-carousel-1">
+              <button class="dot active" aria-label="Go to image 1" data-carousel="carousel-1" data-idx="0"></button>
+              <button class="dot"        aria-label="Go to image 2" data-carousel="carousel-1" data-idx="1"></button>
+            </div>
+
+            <span class="carousel-counter" id="counter-carousel-1">1 / 2</span>
+          </div>
+
+          <div class="thumbnails" id="thumbs-carousel-1">
+            <button class="thumb-btn active" data-carousel="carousel-1" data-idx="0">
+              <img src="https://images.unsplash.com/photo-1596720426673-e4e14290f0cc?w=200&auto=format&fit=crop"
+                   alt="" referrerpolicy="no-referrer" />
+            </button>
+            <button class="thumb-btn" data-carousel="carousel-1" data-idx="1">
+              <img src="https://images.unsplash.com/photo-1593697820826-e4e814a98bd6?w=200&auto=format&fit=crop"
+                   alt="" referrerpolicy="no-referrer" />
+            </button>
+          </div>
+
+          <div class="specs-table">
+            <div class="specs-header"><h4>Specifications</h4></div>
+            <table>
+              <tbody>
+                <tr><td>Module</td><td>Maxtron Bi-LED / Novsight Alpha</td></tr>
+                <tr><td>Technology</td><td>Dual LED (Hi/Lo)</td></tr>
+                <tr><td>Color Temperature</td><td>5500 K – 6000 K</td></tr>
+                <tr><td>Lumen Output</td><td>~6000 lm per unit</td></tr>
+                <tr><td>Power Draw</td><td>35 W per unit</td></tr>
+                <tr><td>Warranty</td><td>1 year workmanship + 1 year module</td></tr>
+                <tr><td>Lead Time</td><td>4 – 5 working days</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- /var-1 -->
+
+        <!-- ── Package 3: Tri-LED Retrofit ─────────────────────────────── -->
+        <div class="var-body" id="var-2" role="tabpanel">
+          <div class="var-meta">
+            <span class="var-price">From ₱38,000</span>
+            <p class="var-desc">
+              Triple LED chip module with DRL integration — the premium retrofit solution
+              for maximum illumination and a factory-clean appearance.
+            </p>
+          </div>
+
+          <div class="carousel" id="carousel-2">
+            <div class="carousel-track">
+              <img class="carousel-img visible"
+                   src="https://images.unsplash.com/photo-1600705722908-bce3a2b9e518?w=900&auto=format&fit=crop"
+                   alt="Tri-LED — image 1" referrerpolicy="no-referrer" />
+            </div>
+            <!-- no buttons / dots when only 1 image -->
+            <span class="carousel-counter" style="display:none">1 / 1</span>
+          </div>
+
+          <div class="specs-table">
+            <div class="specs-header"><h4>Specifications</h4></div>
+            <table>
+              <tbody>
+                <tr><td>Module</td><td>Maxtron Tri-LED Pro / AES Tri</td></tr>
+                <tr><td>Technology</td><td>3× LED Chip (Hi/Lo + DRL)</td></tr>
+                <tr><td>Color Temperature</td><td>5500 K</td></tr>
+                <tr><td>Lumen Output</td><td>~8000 lm per unit</td></tr>
+                <tr><td>Warranty</td><td>1 year workmanship + 2 years module</td></tr>
+                <tr><td>Lead Time</td><td>5 – 6 working days</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- /var-2 -->
+
+      </div><!-- /variations-section -->
+
+    </div><!-- /container -->
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════════════════════════ -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+
+        <!-- Brand -->
+        <div>
+          <img src="https://cdn.1625autolab.com/1625autolab/logos/logo.png"
+               alt="1625 Autolab Logo" class="footer-logo" referrerpolicy="no-referrer" />
+          <p class="footer-tagline">
+            The premier automotive retrofitting shop. We turn ordinary vehicles into
+            extraordinary machines.
+          </p>
+          <div class="footer-socials">
+            <!-- Instagram -->
+            <a href="https://www.instagram.com/1625autolab" target="_blank"
+               rel="noopener noreferrer" class="social-btn" aria-label="Instagram">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+              </svg>
+            </a>
+            <!-- Facebook -->
+            <a href="https://www.facebook.com/1625autolab/" target="_blank"
+               rel="noopener noreferrer" class="social-btn" aria-label="Facebook">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Quick links -->
+        <div class="footer-col">
+          <h4>Quick Links</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/services">Services</a></li>
+            <li><a href="/portfolio">Portfolio</a></li>
+            <li><a href="/booking">Book Appointment</a></li>
+            <li><a href="/faq">FAQ</a></li>
+          </ul>
+        </div>
+
+        <!-- Services -->
+        <div class="footer-col">
+          <h4>Our Services</h4>
+          <ul>
+            <li><a href="/services">Headlight Retrofits</a></li>
+            <li><a href="/services">Android Headunits</a></li>
+            <li><a href="/services">Security Systems</a></li>
+            <li><a href="/services">Aesthetic Upgrades</a></li>
+          </ul>
+        </div>
+
+        <!-- Contact -->
+        <div class="footer-col contact-col">
+          <h4>Contact Us</h4>
+          <ul style="gap:1.5rem">
+            <li>
+              <div class="contact-item">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span>NKKS Arcade, Krystal Homes, Brgy. Alasas<br>Pampanga, San Fernando, Philippines, 2000</span>
+              </div>
+            </li>
+            <li>
+              <div class="contact-item">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.69a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"></path>
+                </svg>
+                <a href="tel:09393308263">0939 330 8263</a>
+              </div>
+            </li>
+            <li>
+              <div class="contact-item">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                <a href="mailto:1625autolab@gmail.com">1625autolab@gmail.com</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+      </div><!-- /footer-grid -->
+
+      <div class="footer-bottom">
+        <p>&copy; <span id="yr"></span> 1625 Autolab. All rights reserved.</p>
+        <div class="footer-bottom-links">
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Service</a>
+        </div>
+      </div>
+    </div><!-- /container -->
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       JAVASCRIPT — header scroll + variation tabs + carousel
+  ═══════════════════════════════════════════════════════════════ -->
+  <script>
+    /* ── Footer year ───────────────────────────────────────────────────────── */
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    /* ── Header scroll effect ──────────────────────────────────────────────── */
+    const header = document.getElementById('header');
+    window.addEventListener('scroll', () => {
+      header.classList.toggle('scrolled', window.scrollY > 50);
+    }, { passive: true });
+
+    /* ── Carousel helper ───────────────────────────────────────────────────── */
+    /**
+     * carouselState maps carouselId -> { idx: number }
+     */
+    const carouselState = {};
+
+    function getImages(carouselId) {
+      return Array.from(document.querySelectorAll(`#${carouselId} .carousel-img`));
+    }
+
+    function goTo(carouselId, newIdx) {
+      const imgs = getImages(carouselId);
+      if (imgs.length === 0) return;
+
+      const n = imgs.length;
+      newIdx = ((newIdx % n) + n) % n;          // wrap around
+      carouselState[carouselId] = { idx: newIdx };
+
+      // Images
+      imgs.forEach((img, i) => img.classList.toggle('visible', i === newIdx));
+
+      // Dots
+      document.querySelectorAll(`#dots-${carouselId} .dot`).forEach((d, i) => {
+        d.classList.toggle('active', i === newIdx);
+      });
+
+      // Counter
+      const counter = document.getElementById(`counter-${carouselId}`);
+      if (counter) counter.textContent = `${newIdx + 1} / ${n}`;
+
+      // Thumbnails
+      document.querySelectorAll(`#thumbs-${carouselId} .thumb-btn`).forEach((btn, i) => {
+        btn.classList.toggle('active', i === newIdx);
+      });
+    }
+
+    // Initialize state
+    ['carousel-0', 'carousel-1', 'carousel-2'].forEach(id => {
+      carouselState[id] = { idx: 0 };
+    });
+
+    // Prev / Next buttons
+    document.querySelectorAll('.carousel-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id  = btn.dataset.carousel;
+        const dir = parseInt(btn.dataset.dir, 10);
+        goTo(id, (carouselState[id]?.idx ?? 0) + dir);
+      });
+    });
+
+    // Dot buttons
+    document.querySelectorAll('.carousel-dots .dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        goTo(dot.dataset.carousel, parseInt(dot.dataset.idx, 10));
+      });
+    });
+
+    // Thumbnail buttons
+    document.querySelectorAll('.thumbnails .thumb-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        goTo(btn.dataset.carousel, parseInt(btn.dataset.idx, 10));
+      });
+    });
+
+    /* ── Variation tabs ────────────────────────────────────────────────────── */
+    document.querySelectorAll('#var-tabs .var-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Update tab active states
+        document.querySelectorAll('#var-tabs .var-tab').forEach(t => {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+
+        // Show the targeted panel, hide others
+        const targetId = tab.dataset.target;
+        document.querySelectorAll('.var-body').forEach(panel => {
+          panel.classList.toggle('visible', panel.id === targetId);
+        });
+
+        // Reset carousel in newly-visible panel
+        const carouselInPanel = document.querySelector(`#${targetId} .carousel`);
+        if (carouselInPanel) {
+          goTo(carouselInPanel.id, 0);
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
