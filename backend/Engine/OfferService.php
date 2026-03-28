@@ -218,7 +218,8 @@ class OfferService
     private function fileCreate(array $data): array
     {
         $all = $this->fileRead();
-        $id  = empty($all) ? 1 : (int) max(array_column($all, 'id')) + 1;
+        $ids = array_filter(array_column($all, 'id'), fn ($v) => is_numeric($v));
+        $id  = empty($ids) ? 1 : (int) max($ids) + 1;
 
         $record = $this->buildRecord($id, $data);
         $all[]  = $record;

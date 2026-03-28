@@ -6,6 +6,7 @@ export default function PromoBanner() {
   const [offer, setOffer] = useState<Offer | null>(null);
 
   useEffect(() => {
+    // Backend returns only active offers sorted by sort_order; the first one is the highest priority.
     fetchOffersApi()
       .then(({ offers }) => {
         if (offers.length > 0) setOffer(offers[0]);

@@ -203,7 +203,12 @@ export default function OffersPanel() {
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Linked Service (optional)</label>
               <select
                 value={form.linkedServiceId ?? ''}
-                onChange={e => setForm(p => ({ ...p, linkedServiceId: e.target.value ? Number(e.target.value) : null, linkedProductId: null }))}
+                onChange={e => setForm(p => ({
+                  ...p,
+                  // Selecting a service clears the product (mutually exclusive)
+                  linkedServiceId: e.target.value ? Number(e.target.value) : null,
+                  linkedProductId: null,
+                }))}
                 className={`${inputCls} appearance-none`}>
                 <option value="">— None —</option>
                 {services.map(s => (
@@ -215,7 +220,12 @@ export default function OffersPanel() {
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Linked Product (optional)</label>
               <select
                 value={form.linkedProductId ?? ''}
-                onChange={e => setForm(p => ({ ...p, linkedProductId: e.target.value ? Number(e.target.value) : null, linkedServiceId: null }))}
+                onChange={e => setForm(p => ({
+                  ...p,
+                  // Selecting a product clears the service (mutually exclusive)
+                  linkedProductId: e.target.value ? Number(e.target.value) : null,
+                  linkedServiceId: null,
+                }))}
                 className={`${inputCls} appearance-none`}>
                 <option value="">— None —</option>
                 {products.map(pr => (
