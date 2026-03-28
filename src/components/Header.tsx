@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut } from 'lucide-react';
-import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 
+const LOGO_URL = 'https://cdn.1625autolab.com/1625autolab/logos/logo.png';
+
 // Header heights match the Tailwind padding + logo height at each breakpoint:
-//   mobile (<sm):  py-6 (24px×2) + h-10 (40px) = 88px  |  scrolled: py-4 (16px×2) + 40px = 72px
-//   sm (640–767px): py-6 (24px×2) + h-12 (48px) = 96px  |  scrolled: py-4 (16px×2) + 48px = 80px
-const HEADER_HEIGHT = { default: 'top-[88px] sm:top-24', scrolled: 'top-[72px] sm:top-20' } as const;
+//   mobile (<sm):  py-6 (24px×2) + h-14 (56px) = 104px  |  scrolled: py-4 (16px×2) + 56px = 88px
+//   sm (640–767px): py-6 (24px×2) + h-16 (64px) = 112px  |  scrolled: py-4 (16px×2) + 64px = 96px
+const HEADER_HEIGHT = { default: 'top-[104px] sm:top-28', scrolled: 'top-[88px] sm:top-24' } as const;
 
 export default function Header() {
   const navigate  = useNavigate();
@@ -74,8 +75,8 @@ export default function Header() {
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center hover:opacity-80 transition-opacity">
-          <img src={logo} alt="1625 Autolab Logo"
-            className="h-10 sm:h-12 md:h-16 w-auto max-w-[180px] sm:max-w-[220px] md:max-w-[300px] object-contain"
+          <img src={LOGO_URL} alt="1625 Autolab Logo"
+            className="h-14 sm:h-16 md:h-20 w-auto max-w-[220px] sm:max-w-[260px] md:max-w-[360px] object-contain"
             referrerPolicy="no-referrer" />
         </Link>
 
