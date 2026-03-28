@@ -1,19 +1,33 @@
-import { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Loader2, AlertCircle, ImageIcon } from 'lucide-react';
-import { fetchPortfolioAsync } from '../store/portfolioSlice';
-import type { AppDispatch, RootState } from '../store';
+import { fetchFacebookPosts } from '../services/api';
+import type { FacebookPost } from '../types';
+import { getPostImages, getPostTitle, getPostUrl } from '../utils/facebookPostHelpers';
 
 export default function Portfolio() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { items, status, error } = useSelector((s: RootState) => s.portfolio);
+  const [posts, setPosts] = useState<FacebookPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchPortfolioAsync(null));
-  }, [dispatch]);
-
-  const activeItems = items.filter(p => p.isActive);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchFacebookPosts()
+      .then(({ posts: fetched }) => {
+        if (!cancelled) {
+          setPosts(fetched.filter(p => getPostImages(p).length > 0));
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load posts.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
@@ -32,14 +46,14 @@ export default function Portfolio() {
         </div>
 
         {/* Loading */}
-        {status === 'loading' && (
+        {loading && (
           <div className="flex justify-center items-center py-16">
             <Loader2 className="w-10 h-10 text-brand-orange animate-spin" />
           </div>
         )}
 
         {/* Error */}
-        {status === 'error' && error && (
+        {!loading && error && (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <AlertCircle className="w-10 h-10 text-red-500" />
             <p className="text-gray-400">{error}</p>
@@ -47,7 +61,7 @@ export default function Portfolio() {
         )}
 
         {/* Empty */}
-        {status !== 'loading' && !error && activeItems.length === 0 && (
+        {!loading && !error && posts.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <ImageIcon className="w-12 h-12 text-gray-700" />
             <p className="text-gray-400">No portfolio posts available yet. Check back soon!</p>
@@ -55,61 +69,61 @@ export default function Portfolio() {
         )}
 
         {/* Items – alternating left-right layout */}
-        {activeItems.length > 0 && (
+        {posts.length > 0 && (
           <div className="space-y-16">
-            {activeItems.map((item, index) => (
-              <div
-                key={item.id}
-                className={`flex flex-col lg:flex-row gap-8 lg:gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}
-              >
-                {/* Image */}
-                {item.imageUrl && (
+            {posts.map((post, index) => {
+              const images = getPostImages(post);
+              const title = getPostTitle(post);
+              const postUrl = getPostUrl(post.id);
+              return (
+                <div
+                  key={post.id}
+                  className={`flex flex-col lg:flex-row gap-8 lg:gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}
+                >
+                  {/* Image */}
                   <div className="w-full lg:w-1/2">
-                    <div className="relative aspect-[4/3] rounded-sm overflow-hidden border border-gray-800 group">
+                    <a href={postUrl} target="_blank" rel="noopener noreferrer"
+                      className="block relative aspect-[4/3] rounded-sm overflow-hidden border border-gray-800 group">
                       <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       <img
-                        src={item.imageUrl}
-                        alt={item.title}
+                        src={images[0]}
+                        alt={title}
                         className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
                         referrerPolicy="no-referrer"
+                        loading="lazy"
                       />
-                    </div>
+                    </a>
                   </div>
-                )}
 
-                {/* Content */}
-                <div className={`flex flex-col ${item.imageUrl ? 'w-full lg:w-1/2' : 'w-full'}`}>
-                  {item.category && (
-                    <span className="text-brand-orange font-bold uppercase tracking-widest text-xs mb-2">
-                      {item.category}
-                    </span>
-                  )}
-                  <h2 className="text-2xl md:text-3xl font-display font-bold text-white uppercase tracking-wide mb-4">
-                    {item.title}
-                  </h2>
-                  {item.description && (
-                    <p className="text-gray-300 text-base leading-relaxed mb-6 whitespace-pre-wrap">
-                      {item.description}
-                    </p>
-                  )}
+                  {/* Content */}
+                  <div className="flex flex-col w-full lg:w-1/2">
+                    <h2 className="text-2xl md:text-3xl font-display font-bold text-white uppercase tracking-wide mb-4">
+                      {title}
+                    </h2>
+                    {post.message && (
+                      <p className="text-gray-300 text-base leading-relaxed mb-6 whitespace-pre-wrap">
+                        {post.message}
+                      </p>
+                    )}
 
-                  {/* CTA */}
-                  <div className="mt-auto p-6 bg-brand-dark border border-gray-800 rounded-sm">
-                    <h4 className="text-white font-bold mb-2">Planning to upgrade your vehicle?</h4>
-                    <p className="text-gray-400 text-sm mb-4">Message us today to schedule your installation.</p>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <Link
-                        to="/booking"
-                        className="inline-flex items-center justify-center gap-2 bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest hover:bg-white hover:text-brand-dark transition-colors"
-                      >
-                        <Calendar className="w-4 h-4" />
-                        Book This Setup
-                      </Link>
+                    {/* CTA */}
+                    <div className="mt-auto p-6 bg-brand-dark border border-gray-800 rounded-sm">
+                      <h4 className="text-white font-bold mb-2">Planning to upgrade your vehicle?</h4>
+                      <p className="text-gray-400 text-sm mb-4">Message us today to schedule your installation.</p>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Link
+                          to="/booking"
+                          className="inline-flex items-center justify-center gap-2 bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest hover:bg-white hover:text-brand-dark transition-colors"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Book This Setup
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -415,6 +415,7 @@ export default function BookingDetail() {
   }
 
   const canModify = booking.status === 'pending' || booking.status === 'confirmed';
+  const isConfirmed = booking.status === 'confirmed';
   const hasMedia  = (booking.mediaUrls ?? []).length > 0;
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -712,14 +713,16 @@ export default function BookingDetail() {
             {!rescheduling && (
               <button
                 onClick={() => setRescheduling(true)}
-                className="flex items-center gap-2 border border-brand-orange/50 text-brand-orange hover:bg-brand-orange/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
+                disabled={isConfirmed}
+                className="flex items-center gap-2 border border-brand-orange/50 text-brand-orange hover:bg-brand-orange/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Edit3 className="w-3.5 h-3.5" /> Reschedule
               </button>
             )}
             <button
               onClick={() => setCancelTarget(true)}
-              className="flex items-center gap-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
+              disabled={isConfirmed}
+              className="flex items-center gap-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <XCircle className="w-3.5 h-3.5" /> Cancel Booking
             </button>
