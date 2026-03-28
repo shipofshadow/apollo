@@ -611,7 +611,7 @@ class ServiceCrudService
     /** Map DB snake_case row to camelCase API shape.
      * @param array<string, mixed>            $row        Raw PDO fetch row from the services table.
      * @param string[]                        $features   Ordered feature strings from service_features.
-     * @param array<int, array<string, mixed>> $variations Indexed by service_id.
+     * @param array<int, array<string, mixed>> $variations Variations array for the service.
      * @return array<string, mixed>
      */
     private function mapRow(array $row, array $features = [], array $variations = []): array

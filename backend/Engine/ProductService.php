@@ -286,7 +286,7 @@ class ProductService
      * Map a DB snake_case row to the camelCase API shape.
      *
      * @param  array<string, mixed>            $row
-     * @param  array<int, array<string, mixed>> $variations Variations indexed by product_id.
+     * @param  array<int, array<string, mixed>> $variations Variations array for the product.
      * @return array<string, mixed>
      */
     private function mapRow(array $row, array $variations = []): array

@@ -439,10 +439,10 @@ export default function BookingPage() {
                       <div className="mt-1 text-xs text-brand-orange">
                         {Object.entries(selectedVariationIds).map(([svcId, varId]) => {
                           const svc = services.find(s => s.id === Number(svcId));
-                          const v = svc?.variations?.find(v => v.id === varId);
-                          return v ? (
+                          const variation = svc?.variations?.find(v => v.id === varId);
+                          return variation ? (
                             <span key={svcId} className="mr-3">
-                              {svc?.title}: <strong>{v.name}</strong>
+                              {svc?.title}: <strong>{variation.name}</strong>
                             </span>
                           ) : null;
                         })}
@@ -715,8 +715,8 @@ export default function BookingPage() {
                   Packages:{' '}
                   {Object.entries(selectedVariationIds).map(([svcId, varId]) => {
                     const svc = services.find(s => s.id === Number(svcId));
-                    const v = svc?.variations?.find(v => v.id === varId);
-                    return v ? `${svc?.title} – ${v.name}` : null;
+                    const variation = svc?.variations?.find(v => v.id === varId);
+                    return variation ? `${svc?.title} – ${variation.name}` : null;
                   }).filter(Boolean).join(', ')}
                 </p>
               )}
