@@ -97,7 +97,12 @@ class ProductService
         $stmt  = Database::getInstance()->query(
             "SELECT * FROM products {$where}ORDER BY sort_order ASC, id ASC"
         );
-        return array_map([$this, 'mapRow'], $stmt->fetchAll());
+        $rows       = $stmt->fetchAll();
+        $variations = $this->dbFetchAllVariations();
+        return array_map(
+            fn ($row) => $this->mapRow($row, $variations[(int) $row['id']] ?? []),
+            $rows
+        );
     }
 
     /** @return array<string, mixed> */
@@ -112,7 +117,7 @@ class ProductService
         if (!$row) {
             throw new RuntimeException('Product not found.', 404);
         }
-        return $this->mapRow($row);
+        return $this->mapRow($row, $this->dbFetchVariations($id));
     }
 
     // -------------------------------------------------------------------------
@@ -280,10 +285,11 @@ class ProductService
     /**
      * Map a DB snake_case row to the camelCase API shape.
      *
-     * @param  array<string, mixed> $row
+     * @param  array<string, mixed>            $row
+     * @param  array<int, array<string, mixed>> $variations Variations indexed by product_id.
      * @return array<string, mixed>
      */
-    private function mapRow(array $row): array
+    private function mapRow(array $row, array $variations = []): array
     {
         $features = $row['features'] ?? '[]';
         if (is_string($features)) {
@@ -298,6 +304,7 @@ class ProductService
             'category'    =>        $row['category'],
             'imageUrl'    =>        $row['image_url'],
             'features'    =>        $features,
+            'variations'  =>        $variations,
             'sortOrder'   => (int)  $row['sort_order'],
             'isActive'    => (bool) $row['is_active'],
             'createdAt'   =>        $row['created_at'],
@@ -341,10 +348,173 @@ class ProductService
             'category'    => $data['category']    ?? '',
             'imageUrl'    => $data['imageUrl']    ?? ($data['image_url'] ?? ''),
             'features'    => array_values((array) $features),
+            'variations'  => [],
             'sortOrder'   => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             'isActive'    => (bool) ($data['isActive'] ?? ($data['is_active'] ?? true)),
             'createdAt'   => $data['createdAt'] ?? date('c'),
             'updatedAt'   => date('c'),
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // DB – product_variations helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Fetch all variations for a single product.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function dbFetchVariations(int $productId): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM product_variations WHERE product_id = :id ORDER BY sort_order ASC, id ASC'
+        );
+        $stmt->execute([':id' => $productId]);
+        return array_map([$this, 'mapVariationRow'], $stmt->fetchAll());
+    }
+
+    /**
+     * Fetch all variations for all products in one query.
+     *
+     * @return array<int, array<int, array<string, mixed>>>  product_id => variation[]
+     */
+    private function dbFetchAllVariations(): array
+    {
+        $stmt = Database::getInstance()->query(
+            'SELECT * FROM product_variations ORDER BY product_id ASC, sort_order ASC, id ASC'
+        );
+        $map = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $map[(int) $row['product_id']][] = $this->mapVariationRow($row);
+        }
+        return $map;
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private function mapVariationRow(array $row): array
+    {
+        $images = json_decode($row['images'] ?? '[]', true);
+        if (!is_array($images)) {
+            $images = [];
+        }
+        $specs = json_decode($row['specs'] ?? '[]', true);
+        if (!is_array($specs)) {
+            $specs = [];
+        }
+        return [
+            'id'          => (int) $row['id'],
+            'productId'   => (int) $row['product_id'],
+            'name'        => $row['name'],
+            'description' => $row['description'],
+            'price'       => $row['price'],
+            'images'      => $images,
+            'specs'       => $specs,
+            'sortOrder'   => (int) $row['sort_order'],
+        ];
+    }
+
+    /**
+     * Public: create a variation for a product.
+     *
+     * @param  array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function createVariation(int $productId, array $data): array
+    {
+        $this->dbGetById($productId, false); // throws 404 if product missing
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'INSERT INTO product_variations (product_id, name, description, price, images, specs, sort_order)
+             VALUES (:product_id, :name, :description, :price, :images, :specs, :sort_order)'
+        );
+        $stmt->execute($this->bindVariationParams($productId, $data));
+        $varId = (int) $db->lastInsertId();
+        return $this->dbFetchVariationById($varId);
+    }
+
+    /**
+     * Public: update a variation.
+     *
+     * @param  array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function updateVariation(int $productId, int $varId, array $data): array
+    {
+        $this->dbGetById($productId, false); // throws 404 if product missing
+        $current = $this->dbFetchVariationById($varId);
+        $merged  = array_merge([
+            'name'        => $current['name'],
+            'description' => $current['description'],
+            'price'       => $current['price'],
+            'images'      => $current['images'],
+            'specs'       => $current['specs'],
+            'sortOrder'   => $current['sortOrder'],
+        ], $data);
+
+        $stmt = Database::getInstance()->prepare(
+            'UPDATE product_variations SET
+               name        = :name,
+               description = :description,
+               price       = :price,
+               images      = :images,
+               specs       = :specs,
+               sort_order  = :sort_order
+             WHERE id = :id AND product_id = :product_id'
+        );
+        $params                = $this->bindVariationParams($productId, $merged);
+        $params[':id']         = $varId;
+        $stmt->execute($params);
+        return $this->dbFetchVariationById($varId);
+    }
+
+    /**
+     * Public: delete a variation.
+     */
+    public function deleteVariation(int $productId, int $varId): void
+    {
+        $stmt = Database::getInstance()->prepare(
+            'DELETE FROM product_variations WHERE id = :id AND product_id = :product_id'
+        );
+        $stmt->execute([':id' => $varId, ':product_id' => $productId]);
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Variation not found.', 404);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function dbFetchVariationById(int $varId): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM product_variations WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $varId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('Variation not found.', 404);
+        }
+        return $this->mapVariationRow($row);
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function bindVariationParams(int $productId, array $data): array
+    {
+        $images = $data['images'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        $specs = $data['specs'] ?? [];
+        if (!is_array($specs)) {
+            $specs = [];
+        }
+        return [
+            ':product_id'  => $productId,
+            ':name'        => $data['name']        ?? '',
+            ':description' => $data['description'] ?? '',
+            ':price'       => $data['price']       ?? '',
+            ':images'      => json_encode($images),
+            ':specs'       => json_encode($specs),
+            ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
         ];
     }
 

@@ -110,9 +110,17 @@ class ServiceCrudService
         $stmt  = Database::getInstance()->query(
             "SELECT * FROM services {$where}ORDER BY sort_order ASC, id ASC"
         );
-        $rows     = $stmt->fetchAll();
-        $features = $this->dbFetchAllFeatures();
-        return array_map(fn ($row) => $this->mapRow($row, $features[(int) $row['id']] ?? []), $rows);
+        $rows       = $stmt->fetchAll();
+        $features   = $this->dbFetchAllFeatures();
+        $variations = $this->dbFetchAllVariations();
+        return array_map(
+            fn ($row) => $this->mapRow(
+                $row,
+                $features[(int) $row['id']] ?? [],
+                $variations[(int) $row['id']] ?? []
+            ),
+            $rows
+        );
     }
 
     /** @return array<string, mixed> */
@@ -127,7 +135,7 @@ class ServiceCrudService
         if (!$row) {
             throw new RuntimeException('Service not found.', 404);
         }
-        return $this->mapRow($row, $this->dbFetchFeatures($id));
+        return $this->mapRow($row, $this->dbFetchFeatures($id), $this->dbFetchVariations($id));
     }
 
     /** @return array<string, mixed> */
@@ -142,7 +150,8 @@ class ServiceCrudService
         if (!$row) {
             throw new RuntimeException('Service not found.', 404);
         }
-        return $this->mapRow($row, $this->dbFetchFeatures((int) $row['id']));
+        $id = (int) $row['id'];
+        return $this->mapRow($row, $this->dbFetchFeatures($id), $this->dbFetchVariations($id));
     }
 
     // -------------------------------------------------------------------------
@@ -279,6 +288,168 @@ class ServiceCrudService
         foreach (array_values($features) as $i => $feature) {
             $stmt->execute([':sid' => $serviceId, ':feature' => $feature, ':order' => $i + 1]);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // DB – service_variations helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Fetch all variations for a single service.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function dbFetchVariations(int $serviceId): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM service_variations WHERE service_id = :id ORDER BY sort_order ASC, id ASC'
+        );
+        $stmt->execute([':id' => $serviceId]);
+        return array_map([$this, 'mapVariationRow'], $stmt->fetchAll());
+    }
+
+    /**
+     * Fetch all variations for all services in one query.
+     *
+     * @return array<int, array<int, array<string, mixed>>>  service_id => variation[]
+     */
+    private function dbFetchAllVariations(): array
+    {
+        $stmt = Database::getInstance()->query(
+            'SELECT * FROM service_variations ORDER BY service_id ASC, sort_order ASC, id ASC'
+        );
+        $map = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $map[(int) $row['service_id']][] = $this->mapVariationRow($row);
+        }
+        return $map;
+    }
+
+    /** @param array<string, mixed> $row @return array<string, mixed> */
+    private function mapVariationRow(array $row): array
+    {
+        $images = json_decode($row['images'] ?? '[]', true);
+        if (!is_array($images)) {
+            $images = [];
+        }
+        $specs = json_decode($row['specs'] ?? '[]', true);
+        if (!is_array($specs)) {
+            $specs = [];
+        }
+        return [
+            'id'          => (int) $row['id'],
+            'serviceId'   => (int) $row['service_id'],
+            'name'        => $row['name'],
+            'description' => $row['description'],
+            'price'       => $row['price'],
+            'images'      => $images,
+            'specs'       => $specs,
+            'sortOrder'   => (int) $row['sort_order'],
+        ];
+    }
+
+    /**
+     * Public: create a variation for a service.
+     *
+     * @param  array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function createVariation(int $serviceId, array $data): array
+    {
+        $this->dbGetById($serviceId, false); // throws 404 if service missing
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'INSERT INTO service_variations (service_id, name, description, price, images, specs, sort_order)
+             VALUES (:service_id, :name, :description, :price, :images, :specs, :sort_order)'
+        );
+        $stmt->execute($this->bindVariationParams($serviceId, $data));
+        $varId = (int) $db->lastInsertId();
+        return $this->dbFetchVariationById($varId);
+    }
+
+    /**
+     * Public: update a variation.
+     *
+     * @param  array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function updateVariation(int $serviceId, int $varId, array $data): array
+    {
+        $this->dbGetById($serviceId, false); // throws 404 if service missing
+        $current = $this->dbFetchVariationById($varId);
+        $merged  = array_merge([
+            'name'        => $current['name'],
+            'description' => $current['description'],
+            'price'       => $current['price'],
+            'images'      => $current['images'],
+            'specs'       => $current['specs'],
+            'sortOrder'   => $current['sortOrder'],
+        ], $data);
+
+        $stmt = Database::getInstance()->prepare(
+            'UPDATE service_variations SET
+               name        = :name,
+               description = :description,
+               price       = :price,
+               images      = :images,
+               specs       = :specs,
+               sort_order  = :sort_order
+             WHERE id = :id AND service_id = :service_id'
+        );
+        $params                = $this->bindVariationParams($serviceId, $merged);
+        $params[':id']         = $varId;
+        $stmt->execute($params);
+        return $this->dbFetchVariationById($varId);
+    }
+
+    /**
+     * Public: delete a variation.
+     */
+    public function deleteVariation(int $serviceId, int $varId): void
+    {
+        $stmt = Database::getInstance()->prepare(
+            'DELETE FROM service_variations WHERE id = :id AND service_id = :service_id'
+        );
+        $stmt->execute([':id' => $varId, ':service_id' => $serviceId]);
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Variation not found.', 404);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function dbFetchVariationById(int $varId): array
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM service_variations WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $varId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('Variation not found.', 404);
+        }
+        return $this->mapVariationRow($row);
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function bindVariationParams(int $serviceId, array $data): array
+    {
+        $images = $data['images'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        $specs = $data['specs'] ?? [];
+        if (!is_array($specs)) {
+            $specs = [];
+        }
+        return [
+            ':service_id'  => $serviceId,
+            ':name'        => $data['name']        ?? '',
+            ':description' => $data['description'] ?? '',
+            ':price'       => $data['price']       ?? '',
+            ':images'      => json_encode($images),
+            ':specs'       => json_encode($specs),
+            ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
+        ];
     }
 
     // -------------------------------------------------------------------------
@@ -438,11 +609,12 @@ class ServiceCrudService
     // -------------------------------------------------------------------------
 
     /** Map DB snake_case row to camelCase API shape.
-     * @param array<string, mixed> $row      Raw PDO fetch row from the services table.
-     * @param string[]             $features Ordered feature strings from service_features.
+     * @param array<string, mixed>            $row        Raw PDO fetch row from the services table.
+     * @param string[]                        $features   Ordered feature strings from service_features.
+     * @param array<int, array<string, mixed>> $variations Indexed by service_id.
      * @return array<string, mixed>
      */
-    private function mapRow(array $row, array $features = []): array
+    private function mapRow(array $row, array $features = [], array $variations = []): array
     {
         return [
             'id'              => (int) $row['id'],
@@ -455,6 +627,7 @@ class ServiceCrudService
             'duration'        => $row['duration'],
             'startingPrice'   => $row['starting_price'],
             'features'        => $features,
+            'variations'      => $variations,
             'sortOrder'       => (int) $row['sort_order'],
             'isActive'        => (bool) $row['is_active'],
             'createdAt'       => $row['created_at'],
@@ -517,6 +690,7 @@ class ServiceCrudService
             'duration'        => $data['duration']        ?? '',
             'startingPrice'   => $data['startingPrice']   ?? ($data['starting_price'] ?? ''),
             'features'        => $features,
+            'variations'      => [],
             'sortOrder'       => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             'isActive'        => (bool) ($data['isActive'] ?? ($data['is_active'] ?? true)),
             'createdAt'       => $data['createdAt'] ?? date('c'),
