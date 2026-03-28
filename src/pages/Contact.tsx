@@ -120,7 +120,7 @@ export default function ContactPage() {
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
 
-            {/* Contact info */}
+            {/* Left column: Contact info + Map */}
             <div className="space-y-8">
               <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">
                 Contact <span className="text-brand-orange">Info</span>
@@ -158,8 +158,34 @@ export default function ContactPage() {
                 ))}
               </div>
 
+              {/* Map */}
+              <div className="space-y-3">
+                <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">
+                  Find <span className="text-brand-orange">Us</span>
+                </h2>
+                <div className="w-full aspect-video rounded-sm overflow-hidden border border-gray-800 bg-brand-darker">
+                  <iframe
+                    src={mapEmbed}
+                    title="Shop location map"
+                    className="w-full h-full"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+                {mapLink && (
+                  <a
+                    href={mapLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Open in Maps
+                  </a>
+                )}
+              </div>
+
               {/* Book CTA */}
-              <div className="bg-brand-darker border border-gray-800 rounded-sm p-6 mt-8">
+              <div className="bg-brand-darker border border-gray-800 rounded-sm p-6">
                 <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-2">Ready to book?</p>
                 <p className="text-gray-400 text-sm mb-4">Schedule your appointment online. Choose your service, pick a date and time, and we'll confirm within 24 hours.</p>
                 <Link
@@ -171,161 +197,133 @@ export default function ContactPage() {
               </div>
             </div>
 
-            {/* Map */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">
-                Find <span className="text-brand-orange">Us</span>
-              </h2>
-              <div className="w-full aspect-video rounded-sm overflow-hidden border border-gray-800 bg-brand-darker">
-                <iframe
-                  src={mapEmbed}
-                  title="Shop location map"
-                  className="w-full h-full"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
+            {/* Right column: Send a Message form */}
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-2">
+                  Send a <span className="text-brand-orange">Message</span>
+                </h2>
+                <p className="text-gray-400 text-sm">Fill out the form below and we'll get back to you as soon as possible.</p>
               </div>
-              {mapLink && (
-                <a
-                  href={mapLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" /> Open in Maps
-                </a>
+
+              {formStatus === 'success' ? (
+                <div className="flex items-start gap-4 bg-green-900/30 border border-green-700 rounded-sm p-6">
+                  <CheckCircle className="w-6 h-6 text-green-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white font-bold mb-1">Message Sent!</p>
+                    <p className="text-gray-400 text-sm">Thank you for reaching out. We'll get back to you within 24 hours.</p>
+                    <button
+                      onClick={() => setFormStatus('idle')}
+                      className="mt-4 text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors"
+                    >
+                      Send another message
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                        Name <span className="text-brand-orange">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="Juan dela Cruz"
+                        className="w-full bg-brand-darker border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                        Email <span className="text-brand-orange">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        required
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="juan@example.com"
+                        className="w-full bg-brand-darker border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                        Phone <span className="text-gray-600">(optional)</span>
+                      </label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="0912 345 6789"
+                        className="w-full bg-brand-darker border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                        Subject <span className="text-brand-orange">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="subject"
+                        required
+                        value={formData.subject}
+                        onChange={handleChange}
+                        placeholder="General Inquiry"
+                        className="w-full bg-brand-darker border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                      Message <span className="text-brand-orange">*</span>
+                    </label>
+                    <textarea
+                      name="message"
+                      required
+                      rows={5}
+                      value={formData.message}
+                      onChange={handleChange}
+                      placeholder="Tell us about your vehicle and what you need..."
+                      className="w-full bg-brand-darker border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors resize-none"
+                    />
+                  </div>
+
+                  {formStatus === 'error' && (
+                    <div className="flex items-start gap-3 bg-red-900/30 border border-red-700 rounded-sm p-4">
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <p className="text-red-300 text-sm">{formError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={formStatus === 'sending'}
+                    className="inline-flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {formStatus === 'sending' ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Sending…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" /> Send Message
+                      </>
+                    )}
+                  </button>
+                </form>
               )}
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Send a Message */}
-      <section className="py-16 bg-brand-darker">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-2">
-              Send a <span className="text-brand-orange">Message</span>
-            </h2>
-            <p className="text-gray-400 text-sm mb-8">Fill out the form below and we'll get back to you as soon as possible.</p>
-
-            {formStatus === 'success' ? (
-              <div className="flex items-start gap-4 bg-green-900/30 border border-green-700 rounded-sm p-6">
-                <CheckCircle className="w-6 h-6 text-green-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-white font-bold mb-1">Message Sent!</p>
-                  <p className="text-gray-400 text-sm">Thank you for reaching out. We'll get back to you within 24 hours.</p>
-                  <button
-                    onClick={() => setFormStatus('idle')}
-                    className="mt-4 text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors"
-                  >
-                    Send another message
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
-                      Name <span className="text-brand-orange">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      required
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Juan dela Cruz"
-                      className="w-full bg-brand-dark border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
-                      Email <span className="text-brand-orange">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      required
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="juan@example.com"
-                      className="w-full bg-brand-dark border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
-                      Phone <span className="text-gray-600">(optional)</span>
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="0912 345 6789"
-                      className="w-full bg-brand-dark border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
-                      Subject <span className="text-brand-orange">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="subject"
-                      required
-                      value={formData.subject}
-                      onChange={handleChange}
-                      placeholder="General Inquiry"
-                      className="w-full bg-brand-dark border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
-                    Message <span className="text-brand-orange">*</span>
-                  </label>
-                  <textarea
-                    name="message"
-                    required
-                    rows={5}
-                    value={formData.message}
-                    onChange={handleChange}
-                    placeholder="Tell us about your vehicle and what you need..."
-                    className="w-full bg-brand-dark border border-gray-700 rounded-sm px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange transition-colors resize-none"
-                  />
-                </div>
-
-                {formStatus === 'error' && (
-                  <div className="flex items-start gap-3 bg-red-900/30 border border-red-700 rounded-sm p-4">
-                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                    <p className="text-red-300 text-sm">{formError}</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={formStatus === 'sending'}
-                  className="inline-flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {formStatus === 'sending' ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Sending…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" /> Send Message
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
           </div>
         </div>
       </section>

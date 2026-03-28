@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Eye, Loader2 } from 'lucide-react';
 import { fetchFacebookPosts } from '../services/api';
 import type { FacebookPost } from '../types';
-import { getPostImages, getPostTitle, getPostUrl } from '../utils/facebookPostHelpers';
+import { getPostImages, getPostTitle, getPostUrl, isPortfolioPost } from '../utils/facebookPostHelpers';
 
 export default function RecentBuilds() {
   const [posts, setPosts] = useState<FacebookPost[]>([]);
@@ -14,7 +14,7 @@ export default function RecentBuilds() {
     fetchFacebookPosts()
       .then(({ posts: fetched }) => {
         if (!cancelled) {
-          setPosts(fetched.filter(p => getPostImages(p).length > 0).slice(0, 6));
+          setPosts(fetched.filter(isPortfolioPost).slice(0, 6));
         }
       })
       .catch((err: unknown) => { console.error('[RecentBuilds] Failed to load Facebook posts:', err); })
