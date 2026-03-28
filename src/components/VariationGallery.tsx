@@ -3,8 +3,8 @@
  *
  * Public-facing component that displays:
  *  - Variation selector tabs (with price shown on each tab)
- *  - Two-column card for the selected variation (animates in on switch):
- *      Left  – scrolling image carousel with thumbnail strip
+ *  - Two-column card for the selected variation (slide-up on tab switch):
+ *      Left  – cross-fade image carousel with expanding pill dots + thumbnails
  *      Right – description paragraph + specifications table
  */
 
@@ -19,8 +19,8 @@ interface Props {
 }
 
 export default function VariationGallery({ variations }: Props) {
-  const [activeIdx,  setActiveIdx]  = useState(0);
-  const [imgIdx,     setImgIdx]     = useState(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [imgIdx,    setImgIdx]    = useState(0);
 
   if (!variations || variations.length === 0) return null;
 
@@ -43,18 +43,20 @@ export default function VariationGallery({ variations }: Props) {
           <button
             key={v.id}
             onClick={() => selectVariation(idx)}
-            className={`flex flex-col items-start min-h-[3.5rem] px-4 py-2 text-sm font-bold uppercase tracking-widest border transition-all rounded-sm ${
-              /* min-h-[3.5rem] keeps all tabs the same height whether or not a price sub-label is shown */
+            /* min-h-[3.5rem] keeps all tabs the same height whether or not a price sub-label is shown */
+            className={`flex flex-col items-start min-h-[3.5rem] px-4 py-2.5 border rounded-sm cursor-pointer transition-all text-left ${
               idx === activeIdx
-                ? 'bg-brand-orange text-white border-brand-orange shadow-[0_4px_12px_rgba(243,111,33,0.3)]'
-                : 'bg-transparent text-gray-400 border-gray-700 hover:border-brand-orange hover:text-white'
+                ? 'border-brand-orange bg-brand-orange/10 shadow-[0_4px_16px_rgba(243,111,33,0.25)]'
+                : 'border-white/[0.07] bg-brand-dark hover:border-white/20 hover:bg-brand-dark'
             }`}
           >
-            <span>{v.name}</span>
+            <span className={`text-xs font-bold uppercase tracking-[0.08em] leading-tight ${
+              idx === activeIdx ? 'text-brand-orange' : 'text-white'
+            }`}>
+              {v.name}
+            </span>
             {v.price && (
-              <span className={`text-xs font-normal normal-case tracking-normal mt-0.5 ${
-                idx === activeIdx ? 'text-white/80' : 'text-gray-500'
-              }`}>
+              <span className="text-[0.7rem] font-semibold text-gray-500 mt-0.5">
                 From {v.price}
               </span>
             )}
@@ -62,51 +64,57 @@ export default function VariationGallery({ variations }: Props) {
         ))}
       </div>
 
-      {/* ── Selected variation card – animates in on switch ─────────────── */}
+      {/* ── Selected variation card – animates in on tab switch ─────────── */}
       {active && (
         <div
           key={activeIdx}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-brand-dark/40 border border-gray-800 rounded-sm p-5 animate-slideUp"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-brand-dark/40 border border-white/[0.07] rounded-sm p-5 animate-slideUp"
         >
-          {/* Left column – image carousel */}
-          <div className="space-y-3">
+          {/* ── Left column – cross-fade image carousel ───────────────────── */}
+          <div className="space-y-2">
             {images.length > 0 ? (
               <>
-                {/* Main image */}
-                <div className="relative aspect-video w-full rounded-sm overflow-hidden border border-gray-800 bg-brand-dark group">
-                  <img
-                    key={images[imgIdx]}
-                    src={images[imgIdx]}
-                    alt={`${active.name} – image ${imgIdx + 1}`}
-                    className="w-full h-full object-cover transition-opacity duration-300"
-                    referrerPolicy="no-referrer"
-                  />
+                {/* Main image — all images stacked, cross-fade via opacity */}
+                <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden border border-white/[0.07] bg-brand-dark group">
+                  {images.map((url, i) => (
+                    <img
+                      key={url + i}
+                      src={url}
+                      alt={`${active.name} – image ${i + 1}`}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                        i === imgIdx ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      referrerPolicy="no-referrer"
+                    />
+                  ))}
 
                   {images.length > 1 && (
                     <>
                       <button
                         onClick={prevImg}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-black/60 hover:bg-brand-orange text-white rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-brand-darker/70 hover:bg-brand-orange border border-white/10 hover:border-brand-orange text-white rounded-full transition-all opacity-0 group-hover:opacity-100 z-10"
                         aria-label="Previous image"
                       >
-                        <ChevronLeft className="w-5 h-5" />
+                        <ChevronLeft className="w-4 h-4" />
                       </button>
                       <button
                         onClick={nextImg}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-black/60 hover:bg-brand-orange text-white rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-brand-darker/70 hover:bg-brand-orange border border-white/10 hover:border-brand-orange text-white rounded-full transition-all opacity-0 group-hover:opacity-100 z-10"
                         aria-label="Next image"
                       >
-                        <ChevronRight className="w-5 h-5" />
+                        <ChevronRight className="w-4 h-4" />
                       </button>
 
-                      {/* Dot indicators */}
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {/* Expanding pill dots */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
                         {images.map((_, i) => (
                           <button
                             key={i}
                             onClick={() => setImgIdx(i)}
-                            className={`w-2 h-2 rounded-full transition-colors ${
-                              i === imgIdx ? 'bg-brand-orange' : 'bg-white/40 hover:bg-white/70'
+                            className={`h-1.5 rounded-full transition-all duration-300 border-none cursor-pointer ${
+                              i === imgIdx
+                                ? 'w-5 bg-brand-orange'
+                                : 'w-1.5 bg-white/30 hover:bg-white/60'
                             }`}
                             aria-label={`Go to image ${i + 1}`}
                           />
@@ -117,7 +125,7 @@ export default function VariationGallery({ variations }: Props) {
 
                   {/* Counter badge */}
                   {images.length > 1 && (
-                    <span className="absolute top-3 right-3 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded-sm">
+                    <span className="absolute top-2.5 right-2.5 bg-brand-darker/75 backdrop-blur-sm text-white text-[0.65rem] font-bold tracking-wide px-2 py-0.5 rounded-sm z-10">
                       {imgIdx + 1} / {images.length}
                     </span>
                   )}
@@ -125,13 +133,15 @@ export default function VariationGallery({ variations }: Props) {
 
                 {/* Thumbnail strip */}
                 {images.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1">
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                     {images.map((url, i) => (
                       <button
                         key={i}
                         onClick={() => setImgIdx(i)}
-                        className={`shrink-0 w-14 h-14 rounded-sm overflow-hidden border-2 transition-colors ${
-                          i === imgIdx ? 'border-brand-orange' : 'border-gray-700 hover:border-gray-500'
+                        className={`shrink-0 w-14 h-14 rounded-sm overflow-hidden border-[1.5px] transition-all ${
+                          i === imgIdx
+                            ? 'border-brand-orange opacity-100'
+                            : 'border-white/[0.07] opacity-50 hover:opacity-80'
                         }`}
                       >
                         <img
@@ -146,35 +156,34 @@ export default function VariationGallery({ variations }: Props) {
                 )}
               </>
             ) : (
-              <div className="aspect-video w-full rounded-sm bg-brand-dark/60 border border-gray-800 flex items-center justify-center">
-                <span className="text-gray-600 text-sm uppercase tracking-widest">No images</span>
+              <div className="aspect-[4/3] w-full rounded-sm bg-brand-dark/60 border border-white/[0.07] flex items-center justify-center">
+                <span className="text-gray-600 text-xs uppercase tracking-widest">No images</span>
               </div>
             )}
           </div>
 
-          {/* Right column – description + specs */}
-          <div className="space-y-5 flex flex-col justify-start">
+          {/* ── Right column – description + specs ────────────────────────── */}
+          <div className="flex flex-col gap-4">
             {active.description && (
-              <p className="text-gray-300 text-sm leading-relaxed">{active.description}</p>
+              <p className="text-gray-400 text-sm leading-[1.75] font-light">{active.description}</p>
             )}
 
-            {/* ── Specs table ─────────────────────────────────────────── */}
             {active.specs && active.specs.length > 0 && (
-              <div className="bg-brand-gray/20 border border-gray-800 rounded-sm overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-gray-800">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-white">
+              <div className="border border-white/[0.07] rounded-sm overflow-hidden">
+                <div className="px-4 py-2 border-b border-white/[0.07] bg-brand-dark">
+                  <span className="text-[0.65rem] font-bold uppercase tracking-[0.12em] text-gray-500">
                     Specifications
-                  </h4>
+                  </span>
                 </div>
-                <table className="w-full text-sm">
+                <table className="w-full">
                   <tbody>
                     {active.specs.map((spec, i) => (
                       <tr
                         key={i}
-                        className={i % 2 === 0 ? 'bg-transparent' : 'bg-brand-dark/40'}
+                        className={i % 2 === 0 ? '' : 'bg-white/[0.02]'}
                       >
-                        <td className="px-4 py-2.5 text-gray-400 font-bold w-2/5 text-xs">{spec.label}</td>
-                        <td className="px-4 py-2.5 text-white text-xs">{spec.value}</td>
+                        <td className="px-4 py-2.5 text-gray-500 text-xs font-medium w-[45%]">{spec.label}</td>
+                        <td className="px-4 py-2.5 text-gray-200 text-xs">{spec.value}</td>
                       </tr>
                     ))}
                   </tbody>
