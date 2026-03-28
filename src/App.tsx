@@ -1,5 +1,5 @@
 import { Provider } from 'react-redux';
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { store } from './store';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -13,7 +13,6 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import ServicesPage from './pages/ServicesPage';
 import ServiceDetail from './pages/ServiceDetail';
-import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
 import Portfolio from './pages/Portfolio';
 import About from './pages/About';
@@ -65,7 +64,7 @@ export default function App() {
                 <Route path="/"             element={<Home />} />
                 <Route path="/services"     element={<ServicesPage />} />
                 <Route path="/services/:slug" element={<ServiceDetail />} />
-                <Route path="/products"     element={<Products />} />
+                <Route path="/products"     element={<Navigate to="/services" replace />} />
                 <Route path="/products/:id" element={<ProductDetail />} />
                 <Route path="/portfolio"    element={<Portfolio />} />
                 <Route path="/blog"         element={<Blog />} />
