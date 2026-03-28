@@ -18,6 +18,22 @@ export interface AuthState {
 
 // ── Service ────────────────────────────────────────────────────────────────
 
+export interface ServiceVariationSpec {
+  label: string;
+  value: string;
+}
+
+export interface ServiceVariation {
+  id: number;
+  serviceId: number;
+  name: string;
+  description: string;
+  price: string;
+  images: string[];
+  specs: ServiceVariationSpec[];
+  sortOrder: number;
+}
+
 export interface Service {
   id: number;
   slug: string;              // URL-safe identifier, e.g. "headlight-retrofits"
@@ -29,6 +45,7 @@ export interface Service {
   duration: string;          // e.g. "4–6 Hours"
   startingPrice: string;     // e.g. "₱13,750"
   features: string[];        // Key Features & Benefits
+  variations: ServiceVariation[];
   sortOrder: number;
   isActive: boolean;
   createdAt: string;
@@ -54,6 +71,8 @@ export interface BookingPayload {
   vehicleYear: string;
   /** All selected service IDs (supports multi-service bookings) */
   serviceIds: number[];
+  /** Variation chosen per service: [{serviceId, variationId, variationName}] */
+  selectedVariations?: { serviceId: number; variationId: number; variationName: string }[];
   appointmentDate: string;
   appointmentTime: string;
   notes: string;
@@ -132,6 +151,8 @@ export interface Booking {
   serviceIds: number[];
   /** Comma-joined service names */
   serviceName: string;
+  /** Variation chosen per service */
+  selectedVariations?: { serviceId: number; variationId: number; variationName: string }[];
   appointmentDate: string;
   appointmentTime: string;
   notes: string;
@@ -143,6 +164,22 @@ export interface Booking {
   createdAt: string;
 }
 
+export interface ProductVariationSpec {
+  label: string;
+  value: string;
+}
+
+export interface ProductVariation {
+  id: number;
+  productId: number;
+  name: string;
+  description: string;
+  price: string;
+  images: string[];
+  specs: ProductVariationSpec[];
+  sortOrder: number;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -151,6 +188,7 @@ export interface Product {
   category: string;
   imageUrl: string;
   features: string[];
+  variations: ProductVariation[];
   sortOrder: number;
   isActive: boolean;
   createdAt: string;

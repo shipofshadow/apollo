@@ -91,27 +91,28 @@ class BookingService
         $serviceName = $this->resolveServiceNames($serviceIds, $data);
 
         $booking = [
-            'id'              => $this->uuid(),
-            'userId'          => $userId,
-            'name'            => trim($data['name']),
-            'email'           => strtolower(trim($data['email'])),
-            'phone'           => trim($data['phone']),
-            'vehicleInfo'     => trim($data['vehicleInfo']),
-            'vehicleMake'     => trim($data['vehicleMake']  ?? ''),
-            'vehicleModel'    => trim($data['vehicleModel'] ?? ''),
-            'vehicleYear'     => trim($data['vehicleYear']  ?? ''),
-            'serviceId'       => $primaryId,
-            'serviceIds'      => $serviceIds,
-            'serviceName'     => $serviceName,
-            'appointmentDate' => trim($data['appointmentDate']),
-            'appointmentTime' => trim($data['appointmentTime']),
-            'notes'           => trim($data['notes']          ?? ''),
-            'signatureData'   => $data['signatureData']        ?? null,
-            'mediaUrls'       => $data['mediaUrls']            ?? [],
-            'status'          => 'pending',
-            'awaitingParts'   => false,
-            'partsNotes'      => null,
-            'createdAt'       => date('c'),
+            'id'                 => $this->uuid(),
+            'userId'             => $userId,
+            'name'               => trim($data['name']),
+            'email'              => strtolower(trim($data['email'])),
+            'phone'              => trim($data['phone']),
+            'vehicleInfo'        => trim($data['vehicleInfo']),
+            'vehicleMake'        => trim($data['vehicleMake']  ?? ''),
+            'vehicleModel'       => trim($data['vehicleModel'] ?? ''),
+            'vehicleYear'        => trim($data['vehicleYear']  ?? ''),
+            'serviceId'          => $primaryId,
+            'serviceIds'         => $serviceIds,
+            'serviceName'        => $serviceName,
+            'selectedVariations' => $this->resolveSelectedVariations($data),
+            'appointmentDate'    => trim($data['appointmentDate']),
+            'appointmentTime'    => trim($data['appointmentTime']),
+            'notes'              => trim($data['notes']          ?? ''),
+            'signatureData'      => $data['signatureData']        ?? null,
+            'mediaUrls'          => $data['mediaUrls']            ?? [],
+            'status'             => 'pending',
+            'awaitingParts'      => false,
+            'partsNotes'         => null,
+            'createdAt'          => date('c'),
         ];
 
         $this->useDb ? $this->dbInsert($booking) : $this->fileInsert($booking);
@@ -386,30 +387,31 @@ class BookingService
         $db->prepare(
             'INSERT INTO bookings
              (id, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
-              vehicle_year, service_id, service_ids, appointment_date, appointment_time,
+              vehicle_year, service_id, service_ids, selected_variations, appointment_date, appointment_time,
               notes, signature_data, media_urls, status)
              VALUES
              (:id, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
-              :vehicle_year, :service_id, :service_ids, :appointment_date, :appointment_time,
+              :vehicle_year, :service_id, :service_ids, :selected_variations, :appointment_date, :appointment_time,
               :notes, :signature_data, :media_urls, :status)'
         )->execute([
-            ':id'               => $booking['id'],
-            ':user_id'          => $booking['userId'],
-            ':name'             => $booking['name'],
-            ':email'            => $booking['email'],
-            ':phone'            => $booking['phone'],
-            ':vehicle_info'     => $booking['vehicleInfo'],
-            ':vehicle_make'     => $booking['vehicleMake']  ?? null,
-            ':vehicle_model'    => $booking['vehicleModel'] ?? null,
-            ':vehicle_year'     => $booking['vehicleYear']  ?? null,
-            ':service_id'       => $booking['serviceId'],
-            ':service_ids'      => json_encode($booking['serviceIds'] ?? [$booking['serviceId']]),
-            ':appointment_date' => $booking['appointmentDate'],
-            ':appointment_time' => $booking['appointmentTime'],
-            ':notes'            => $booking['notes'],
-            ':signature_data'   => $booking['signatureData'] ?? null,
-            ':media_urls'       => json_encode($booking['mediaUrls'] ?? []),
-            ':status'           => $booking['status'],
+            ':id'                  => $booking['id'],
+            ':user_id'             => $booking['userId'],
+            ':name'                => $booking['name'],
+            ':email'               => $booking['email'],
+            ':phone'               => $booking['phone'],
+            ':vehicle_info'        => $booking['vehicleInfo'],
+            ':vehicle_make'        => $booking['vehicleMake']  ?? null,
+            ':vehicle_model'       => $booking['vehicleModel'] ?? null,
+            ':vehicle_year'        => $booking['vehicleYear']  ?? null,
+            ':service_id'          => $booking['serviceId'],
+            ':service_ids'         => json_encode($booking['serviceIds'] ?? [$booking['serviceId']]),
+            ':selected_variations' => json_encode($booking['selectedVariations'] ?? []),
+            ':appointment_date'    => $booking['appointmentDate'],
+            ':appointment_time'    => $booking['appointmentTime'],
+            ':notes'               => $booking['notes'],
+            ':signature_data'      => $booking['signatureData'] ?? null,
+            ':media_urls'          => json_encode($booking['mediaUrls'] ?? []),
+            ':status'              => $booking['status'],
         ]);
     }
 
@@ -568,28 +570,32 @@ class BookingService
         $rawMedia = $row['media_urls'] ?? null;
         $mediaUrls = $rawMedia ? (json_decode((string) $rawMedia, true) ?? []) : [];
 
+        $rawVars = $row['selected_variations'] ?? null;
+        $selectedVariations = $rawVars ? (json_decode((string) $rawVars, true) ?? []) : [];
+
         return [
-            'id'              => $row['id'],
-            'userId'          => $row['user_id'] !== null ? (int) $row['user_id'] : null,
-            'name'            => $row['name'],
-            'email'           => $row['email'],
-            'phone'           => $row['phone'],
-            'vehicleInfo'     => $row['vehicle_info'],
-            'vehicleMake'     => $row['vehicle_make']  ?? null,
-            'vehicleModel'    => $row['vehicle_model'] ?? null,
-            'vehicleYear'     => $row['vehicle_year']  ?? null,
-            'serviceId'       => (int) $row['service_id'],
-            'serviceIds'      => $serviceIds,
-            'serviceName'     => $row['service_name'],
-            'appointmentDate' => $row['appointment_date'],
-            'appointmentTime' => $row['appointment_time'],
-            'notes'           => $row['notes']          ?? '',
-            'signatureData'   => $row['signature_data'] ?? null,
-            'mediaUrls'       => $mediaUrls,
-            'status'          => $row['status'],
-            'awaitingParts'   => ($row['status'] === 'awaiting_parts'),
-            'partsNotes'      => $row['parts_notes'] ?? null,
-            'createdAt'       => $row['created_at'],
+            'id'                 => $row['id'],
+            'userId'             => $row['user_id'] !== null ? (int) $row['user_id'] : null,
+            'name'               => $row['name'],
+            'email'              => $row['email'],
+            'phone'              => $row['phone'],
+            'vehicleInfo'        => $row['vehicle_info'],
+            'vehicleMake'        => $row['vehicle_make']  ?? null,
+            'vehicleModel'       => $row['vehicle_model'] ?? null,
+            'vehicleYear'        => $row['vehicle_year']  ?? null,
+            'serviceId'          => (int) $row['service_id'],
+            'serviceIds'         => $serviceIds,
+            'serviceName'        => $row['service_name'],
+            'selectedVariations' => $selectedVariations,
+            'appointmentDate'    => $row['appointment_date'],
+            'appointmentTime'    => $row['appointment_time'],
+            'notes'              => $row['notes']          ?? '',
+            'signatureData'      => $row['signature_data'] ?? null,
+            'mediaUrls'          => $mediaUrls,
+            'status'             => $row['status'],
+            'awaitingParts'      => ($row['status'] === 'awaiting_parts'),
+            'partsNotes'         => $row['parts_notes'] ?? null,
+            'createdAt'          => $row['created_at'],
         ];
     }
 
@@ -890,6 +896,38 @@ class BookingService
     // -------------------------------------------------------------------------
     // Utilities
     // -------------------------------------------------------------------------
+
+    /**
+     * Normalise and validate the selectedVariations input.
+     * Expects an array of objects: [{serviceId, variationId, variationName}, ...]
+     *
+     * @param  array<string, mixed> $data
+     * @return array<int, array<string, mixed>>
+     */
+    private function resolveSelectedVariations(array $data): array
+    {
+        $raw = $data['selectedVariations'] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+        $result = [];
+        foreach ($raw as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $serviceId   = isset($item['serviceId'])   ? (int) $item['serviceId']   : null;
+            $variationId = isset($item['variationId']) ? (int) $item['variationId'] : null;
+            $name        = isset($item['variationName']) ? trim((string) $item['variationName']) : '';
+            if ($serviceId && $variationId) {
+                $result[] = [
+                    'serviceId'     => $serviceId,
+                    'variationId'   => $variationId,
+                    'variationName' => $name,
+                ];
+            }
+        }
+        return $result;
+    }
 
     private function uuid(): string
     {

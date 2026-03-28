@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { fetchServiceBySlugAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
+import VariationGallery from '../components/VariationGallery';
 
 export default function ServiceDetail() {
   const { slug }  = useParams<{ slug: string }>();
@@ -41,6 +42,8 @@ export default function ServiceDetail() {
     );
   }
 
+  const hasVariations = service.variations && service.variations.length > 0;
+
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
       <div className="container mx-auto px-4 md:px-6">
@@ -52,17 +55,21 @@ export default function ServiceDetail() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Image */}
-          {service.imageUrl && (
-            <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden shadow-2xl shadow-brand-orange/5">
-              <img
-                src={service.imageUrl}
-                alt={service.title}
-                className="w-full h-full object-cover aspect-video lg:aspect-square"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          )}
+          {/* Left column: image (if no variations) or variation gallery */}
+          <div>
+            {hasVariations ? (
+              <VariationGallery variations={service.variations} />
+            ) : service.imageUrl ? (
+              <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden shadow-2xl shadow-brand-orange/5">
+                <img
+                  src={service.imageUrl}
+                  alt={service.title}
+                  className="w-full h-full object-cover aspect-video lg:aspect-square"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            ) : null}
+          </div>
 
           {/* Content */}
           <div className="space-y-8">

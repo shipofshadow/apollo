@@ -8,8 +8,9 @@ import {
 } from '../../store/servicesSlice';
 import { uploadAdminImageApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Service } from '../../types';
+import type { Service, ServiceVariation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import VariationsManager from '../../components/VariationsManager';
 
 const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
 
@@ -68,14 +69,15 @@ export default function ServicesPanel() {
   const [saveError,    setSaveError]    = useState<string | null>(null);
   const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
+  const [variations,   setVariations]   = useState<ServiceVariation[]>([]);
 
   useEffect(() => {
     if (token) dispatch(fetchServicesAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = () => { setForm(EMPTY_FORM); setEditId(null); setSlugEdited(false); setSaveError(null); setEditing(true); };
-  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSlugEdited(false); setSaveError(null); setEditing(true); };
-  const cancel   = () => { setEditing(false); setEditId(null); setSlugEdited(false); setSaveError(null); };
+  const openNew  = () => { setForm(EMPTY_FORM); setEditId(null); setSlugEdited(false); setSaveError(null); setVariations([]); setEditing(true); };
+  const openEdit = (s: Service) => { setForm(serviceToForm(s)); setEditId(s.id); setSlugEdited(false); setSaveError(null); setVariations(s.variations ?? []); setEditing(true); };
+  const cancel   = () => { setEditing(false); setEditId(null); setSlugEdited(false); setSaveError(null); setVariations([]); };
 
   const set = (field: keyof ServiceForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -259,6 +261,23 @@ export default function ServicesPanel() {
               </label>
             </div>
           </div>
+
+          {/* Variations – only shown when editing an existing service */}
+          {editId !== null && token && (
+            <div className="pt-2 border-t border-gray-800">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block mb-3">
+                Package Variations
+                <span className="ml-2 font-normal text-gray-600">(each with its own images &amp; specs)</span>
+              </label>
+              <VariationsManager
+                variations={variations}
+                parentId={editId}
+                parentType="service"
+                token={token}
+                onSaved={v => setVariations(v as ServiceVariation[])}
+              />
+            </div>
+          )}
 
           <div className="flex gap-4 pt-4 border-t border-gray-800">
             <button type="submit" disabled={saving}

@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ArrowLeft, Check } from 'lucide-react';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
+import VariationGallery from '../components/VariationGallery';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +40,8 @@ export default function ProductDetail() {
     );
   }
 
+  const hasVariations = product.variations && product.variations.length > 0;
+
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
       <div className="container mx-auto px-4 md:px-6">
@@ -51,15 +54,21 @@ export default function ProductDetail() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Product Image */}
-          <div className="relative aspect-square rounded-sm overflow-hidden border border-gray-800 group">
-            <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <img 
-              src={product.imageUrl} 
-              alt={product.name}
-              className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
-              referrerPolicy="no-referrer"
-            />
+          {/* Left column: variation gallery or single product image */}
+          <div>
+            {hasVariations ? (
+              <VariationGallery variations={product.variations} />
+            ) : (
+              <div className="relative aspect-square rounded-sm overflow-hidden border border-gray-800 group">
+                <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.name}
+                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            )}
           </div>
 
           {/* Product Info */}
@@ -72,7 +81,7 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
               <div className="text-3xl font-display font-bold text-white">
-                ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₱{product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
 
