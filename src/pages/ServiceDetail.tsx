@@ -43,6 +43,7 @@ export default function ServiceDetail() {
   }
 
   const hasVariations = service.variations && service.variations.length > 0;
+  const quickInfoSpecs = hasVariations ? service.variations[0].specs : [];
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
@@ -54,23 +55,10 @@ export default function ServiceDetail() {
           <ArrowLeft className="w-4 h-4" /> Back to Services
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Left column: service image */}
-          <div>
-            {service.imageUrl ? (
-              <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden shadow-2xl shadow-brand-orange/5">
-                <img
-                  src={service.imageUrl}
-                  alt={service.title}
-                  className="w-full h-full object-cover aspect-video lg:aspect-square"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            ) : null}
-          </div>
-
-          {/* Content */}
-          <div className="space-y-8">
+        {/* ── Overview: description + features | pricing sidebar ─────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-16">
+          {/* Left: overview content (2/3 width) */}
+          <div className="lg:col-span-2 space-y-8">
             <div>
               <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-2">
                 Service Details
@@ -78,22 +66,6 @@ export default function ServiceDetail() {
               <h1 className="text-4xl md:text-6xl font-display font-black text-white uppercase tracking-tighter mb-4">
                 {service.title}
               </h1>
-
-              {(service.startingPrice || service.duration) && (
-                <div className="flex flex-wrap gap-4 mb-4">
-                  {service.startingPrice && (
-                    <span className="bg-brand-orange/10 border border-brand-orange/30 text-brand-orange font-bold px-4 py-2 rounded-sm text-sm uppercase tracking-widest">
-                      {service.startingPrice}
-                    </span>
-                  )}
-                  {service.duration && (
-                    <span className="bg-gray-800 border border-gray-700 text-gray-300 font-bold px-4 py-2 rounded-sm text-sm uppercase tracking-widest">
-                      {service.duration}
-                    </span>
-                  )}
-                </div>
-              )}
-
               <div className="w-20 h-1 bg-brand-orange mb-8" />
               <p className="text-gray-300 text-lg leading-relaxed">
                 {service.fullDescription || service.description}
@@ -115,22 +87,65 @@ export default function ServiceDetail() {
                 </ul>
               </div>
             )}
+          </div>
 
-            <div className="pt-8 border-t border-gray-800">
+          {/* Right: pricing sidebar (1/3 width) */}
+          <div className="space-y-6">
+            {/* Price card */}
+            <div className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-4">
+              {service.startingPrice && (
+                <div>
+                  <div className="text-4xl font-display font-black text-white leading-none">
+                    {service.startingPrice}
+                  </div>
+                  <div className="text-gray-400 text-sm uppercase tracking-widest mt-1">
+                    Starting Price
+                  </div>
+                </div>
+              )}
               <Link
                 to="/booking"
                 state={{ serviceId: service.id }}
-                className="inline-block bg-brand-orange hover:bg-orange-600 text-white font-display uppercase tracking-wider px-8 py-4 rounded-sm transition-all transform hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(243,111,33,0.3)]"
+                className="block text-center bg-brand-orange hover:bg-orange-600 text-white font-display uppercase tracking-wider px-6 py-3 rounded-sm transition-all transform hover:-translate-y-0.5 hover:shadow-[0_8px_16px_rgba(243,111,33,0.3)]"
               >
                 Book This Service
               </Link>
+              <p className="text-gray-500 text-xs text-center">
+                Free consultation · No hidden fees
+              </p>
+              {service.duration && (
+                <div className="pt-2 border-t border-gray-800">
+                  <span className="bg-gray-800 border border-gray-700 text-gray-300 font-bold px-3 py-1 rounded-sm text-xs uppercase tracking-widest">
+                    {service.duration}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* Quick info card – uses first variation's specs when available */}
+            {quickInfoSpecs.length > 0 && (
+              <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-800">
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-white">
+                    Quick Info
+                  </h4>
+                </div>
+                <ul className="divide-y divide-gray-800">
+                  {quickInfoSpecs.map((spec, i) => (
+                    <li key={i} className="flex items-start justify-between px-5 py-3 gap-4">
+                      <span className="text-gray-400 text-sm font-bold shrink-0">{spec.label}</span>
+                      <span className="text-white text-sm text-right">{spec.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Variation gallery – shown below service details when variations exist */}
+        {/* ── Variation gallery ───────────────────────────────────────────── */}
         {hasVariations && (
-          <div className="mt-12">
+          <div>
             <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">
               Available Packages
             </h2>
