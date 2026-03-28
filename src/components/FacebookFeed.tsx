@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Loader2, AlertCircle } from 'lucide-react';
+import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { FacebookPost } from '../types';
 import { fetchFacebookPosts } from '../services/api';
 import { getPostImages, getPostUrl } from '../utils/facebookPostHelpers';
+
+const POSTS_PER_PAGE = 6;
+const FETCH_BATCH = POSTS_PER_PAGE * 2; // pre-fetch two pages to minimise API round-trips
 
 function formatDate(isoString: string): string {
   try {
@@ -24,13 +27,14 @@ export default function FacebookFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
     cancelledRef.current = false;
     setLoading(true);
     setError(null);
-    fetchFacebookPosts()
+    fetchFacebookPosts(undefined, FETCH_BATCH)
       .then(({ posts: fetched, nextCursor: cursor }) => {
         if (!cancelledRef.current) {
           setPosts(fetched);
@@ -46,20 +50,38 @@ export default function FacebookFeed() {
     return () => { cancelledRef.current = true; };
   }, []);
 
-  function handleLoadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    fetchFacebookPosts(nextCursor)
-      .then(({ posts: fetched, nextCursor: cursor }) => {
-        setPosts((prev) => [...prev, ...fetched]);
-        setNextCursor(cursor);
-      })
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load more posts.');
-      })
-      .finally(() => {
-        setLoadingMore(false);
-      });
+  const totalLoadedPages = Math.max(1, Math.ceil(posts.length / POSTS_PER_PAGE));
+  const hasNextPage = currentPage < totalLoadedPages || Boolean(nextCursor);
+  const hasPrevPage = currentPage > 1;
+
+  const pagePosts = posts.slice((currentPage - 1) * POSTS_PER_PAGE, currentPage * POSTS_PER_PAGE);
+
+  function handlePrev() {
+    if (!hasPrevPage) return;
+    setCurrentPage((p) => p - 1);
+  }
+
+  function handleNext() {
+    if (!hasNextPage) return;
+    const nextPage = currentPage + 1;
+    const needed = nextPage * POSTS_PER_PAGE;
+    if (needed > posts.length && nextCursor) {
+      setLoadingMore(true);
+      fetchFacebookPosts(nextCursor, FETCH_BATCH)
+        .then(({ posts: fetched, nextCursor: cursor }) => {
+          setPosts((prev) => [...prev, ...fetched]);
+          setNextCursor(cursor);
+          setCurrentPage(nextPage);
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : 'Failed to load more posts.');
+        })
+        .finally(() => {
+          setLoadingMore(false);
+        });
+    } else {
+      setCurrentPage(nextPage);
+    }
   }
 
   return (
@@ -96,7 +118,7 @@ export default function FacebookFeed() {
         {!loading && !error && posts.length > 0 && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {posts.map((post) => {
+              {pagePosts.map((post) => {
                 const images = getPostImages(post);
                 const postUrl = getPostUrl(post.id);
                 return (
@@ -155,13 +177,28 @@ export default function FacebookFeed() {
               })}
             </div>
 
-            {/* Load More */}
-            {nextCursor && (
-              <div className="flex justify-center mt-12">
+            {/* Pagination controls */}
+            {(hasPrevPage || hasNextPage) && (
+              <div className="flex justify-center items-center gap-4 mt-12">
                 <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="inline-flex items-center gap-2 bg-transparent border border-brand-orange text-brand-orange px-8 py-3 font-bold uppercase tracking-widest hover:bg-brand-orange hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handlePrev}
+                  disabled={!hasPrevPage || loadingMore}
+                  aria-label="Previous page"
+                  className="inline-flex items-center gap-2 bg-transparent border border-brand-orange text-brand-orange px-5 py-3 font-bold uppercase tracking-widest hover:bg-brand-orange hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+
+                <span className="text-gray-400 text-sm font-semibold tracking-widest uppercase">
+                  Page {currentPage}
+                </span>
+
+                <button
+                  onClick={handleNext}
+                  disabled={!hasNextPage || loadingMore}
+                  aria-label="Next page"
+                  className="inline-flex items-center gap-2 bg-transparent border border-brand-orange text-brand-orange px-5 py-3 font-bold uppercase tracking-widest hover:bg-brand-orange hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   {loadingMore ? (
                     <>
@@ -169,7 +206,10 @@ export default function FacebookFeed() {
                       Loading…
                     </>
                   ) : (
-                    'Load More'
+                    <>
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </>
                   )}
                 </button>
               </div>
