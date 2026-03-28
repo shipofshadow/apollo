@@ -89,6 +89,7 @@ export interface PortfolioItem {
   category: string;
   description: string;
   imageUrl: string;
+  images: string[];
   sortOrder: number;
   isActive: boolean;
   createdAt: string;
@@ -97,6 +98,20 @@ export interface PortfolioItem {
 
 export interface PortfolioState {
   items: PortfolioItem[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
+
+export interface PortfolioCategory {
+  id: number;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortfolioCategoryState {
+  categories: PortfolioCategory[];
   status: 'idle' | 'loading' | 'success' | 'error';
   error: string | null;
 }
