@@ -303,4 +303,27 @@ export interface FaqState {
   error: string | null;
 }
 
+// ── Offer ─────────────────────────────────────────────────────────────────────
+
+export interface Offer {
+  id: number;
+  title: string;
+  subtitle: string;
+  description: string;
+  badgeText: string;
+  ctaText: string;
+  ctaUrl: string;
+  linkedServiceId: number | null;
+  linkedProductId: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OfferState {
+  items: Offer[];
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}
 

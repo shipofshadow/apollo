@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -512,6 +512,38 @@ export const updateFaqApi = (
 
 export const deleteFaqApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/faq/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Offers API ────────────────────────────────────────────────────────────────
+
+export const fetchOffersApi = (token?: string | null) =>
+  apiFetch<{ offers: Offer[] }>('/api/offers', {}, token);
+
+export const fetchOfferByIdApi = (id: number, token?: string | null) =>
+  apiFetch<{ offer: Offer }>(`/api/offers/${id}`, {}, token);
+
+export const createOfferApi = (
+  token: string,
+  data: Partial<Omit<Offer, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ offer: Offer }>('/api/offers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateOfferApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<Offer, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ offer: Offer }>(`/api/offers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteOfferApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/offers/${id}`, {
     method: 'DELETE',
   }, token);
 
