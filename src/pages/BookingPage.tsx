@@ -150,6 +150,18 @@ export default function BookingPage() {
   );
   const vehicleInfo = [vehicleYear, vehicleMake, vehicleModel].filter(Boolean).join(' ');
 
+  /** Return the effective price for a service: variation price if one is selected, otherwise startingPrice */
+  const getEffectivePrice = (svcId: number): string | null => {
+    const svc = services.find(s => s.id === svcId);
+    if (!svc) return null;
+    const varId = selectedVariationIds[svcId];
+    if (varId !== undefined) {
+      const variation = svc.variations?.find(v => v.id === varId);
+      if (variation?.price) return variation.price;
+    }
+    return svc.startingPrice || null;
+  };
+
   // Load services + shop hours on mount
   useEffect(() => {
     dispatch(fetchServicesAsync(token));
@@ -448,6 +460,17 @@ export default function BookingPage() {
                         })}
                       </div>
                     )}
+                    <div className="mt-1 text-xs text-gray-400 space-y-0.5">
+                      {selectedServices.map(svc => {
+                        const price = getEffectivePrice(svc.id);
+                        return price ? (
+                          <div key={svc.id}>
+                            <span className="text-gray-500">{svc.title}:</span>{' '}
+                            <span className="text-brand-orange font-bold">{price}</span>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
                   </div>
                   <span className="text-brand-orange font-bold flex items-center gap-1 shrink-0">
                     <Clock className="w-4 h-4" /> Est. {totalMaxHours}h max
@@ -676,6 +699,15 @@ export default function BookingPage() {
                     <span className="text-gray-400">Services</span>
                     <span className="text-white font-semibold text-right max-w-[60%]">{selectedServices.map(s => s.title).join(', ')}</span>
                   </div>
+                  {selectedServices.map(svc => {
+                    const price = getEffectivePrice(svc.id);
+                    return price ? (
+                      <div key={svc.id} className="flex justify-between">
+                        <span className="text-gray-500 pl-4">{svc.title}</span>
+                        <span className="text-brand-orange font-bold">{price}</span>
+                      </div>
+                    ) : null;
+                  })}
                   <div className="flex justify-between"><span className="text-gray-400">Vehicle</span><span className="text-white">{vehicleInfo || '—'}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Date</span><span className="text-white">{selectedDate?.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Time</span><span className="text-white">{selectedTime}</span></div>

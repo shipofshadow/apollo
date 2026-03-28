@@ -54,21 +54,17 @@ export default function ProductDetail() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Left column: variation gallery or single product image */}
+          {/* Left column: product image */}
           <div>
-            {hasVariations ? (
-              <VariationGallery variations={product.variations} />
-            ) : (
-              <div className="relative aspect-square rounded-sm overflow-hidden border border-gray-800 group">
-                <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <img 
-                  src={product.imageUrl} 
-                  alt={product.name}
-                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            )}
+            <div className="relative aspect-square rounded-sm overflow-hidden border border-gray-800 group">
+              <div className="absolute inset-0 bg-brand-orange/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <img 
+                src={product.imageUrl} 
+                alt={product.name}
+                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
 
           {/* Product Info */}
@@ -108,6 +104,16 @@ export default function ProductDetail() {
             )}
           </div>
         </div>
+
+        {/* Variation gallery – shown below product details when variations exist */}
+        {hasVariations && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">
+              Available Options
+            </h2>
+            <VariationGallery variations={product.variations} />
+          </div>
+        )}
       </div>
     </div>
   );

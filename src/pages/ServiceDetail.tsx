@@ -55,11 +55,9 @@ export default function ServiceDetail() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Left column: image (if no variations) or variation gallery */}
+          {/* Left column: service image */}
           <div>
-            {hasVariations ? (
-              <VariationGallery variations={service.variations} />
-            ) : service.imageUrl ? (
+            {service.imageUrl ? (
               <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden shadow-2xl shadow-brand-orange/5">
                 <img
                   src={service.imageUrl}
@@ -129,6 +127,16 @@ export default function ServiceDetail() {
             </div>
           </div>
         </div>
+
+        {/* Variation gallery – shown below service details when variations exist */}
+        {hasVariations && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">
+              Available Packages
+            </h2>
+            <VariationGallery variations={service.variations} />
+          </div>
+        )}
       </div>
     </div>
   );
