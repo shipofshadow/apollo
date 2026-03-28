@@ -36,11 +36,13 @@ class Router
             $r->addRoute('DELETE', '/api/services/{id:\d+}/variations/{vid:\d+}',    'handleServiceVariationDelete');
 
             // ── Auth ────────────────────────────────────────────────────────
-            $r->addRoute('POST', '/api/auth/register',  'handleAuthRegister');
-            $r->addRoute('POST', '/api/auth/login',     'handleAuthLogin');
-            $r->addRoute('POST', '/api/auth/logout',    'handleAuthLogout');
-            $r->addRoute('GET',  '/api/auth/me',        'handleAuthMe');
-            $r->addRoute('PUT',  '/api/auth/profile',   'handleAuthProfile');
+            $r->addRoute('POST', '/api/auth/register',         'handleAuthRegister');
+            $r->addRoute('POST', '/api/auth/login',            'handleAuthLogin');
+            $r->addRoute('POST', '/api/auth/logout',           'handleAuthLogout');
+            $r->addRoute('GET',  '/api/auth/me',               'handleAuthMe');
+            $r->addRoute('PUT',  '/api/auth/profile',          'handleAuthProfile');
+            $r->addRoute('POST', '/api/auth/forgot-password',  'handleAuthForgotPassword');
+            $r->addRoute('POST', '/api/auth/reset-password',   'handleAuthResetPassword');
 
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
@@ -288,6 +290,47 @@ class Router
         $data    = $this->jsonBody();
         $user    = (new UserService())->updateProfile((int) $payload['sub'], $data);
         echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthForgotPassword(array $vars = []): void
+    {
+        $data  = $this->jsonBody();
+        $email = strtolower(trim((string) ($data['email'] ?? '')));
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid email address is required.', 422);
+        }
+
+        $token = Auth::generatePasswordResetToken($email);
+
+        if ($token !== null) {
+            $appUrl   = rtrim((string) ($_SERVER['HTTP_ORIGIN'] ?? APP_URL), '/');
+            $resetUrl = $appUrl . '/reset-password?token=' . urlencode($token);
+            (new NotificationService())->passwordReset($email, $resetUrl);
+        }
+
+        // Always return 200 to prevent email enumeration
+        echo json_encode(['message' => 'If that email is registered, a reset link has been sent.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthResetPassword(array $vars = []): void
+    {
+        $data     = $this->jsonBody();
+        $token    = trim((string) ($data['token']    ?? ''));
+        $password = (string) ($data['password']       ?? '');
+        $confirm  = (string) ($data['passwordConfirm'] ?? '');
+
+        if ($token === '') {
+            throw new RuntimeException('Reset token is required.', 422);
+        }
+        if ($password !== $confirm) {
+            throw new RuntimeException('Passwords do not match.', 422);
+        }
+
+        Auth::resetPassword($token, $password);
+        echo json_encode(['message' => 'Your password has been updated. You can now sign in.']);
     }
 
     // -------------------------------------------------------------------------
@@ -566,6 +609,13 @@ class Router
         }
 
         $update = (new BuildUpdateService())->create($id, $note, $photoUrls);
+
+        // Notify the customer that a new build progress update was posted
+        $booking = (new BookingService())->adminFindById($id);
+        if ($booking !== null) {
+            (new NotificationService())->buildUpdateCreated($booking, $update);
+        }
+
         http_response_code(201);
         echo json_encode(['update' => $update]);
     }

@@ -22,14 +22,17 @@ define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN'] ?? '');
 
 define('CACHE_TTL_SECONDS', (int)($_ENV['CACHE_TTL_SECONDS'] ?? 60));
 
-define(
-    'CORS_ORIGINS',
+define('CORS_ORIGINS',
     array_values(
         array_filter(
             array_map('trim', explode(',', $_ENV['CORS_ORIGINS'] ?? 'http://localhost:5173,http://localhost:4173'))
         )
     )
 );
+
+// Public-facing URL of the frontend app, used for password reset links.
+// Defaults to the first CORS origin when not explicitly set.
+define('APP_URL', rtrim($_ENV['APP_URL'] ?? (CORS_ORIGINS[0] ?? 'http://localhost:5173'), '/'));
 
 // ---------------------------------------------------------------------------
 // Database constants

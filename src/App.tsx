@@ -25,6 +25,8 @@ import NotFoundPage from './pages/NotFoundPage';
 // Auth pages
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
 // Client portal
 import ClientLayout from './pages/client/ClientLayout';
@@ -72,8 +74,10 @@ export default function App() {
                 <Route path="/contact"      element={<ContactPage />} />
                 <Route path="/about"        element={<About />} />
                 <Route path="/booking"      element={<BookingPage />} />
-                <Route path="/login"        element={<LoginPage />} />
-                <Route path="/register"     element={<RegisterPage />} />
+                <Route path="/login"             element={<LoginPage />} />
+                <Route path="/register"          element={<RegisterPage />} />
+                <Route path="/forgot-password"   element={<ForgotPasswordPage />} />
+                <Route path="/reset-password"    element={<ResetPasswordPage />} />
                 <Route path="*"             element={<NotFoundPage />} />
               </Route>
 

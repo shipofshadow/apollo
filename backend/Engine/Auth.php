@@ -271,6 +271,89 @@ class Auth
     }
 
     // -------------------------------------------------------------------------
+    // Password reset flow
+    // -------------------------------------------------------------------------
+
+    /**
+     * Generate and store a password-reset token for the given email.
+     *
+     * Silently succeeds even when the email is not found to prevent
+     * user-enumeration attacks.  Returns the plain-text token (to be emailed
+     * to the user) or null when the email is unknown.
+     *
+     * @throws RuntimeException  On DB errors.
+     */
+    public static function generatePasswordResetToken(string $email): ?string
+    {
+        if (DB_NAME === '') {
+            throw new RuntimeException('Password reset requires a database connection.', 500);
+        }
+
+        $email = strtolower(trim($email));
+        $db    = Database::getInstance();
+
+        $stmt = $db->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute([':email' => $email]);
+        if (!$stmt->fetch()) {
+            return null; // Email not found – suppress the fact for security
+        }
+
+        // Invalidate any existing token for this email before creating a new one
+        $db->prepare('DELETE FROM password_resets WHERE email = :email')
+           ->execute([':email' => $email]);
+
+        $token     = bin2hex(random_bytes(32)); // 64-char hex string
+        $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour
+
+        $db->prepare(
+            'INSERT INTO password_resets (email, token, expires_at) VALUES (:email, :token, :exp)'
+        )->execute([':email' => $email, ':token' => $token, ':exp' => $expiresAt]);
+
+        return $token;
+    }
+
+    /**
+     * Verify a password-reset token and update the user's password.
+     *
+     * @throws RuntimeException  On invalid / expired token or validation failure.
+     */
+    public static function resetPassword(string $token, string $newPassword): void
+    {
+        if (DB_NAME === '') {
+            throw new RuntimeException('Password reset requires a database connection.', 500);
+        }
+        if (strlen($newPassword) < 8) {
+            throw new RuntimeException('Password must be at least 8 characters.', 422);
+        }
+
+        $token = trim($token);
+        $db    = Database::getInstance();
+
+        $stmt = $db->prepare(
+            'SELECT email FROM password_resets
+              WHERE token = :token AND expires_at > NOW() LIMIT 1'
+        );
+        $stmt->execute([':token' => $token]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            throw new RuntimeException('This reset link is invalid or has expired.', 422);
+        }
+
+        $email = (string) $row['email'];
+
+        $db->prepare('UPDATE users SET password = :pw WHERE email = :email')
+           ->execute([
+               ':pw'    => self::hashPassword($newPassword),
+               ':email' => $email,
+           ]);
+
+        // Delete used token so it cannot be reused
+        $db->prepare('DELETE FROM password_resets WHERE token = :token')
+           ->execute([':token' => $token]);
+    }
+
+    // -------------------------------------------------------------------------
     // Request helpers
     // -------------------------------------------------------------------------
 

@@ -57,6 +57,18 @@ export const updateProfileApi = (
 export const logoutApi = (token: string) =>
   apiFetch<{ message: string }>('/api/auth/logout', { method: 'POST' }, token);
 
+export const forgotPasswordApi = (email: string) =>
+  apiFetch<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+
+export const resetPasswordApi = (token: string, password: string, passwordConfirm: string) =>
+  apiFetch<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password, passwordConfirm }),
+  });
+
 // ── Services API ─────────────────────────────────────────────────────────────
 
 export const fetchServicesApi = (token?: string | null) =>

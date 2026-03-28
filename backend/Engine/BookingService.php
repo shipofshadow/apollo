@@ -280,6 +280,18 @@ class BookingService
     }
 
     /**
+     * Retrieve a booking by ID without an ownership check (admin use only).
+     *
+     * @return array<string, mixed>|null  null when not found
+     */
+    public function adminFindById(string $id): ?array
+    {
+        return $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+    }
+
+    /**
      * Admin-only reschedule: no ownership check, bypasses client restrictions.
      * Date must be in YYYY-MM-DD format; time must be non-empty.
      *
@@ -593,7 +605,7 @@ class BookingService
             'signatureData'      => $row['signature_data'] ?? null,
             'mediaUrls'          => $mediaUrls,
             'status'             => $row['status'],
-            'awaitingParts'      => ($row['status'] === 'awaiting_parts'),
+            'awaitingParts'      => (bool) ($row['awaiting_parts'] ?? ($row['status'] === 'awaiting_parts')),
             'partsNotes'         => $row['parts_notes'] ?? null,
             'createdAt'          => $row['created_at'],
         ];
