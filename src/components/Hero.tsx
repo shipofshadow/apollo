@@ -1,4 +1,5 @@
 import { ArrowRight, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Hero() {
   return (
@@ -36,22 +37,22 @@ export default function Hero() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
-            <a
-              href="#services"
+            <Link
+              to="/services"
               className="group relative inline-flex items-center justify-center gap-2 bg-brand-orange text-white font-display uppercase tracking-wider px-8 py-4 rounded-sm overflow-hidden transition-all hover:shadow-[0_0_30px_rgba(255,106,0,0.4)]"
             >
               <span className="relative z-10 flex items-center gap-2">
                 Explore Services <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
-            </a>
+            </Link>
             
-            <a
-              href="#contact"
+            <Link
+              to="/booking"
               className="group inline-flex items-center justify-center gap-2 bg-transparent border border-gray-600 text-white font-display uppercase tracking-wider px-8 py-4 rounded-sm hover:border-white hover:bg-white/5 transition-all"
             >
               Book The Lab <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </a>
+            </Link>
           </div>
         </div>
       </div>
