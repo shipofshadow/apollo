@@ -104,6 +104,13 @@ class Router
             $r->addRoute('PUT',    '/api/faq/{id:\d+}',     'handleFaqUpdate');
             $r->addRoute('DELETE', '/api/faq/{id:\d+}',     'handleFaqDelete');
 
+            // ── Offers (public read, admin write) ────────────────────────────
+            $r->addRoute('GET',    '/api/offers',          'handleOfferList');
+            $r->addRoute('GET',    '/api/offers/{id:\d+}', 'handleOfferGet');
+            $r->addRoute('POST',   '/api/offers',          'handleOfferCreate');
+            $r->addRoute('PUT',    '/api/offers/{id:\d+}', 'handleOfferUpdate');
+            $r->addRoute('DELETE', '/api/offers/{id:\d+}', 'handleOfferDelete');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -1125,6 +1132,72 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new FaqService())->delete($id);
         echo json_encode(['message' => 'FAQ deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Offer handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleOfferList(array $vars = []): void
+    {
+        $includeInactive = false;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload         = Auth::decodeToken($token);
+                $includeInactive = ($payload['role'] ?? '') === 'admin';
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $offers = (new OfferService())->getAll($includeInactive);
+        echo json_encode(['offers' => $offers]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleOfferGet(array $vars = []): void
+    {
+        $id           = (int) ($vars['id'] ?? 0);
+        $requireActive = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload       = Auth::decodeToken($token);
+                $requireActive = ($payload['role'] ?? '') !== 'admin';
+            } catch (RuntimeException) { /* stay public */ }
+        }
+
+        $offer = (new OfferService())->getById($id, $requireActive);
+        echo json_encode(['offer' => $offer]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleOfferCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data  = $this->jsonBody();
+        $offer = (new OfferService())->create($data);
+        http_response_code(201);
+        echo json_encode(['offer' => $offer]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleOfferUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id    = (int) ($vars['id'] ?? 0);
+        $data  = $this->jsonBody();
+        $offer = (new OfferService())->update($id, $data);
+        echo json_encode(['offer' => $offer]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleOfferDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new OfferService())->delete($id);
+        echo json_encode(['message' => 'Offer deleted.']);
     }
 }
 

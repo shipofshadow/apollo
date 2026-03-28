@@ -1,4 +1,20 @@
+import { useEffect, useState } from 'react';
+import type { Offer } from '../types';
+import { fetchOffersApi } from '../services/api';
+
 export default function PromoBanner() {
+  const [offer, setOffer] = useState<Offer | null>(null);
+
+  useEffect(() => {
+    fetchOffersApi()
+      .then(({ offers }) => {
+        if (offers.length > 0) setOffer(offers[0]);
+      })
+      .catch(() => {/* silently ignore – banner just won't show */});
+  }, []);
+
+  if (!offer) return null;
+
   return (
     <section className="relative py-32 overflow-hidden bg-asphalt border-y-4 border-brand-orange">
       {/* Background Image with Parallax Effect */}
@@ -15,25 +31,34 @@ export default function PromoBanner() {
 
       <div className="container mx-auto px-4 md:px-6 relative z-10 text-center">
         <div className="max-w-4xl mx-auto space-y-8">
-          <span className="inline-block px-4 py-1 bg-brand-orange text-white font-bold uppercase tracking-widest text-sm rounded-sm shadow-lg">
-            Limited Time Offer
-          </span>
-          
+          {offer.badgeText && (
+            <span className="inline-block px-4 py-1 bg-brand-orange text-white font-bold uppercase tracking-widest text-sm rounded-sm shadow-lg">
+              {offer.badgeText}
+            </span>
+          )}
+
           <h2 className="text-3xl sm:text-5xl md:text-7xl font-display font-black text-brand-orange uppercase leading-tight drop-shadow-2xl tracking-tighter text-outline">
-            Free <span className="text-white text-outline-none tracking-tight">Demon Eyes</span> <br />
-            With Any Retrofit
+            {offer.title}
           </h2>
-          
-          <p className="text-xl md:text-2xl text-gray-300 font-medium max-w-2xl mx-auto">
-            Book your custom headlight build this month and get RGB Demon Eyes installed absolutely free.
-          </p>
-          
+
+          {offer.subtitle && (
+            <p className="text-base md:text-lg text-brand-orange/80 font-bold uppercase tracking-widest">
+              {offer.subtitle}
+            </p>
+          )}
+
+          {offer.description && (
+            <p className="text-xl md:text-2xl text-gray-300 font-medium max-w-2xl mx-auto">
+              {offer.description}
+            </p>
+          )}
+
           <div className="pt-8">
             <a
-              href="#contact"
+              href={offer.ctaUrl || '#contact'}
               className="inline-block bg-brand-orange text-white font-display uppercase tracking-wider px-10 py-5 rounded-sm text-lg hover:bg-orange-600 transition-colors shadow-[0_10px_30px_rgba(243,111,33,0.3)] hover:-translate-y-1 transform duration-300"
             >
-              Claim Your Offer
+              {offer.ctaText || 'Claim Your Offer'}
             </a>
           </div>
         </div>
@@ -47,3 +72,4 @@ export default function PromoBanner() {
     </section>
   );
 }
+
