@@ -24,12 +24,12 @@ export default function Hero() {
             </span>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-display font-black leading-[0.85] text-brand-orange text-outline-thick uppercase tracking-tighter">
-            <span className="font-fasthand">1625</span> <br />
-            <span className="text-white text-outline-none tracking-tight">
-              AUTOLAB
-            </span>
-          </h1>
+          <img
+            src="https://cdn.chopaeng.com/1625autolab/logos/1625%20Autolab%20V2.png"
+            alt="1625 Autolab"
+            className="w-auto max-w-[320px] sm:max-w-[420px] md:max-w-[520px] object-contain"
+            referrerPolicy="no-referrer"
+          />
 
           <p className="text-gray-400 text-lg md:text-xl max-w-lg leading-relaxed border-l-4 border-brand-orange pl-4">
             Specializing in custom headlight retrofits, android headunits, and advanced security systems. We don't just fix cars; we upgrade them.

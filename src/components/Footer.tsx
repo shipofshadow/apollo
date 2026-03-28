@@ -39,7 +39,7 @@ export default function Footer() {
               <img
                 src="https://cdn.chopaeng.com/1625autolab/logos/1625%20Autolab%20V2.png"
                 alt="1625 Autolab Logo"
-                className="h-12 md:h-16 w-auto max-w-[200px] md:max-w-[300px] object-contain"
+                className="h-16 md:h-24 w-auto max-w-[240px] md:max-w-[360px] object-contain"
                 referrerPolicy="no-referrer"
               />
             </div>
