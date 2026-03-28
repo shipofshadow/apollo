@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { fetchServiceBySlugAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import VariationGallery from '../components/VariationGallery';
+import { formatPrice } from '../utils/formatPrice';
 
 export default function ServiceDetail() {
   const { slug }  = useParams<{ slug: string }>();
@@ -96,7 +97,7 @@ export default function ServiceDetail() {
               {service.startingPrice && (
                 <>
                   <span className="text-brand-orange font-display font-black text-2xl leading-none">
-                    {service.startingPrice}
+                    {formatPrice(service.startingPrice)}
                   </span>
                   <span className="w-px h-5 bg-white/20" />
                 </>
@@ -149,7 +150,7 @@ export default function ServiceDetail() {
               {service.startingPrice && (
                 <>
                   <div className="text-4xl font-display font-black text-brand-orange leading-none">
-                    {service.startingPrice}
+                    {formatPrice(service.startingPrice)}
                   </div>
                   <div className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-[0.12em] mt-1 mb-5">
                     Starting Price

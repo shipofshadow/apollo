@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ServiceVariation, ProductVariation } from '../types';
+import { formatPrice } from '../utils/formatPrice';
 
 type Variation = ServiceVariation | ProductVariation;
 
@@ -57,7 +58,7 @@ export default function VariationGallery({ variations }: Props) {
             </span>
             {v.price && (
               <span className="text-[0.7rem] font-semibold text-gray-500 mt-0.5">
-                From {v.price}
+                From {formatPrice(v.price)}
               </span>
             )}
           </button>

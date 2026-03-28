@@ -18,6 +18,7 @@ import { BACKEND_URL } from '../config';
 import type { ShopDayHours } from '../types';
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
 import SignaturePad from '../components/SignaturePad';
+import { formatPrice } from '../utils/formatPrice';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -387,7 +388,7 @@ export default function BookingPage() {
                 {services.map(svc => {
                   const active = selectedIds.includes(svc.id);
                   return (
-                    <button key={svc.id} onClick={() => toggleService(svc.id)}
+                    <button key={svc.id} type="button" onClick={() => toggleService(svc.id)}
                       className={`p-6 border text-left transition-all rounded-sm relative ${active ? 'border-brand-orange bg-brand-orange/10' : 'border-gray-800 hover:border-gray-600'}`}>
                       {active && (
                         <span className="absolute top-3 right-3 w-5 h-5 bg-brand-orange rounded-full flex items-center justify-center">
@@ -397,7 +398,7 @@ export default function BookingPage() {
                       <h3 className="text-lg font-bold text-white mb-2 pr-8">{svc.title}</h3>
                       <div className="flex items-center gap-4 text-sm text-gray-400">
                         <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {svc.duration}</span>
-                        <span className="text-brand-orange font-bold">{svc.startingPrice}</span>
+                        <span className="text-brand-orange font-bold">{formatPrice(svc.startingPrice)}</span>
                       </div>
                     </button>
                   );
@@ -430,7 +431,7 @@ export default function BookingPage() {
                               {v.name}
                               {v.price && (
                                 <span className={`ml-2 font-normal normal-case tracking-normal ${picked ? 'text-orange-200' : 'text-gray-500'}`}>
-                                  {v.price}
+                                  {formatPrice(v.price)}
                                 </span>
                               )}
                             </button>
@@ -466,7 +467,7 @@ export default function BookingPage() {
                         return price ? (
                           <div key={svc.id}>
                             <span className="text-gray-500">{svc.title}:</span>{' '}
-                            <span className="text-brand-orange font-bold">{price}</span>
+                            <span className="text-brand-orange font-bold">{formatPrice(price)}</span>
                           </div>
                         ) : null;
                       })}
@@ -704,7 +705,7 @@ export default function BookingPage() {
                     return price ? (
                       <div key={svc.id} className="flex justify-between">
                         <span className="text-gray-500 pl-4">{svc.title}</span>
-                        <span className="text-brand-orange font-bold">{price}</span>
+                        <span className="text-brand-orange font-bold">{formatPrice(price)}</span>
                       </div>
                     ) : null;
                   })}

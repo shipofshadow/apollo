@@ -5,6 +5,7 @@ import { ArrowLeft, Check } from 'lucide-react';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import VariationGallery from '../components/VariationGallery';
+import { formatPrice } from '../utils/formatPrice';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +94,7 @@ export default function ProductDetail() {
             {/* Price badge */}
             <div className="flex items-center gap-5 flex-wrap animate-fadeInUp animate-delay-200">
               <span className="text-brand-orange font-display font-black text-2xl leading-none">
-                ₱{product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatPrice(product.price)}
               </span>
             </div>
           </div>
@@ -137,7 +138,7 @@ export default function ProductDetail() {
             {/* CTA card — gradient with orange border glow */}
             <div className="bg-gradient-to-br from-[#1a0d00] to-brand-darker border border-brand-orange/20 rounded-sm p-6 text-center animate-fadeInUp">
               <div className="text-4xl font-display font-black text-brand-orange leading-none">
-                ₱{product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatPrice(product.price)}
               </div>
               <div className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-[0.12em] mt-1 mb-5">
                 Price
