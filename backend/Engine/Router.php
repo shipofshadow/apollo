@@ -126,6 +126,9 @@ class Router
             $r->addRoute('PUT',    '/api/offers/{id:\d+}', 'handleOfferUpdate');
             $r->addRoute('DELETE', '/api/offers/{id:\d+}', 'handleOfferDelete');
 
+            // ── Contact message (public) ─────────────────────────────────────
+            $r->addRoute('POST', '/api/contact', 'handleContactMessage');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -1394,6 +1397,43 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new OfferService())->delete($id);
         echo json_encode(['message' => 'Offer deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Contact message handler
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleContactMessage(array $vars = []): void
+    {
+        $data    = $this->jsonBody();
+        $name    = trim((string) ($data['name']    ?? ''));
+        $email   = trim((string) ($data['email']   ?? ''));
+        $phone   = trim((string) ($data['phone']   ?? ''));
+        $subject = trim((string) ($data['subject'] ?? ''));
+        $message = trim((string) ($data['message'] ?? ''));
+
+        if ($name === '' || $email === '' || $subject === '' || $message === '') {
+            http_response_code(422);
+            echo json_encode(['detail' => 'Name, email, subject, and message are required.']);
+            return;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(422);
+            echo json_encode(['detail' => 'Invalid email address.']);
+            return;
+        }
+
+        (new NotificationService())->contactMessage([
+            'name'    => $name,
+            'email'   => $email,
+            'phone'   => $phone,
+            'subject' => $subject,
+            'message' => $message,
+        ]);
+
+        echo json_encode(['message' => 'Your message has been sent successfully.']);
     }
 }
 

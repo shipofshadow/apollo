@@ -694,3 +694,19 @@ export const fetchFacebookPosts = async (after?: string): Promise<FacebookPostsP
     nextCursor: hasNext ? nextCursor : null,
   };
 };
+
+// ── Contact ──────────────────────────────────────────────────────────────────
+
+export interface ContactMessagePayload {
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+}
+
+export const sendContactMessageApi = (payload: ContactMessagePayload) =>
+  apiFetch<{ message: string }>('/api/contact', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
