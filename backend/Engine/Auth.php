@@ -274,6 +274,9 @@ class Auth
     // Password reset flow
     // -------------------------------------------------------------------------
 
+    /** Lifetime of a password-reset token in seconds (1 hour). */
+    private const PASSWORD_RESET_TOKEN_TTL = 3600;
+
     /**
      * Generate and store a password-reset token for the given email.
      *
@@ -303,7 +306,7 @@ class Auth
            ->execute([':email' => $email]);
 
         $token     = bin2hex(random_bytes(32)); // 64-char hex string
-        $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1 hour
+        $expiresAt = date('Y-m-d H:i:s', time() + self::PASSWORD_RESET_TOKEN_TTL);
 
         $db->prepare(
             'INSERT INTO password_resets (email, token, expires_at) VALUES (:email, :token, :exp)'

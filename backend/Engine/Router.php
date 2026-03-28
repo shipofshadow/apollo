@@ -305,8 +305,7 @@ class Router
         $token = Auth::generatePasswordResetToken($email);
 
         if ($token !== null) {
-            $appUrl   = rtrim((string) ($_SERVER['HTTP_ORIGIN'] ?? APP_URL), '/');
-            $resetUrl = $appUrl . '/reset-password?token=' . urlencode($token);
+            $resetUrl = APP_URL . '/reset-password?token=' . urlencode($token);
             (new NotificationService())->passwordReset($email, $resetUrl);
         }
 

@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { KeyRound, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { resetPasswordApi } from '../../services/api';
 
+const REDIRECT_DELAY_MS = 3000;
+
 export default function ResetPasswordPage() {
   const navigate     = useNavigate();
   const [params]     = useSearchParams();
@@ -37,7 +39,7 @@ export default function ResetPasswordPage() {
       const data = await resetPasswordApi(token, password, confirm);
       setStatus('success');
       setMessage(data.message);
-      setTimeout(() => navigate('/login'), 3000);
+      setTimeout(() => navigate('/login'), REDIRECT_DELAY_MS);
     } catch (err: unknown) {
       setStatus('error');
       setMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again.');

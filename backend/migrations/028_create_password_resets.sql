@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS password_resets (
     id         INT UNSIGNED  NOT NULL AUTO_INCREMENT PRIMARY KEY,
     email      VARCHAR(255)  NOT NULL,
     token      CHAR(64)      NOT NULL,
-    expires_at DATETIME      NOT NULL,
+    expires_at TIMESTAMP     NOT NULL,
     created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_password_resets_email (email),
     UNIQUE KEY uq_password_resets_token (token)
