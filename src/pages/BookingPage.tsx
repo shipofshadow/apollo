@@ -90,6 +90,8 @@ export default function BookingPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>(
     preselectedId ? [preselectedId] : []
   );
+  // Step 1 – variation selection per service: { [serviceId]: variationId }
+  const [selectedVariationIds, setSelectedVariationIds] = useState<Record<number, number>>({});
 
   // Shop hours – loaded on mount to filter the date picker
   const [shopHours,       setShopHours]       = useState<ShopDayHours[]>([]);
@@ -190,9 +192,30 @@ export default function BookingPage() {
   }, [vehicleMake, vehicleYear]);
 
   const toggleService = (id: number) => {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        // Remove variation selection for this service when deselected
+        setSelectedVariationIds(v => {
+          const next = { ...v };
+          delete next[id];
+          return next;
+        });
+        return prev.filter(x => x !== id);
+      }
+      return [...prev, id];
+    });
+  };
+
+  const selectVariation = (serviceId: number, variationId: number) => {
+    setSelectedVariationIds(prev => {
+      // Toggle off if already selected
+      if (prev[serviceId] === variationId) {
+        const next = { ...prev };
+        delete next[serviceId];
+        return next;
+      }
+      return { ...prev, [serviceId]: variationId };
+    });
   };
 
   const handleDateSelect = async (date: Date) => {
@@ -270,6 +293,15 @@ export default function BookingPage() {
           vehicleModel,
           vehicleYear,
           serviceIds:      selectedIds,
+          selectedVariations: Object.entries(selectedVariationIds).map(([svcId, varId]) => {
+            const svc = services.find(s => s.id === Number(svcId));
+            const variation = svc?.variations?.find(v => v.id === varId);
+            return {
+              serviceId:     Number(svcId),
+              variationId:   varId,
+              variationName: variation?.name ?? '',
+            };
+          }),
           appointmentDate: selectedDate!.toISOString().split('T')[0],
           appointmentTime: selectedTime,
           notes:           form.notes,
@@ -286,6 +318,7 @@ export default function BookingPage() {
     dispatch(resetBookingState());
     setStep(1);
     setSelectedIds([]);
+    setSelectedVariationIds({});
     setSelectedDate(null);
     setSelectedTime('');
     setAvailableSlots([]);
@@ -358,11 +391,63 @@ export default function BookingPage() {
                   );
                 })}
               </div>
+
+              {/* Variation picker – shown for each selected service that has variations */}
+              {selectedServices.some(s => s.variations && s.variations.length > 0) && (
+                <div className="mt-6 space-y-4">
+                  {selectedServices.filter(s => s.variations && s.variations.length > 0).map(svc => (
+                    <div key={svc.id} className="bg-brand-darker border border-gray-700 rounded-sm p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">
+                        {svc.title} — Choose a Package
+                        <span className="ml-1 font-normal text-gray-600">(optional)</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {svc.variations.map(v => {
+                          const picked = selectedVariationIds[svc.id] === v.id;
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => selectVariation(svc.id, v.id)}
+                              className={`px-4 py-2 border text-sm font-bold uppercase tracking-widest rounded-sm transition-colors ${
+                                picked
+                                  ? 'bg-brand-orange text-white border-brand-orange'
+                                  : 'text-gray-400 border-gray-700 hover:border-brand-orange hover:text-white'
+                              }`}
+                            >
+                              {v.name}
+                              {v.price && (
+                                <span className={`ml-2 font-normal normal-case tracking-normal ${picked ? 'text-orange-200' : 'text-gray-500'}`}>
+                                  {v.price}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {selectedIds.length > 0 && (
                 <div className="mt-6 bg-brand-darker border border-gray-700 rounded-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
                   <div>
                     <span className="text-gray-400">Selected: </span>
                     <span className="text-white font-semibold">{selectedServices.map(s => s.title).join(', ')}</span>
+                    {Object.keys(selectedVariationIds).length > 0 && (
+                      <div className="mt-1 text-xs text-brand-orange">
+                        {Object.entries(selectedVariationIds).map(([svcId, varId]) => {
+                          const svc = services.find(s => s.id === Number(svcId));
+                          const v = svc?.variations?.find(v => v.id === varId);
+                          return v ? (
+                            <span key={svcId} className="mr-3">
+                              {svc?.title}: <strong>{v.name}</strong>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
                   </div>
                   <span className="text-brand-orange font-bold flex items-center gap-1 shrink-0">
                     <Clock className="w-4 h-4" /> Est. {totalMaxHours}h max
@@ -625,6 +710,16 @@ export default function BookingPage() {
                 at <span className="text-white">{selectedTime}</span>.
               </p>
               <p className="text-sm text-gray-500 mb-2">Services: {selectedServices.map(s => s.title).join(', ')}</p>
+              {Object.keys(selectedVariationIds).length > 0 && (
+                <p className="text-sm text-gray-500 mb-2">
+                  Packages:{' '}
+                  {Object.entries(selectedVariationIds).map(([svcId, varId]) => {
+                    const svc = services.find(s => s.id === Number(svcId));
+                    const v = svc?.variations?.find(v => v.id === varId);
+                    return v ? `${svc?.title} – ${v.name}` : null;
+                  }).filter(Boolean).join(', ')}
+                </p>
+              )}
               <p className="text-sm text-gray-600 mb-8">We'll send a confirmation to your email. If you need to change anything, just give us a call.</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 {user ? (

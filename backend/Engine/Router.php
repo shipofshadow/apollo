@@ -29,6 +29,11 @@ class Router
             $r->addRoute('POST',   '/api/services',                   'handleServiceCreate');
             $r->addRoute('PUT',    '/api/services/{id:\d+}',          'handleServiceUpdate');
             $r->addRoute('DELETE', '/api/services/{id:\d+}',          'handleServiceDelete');
+            // Service variations (admin write, public read via parent service)
+            $r->addRoute('GET',    '/api/services/{id:\d+}/variations',              'handleServiceVariationList');
+            $r->addRoute('POST',   '/api/services/{id:\d+}/variations',              'handleServiceVariationCreate');
+            $r->addRoute('PUT',    '/api/services/{id:\d+}/variations/{vid:\d+}',    'handleServiceVariationUpdate');
+            $r->addRoute('DELETE', '/api/services/{id:\d+}/variations/{vid:\d+}',    'handleServiceVariationDelete');
 
             // ── Auth ────────────────────────────────────────────────────────
             $r->addRoute('POST', '/api/auth/register',  'handleAuthRegister');
@@ -63,6 +68,11 @@ class Router
             $r->addRoute('POST',   '/api/products',          'handleProductCreate');
             $r->addRoute('PUT',    '/api/products/{id:\d+}', 'handleProductUpdate');
             $r->addRoute('DELETE', '/api/products/{id:\d+}', 'handleProductDelete');
+            // Product variations (admin write, public read via parent product)
+            $r->addRoute('GET',    '/api/products/{id:\d+}/variations',              'handleProductVariationList');
+            $r->addRoute('POST',   '/api/products/{id:\d+}/variations',              'handleProductVariationCreate');
+            $r->addRoute('PUT',    '/api/products/{id:\d+}/variations/{vid:\d+}',    'handleProductVariationUpdate');
+            $r->addRoute('DELETE', '/api/products/{id:\d+}/variations/{vid:\d+}',    'handleProductVariationDelete');
 
             // ── Portfolio (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/portfolio',                          'handlePortfolioList');
@@ -594,6 +604,50 @@ class Router
     }
 
     // -------------------------------------------------------------------------
+    // Service variation handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleServiceVariationList(array $vars = []): void
+    {
+        $id      = (int) ($vars['id'] ?? 0);
+        $service = (new ServiceCrudService())->getById($id, false);
+        echo json_encode(['variations' => $service['variations'] ?? []]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceVariationCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id        = (int) ($vars['id'] ?? 0);
+        $data      = $this->jsonBody();
+        $variation = (new ServiceCrudService())->createVariation($id, $data);
+        http_response_code(201);
+        echo json_encode(['variation' => $variation]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceVariationUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id        = (int) ($vars['id']  ?? 0);
+        $vid       = (int) ($vars['vid'] ?? 0);
+        $data      = $this->jsonBody();
+        $variation = (new ServiceCrudService())->updateVariation($id, $vid, $data);
+        echo json_encode(['variation' => $variation]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleServiceVariationDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id  = (int) ($vars['id']  ?? 0);
+        $vid = (int) ($vars['vid'] ?? 0);
+        (new ServiceCrudService())->deleteVariation($id, $vid);
+        echo json_encode(['message' => 'Variation deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
     // Blog post handlers
     // -------------------------------------------------------------------------
 
@@ -784,6 +838,50 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new ProductService())->delete($id);
         echo json_encode(['message' => 'Product deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Product variation handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleProductVariationList(array $vars = []): void
+    {
+        $id      = (int) ($vars['id'] ?? 0);
+        $product = (new ProductService())->getById($id, false);
+        echo json_encode(['variations' => $product['variations'] ?? []]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductVariationCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id        = (int) ($vars['id'] ?? 0);
+        $data      = $this->jsonBody();
+        $variation = (new ProductService())->createVariation($id, $data);
+        http_response_code(201);
+        echo json_encode(['variation' => $variation]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductVariationUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id        = (int) ($vars['id']  ?? 0);
+        $vid       = (int) ($vars['vid'] ?? 0);
+        $data      = $this->jsonBody();
+        $variation = (new ProductService())->updateVariation($id, $vid, $data);
+        echo json_encode(['variation' => $variation]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleProductVariationDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id  = (int) ($vars['id']  ?? 0);
+        $vid = (int) ($vars['vid'] ?? 0);
+        (new ProductService())->deleteVariation($id, $vid);
+        echo json_encode(['message' => 'Variation deleted.']);
     }
 
     // -------------------------------------------------------------------------

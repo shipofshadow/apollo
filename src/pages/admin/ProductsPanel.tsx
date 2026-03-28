@@ -8,8 +8,9 @@ import {
 } from '../../store/productsSlice';
 import { uploadAdminImageApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Product } from '../../types';
+import type { Product, ProductVariation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import VariationsManager from '../../components/VariationsManager';
 
 const UPLOAD_MAX_MB = 10;
 function validateImageFile(file: File): string | null {
@@ -72,14 +73,15 @@ export default function ProductsPanel() {
   const [saveError,    setSaveError]    = useState<string | null>(null);
   const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
+  const [variations,   setVariations]   = useState<ProductVariation[]>([]);
 
   useEffect(() => {
     if (token) dispatch(fetchProductsAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = () => { setForm(EMPTY_PRODUCT_FORM); setEditId(null); setSaveError(null); setEditing(true); };
-  const openEdit = (p: Product) => { setForm(productToForm(p)); setEditId(p.id); setSaveError(null); setEditing(true); };
-  const cancel   = () => { setEditing(false); setEditId(null); setSaveError(null); };
+  const openNew  = () => { setForm(EMPTY_PRODUCT_FORM); setEditId(null); setSaveError(null); setVariations([]); setEditing(true); };
+  const openEdit = (p: Product) => { setForm(productToForm(p)); setEditId(p.id); setSaveError(null); setVariations(p.variations ?? []); setEditing(true); };
+  const cancel   = () => { setEditing(false); setEditId(null); setSaveError(null); setVariations([]); };
 
   const set = (field: keyof ProductForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -235,6 +237,23 @@ export default function ProductsPanel() {
               </label>
             </div>
           </div>
+
+          {/* Variations – only shown when editing an existing product */}
+          {editId !== null && token && (
+            <div className="pt-2 border-t border-gray-800">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block mb-3">
+                Product Variations
+                <span className="ml-2 font-normal text-gray-600">(each with its own images &amp; specs)</span>
+              </label>
+              <VariationsManager
+                variations={variations}
+                parentId={editId}
+                parentType="product"
+                token={token}
+                onSaved={v => setVariations(v as ProductVariation[])}
+              />
+            </div>
+          )}
 
           <div className="flex gap-4 pt-4 border-t border-gray-800">
             <button type="submit" disabled={saving}

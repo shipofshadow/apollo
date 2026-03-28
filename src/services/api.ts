@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -89,6 +89,34 @@ export const updateServiceApi = (
 
 export const deleteServiceApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/services/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Service Variation API ─────────────────────────────────────────────────────
+
+export const createServiceVariationApi = (
+  token: string,
+  serviceId: number,
+  data: Partial<Omit<ServiceVariation, 'id' | 'serviceId'>>
+) =>
+  apiFetch<{ variation: ServiceVariation }>(`/api/services/${serviceId}/variations`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateServiceVariationApi = (
+  token: string,
+  serviceId: number,
+  varId: number,
+  data: Partial<Omit<ServiceVariation, 'id' | 'serviceId'>>
+) =>
+  apiFetch<{ variation: ServiceVariation }>(`/api/services/${serviceId}/variations/${varId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteServiceVariationApi = (token: string, serviceId: number, varId: number) =>
+  apiFetch<{ message: string }>(`/api/services/${serviceId}/variations/${varId}`, {
     method: 'DELETE',
   }, token);
 
@@ -312,6 +340,34 @@ export const updateProductApi = (
 
 export const deleteProductApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/products/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Product Variation API ─────────────────────────────────────────────────────
+
+export const createProductVariationApi = (
+  token: string,
+  productId: number,
+  data: Partial<Omit<ProductVariation, 'id' | 'productId'>>
+) =>
+  apiFetch<{ variation: ProductVariation }>(`/api/products/${productId}/variations`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateProductVariationApi = (
+  token: string,
+  productId: number,
+  varId: number,
+  data: Partial<Omit<ProductVariation, 'id' | 'productId'>>
+) =>
+  apiFetch<{ variation: ProductVariation }>(`/api/products/${productId}/variations/${varId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteProductVariationApi = (token: string, productId: number, varId: number) =>
+  apiFetch<{ message: string }>(`/api/products/${productId}/variations/${varId}`, {
     method: 'DELETE',
   }, token);
 
