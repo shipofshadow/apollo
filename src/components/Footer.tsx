@@ -37,7 +37,7 @@ export default function Footer() {
           <div className="space-y-6">
             <div className="flex items-start">
               <img
-                src="https://cdn.chopaeng.com/1625autolab/logos/1625%20Autolab%20V2.png"
+                src="https://cdn.1625autolab.com/1625autolab/logos/logo.png"
                 alt="1625 Autolab Logo"
                 className="h-16 md:h-24 w-auto max-w-[240px] md:max-w-[360px] object-contain"
                 referrerPolicy="no-referrer"

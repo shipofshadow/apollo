@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut } from 'lucide-react';
-import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
+
+const LOGO_URL = 'https://cdn.1625autolab.com/1625autolab/logos/logo.png';
 
 // Header heights match the Tailwind padding + logo height at each breakpoint:
 //   mobile (<sm):  py-6 (24px×2) + h-14 (56px) = 104px  |  scrolled: py-4 (16px×2) + 56px = 88px
@@ -74,7 +75,7 @@ export default function Header() {
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center hover:opacity-80 transition-opacity">
-          <img src={logo} alt="1625 Autolab Logo"
+          <img src={LOGO_URL} alt="1625 Autolab Logo"
             className="h-14 sm:h-16 md:h-20 w-auto max-w-[220px] sm:max-w-[260px] md:max-w-[360px] object-contain"
             referrerPolicy="no-referrer" />
         </Link>

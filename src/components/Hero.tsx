@@ -25,7 +25,7 @@ export default function Hero() {
           </div>
 
           <img
-            src="https://cdn.chopaeng.com/1625autolab/logos/1625%20Autolab%20V2.png"
+            src="https://cdn.1625autolab.com/1625autolab/logos/1625%20Autolab%20logo.png"
             alt="1625 Autolab"
             className="w-auto max-w-[320px] sm:max-w-[420px] md:max-w-[520px] object-contain"
             referrerPolicy="no-referrer"
