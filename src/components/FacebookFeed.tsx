@@ -10,6 +10,8 @@ function formatDate(isoString: string): string {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     }).format(new Date(isoString));
   } catch {
     return '';

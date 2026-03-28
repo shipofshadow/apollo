@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Calendar, Loader2, AlertCircle, ImageIcon } from 'lucide-react';
 import { fetchFacebookPosts } from '../services/api';
 import type { FacebookPost } from '../types';
-import { getPostImages, getPostTitle, getPostUrl } from '../utils/facebookPostHelpers';
+import { getPostImages, getPostTitle, getPostUrl, isPortfolioPost } from '../utils/facebookPostHelpers';
 
 export default function Portfolio() {
   const [posts, setPosts] = useState<FacebookPost[]>([]);
@@ -17,7 +17,7 @@ export default function Portfolio() {
     fetchFacebookPosts()
       .then(({ posts: fetched }) => {
         if (!cancelled) {
-          setPosts(fetched.filter(p => getPostImages(p).length > 0));
+          setPosts(fetched.filter(isPortfolioPost));
         }
       })
       .catch((err: unknown) => {
