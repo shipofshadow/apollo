@@ -19,6 +19,56 @@ class NotificationService
     // -------------------------------------------------------------------------
 
     /**
+     * Send a contact-form message to the admin inbox (1625autolab@gmail.com).
+     *
+     * @param array<string, string> $data
+     */
+    public function contactMessage(array $data): void
+    {
+        $to      = '1625autolab@gmail.com';
+        // Strip CRLF from values used in email headers to prevent header injection
+        $rawName    = str_replace(["\r", "\n"], '', $data['name']    ?? '');
+        $rawEmail   = str_replace(["\r", "\n"], '', $data['email']   ?? '');
+        $rawSubject = str_replace(["\r", "\n"], '', $data['subject'] ?? '');
+
+        // HTML-escaped versions for use in the email body
+        $name    = htmlspecialchars($rawName);
+        $email   = htmlspecialchars($rawEmail);
+        $phone   = htmlspecialchars(str_replace(["\r", "\n"], '', $data['phone'] ?? ''));
+        $subject = htmlspecialchars($rawSubject);
+        $msgText = nl2br(htmlspecialchars($data['message'] ?? ''));
+
+        $phoneRow = $phone !== '' ? "<tr><td><strong>Phone:</strong></td><td>$phone</td></tr>" : '';
+
+        $body = $this->wrapHtml("
+            <h2>New Contact Form Message</h2>
+            <table>
+                <tr><td><strong>From:</strong></td><td>$name &lt;$email&gt;</td></tr>
+                $phoneRow
+                <tr><td><strong>Subject:</strong></td><td>$subject</td></tr>
+            </table>
+            <h3>Message</h3>
+            <p style='white-space:pre-wrap'>$msgText</p>
+            <p style='color:#888;font-size:12px'>Sent via the contact form on the 1625 Auto Lab website.</p>
+        ");
+
+        $emailSubject = "Contact Form: $rawSubject";
+
+        // Build headers; use RFC 2047 base64 encoding for the Reply-To display name
+        $fromName   = MAIL_FROM_NAME;
+        $from       = MAIL_FROM !== '' ? MAIL_FROM : $to;
+        $headers    = implode("\r\n", [
+            "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>",
+            "Reply-To: =?UTF-8?B?" . base64_encode($rawName) . "?= <$rawEmail>",
+            'MIME-Version: 1.0',
+            'Content-Type: text/html; charset=UTF-8',
+            'X-Mailer: 1625-AutoLab',
+        ]);
+
+        @mail($to, $emailSubject, $body, $headers);
+    }
+
+    /**
      * Send a booking-confirmation email to the customer and a copy to the admin
      * inbox (if MAIL_ADMIN is set).
      *
