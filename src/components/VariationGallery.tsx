@@ -3,7 +3,7 @@
  *
  * Public-facing component that displays:
  *  - Variation selector tabs (with price shown on each tab)
- *  - Two-column card for the selected variation:
+ *  - Two-column card for the selected variation (animates in on switch):
  *      Left  – scrolling image carousel with thumbnail strip
  *      Right – description paragraph + specifications table
  */
@@ -36,16 +36,17 @@ export default function VariationGallery({ variations }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ── Variation selector tabs ─────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
         {variations.map((v, idx) => (
           <button
             key={v.id}
             onClick={() => selectVariation(idx)}
-            className={`flex flex-col items-start min-h-[3.5rem] px-4 py-2 text-sm font-bold uppercase tracking-widest border transition-colors rounded-sm ${
+            className={`flex flex-col items-start min-h-[3.5rem] px-4 py-2 text-sm font-bold uppercase tracking-widest border transition-all rounded-sm ${
+              /* min-h-[3.5rem] keeps all tabs the same height whether or not a price sub-label is shown */
               idx === activeIdx
-                ? 'bg-brand-orange text-white border-brand-orange'
+                ? 'bg-brand-orange text-white border-brand-orange shadow-[0_4px_12px_rgba(243,111,33,0.3)]'
                 : 'bg-transparent text-gray-400 border-gray-700 hover:border-brand-orange hover:text-white'
             }`}
           >
@@ -61,9 +62,12 @@ export default function VariationGallery({ variations }: Props) {
         ))}
       </div>
 
-      {/* ── Selected variation card – two-column layout ─────────────────── */}
+      {/* ── Selected variation card – animates in on switch ─────────────── */}
       {active && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 bg-brand-dark/40 border border-gray-800 rounded-sm p-6">
+        <div
+          key={activeIdx}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-brand-dark/40 border border-gray-800 rounded-sm p-5 animate-slideUp"
+        >
           {/* Left column – image carousel */}
           <div className="space-y-3">
             {images.length > 0 ? (
@@ -126,7 +130,7 @@ export default function VariationGallery({ variations }: Props) {
                       <button
                         key={i}
                         onClick={() => setImgIdx(i)}
-                        className={`shrink-0 w-16 h-16 rounded-sm overflow-hidden border-2 transition-colors ${
+                        className={`shrink-0 w-14 h-14 rounded-sm overflow-hidden border-2 transition-colors ${
                           i === imgIdx ? 'border-brand-orange' : 'border-gray-700 hover:border-gray-500'
                         }`}
                       >
@@ -149,16 +153,16 @@ export default function VariationGallery({ variations }: Props) {
           </div>
 
           {/* Right column – description + specs */}
-          <div className="space-y-6 flex flex-col justify-start">
+          <div className="space-y-5 flex flex-col justify-start">
             {active.description && (
-              <p className="text-gray-300 leading-relaxed">{active.description}</p>
+              <p className="text-gray-300 text-sm leading-relaxed">{active.description}</p>
             )}
 
             {/* ── Specs table ─────────────────────────────────────────── */}
             {active.specs && active.specs.length > 0 && (
               <div className="bg-brand-gray/20 border border-gray-800 rounded-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-800">
-                  <h4 className="text-sm font-bold uppercase tracking-widest text-white">
+                <div className="px-4 py-2.5 border-b border-gray-800">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-white">
                     Specifications
                   </h4>
                 </div>
@@ -169,8 +173,8 @@ export default function VariationGallery({ variations }: Props) {
                         key={i}
                         className={i % 2 === 0 ? 'bg-transparent' : 'bg-brand-dark/40'}
                       >
-                        <td className="px-5 py-3 text-gray-400 font-bold w-2/5">{spec.label}</td>
-                        <td className="px-5 py-3 text-white">{spec.value}</td>
+                        <td className="px-4 py-2.5 text-gray-400 font-bold w-2/5 text-xs">{spec.label}</td>
+                        <td className="px-4 py-2.5 text-white text-xs">{spec.value}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -183,3 +187,4 @@ export default function VariationGallery({ variations }: Props) {
     </div>
   );
 }
+
