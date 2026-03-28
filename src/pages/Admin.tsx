@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
-  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Images, Tag,
+  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown
 } from 'lucide-react';
 import logo from '../assets/logo.png';
@@ -17,7 +17,6 @@ import AccountSettingsPanel from './admin/AccountSettingsPanel';
 import ShopHoursPanel       from './admin/ShopHoursPanel';
 import SiteSettingsPanel    from './admin/SiteSettingsPanel';
 import FaqPanel             from './admin/FaqPanel';
-import PortfolioPanel       from './admin/PortfolioPanel';
 import OffersPanel          from './admin/OffersPanel';
 
 // ── Admin login screen (Unchanged) ────────────────────────────────────────────
@@ -140,7 +139,6 @@ export default function AdminPage() {
     {
       isGroup: true, key: 'content', label: 'Site Content', icon: FileText,
       children: [
-        { key: 'portfolio', label: 'Portfolio', icon: Images },
         { key: 'offers',    label: 'Offers',    icon: Tag },
         { key: 'content',   label: 'Content',   icon: FileText },
         { key: 'faq',       label: 'FAQ',       icon: HelpCircle },
@@ -159,7 +157,6 @@ export default function AdminPage() {
     switch (activeTab) {
       case 'analytics':     return <AnalyticsPanel />;
       case 'services':      return <ServicesPanel />;
-      case 'portfolio':     return <PortfolioPanel />;
       case 'offers':        return <OffersPanel />;
       case 'content':       return <ContentPanel />;
       case 'appointments':
