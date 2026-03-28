@@ -86,12 +86,10 @@ export default function BookingPage() {
 
   const [step, setStep] = useState(1);
 
-  // Step 1 – multi-select services (pre-select from location state if present)
+  // Step 1 – single-select service (pre-select from location state if present)
   const preselectedId = (location.state as { serviceId?: number } | null)?.serviceId ?? null;
-  const [selectedIds, setSelectedIds] = useState<number[]>(
-    preselectedId ? [preselectedId] : []
-  );
-  // Step 1 – variation selection per service: { [serviceId]: variationId }
+  const [selectedId, setSelectedId] = useState<number | null>(preselectedId ?? null);
+  // Step 1 – variation selection for the selected service: { [serviceId]: variationId }
   const [selectedVariationIds, setSelectedVariationIds] = useState<Record<number, number>>({});
 
   // Shop hours – loaded on mount to filter the date picker
@@ -145,7 +143,7 @@ export default function BookingPage() {
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : []);
 
-  const selectedServices = services.filter(s => selectedIds.includes(s.id));
+  const selectedServices = services.filter(s => s.id === selectedId);
   const totalMaxHours    = selectedServices.reduce(
     (acc, s) => acc + parseDurationMax(s.duration), 0
   );
@@ -205,18 +203,15 @@ export default function BookingPage() {
   }, [vehicleMake, vehicleYear]);
 
   const toggleService = (id: number) => {
-    setSelectedIds(prev => {
-      if (prev.includes(id)) {
-        // Remove variation selection for this service when deselected
-        setSelectedVariationIds(v => {
-          const next = { ...v };
-          delete next[id];
-          return next;
-        });
-        return prev.filter(x => x !== id);
-      }
-      return [...prev, id];
-    });
+    if (selectedId === id) {
+      // Deselect: clear service and its variation
+      setSelectedId(null);
+      setSelectedVariationIds({});
+    } else {
+      // Select new service, clearing any previous variation choice
+      setSelectedId(id);
+      setSelectedVariationIds({});
+    }
   };
 
   const selectVariation = (serviceId: number, variationId: number) => {
@@ -305,7 +300,7 @@ export default function BookingPage() {
           vehicleMake,
           vehicleModel,
           vehicleYear,
-          serviceIds:      selectedIds,
+          serviceIds:      selectedId !== null ? [selectedId] : [],
           selectedVariations: Object.entries(selectedVariationIds).map(([svcId, varId]) => {
             const svc = services.find(s => s.id === Number(svcId));
             const variation = svc?.variations?.find(v => v.id === varId);
@@ -330,7 +325,7 @@ export default function BookingPage() {
   const reset = () => {
     dispatch(resetBookingState());
     setStep(1);
-    setSelectedIds([]);
+    setSelectedId(null);
     setSelectedVariationIds({});
     setSelectedDate(null);
     setSelectedTime('');
@@ -386,7 +381,7 @@ export default function BookingPage() {
               <p className="text-sm text-gray-400 mb-6">Tap the services you'd like — you can choose more than one. Prices and estimated times are shown on each card.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {services.map(svc => {
-                  const active = selectedIds.includes(svc.id);
+                  const active = selectedId === svc.id;
                   return (
                     <button key={svc.id} type="button" onClick={() => toggleService(svc.id)}
                       className={`p-6 border text-left transition-all rounded-sm relative ${active ? 'border-brand-orange bg-brand-orange/10' : 'border-gray-800 hover:border-gray-600'}`}>
@@ -443,7 +438,7 @@ export default function BookingPage() {
                 </div>
               )}
 
-              {selectedIds.length > 0 && (
+              {selectedId !== null && (
                 <div className="mt-6 bg-brand-darker border border-gray-700 rounded-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
                   <div>
                     <span className="text-gray-400">Selected: </span>
@@ -479,9 +474,9 @@ export default function BookingPage() {
                 </div>
               )}
               <div className="mt-8 flex justify-end">
-                <button onClick={() => setStep(2)} disabled={selectedIds.length === 0}
+                <button type="button" onClick={() => setStep(2)} disabled={selectedId === null}
                   className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm"
-                  title={selectedIds.length === 0 ? 'Please select at least one service to continue' : undefined}>
+                  title={selectedId === null ? 'Please select a service to continue' : undefined}>
                   Choose Date & Time <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
