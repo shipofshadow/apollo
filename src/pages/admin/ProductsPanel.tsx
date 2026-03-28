@@ -11,6 +11,7 @@ import type { AppDispatch, RootState } from '../../store';
 import type { Product, ProductVariation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import VariationsManager from '../../components/VariationsManager';
+import { formatPrice } from '../../utils/formatPrice';
 
 const UPLOAD_MAX_MB = 10;
 function validateImageFile(file: File): string | null {
@@ -319,7 +320,7 @@ export default function ProductsPanel() {
                     <span className="bg-gray-800 px-2 py-0.5 rounded">{prod.category}</span>
                   )}
                   <span className="bg-brand-orange/10 text-brand-orange px-2 py-0.5 rounded font-bold flex items-center gap-1">
-                    <DollarSign className="w-3 h-3" /> ₱{prod.price.toLocaleString()}
+                    <DollarSign className="w-3 h-3" /> {formatPrice(prod.price)}
                   </span>
                   {prod.features.length > 0 && (
                     <span className="bg-gray-800 px-2 py-0.5 rounded">{prod.features.length} features</span>

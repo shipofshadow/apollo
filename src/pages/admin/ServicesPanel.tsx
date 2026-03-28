@@ -11,6 +11,7 @@ import type { AppDispatch, RootState } from '../../store';
 import type { Service, ServiceVariation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import VariationsManager from '../../components/VariationsManager';
+import { formatPrice } from '../../utils/formatPrice';
 
 const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
 
@@ -341,7 +342,7 @@ export default function ServicesPanel() {
                 <p className="text-gray-400 text-sm line-clamp-1">{svc.description}</p>
                 <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
                   {svc.duration      && <span className="bg-gray-800 px-2 py-0.5 rounded">{svc.duration}</span>}
-                  {svc.startingPrice && <span className="bg-brand-orange/10 text-brand-orange px-2 py-0.5 rounded font-bold">{svc.startingPrice}</span>}
+                  {svc.startingPrice && <span className="bg-brand-orange/10 text-brand-orange px-2 py-0.5 rounded font-bold">{formatPrice(svc.startingPrice)}</span>}
                   <span className="bg-gray-800 px-2 py-0.5 rounded">{svc.features.length} features</span>
                 </div>
               </div>

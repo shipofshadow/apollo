@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Lightbulb, MonitorPlay, Wrench, ShieldAlert, Zap, CarFront, Loader2 } from 'lucide-react';
 import { fetchServicesAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
+import { formatPrice } from '../utils/formatPrice';
 
 const IconMap: Record<string, React.ElementType> = {
   Lightbulb,
@@ -67,7 +68,7 @@ export default function ServicesGrid() {
 
                   {service.startingPrice && (
                     <p className="mt-3 text-brand-orange font-bold text-sm">
-                      {service.startingPrice}
+                      {formatPrice(service.startingPrice)}
                       {service.duration && (
                         <span className="text-gray-500 font-normal"> · {service.duration}</span>
                       )}

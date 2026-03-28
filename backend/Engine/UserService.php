@@ -51,6 +51,10 @@ class UserService
         $user  = $this->findById((int) $this->db->lastInsertId());
         $token = $this->issueTokenFor($user);
 
+        // Claim any anonymous bookings submitted with this email before the
+        // account existed (guest bookings have user_id = NULL).
+        $this->claimAnonymousBookings((int) $user['id'], strtolower(trim((string) ($data['email'] ?? ''))));
+
         return ['token' => $token, 'user' => $user];
     }
 
@@ -146,5 +150,20 @@ class UserService
     {
         unset($row['password']);
         return $row;
+    }
+
+    /**
+     * Link any anonymous bookings (user_id IS NULL) that share the given
+     * email address to the newly registered user.
+     * This connects guest bookings made before account creation.
+     */
+    private function claimAnonymousBookings(int $userId, string $email): void
+    {
+        if ($email === '') {
+            return;
+        }
+        $this->db->prepare(
+            'UPDATE bookings SET user_id = :uid WHERE email = :email AND user_id IS NULL'
+        )->execute([':uid' => $userId, ':email' => $email]);
     }
 }

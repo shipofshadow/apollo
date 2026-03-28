@@ -42,11 +42,35 @@
     background-color: #151515;
     background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
   }
+
+  /* Variation card / section slide-in */
   @keyframes slideUp {
     from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
   .animate-slideUp {
-    animation: slideUp 0.2s ease-out;
+    animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+
+  /* Hero image slow-zoom on load */
+  @keyframes slowzoom {
+    from { transform: scale(1.06); }
+    to   { transform: scale(1); }
+  }
+  .animate-slowzoom {
+    animation: slowzoom 10s ease forwards;
+  }
+
+  /* Fade-in-up for body sections */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeInUp {
+    animation: fadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-delay-100 { animation-delay: 0.1s; }
+  .animate-delay-200 { animation-delay: 0.2s; }
+  .animate-delay-300 { animation-delay: 0.3s; }
+  .animate-delay-400 { animation-delay: 0.4s; }
 }

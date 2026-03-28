@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import { SkeletonCard } from '../components/Skeleton';
+import { formatPrice } from '../utils/formatPrice';
 
 export default function Products() {
   const dispatch = useDispatch<AppDispatch>();
@@ -107,7 +108,7 @@ export default function Products() {
               <div className="p-6 flex flex-col flex-grow">
                 <h3 className="text-white font-bold uppercase tracking-wider mb-2 text-lg line-clamp-2">{product.name}</h3>
                 <p className="text-brand-orange font-display text-2xl font-bold mt-auto">
-                  ${product.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatPrice(product.price)}
                 </p>
               </div>
             </Link>
