@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -344,6 +344,35 @@ export const updatePortfolioItemApi = (
 
 export const deletePortfolioItemApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/portfolio/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+// ── Portfolio Categories API ──────────────────────────────────────────────────
+
+export const fetchPortfolioCategoriesApi = (token?: string | null) =>
+  apiFetch<{ categories: PortfolioCategory[] }>('/api/portfolio-categories', {}, token);
+
+export const createPortfolioCategoryApi = (
+  token: string,
+  data: { name: string; sortOrder?: number }
+) =>
+  apiFetch<{ category: PortfolioCategory }>('/api/portfolio-categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updatePortfolioCategoryApi = (
+  token: string,
+  id: number,
+  data: { name?: string; sortOrder?: number }
+) =>
+  apiFetch<{ category: PortfolioCategory }>(`/api/portfolio-categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deletePortfolioCategoryApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/portfolio-categories/${id}`, {
     method: 'DELETE',
   }, token);
 

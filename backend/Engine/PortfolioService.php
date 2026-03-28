@@ -100,6 +100,21 @@ class PortfolioService
         return array_map([$this, 'mapRow'], $stmt->fetchAll());
     }
 
+    /** Check whether the images column exists (added in migration 021). */
+    private function hasImagesColumn(): bool
+    {
+        static $checked = null;
+        if ($checked === null) {
+            try {
+                $stmt    = Database::getInstance()->query('SELECT images FROM portfolio LIMIT 0');
+                $checked = $stmt !== false;
+            } catch (\Throwable $e) {
+                $checked = false;
+            }
+        }
+        return $checked;
+    }
+
     /** @return array<string, mixed> */
     private function dbGetById(int $id, bool $requireActive): array
     {
@@ -122,13 +137,22 @@ class PortfolioService
     /** @param array<string, mixed> $data @return array<string, mixed> */
     private function dbCreate(array $data): array
     {
-        $db   = Database::getInstance();
-        $stmt = $db->prepare(
-            'INSERT INTO portfolio
-             (title, category, description, image_url, sort_order, is_active)
-             VALUES
-             (:title, :category, :description, :image_url, :sort_order, :is_active)'
-        );
+        $db = Database::getInstance();
+        if ($this->hasImagesColumn()) {
+            $stmt = $db->prepare(
+                'INSERT INTO portfolio
+                 (title, category, description, image_url, images, sort_order, is_active)
+                 VALUES
+                 (:title, :category, :description, :image_url, :images, :sort_order, :is_active)'
+            );
+        } else {
+            $stmt = $db->prepare(
+                'INSERT INTO portfolio
+                 (title, category, description, image_url, sort_order, is_active)
+                 VALUES
+                 (:title, :category, :description, :image_url, :sort_order, :is_active)'
+            );
+        }
         $stmt->execute($this->bindParams($data));
         return $this->dbGetById((int) $db->lastInsertId(), false);
     }
@@ -143,20 +167,35 @@ class PortfolioService
             'category'    => $current['category'],
             'description' => $current['description'],
             'imageUrl'    => $current['imageUrl'],
+            'images'      => $current['images'],
             'sortOrder'   => $current['sortOrder'],
             'isActive'    => $current['isActive'],
         ], $data);
 
-        $stmt = Database::getInstance()->prepare(
-            'UPDATE portfolio SET
-               title       = :title,
-               category    = :category,
-               description = :description,
-               image_url   = :image_url,
-               sort_order  = :sort_order,
-               is_active   = :is_active
-             WHERE id = :id'
-        );
+        if ($this->hasImagesColumn()) {
+            $stmt = Database::getInstance()->prepare(
+                'UPDATE portfolio SET
+                   title       = :title,
+                   category    = :category,
+                   description = :description,
+                   image_url   = :image_url,
+                   images      = :images,
+                   sort_order  = :sort_order,
+                   is_active   = :is_active
+                 WHERE id = :id'
+            );
+        } else {
+            $stmt = Database::getInstance()->prepare(
+                'UPDATE portfolio SET
+                   title       = :title,
+                   category    = :category,
+                   description = :description,
+                   image_url   = :image_url,
+                   sort_order  = :sort_order,
+                   is_active   = :is_active
+                 WHERE id = :id'
+            );
+        }
         $params        = $this->bindParams($merged);
         $params[':id'] = $id;
         $stmt->execute($params);
@@ -254,7 +293,11 @@ class PortfolioService
         if (!file_exists(self::$storageFile)) {
             return [];
         }
-        $data = json_decode((string) file_get_contents(self::$storageFile), true);
+        $raw = file_get_contents(self::$storageFile);
+        if ($raw === false) {
+            return [];
+        }
+        $data = json_decode($raw, true);
         return is_array($data) ? $data : [];
     }
 
@@ -281,12 +324,19 @@ class PortfolioService
      */
     private function mapRow(array $row): array
     {
+        $rawImages = $row['images'] ?? '[]';
+        $images    = json_decode((string) $rawImages, true);
+        if (!is_array($images)) {
+            $images = [];
+        }
+
         return [
             'id'          => (int)  $row['id'],
             'title'       =>        $row['title'],
             'category'    =>        $row['category'],
             'description' =>        $row['description'],
             'imageUrl'    =>        $row['image_url'],
+            'images'      =>        $images,
             'sortOrder'   => (int)  $row['sort_order'],
             'isActive'    => (bool) $row['is_active'],
             'createdAt'   =>        $row['created_at'],
@@ -297,14 +347,32 @@ class PortfolioService
     /** @return array<string, mixed> */
     private function bindParams(array $data): array
     {
-        return [
+        $images = $data['images'] ?? [];
+        if (is_string($images)) {
+            $decoded = json_decode($images, true);
+            $images  = is_array($decoded) ? $decoded : [];
+        }
+
+        // Derive image_url from first image in the array when available.
+        $imageUrl = $data['imageUrl'] ?? ($data['image_url'] ?? '');
+        if (empty($imageUrl) && !empty($images)) {
+            $imageUrl = $images[0];
+        }
+
+        $params = [
             ':title'       => $data['title']       ?? '',
             ':category'    => $data['category']    ?? '',
             ':description' => $data['description'] ?? '',
-            ':image_url'   => $data['imageUrl']    ?? ($data['image_url'] ?? ''),
+            ':image_url'   => $imageUrl,
             ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             ':is_active'   => (int) ($data['isActive']  ?? ($data['is_active']  ?? 1)),
         ];
+
+        if ($this->hasImagesColumn()) {
+            $params[':images'] = json_encode(array_values($images), JSON_UNESCAPED_UNICODE);
+        }
+
+        return $params;
     }
 
     /**
@@ -316,12 +384,24 @@ class PortfolioService
      */
     private function buildRecord(int $id, array $data): array
     {
+        $images = $data['images'] ?? [];
+        if (is_string($images)) {
+            $decoded = json_decode($images, true);
+            $images  = is_array($decoded) ? $decoded : [];
+        }
+
+        $imageUrl = $data['imageUrl'] ?? ($data['image_url'] ?? '');
+        if (empty($imageUrl) && !empty($images)) {
+            $imageUrl = $images[0];
+        }
+
         return [
             'id'          => $id,
             'title'       => $data['title']       ?? '',
             'category'    => $data['category']    ?? '',
             'description' => $data['description'] ?? '',
-            'imageUrl'    => $data['imageUrl']    ?? ($data['image_url'] ?? ''),
+            'imageUrl'    => $imageUrl,
+            'images'      => array_values($images),
             'sortOrder'   => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             'isActive'    => (bool) ($data['isActive'] ?? ($data['is_active'] ?? true)),
             'createdAt'   => $data['createdAt'] ?? date('c'),

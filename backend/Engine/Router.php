@@ -65,11 +65,18 @@ class Router
             $r->addRoute('DELETE', '/api/products/{id:\d+}', 'handleProductDelete');
 
             // ── Portfolio (public read, admin write) ─────────────────────────
-            $r->addRoute('GET',    '/api/portfolio',          'handlePortfolioList');
-            $r->addRoute('GET',    '/api/portfolio/{id:\d+}', 'handlePortfolioGet');
-            $r->addRoute('POST',   '/api/portfolio',          'handlePortfolioCreate');
-            $r->addRoute('PUT',    '/api/portfolio/{id:\d+}', 'handlePortfolioUpdate');
-            $r->addRoute('DELETE', '/api/portfolio/{id:\d+}', 'handlePortfolioDelete');
+            $r->addRoute('GET',    '/api/portfolio',                          'handlePortfolioList');
+            $r->addRoute('GET',    '/api/portfolio/{id:\d+}',                 'handlePortfolioGet');
+            $r->addRoute('POST',   '/api/portfolio',                          'handlePortfolioCreate');
+            $r->addRoute('PUT',    '/api/portfolio/{id:\d+}',                 'handlePortfolioUpdate');
+            $r->addRoute('DELETE', '/api/portfolio/{id:\d+}',                 'handlePortfolioDelete');
+
+            // ── Portfolio Categories (public read, admin write) ───────────────
+            $r->addRoute('GET',    '/api/portfolio-categories',               'handlePortfolioCategoryList');
+            $r->addRoute('GET',    '/api/portfolio-categories/{id:\d+}',      'handlePortfolioCategoryGet');
+            $r->addRoute('POST',   '/api/portfolio-categories',               'handlePortfolioCategoryCreate');
+            $r->addRoute('PUT',    '/api/portfolio-categories/{id:\d+}',      'handlePortfolioCategoryUpdate');
+            $r->addRoute('DELETE', '/api/portfolio-categories/{id:\d+}',      'handlePortfolioCategoryDelete');
 
             // ── Shop hours ──────────────────────────────────────────────────
             $r->addRoute('GET', '/api/shop/hours', 'handleShopHoursGet');
@@ -836,6 +843,54 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new PortfolioService())->delete($id);
         echo json_encode(['message' => 'Portfolio item deleted.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Portfolio Category handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioCategoryList(array $vars = []): void
+    {
+        $categories = (new PortfolioCategoryService())->getAll();
+        echo json_encode(['categories' => $categories]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioCategoryGet(array $vars = []): void
+    {
+        $id       = (int) ($vars['id'] ?? 0);
+        $category = (new PortfolioCategoryService())->getById($id);
+        echo json_encode(['category' => $category]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioCategoryCreate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $data     = $this->jsonBody();
+        $category = (new PortfolioCategoryService())->create($data);
+        http_response_code(201);
+        echo json_encode(['category' => $category]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioCategoryUpdate(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id       = (int) ($vars['id'] ?? 0);
+        $data     = $this->jsonBody();
+        $category = (new PortfolioCategoryService())->update($id, $data);
+        echo json_encode(['category' => $category]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePortfolioCategoryDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id = (int) ($vars['id'] ?? 0);
+        (new PortfolioCategoryService())->delete($id);
+        echo json_encode(['message' => 'Portfolio category deleted.']);
     }
 
     // -------------------------------------------------------------------------
