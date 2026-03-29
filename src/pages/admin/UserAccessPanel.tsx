@@ -28,6 +28,7 @@ const PERMISSION_CATALOG = [
   { key: 'users:manage', label: 'Manage Users', description: 'Can create users and change user roles.' },
   { key: 'roles:view', label: 'View Roles', description: 'Can view role matrix and role definitions.' },
   { key: 'roles:manage', label: 'Manage Roles', description: 'Can create, edit, and delete roles.' },
+  { key: 'security:audit:view', label: 'Security Audit', description: 'Can view and export authentication security audit logs.' },
   { key: 'reviews:manage', label: 'Manage Reviews', description: 'Can approve, reject, and delete reviews.' },
   { key: 'shop-hours:manage', label: 'Shop Hours', description: 'Can update business hours.' },
   { key: 'media:upload', label: 'Media Uploads', description: 'Can upload service/product/content media.' },

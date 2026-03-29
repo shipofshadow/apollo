@@ -88,6 +88,71 @@ export const resetPasswordApi = (token: string, password: string, passwordConfir
     body: JSON.stringify({ token, password, passwordConfirm }),
   });
 
+export const fetchAuthSessionsApi = (token: string) =>
+  apiFetch<{ sessions: Array<{
+    id: number;
+    userId: number;
+    ipAddress: string;
+    userAgent: string;
+    issuedAt: string;
+    expiresAt: string;
+    lastSeenAt: string;
+    revokedAt: string | null;
+    revokedReason: string | null;
+    isCurrent: boolean;
+    isActive: boolean;
+  }> }>('/api/auth/sessions', {}, token);
+
+export const revokeAuthSessionApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/auth/sessions/${id}`, {
+    method: 'DELETE',
+  }, token);
+
+export const revokeOtherAuthSessionsApi = (token: string) =>
+  apiFetch<{ revoked: number }>('/api/auth/sessions/revoke-others', {
+    method: 'DELETE',
+  }, token);
+
+export const fetchSecurityAuditLogsApi = (token: string, limit = 200) =>
+  apiFetch<{ logs: Array<{
+    id: number;
+    userId: number | null;
+    userName: string | null;
+    email: string;
+    ipAddress: string;
+    userAgent: string;
+    eventType: string;
+    outcome: string;
+    detail: string | null;
+    createdAt: string;
+  }> }>(`/api/admin/security/audit?limit=${encodeURIComponent(String(limit))}`, {}, token);
+
+export const exportSecurityAuditCsvApi = async (token: string, limit = 1000): Promise<Blob> => {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${BACKEND_URL}/api/admin/security/audit/export?limit=${encodeURIComponent(String(limit))}`,
+      {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+  } catch {
+    throw new Error('Unable to reach the backend server. Please check your connection.');
+  }
+
+  if (!response.ok) {
+    try {
+      const data = await response.json();
+      throw new Error(data?.detail ?? `Request failed (${response.status})`);
+    } catch (e: unknown) {
+      throw new Error((e as Error).message ?? `Request failed (${response.status})`);
+    }
+  }
+
+  return response.blob();
+};
+
 // ── Services API ─────────────────────────────────────────────────────────────
 
 export const fetchServicesApi = (token?: string | null) =>

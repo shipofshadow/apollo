@@ -57,16 +57,16 @@ export default function ClientDashboard() {
   ];
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 w-full">
       {/* Welcome hero */}
-      <div className="relative bg-brand-dark border border-gray-800 rounded-sm overflow-hidden px-7 py-6">
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-orange/5 to-transparent pointer-events-none" />
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-orange" />
-        <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-1">Client Portal</p>
-        <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter">
+      <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#151515] px-6 py-6 md:px-7 md:py-7">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-14 left-20 h-32 w-32 rounded-full bg-red-400/10 blur-2xl" />
+        <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-orange/90 mb-2">Client Portal</p>
+        <h1 className="text-3xl md:text-4xl font-display font-black text-white uppercase tracking-tight">
           Welcome back, {user?.name?.split(' ')[0]}
         </h1>
-        <p className="text-gray-400 mt-1 text-sm">Here's a quick overview of your appointments and what's coming up.</p>
+        <p className="text-gray-400 mt-2 text-sm">Here is a quick overview of your appointments and what is coming up.</p>
       </div>
 
       {/* Stat cards */}
@@ -74,7 +74,7 @@ export default function ClientDashboard() {
         {stats.map(({ label, value, icon: Icon, color }) => (
           <div
             key={label}
-            className={`bg-brand-dark border-t-2 ${STAT_LEFT_BORDER[label]} border-x border-b border-gray-800 rounded-sm p-5`}
+            className={`bg-gradient-to-br from-brand-dark to-[#1a1a1a] border-t-2 ${STAT_LEFT_BORDER[label]} border-x border-b border-gray-800 rounded-xl p-5`}
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{label}</span>
@@ -86,7 +86,7 @@ export default function ClientDashboard() {
       </div>
 
       {/* Recent bookings */}
-      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+      <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
           <h2 className="text-sm font-bold text-white uppercase tracking-widest">Recent Bookings</h2>
           <Link
@@ -109,7 +109,7 @@ export default function ClientDashboard() {
             <p className="text-sm mb-4">You have no bookings yet.</p>
             <Link
               to="/booking"
-              className="inline-flex items-center gap-2 bg-brand-orange text-white px-5 py-2.5 font-bold uppercase tracking-widest text-xs hover:bg-orange-600 transition-colors rounded-sm"
+              className="inline-flex items-center gap-2 bg-brand-orange text-white px-5 py-2.5 font-bold uppercase tracking-widest text-xs hover:bg-orange-600 transition-colors rounded-md"
             >
               <PlusCircle className="w-4 h-4" /> Book a Service
             </Link>
@@ -151,9 +151,8 @@ export default function ClientDashboard() {
       </div>
 
       {/* CTA */}
-      <div className="relative bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-orange/10 to-transparent pointer-events-none" />
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-orange" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-orange/10 to-transparent pointer-events-none" />
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-7 py-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -165,7 +164,7 @@ export default function ClientDashboard() {
           </div>
           <Link
             to="/booking"
-            className="shrink-0 bg-brand-orange text-white px-5 py-2.5 font-bold uppercase tracking-widest text-xs hover:bg-orange-600 transition-colors rounded-sm flex items-center gap-2"
+            className="shrink-0 bg-brand-orange text-white px-5 py-2.5 font-bold uppercase tracking-widest text-xs hover:bg-orange-600 transition-colors rounded-md flex items-center gap-2"
           >
             <PlusCircle className="w-4 h-4" /> New Booking
           </Link>

@@ -153,30 +153,34 @@ export default function MyGarage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="relative bg-brand-dark border border-gray-800 rounded-sm overflow-hidden px-7 py-6">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-orange" />
-        <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-1">Client Portal</p>
-        <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter">
-          My Garage
-        </h1>
-        <p className="text-gray-400 mt-1 text-sm">Save your vehicles once and reuse them when booking.</p>
-      </div>
+    <div className="space-y-6 w-full">
+      <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#151515] px-6 py-6 md:px-7 md:py-7">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-14 left-20 h-32 w-32 rounded-full bg-amber-400/10 blur-2xl" />
 
-      <section className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Saved Vehicles</p>
-          {editingId === null && (
+        <div className="relative">
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-orange/90 mb-2">Client Portal</p>
+          <h1 className="text-3xl md:text-4xl font-display font-black text-white uppercase tracking-tight">
+          My Garage
+          </h1>
+          <p className="text-gray-400 mt-2 text-sm">Save your vehicles once and reuse them when booking.</p>
+        </div>
+
+        {editingId === null && (
+          <div className="relative mt-4">
             <button
               type="button"
               onClick={startCreate}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-md hover:bg-orange-600 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" /> Add Vehicle
             </button>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
+      <section className="bg-gradient-to-br from-brand-dark to-[#181818] border border-gray-800 rounded-xl p-5 md:p-6 space-y-5">
+         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Saved Vehicles</p>
         {loading ? (
           <div className="py-10 flex justify-center"><Loader2 className="w-6 h-6 text-brand-orange animate-spin" /></div>
         ) : vehicles.length === 0 ? (
@@ -185,15 +189,15 @@ export default function MyGarage() {
             <p>No vehicles yet. Add your first car to speed up booking.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {vehicles.map(vehicle => (
-              <article key={vehicle.id} className="border border-gray-800 bg-brand-darker rounded-sm p-4">
+              <article key={vehicle.id} className="border border-gray-800 bg-brand-darker/80 rounded-xl p-4 hover:border-gray-700 transition-colors">
                 {vehicle.imageUrl && (
-                  <div className="mb-3 rounded-sm overflow-hidden border border-gray-800 bg-black/40">
+                  <div className="mb-3 rounded-md overflow-hidden border border-gray-800 bg-black/40">
                     <img src={vehicle.imageUrl} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} className="w-full h-32 object-cover" />
                   </div>
                 )}
-                <p className="text-white font-bold text-sm">{vehicle.year} {vehicle.make} {vehicle.model}</p>
+                <p className="text-white font-bold text-sm md:text-base">{vehicle.year} {vehicle.make} {vehicle.model}</p>
                 <p className="text-gray-500 text-xs mt-1">
                   {vehicle.licensePlate ? `Plate: ${vehicle.licensePlate}` : 'No plate saved'}
                   {vehicle.vin ? ` · VIN: ${vehicle.vin}` : ''}
@@ -202,7 +206,7 @@ export default function MyGarage() {
                   <button
                     type="button"
                     onClick={() => startEdit(vehicle)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange rounded-sm transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange rounded-md transition-colors"
                   >
                     <Pencil className="w-3 h-3" /> Edit
                   </button>
@@ -210,7 +214,7 @@ export default function MyGarage() {
                     type="button"
                     onClick={() => removeVehicle(vehicle.id)}
                     disabled={deletingId === vehicle.id}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-red-900 text-red-400 hover:text-red-300 hover:border-red-500 rounded-sm transition-colors disabled:opacity-60"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-red-900 text-red-400 hover:text-red-300 hover:border-red-500 rounded-md transition-colors disabled:opacity-60"
                   >
                     {deletingId === vehicle.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />} Remove
                   </button>
@@ -221,7 +225,7 @@ export default function MyGarage() {
         )}
 
         {editingId !== null && (
-          <div className="border border-gray-800 bg-brand-darker rounded-sm p-4 space-y-3">
+          <div className="border border-gray-800 bg-brand-darker rounded-xl p-4 md:p-5 space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               {editingId > 0 ? 'Edit Vehicle' : 'Add Vehicle'}
             </p>
@@ -230,24 +234,24 @@ export default function MyGarage() {
                 value={form.make}
                 onChange={e => setForm(prev => ({ ...prev, make: e.target.value }))}
                 placeholder="Make (e.g. Toyota)"
-                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-sm focus:outline-none focus:border-brand-orange"
+                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-md focus:outline-none focus:border-brand-orange"
               />
               <input
                 value={form.model}
                 onChange={e => setForm(prev => ({ ...prev, model: e.target.value }))}
                 placeholder="Model (e.g. Vios)"
-                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-sm focus:outline-none focus:border-brand-orange"
+                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-md focus:outline-none focus:border-brand-orange"
               />
               <input
                 value={form.year}
                 onChange={e => setForm(prev => ({ ...prev, year: e.target.value }))}
                 placeholder="Year (e.g. 2021)"
-                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-sm focus:outline-none focus:border-brand-orange"
+                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-md focus:outline-none focus:border-brand-orange"
               />
               <div className="space-y-2">
                 {form.imageUrl ? (
                   <div className="relative h-[42px]">
-                    <img src={form.imageUrl} alt="Vehicle" className="w-full h-full object-cover rounded-sm border border-gray-700" />
+                    <img src={form.imageUrl} alt="Vehicle" className="w-full h-full object-cover rounded-md border border-gray-700" />
                     <button
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, imageUrl: '' }))}
@@ -261,7 +265,7 @@ export default function MyGarage() {
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
                     disabled={imageUploading}
-                    className="w-full h-[42px] inline-flex items-center justify-center gap-1.5 border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange text-[11px] font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-60"
+                    className="w-full h-[42px] inline-flex items-center justify-center gap-1.5 border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange text-[11px] font-bold uppercase tracking-widest rounded-md transition-colors disabled:opacity-60"
                   >
                     {imageUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />} Add Photo
                   </button>
@@ -272,27 +276,27 @@ export default function MyGarage() {
                 value={form.licensePlate}
                 onChange={e => setForm(prev => ({ ...prev, licensePlate: e.target.value }))}
                 placeholder="License Plate (optional)"
-                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-sm focus:outline-none focus:border-brand-orange"
+                className="w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-md focus:outline-none focus:border-brand-orange"
               />
               <input
                 value={form.imageUrl}
                 onChange={e => setForm(prev => ({ ...prev, imageUrl: e.target.value }))}
                 placeholder="Image URL (optional)"
-                className="md:col-span-2 w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-sm focus:outline-none focus:border-brand-orange"
+                className="md:col-span-2 w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-md focus:outline-none focus:border-brand-orange"
               />
               <input
                 value={form.vin}
                 onChange={e => setForm(prev => ({ ...prev, vin: e.target.value }))}
                 placeholder="VIN (optional)"
-                className="md:col-span-2 w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-sm focus:outline-none focus:border-brand-orange"
+                className="md:col-span-2 w-full bg-black border border-gray-700 text-white px-3 py-2 text-sm rounded-md focus:outline-none focus:border-brand-orange"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={saveVehicle}
                 disabled={saving || imageUploading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-md hover:bg-orange-600 transition-colors disabled:opacity-60"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Save
               </button>
@@ -300,7 +304,7 @@ export default function MyGarage() {
                 type="button"
                 onClick={cancelEdit}
                 disabled={saving}
-                className="px-4 py-2 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors"
+                className="px-4 py-2 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-xs font-bold uppercase tracking-widest rounded-md transition-colors"
               >
                 Cancel
               </button>

@@ -43,6 +43,7 @@ class Router
             'bookings:notes',
             'build-updates:manage',
             'clients:manage',
+            'security:audit:view',
             'roles:view',
             'reviews:manage',
             'services:manage',
@@ -90,6 +91,9 @@ class Router
             $r->addRoute('POST', '/api/auth/avatar-upload',    'handleAuthAvatarUpload');
             $r->addRoute('POST', '/api/auth/forgot-password',  'handleAuthForgotPassword');
             $r->addRoute('POST', '/api/auth/reset-password',   'handleAuthResetPassword');
+            $r->addRoute('GET',  '/api/auth/sessions',         'handleAuthSessionList');
+            $r->addRoute('DELETE', '/api/auth/sessions/revoke-others', 'handleAuthSessionRevokeOthers');
+            $r->addRoute('DELETE', '/api/auth/sessions/{id:\d+}', 'handleAuthSessionRevoke');
 
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
@@ -221,6 +225,8 @@ class Router
             $r->addRoute('GET',  '/api/admin/clients', 'handleAdminClientList');
             $r->addRoute('GET',  '/api/admin/roles',   'handleAdminRoleList');
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
+            $r->addRoute('GET',  '/api/admin/security/audit', 'handleAdminSecurityAuditList');
+            $r->addRoute('GET',  '/api/admin/security/audit/export', 'handleAdminSecurityAuditExport');
             $r->addRoute('POST', '/api/admin/roles',   'handleAdminRoleCreate');
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
@@ -312,6 +318,56 @@ class Router
     private function isBackofficeRole(string $role): bool
     {
         return in_array($role, ['admin', 'manager', 'staff'], true);
+    }
+
+    private function getClientIp(): string
+    {
+        $candidates = [
+            $_SERVER['HTTP_CF_CONNECTING_IP'] ?? null,
+            $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null,
+            $_SERVER['REMOTE_ADDR'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            $first = trim(explode(',', $candidate)[0]);
+            if ($first !== '') {
+                return substr($first, 0, 64);
+            }
+        }
+
+        return '';
+    }
+
+    private function getUserAgent(): string
+    {
+        $ua = trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+        if ($ua === '') {
+            return '';
+        }
+
+        return mb_substr($ua, 0, 500);
+    }
+
+    private function formatRetryAfterHuman(int $seconds): string
+    {
+        $seconds = max(0, $seconds);
+        $minutes = intdiv($seconds, 60);
+        $remain = $seconds % 60;
+
+        if ($minutes <= 0) {
+            return $remain . ' second' . ($remain === 1 ? '' : 's');
+        }
+
+        if ($remain === 0) {
+            return $minutes . ' minute' . ($minutes === 1 ? '' : 's');
+        }
+
+        return $minutes . ' minute' . ($minutes === 1 ? '' : 's')
+            . ' ' . $remain . ' second' . ($remain === 1 ? '' : 's');
     }
 
     /** @return array<string, string[]> */
@@ -457,8 +513,84 @@ class Router
         $data   = $this->jsonBody();
         $email  = (string) ($data['email']    ?? '');
         $pass   = (string) ($data['password'] ?? '');
-        $result = (new UserService())->login($email, $pass);
-        echo json_encode($result);
+        $security = null;
+        $ip = $this->getClientIp();
+        $ua = $this->getUserAgent();
+
+        if (DB_NAME !== '') {
+            $security = new AuthSecurityService();
+            $retryAfter = $security->getRetryAfterSeconds($email, $ip);
+            if ($retryAfter > 0) {
+                header('Retry-After: ' . (string) $retryAfter);
+                $security->recordBlockedLoginAttempt(
+                    $email,
+                    $ip,
+                    $ua,
+                    $retryAfter,
+                    'Blocked before credential verification.'
+                );
+
+                if ($security->isSuspiciousLogin($email, $ip) && $security->shouldSendSuspiciousAlert($email, $ip)) {
+                    (new UserNotificationService())->createForAdmin(
+                        'status_changed',
+                        'Suspicious Login Pattern',
+                        'Repeated login failures detected for ' . strtolower(trim($email)) . ' from IP ' . ($ip !== '' ? $ip : 'unknown') . '.',
+                        ['email' => strtolower(trim($email)), 'ipAddress' => $ip]
+                    );
+                    $security->markSuspiciousAlertSent($email, $ip, $ua, 'Admin suspicious login alert sent.');
+                }
+
+                throw new RuntimeException('Too many failed attempts. Try again in ' . $this->formatRetryAfterHuman($retryAfter) . '.', 429);
+            }
+        }
+
+        try {
+            $result = (new UserService())->login($email, $pass);
+
+            if ($security !== null) {
+                $payload = Auth::decodeToken((string) ($result['token'] ?? ''));
+                $uid = (int) ($payload['sub'] ?? 0);
+                $exp = (int) ($payload['exp'] ?? (time() + JWT_TTL));
+
+                $security->recordLoginAttempt($email, true, $uid > 0 ? $uid : null, $ip, $ua, 'Login successful.');
+                if ($uid > 0) {
+                    $security->createSession($uid, (string) $result['token'], $exp, $ip, $ua);
+                }
+
+                if ($security->isSuspiciousLogin($email, $ip) && $security->shouldSendSuspiciousAlert($email, $ip)) {
+                    (new UserNotificationService())->createForAdmin(
+                        'status_changed',
+                        'Suspicious Login Pattern',
+                        'Repeated login failures detected for ' . strtolower(trim($email)) . ' from IP ' . ($ip !== '' ? $ip : 'unknown') . '.',
+                        ['email' => strtolower(trim($email)), 'ipAddress' => $ip]
+                    );
+                    $security->markSuspiciousAlertSent($email, $ip, $ua, 'Admin suspicious login alert sent.');
+                }
+            }
+
+            echo json_encode($result);
+        } catch (RuntimeException $e) {
+            if ($security !== null) {
+                $security->recordLoginAttempt($email, false, null, $ip, $ua, $e->getMessage());
+
+                $retryAfter = $security->getRetryAfterSeconds($email, $ip);
+                if ($retryAfter > 0) {
+                    header('Retry-After: ' . (string) $retryAfter);
+                }
+
+                if ($security->isSuspiciousLogin($email, $ip) && $security->shouldSendSuspiciousAlert($email, $ip)) {
+                    (new UserNotificationService())->createForAdmin(
+                        'status_changed',
+                        'Suspicious Login Pattern',
+                        'Repeated login failures detected for ' . strtolower(trim($email)) . ' from IP ' . ($ip !== '' ? $ip : 'unknown') . '.',
+                        ['email' => strtolower(trim($email)), 'ipAddress' => $ip]
+                    );
+                    $security->markSuspiciousAlertSent($email, $ip, $ua, 'Admin suspicious login alert sent.');
+                }
+            }
+
+            throw $e;
+        }
     }
 
     /** @param array<string, string> $vars */
@@ -466,9 +598,73 @@ class Router
     {
         $token = Auth::tokenFromHeader();
         if ($token !== null) {
+            if (DB_NAME !== '') {
+                (new AuthSecurityService())->endSessionByToken($token, 'logout');
+            }
             Auth::logout($token);
         }
         echo json_encode(['message' => 'Logged out successfully.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthSessionList(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['sessions' => []]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $userId = (int) ($payload['sub'] ?? 0);
+        $token = Auth::tokenFromHeader();
+        $currentHash = $token !== null ? hash('sha256', $token) : null;
+
+        $sessions = (new AuthSecurityService())->listSessions($userId, $currentHash);
+        echo json_encode(['sessions' => $sessions]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthSessionRevoke(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $userId = (int) ($payload['sub'] ?? 0);
+        $sessionId = (int) ($vars['id'] ?? 0);
+        if ($sessionId <= 0) {
+            throw new RuntimeException('Invalid session id.', 422);
+        }
+
+        $ok = (new AuthSecurityService())->revokeSessionById($userId, $sessionId);
+        if (!$ok) {
+            throw new RuntimeException('Session not found.', 404);
+        }
+
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthSessionRevokeOthers(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['revoked' => 0]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $userId = (int) ($payload['sub'] ?? 0);
+        $token = Auth::tokenFromHeader();
+        if ($token === null) {
+            throw new RuntimeException('Unauthenticated.', 401);
+        }
+
+        $currentHash = hash('sha256', $token);
+        $revoked = (new AuthSecurityService())->revokeOtherSessions($userId, $currentHash);
+
+        echo json_encode(['revoked' => $revoked]);
     }
 
     /** @param array<string, string> $vars */
@@ -1208,7 +1404,84 @@ class Router
         $this->requirePermission('roles:view');
         $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 120;
         $logs = (new UserService())->listRoleAuditLogs($limit);
+
+        $format = strtolower(trim((string) ($_GET['format'] ?? 'json')));
+        if ($format === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="role-audit-logs.csv"');
+            $out = fopen('php://output', 'wb');
+            if ($out === false) {
+                throw new RuntimeException('Unable to stream CSV.', 500);
+            }
+
+            fputcsv($out, ['id', 'action', 'roleKey', 'targetUserEmail', 'actorName', 'actorEmail', 'createdAt']);
+            foreach ($logs as $log) {
+                fputcsv($out, [
+                    (string) ($log['id'] ?? ''),
+                    (string) ($log['action'] ?? ''),
+                    (string) ($log['roleKey'] ?? ''),
+                    (string) ($log['targetUserEmail'] ?? ''),
+                    (string) ($log['actorName'] ?? ''),
+                    (string) ($log['actorEmail'] ?? ''),
+                    (string) ($log['created_at'] ?? ''),
+                ]);
+            }
+            fclose($out);
+            return;
+        }
+
         echo json_encode(['logs' => $logs]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminSecurityAuditList(array $vars = []): void
+    {
+        $this->requirePermission('security:audit:view');
+
+        if (DB_NAME === '') {
+            echo json_encode(['logs' => []]);
+            return;
+        }
+
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 200;
+        $logs = (new AuthSecurityService())->listAuthAuditLogs($limit);
+        echo json_encode(['logs' => $logs]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminSecurityAuditExport(array $vars = []): void
+    {
+        $this->requirePermission('security:audit:view');
+
+        if (DB_NAME === '') {
+            throw new RuntimeException('Database is required for audit export.', 503);
+        }
+
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 1000;
+        $logs = (new AuthSecurityService())->listAuthAuditLogs($limit);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="auth-security-audit.csv"');
+        $out = fopen('php://output', 'wb');
+        if ($out === false) {
+            throw new RuntimeException('Unable to stream CSV.', 500);
+        }
+
+        fputcsv($out, ['id', 'eventType', 'outcome', 'email', 'userName', 'ipAddress', 'userAgent', 'detail', 'createdAt']);
+        foreach ($logs as $log) {
+            fputcsv($out, [
+                (string) ($log['id'] ?? ''),
+                (string) ($log['eventType'] ?? ''),
+                (string) ($log['outcome'] ?? ''),
+                (string) ($log['email'] ?? ''),
+                (string) ($log['userName'] ?? ''),
+                (string) ($log['ipAddress'] ?? ''),
+                (string) ($log['userAgent'] ?? ''),
+                (string) ($log['detail'] ?? ''),
+                (string) ($log['createdAt'] ?? ''),
+            ]);
+        }
+        fclose($out);
     }
 
     /** @param array<string, string> $vars */

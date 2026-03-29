@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2, Upload, Trash2 } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2, Upload, Trash2, Monitor, RefreshCw, Shield } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
 import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getNotificationPrefsApi, saveNotificationPrefsApi, uploadProfileAvatarApi } from '../../services/api';
+import {
+  getNotificationPrefsApi,
+  saveNotificationPrefsApi,
+  uploadProfileAvatarApi,
+  fetchAuthSessionsApi,
+  revokeAuthSessionApi,
+  revokeOtherAuthSessionsApi,
+} from '../../services/api';
 import type { NotificationPreferences } from '../../types';
 
 const UPLOAD_MAX_MB = 10;
@@ -15,6 +22,20 @@ function validateImageFile(file: File): string | null {
     ? `Image must be under ${UPLOAD_MAX_MB} MB.`
     : null;
 }
+
+type AuthSession = {
+  id: number;
+  userId: number;
+  ipAddress: string;
+  userAgent: string;
+  issuedAt: string;
+  expiresAt: string;
+  lastSeenAt: string;
+  revokedAt: string | null;
+  revokedReason: string | null;
+  isCurrent: boolean;
+  isActive: boolean;
+};
 
 export default function Profile() {
   const dispatch               = useDispatch<AppDispatch>();
@@ -33,6 +54,11 @@ export default function Profile() {
   const [prefsBusy,  setPrefsBusy]  = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
 
+  const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionBusyId, setSessionBusyId] = useState<number | null>(null);
+  const [revokeOthersBusy, setRevokeOthersBusy] = useState(false);
+
   useEffect(() => {
     if (user) setInfo({ name: user.name, phone: user.phone });
   }, [user]);
@@ -44,6 +70,25 @@ export default function Profile() {
     getNotificationPrefsApi(token)
       .then(r => r.preferences && setPrefs(r.preferences))
       .catch(() => {});
+  }, [token]);
+
+  const loadSessions = async () => {
+    if (!token) return;
+    setSessionsLoading(true);
+    try {
+      const res = await fetchAuthSessionsApi(token);
+      setSessions(res.sessions as AuthSession[]);
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to load active sessions.', 'error');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    loadSessions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const handlePrefsToggle = (key: keyof NotificationPreferences) => {
@@ -103,17 +148,20 @@ export default function Profile() {
   const displayError = localErr || error;
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 w-full">
       {/* Page header */}
-      <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-1">Client Portal</p>
-        <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter">
+      <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#151515] px-6 py-6 md:px-7 md:py-7">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-14 left-20 h-32 w-32 rounded-full bg-red-400/10 blur-2xl" />
+        <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-orange/90 mb-2">Client Portal</p>
+        <h1 className="text-3xl md:text-4xl font-display font-black text-white uppercase tracking-tight">
           My Profile
         </h1>
+        <p className="text-gray-400 mt-2 text-sm">Manage your account details, security settings, and alerts.</p>
       </div>
 
       {/* Avatar card */}
-      <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-5 flex items-center gap-4">
+      <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl px-6 py-5 flex flex-wrap items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0 overflow-hidden">
           {user?.avatar_url ? (
             <img
@@ -136,7 +184,7 @@ export default function Profile() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <label className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white transition-colors cursor-pointer ${uploadingAvatar ? 'opacity-60 pointer-events-none' : ''}`}>
+          <label className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-md border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white transition-colors cursor-pointer ${uploadingAvatar ? 'opacity-60 pointer-events-none' : ''}`}>
             {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             <span>Change Image</span>
             <input
@@ -183,12 +231,12 @@ export default function Profile() {
                 .finally(() => setRemovingAvatar(false));
             }}
             disabled={!user?.avatar_url || removingAvatar}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-md border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 disabled:opacity-40"
           >
             {removingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             <span>Remove</span>
           </button>
-          <span className="shrink-0 px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border border-brand-orange/30 text-brand-orange bg-brand-orange/10">
+          <span className="shrink-0 px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-md border border-brand-orange/30 text-brand-orange bg-brand-orange/10">
             {user?.role}
           </span>
         </div>
@@ -196,7 +244,7 @@ export default function Profile() {
 
       {/* Feedback */}
       {displayError && (
-        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm text-sm">
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" /> {displayError}
         </div>
       )}
@@ -208,7 +256,7 @@ export default function Profile() {
         <div className="space-y-6">
 
           {/* Personal info */}
-          <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+          <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-800">
               <h2 className="text-xs font-bold text-white uppercase tracking-widest">Personal Information</h2>
             </div>
@@ -220,7 +268,7 @@ export default function Profile() {
                 </label>
                 <input
                   type="email" value={user?.email ?? ''} disabled
-                  className="w-full bg-brand-darker border border-gray-800 text-gray-600 px-4 py-2.5 rounded-sm cursor-not-allowed text-sm"
+                  className="w-full bg-brand-darker border border-gray-800 text-gray-600 px-4 py-2.5 rounded-md cursor-not-allowed text-sm"
                 />
                 <p className="text-[11px] text-gray-700">Email cannot be changed.</p>
               </div>
@@ -232,7 +280,7 @@ export default function Profile() {
                   <input
                     type="text" required value={info.name}
                     onChange={e => setInfo(p => ({ ...p, name: e.target.value }))}
-                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-md text-sm"
                   />
                 </div>
 
@@ -244,7 +292,7 @@ export default function Profile() {
                   <input
                     type="tel" value={info.phone}
                     onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-md text-sm"
                     placeholder="09XXXXXXXXX"
                   />
                 </div>
@@ -253,7 +301,7 @@ export default function Profile() {
               <div className="flex justify-end">
                 <button
                   type="submit" disabled={status === 'loading'}
-                  className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+                  className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-md"
                 >
                   {status === 'loading' ? 'Saving…' : 'Save Changes'}
                 </button>
@@ -262,7 +310,7 @@ export default function Profile() {
           </div>
 
           {/* Change password */}
-          <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+          <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-800">
               <h2 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
                 <Lock className="w-3.5 h-3.5 text-brand-orange" /> Change Password
@@ -278,7 +326,7 @@ export default function Profile() {
                       value={pw.newPw}
                       onChange={e => setPw(p => ({ ...p, newPw: e.target.value }))}
                       autoComplete="new-password"
-                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 pr-10 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 pr-10 focus:outline-none focus:border-brand-orange transition-colors rounded-md text-sm"
                       placeholder="At least 8 characters"
                     />
                     <button type="button" onClick={() => setShowPw(v => !v)}
@@ -295,7 +343,7 @@ export default function Profile() {
                     value={pw.confirm}
                     onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))}
                     autoComplete="new-password"
-                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-md text-sm"
                   />
                 </div>
               </div>
@@ -303,7 +351,7 @@ export default function Profile() {
               <div className="flex justify-end">
                 <button
                   type="submit" disabled={status === 'loading' || !pw.newPw}
-                  className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+                  className="bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-md"
                 >
                   {status === 'loading' ? 'Saving…' : 'Update Password'}
                 </button>
@@ -314,14 +362,15 @@ export default function Profile() {
         </div>{/* end left column */}
 
         {/* Right column: Notification Preferences */}
+        <div className="space-y-6">
         {prefs && (
-          <div className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
+          <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl p-6 space-y-5">
             <h2 className="text-sm font-bold uppercase tracking-widest text-white flex items-center gap-2">
               <Bell className="w-4 h-4 text-brand-orange" /> Notification Preferences
             </h2>
 
             {prefsSaved && (
-              <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-2 rounded-sm">
+              <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-2 rounded-md">
                 <CheckCircle2 className="w-4 h-4 shrink-0" /> Preferences saved!
               </div>
             )}
@@ -386,7 +435,7 @@ export default function Profile() {
               <button
                 onClick={handlePrefsSave}
                 disabled={prefsBusy}
-                className="flex items-center gap-2 bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+                className="flex items-center gap-2 bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-md"
               >
                 {prefsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 Save Preferences
@@ -394,6 +443,101 @@ export default function Profile() {
             </div>
           </div>
         )}
+
+        {/* Active sessions */}
+        <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-white flex items-center gap-2">
+              <Monitor className="w-4 h-4 text-brand-orange" /> Active Sessions
+            </h2>
+            <button
+              type="button"
+              onClick={loadSessions}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-md border border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                if (!token) return;
+                setRevokeOthersBusy(true);
+                try {
+                  const r = await revokeOtherAuthSessionsApi(token);
+                  showToast(`Revoked ${r.revoked} other session${r.revoked === 1 ? '' : 's'}.`, 'success');
+                  await loadSessions();
+                } catch (e: unknown) {
+                  showToast((e as Error).message ?? 'Failed to revoke other sessions.', 'error');
+                } finally {
+                  setRevokeOthersBusy(false);
+                }
+              }}
+              disabled={revokeOthersBusy || sessionsLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-md border border-red-900/70 text-red-300 hover:border-red-500 hover:text-red-200 transition-colors disabled:opacity-60"
+            >
+              {revokeOthersBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
+              Revoke Others
+            </button>
+          </div>
+
+          {sessionsLoading ? (
+            <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-orange" /></div>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-gray-500">No active sessions found.</p>
+          ) : (
+            <div className="space-y-3">
+              {sessions.map(s => (
+                <div key={s.id} className={`border rounded-md px-3 py-3 ${s.isCurrent ? 'border-brand-orange/40 bg-brand-orange/5' : 'border-gray-800 bg-black/20'}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-300">
+                        {s.isCurrent ? 'Current Device' : 'Signed-in Device'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1 font-mono">{s.ipAddress || 'Unknown IP'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {s.isCurrent ? (
+                        <span className="text-[10px] px-2 py-1 rounded-md border border-brand-orange/30 text-brand-orange bg-brand-orange/10 font-bold uppercase tracking-widest">
+                          Current
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!token) return;
+                            setSessionBusyId(s.id);
+                            try {
+                              await revokeAuthSessionApi(token, s.id);
+                              showToast('Session revoked.', 'success');
+                              await loadSessions();
+                            } catch (e: unknown) {
+                              showToast((e as Error).message ?? 'Failed to revoke session.', 'error');
+                            } finally {
+                              setSessionBusyId(null);
+                            }
+                          }}
+                          disabled={sessionBusyId === s.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-md border border-red-900/70 text-red-300 hover:border-red-500 hover:text-red-200 disabled:opacity-60"
+                        >
+                          {sessionBusyId === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-600 mt-2 truncate">{s.userAgent || 'Unknown device agent'}</p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Signed in: {new Date(s.issuedAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        </div>
 
       </div>{/* end two-column grid */}
     </div>

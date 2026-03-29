@@ -22,6 +22,7 @@ import OffersPanel          from './admin/OffersPanel';
 import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
 import UserAccessPanel      from './admin/UserAccessPanel';
+import SecurityAuditPanel   from './admin/SecurityAuditPanel';
 
 // ── Admin login screen (Unchanged) ────────────────────────────────────────────
 function AdminLogin() {
@@ -129,6 +130,11 @@ export default function AdminPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    // Prevent stale mobile overlay state from persisting across logout/login transitions.
+    setMobileOpen(false);
+  }, [user?.id]);
+
   const MD_BREAKPOINT = 768;
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`);
@@ -137,17 +143,14 @@ export default function AdminPage() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  if (!user) return <AdminLogin />;
-  if (user.role === 'client') return <Navigate to="/" replace />;
-
-  const role = user.role;
+  const role = user?.role ?? '';
   const isAdmin = role === 'admin';
 
   const canAccessTab = (key: string) => {
     if (isAdmin) return true;
 
     if (role === 'manager') {
-      return ['analytics', 'appointments', 'calendar', 'user-access', 'settings'].includes(key);
+      return ['analytics', 'appointments', 'calendar', 'user-access', 'security-audit', 'settings'].includes(key);
     }
 
     if (role === 'staff') {
@@ -185,17 +188,22 @@ export default function AdminPage() {
       children: [
         { key: 'site-settings', label: 'Site Config', icon: SlidersHorizontal },
         { key: 'user-access',   label: 'User Access', icon: ShieldCheck },
+        { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
         { key: 'settings',      label: 'Account',     icon: UserCog },
       ]
     }
   ];
 
   useEffect(() => {
+    if (!user) return;
     if (canAccessTab(activeTab)) return;
     const fallback = role === 'staff' ? 'appointments' : (role === 'manager' ? 'analytics' : 'user-access');
     setActiveTab(fallback);
     setActiveBookingId(null);
-  }, [activeTab, role]);
+  }, [activeTab, role, user]);
+
+  if (!user) return <AdminLogin />;
+  if (user.role === 'client') return <Navigate to="/" replace />;
 
   const renderContent = () => {
     switch (activeTab) {
@@ -220,6 +228,7 @@ export default function AdminPage() {
       case 'shop-hours':    return <ShopHoursPanel />;
       case 'site-settings': return <SiteSettingsPanel />;
       case 'user-access':   return <UserAccessPanel />;
+      case 'security-audit': return <SecurityAuditPanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;
     }

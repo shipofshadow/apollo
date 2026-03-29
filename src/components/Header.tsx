@@ -42,8 +42,10 @@ export default function Header() {
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    setIsMobileMenuOpen(false);
+    setIsDropdownOpen(false);
+    await logout();
     navigate('/', { replace: true });
   };
 

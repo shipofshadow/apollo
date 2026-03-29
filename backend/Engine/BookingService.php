@@ -296,13 +296,16 @@ class BookingService
                 $uid = (int) ($booking['userId'] ?? 0);
                 if ($uid > 0) {
                     $svcName = (string) ($booking['serviceName'] ?? 'your service');
-                    (new UserNotificationService())->createForUser(
-                        $uid,
-                        'parts_update',
-                        'Job On Hold – Awaiting Parts',
-                        "Your {$svcName} job is on hold while we wait for parts to arrive.",
-                        ['bookingId' => $booking['id']]
-                    );
+                    $prefSvc = new NotificationPreferencesService();
+                    if ($prefSvc->inappEnabled($uid, 'parts_update')) {
+                        (new UserNotificationService())->createForUser(
+                            $uid,
+                            'parts_update',
+                            'Job On Hold – Awaiting Parts',
+                            "Your {$svcName} job is on hold while we wait for parts to arrive.",
+                            ['bookingId' => $booking['id']]
+                        );
+                    }
                 }
             }
         }

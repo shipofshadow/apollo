@@ -2,20 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  ArrowLeft, Calendar, Clock, Car, User, Mail, Phone,
+  ArrowLeft, User, Mail, Phone,
   FileText, CheckCircle2, XCircle, Loader2, AlertCircle,
   Edit3, ChevronDown, ChevronUp, Image as ImageIcon,
   Package, BadgeCheck, ChevronLeft, ChevronRight, Camera, Printer,
-  Wrench,
+  Wrench, History,
 } from 'lucide-react';
 import {
   fetchBookingByIdAsync,
   cancelMyBookingAsync,
   rescheduleMyBookingAsync,
 } from '../../store/bookingSlice';
-import { fetchAvailabilityApi, fetchShopHoursApi, fetchBuildUpdatesApi } from '../../services/api';
+import { fetchAvailabilityApi, fetchShopHoursApi, fetchBuildUpdatesApi, fetchBookingActivityApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, BuildUpdate, ShopDayHours } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours, BookingActivityLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -84,6 +84,76 @@ function formatDisplayDate(isoDate: string): string {
   } catch {
     return isoDate;
   }
+}
+
+function formatActivityLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function getActivityPresentation(log: BookingActivityLog) {
+  const signature = `${log.eventType} ${log.action}`.toLowerCase();
+
+  if (signature.includes('cancel')) {
+    return {
+      icon: XCircle,
+      iconClass: 'text-red-400',
+      dotClass: 'bg-red-500/10 border-red-500/40',
+      cardClass: 'border-red-500/20',
+      title: 'Booking Cancelled',
+    };
+  }
+
+  if (signature.includes('reschedul')) {
+    return {
+      icon: Edit3,
+      iconClass: 'text-amber-400',
+      dotClass: 'bg-amber-500/10 border-amber-500/40',
+      cardClass: 'border-amber-500/20',
+      title: 'Rescheduled',
+    };
+  }
+
+  if (signature.includes('build') || signature.includes('photo') || signature.includes('media')) {
+    return {
+      icon: Camera,
+      iconClass: 'text-brand-orange',
+      dotClass: 'bg-brand-orange/10 border-brand-orange/40',
+      cardClass: 'border-brand-orange/20',
+      title: 'Build Update',
+    };
+  }
+
+  if (signature.includes('part')) {
+    return {
+      icon: Package,
+      iconClass: 'text-purple-400',
+      dotClass: 'bg-purple-500/10 border-purple-500/40',
+      cardClass: 'border-purple-500/20',
+      title: 'Parts Update',
+    };
+  }
+
+  if (signature.includes('status') || signature.includes('confirm') || signature.includes('complete')) {
+    return {
+      icon: CheckCircle2,
+      iconClass: 'text-green-400',
+      dotClass: 'bg-green-500/10 border-green-500/40',
+      cardClass: 'border-green-500/20',
+      title: 'Status Updated',
+    };
+  }
+
+  return {
+    icon: FileText,
+    iconClass: 'text-gray-300',
+    dotClass: 'bg-gray-700/40 border-gray-600',
+    cardClass: 'border-gray-700',
+    title: formatActivityLabel(log.action || log.eventType || 'Activity'),
+  };
 }
 
 function buildRescheduleDateList(shopHours: ShopDayHours[]): Date[] {
@@ -178,7 +248,7 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
   const unchanged   = selectedIso === booking.appointmentDate && selectedTime === booking.appointmentTime;
 
   return (
-    <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-5">
+    <div className="bg-gradient-to-br from-brand-dark to-[#171717] border border-gray-800 rounded-xl p-5 md:p-6 space-y-5">
       <h3 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
         <Edit3 className="w-3.5 h-3.5" />
         Reschedule Appointment
@@ -286,11 +356,11 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex flex-wrap items-center gap-3 pt-1">
         <button
           onClick={handleSave}
           disabled={saveBusy || !selectedDate || !selectedTime || unchanged}
-          className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm disabled:opacity-50"
+          className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-md disabled:opacity-50"
         >
           {saveBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           Save Changes
@@ -298,7 +368,7 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
         <button
           onClick={onCancel}
           disabled={saveBusy}
-          className="border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+          className="border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-50"
         >
           Cancel
         </button>
@@ -325,6 +395,8 @@ export default function BookingDetail() {
   const [cancelBusy, setCancelBusy]       = useState(false);
   const [mediaExpanded, setMediaExpanded] = useState(false);
   const [buildUpdates,  setBuildUpdates]  = useState<BuildUpdate[]>([]);
+  const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const [lightboxUrl,   setLightboxUrl]   = useState<string | null>(null);
 
   // Try redux cache first (only if it belongs to the current user), then fetch
@@ -383,6 +455,9 @@ export default function BookingDetail() {
     fetchBuildUpdatesApi(token, booking.id)
       .then(({ updates }) => setBuildUpdates(updates))
       .catch(() => {});
+    fetchBookingActivityApi(token, booking.id)
+      .then(({ logs }) => setActivityLogs(logs))
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, booking?.id]);
 
@@ -423,7 +498,7 @@ export default function BookingDetail() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full">
       {/* Lightbox */}
       {lightboxUrl && (
         <div
@@ -449,40 +524,57 @@ export default function BookingDetail() {
       {/* Back link */}
       <Link
         to="/client/bookings"
-        className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
+        className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors px-1"
       >
         <ArrowLeft className="w-3.5 h-3.5" /> Back to Bookings
       </Link>
 
       {/* Hero header */}
-      <div className="relative bg-brand-dark border border-gray-800 rounded-sm overflow-hidden px-6 py-5">
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-orange" />
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#171515] px-6 py-6 md:px-7 md:py-7">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-16 left-14 h-36 w-36 rounded-full bg-red-400/10 blur-2xl" />
+
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-1">Booking Details</p>
-            <h1 className="text-xl md:text-2xl font-display font-black text-white uppercase tracking-tighter leading-tight">
+            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-orange/90 mb-2">Booking Details</p>
+            <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tight leading-tight">
               {booking.serviceName}
             </h1>
-            <p className="text-gray-500 text-xs mt-1 font-mono">#{booking.id}</p>
+            <p className="text-gray-500 text-xs mt-2 font-mono">#{booking.id}</p>
           </div>
-          <span className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[booking.status]}`}>
+          <span className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded-md border ${STATUS_STYLES[booking.status]}`}>
             {formatStatus(booking.status)}
           </span>
+        </div>
+
+        <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-lg border border-gray-800/90 bg-black/20 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Date</p>
+            <p className="text-sm font-semibold text-white mt-1">{formatDisplayDate(booking.appointmentDate)}</p>
+          </div>
+          <div className="rounded-lg border border-gray-800/90 bg-black/20 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Time</p>
+            <p className="text-sm font-semibold text-white mt-1">{booking.appointmentTime}</p>
+          </div>
+          <div className="rounded-lg border border-gray-800/90 bg-black/20 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Vehicle</p>
+            <p className="text-sm font-semibold text-white mt-1 truncate">{booking.vehicleInfo}</p>
+          </div>
         </div>
       </div>
 
       {/* Status timeline */}
       {booking.status !== 'cancelled' && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-5">
+        <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl px-5 py-5 md:px-6">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">Progress</p>
-          <div className="flex items-center gap-0">
+          <div className="flex items-center gap-0 overflow-x-auto pb-1">
             {TIMELINE_STEPS.map((step, i) => {
               const isCompleted = step.completedForStatuses.includes(booking.status);
               const isActive    = step.activeForStatuses.includes(booking.status);
               const Icon        = step.icon;
               const isLast      = i === TIMELINE_STEPS.length - 1;
               return (
-                <div key={step.key} className="flex items-center flex-1 min-w-0">
+                <div key={step.key} className="flex items-center flex-1 min-w-[140px]">
                   <div className="flex flex-col items-center shrink-0">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${
                       isCompleted ? 'bg-brand-orange border-brand-orange' :
@@ -508,7 +600,7 @@ export default function BookingDetail() {
       )}
 
       {booking.status === 'cancelled' && (
-        <div className="flex items-center gap-3 bg-gray-700/30 border border-gray-700 text-gray-400 px-5 py-4 rounded-sm">
+        <div className="flex items-center gap-3 bg-gray-700/30 border border-gray-700 text-gray-400 px-5 py-4 rounded-xl">
           <XCircle className="w-4 h-4 shrink-0" />
           <p className="text-sm">This booking has been cancelled.</p>
         </div>
@@ -516,7 +608,7 @@ export default function BookingDetail() {
 
       {/* Awaiting parts note */}
       {booking.status === 'awaiting_parts' && booking.partsNotes && (
-        <div className="bg-purple-500/5 border border-purple-500/20 rounded-sm px-5 py-4 flex items-start gap-3">
+        <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
           <Package className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400 mb-1">Awaiting Parts</p>
@@ -525,46 +617,14 @@ export default function BookingDetail() {
         </div>
       )}
 
-      {/* Details grid */}
-      <div className="bg-brand-dark border border-gray-800 rounded-sm p-6">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-5">Appointment Info</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* Date */}
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
-              <Calendar className="w-4 h-4 text-brand-orange" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Date</p>
-              <p className="text-white text-sm font-semibold">{formatDisplayDate(booking.appointmentDate)}</p>
-            </div>
-          </div>
-
-          {/* Time */}
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
-              <Clock className="w-4 h-4 text-brand-orange" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Time</p>
-              <p className="text-white text-sm font-semibold">{booking.appointmentTime}</p>
-            </div>
-          </div>
-
-          {/* Vehicle */}
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
-              <Car className="w-4 h-4 text-brand-orange" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Vehicle</p>
-              <p className="text-white text-sm font-semibold">{booking.vehicleInfo}</p>
-            </div>
-          </div>
-
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Details grid */}
+        <div className="bg-gradient-to-br from-brand-dark to-[#181818] border border-gray-800 rounded-xl p-6 xl:col-span-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-5">Service Info</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {/* Service */}
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
               <BadgeCheck className="w-4 h-4 text-brand-orange" />
             </div>
             <div>
@@ -573,10 +633,37 @@ export default function BookingDetail() {
             </div>
           </div>
 
+          {/* Vehicle Details */}
+          {(booking.vehicleMake || booking.vehicleModel || booking.vehicleYear) && (
+            <div className="sm:col-span-2 space-y-3">
+              <p className="text-xs text-gray-400 font-mono">Vehicle Details:</p>
+              <div className="grid grid-cols-3 gap-3">
+                {booking.vehicleYear && (
+                  <div className="text-center p-2.5 rounded-sm bg-brand-darker/40 border border-gray-800">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600">Year</p>
+                    <p className="text-sm font-semibold text-white mt-1">{booking.vehicleYear}</p>
+                  </div>
+                )}
+                {booking.vehicleMake && (
+                  <div className="text-center p-2.5 rounded-sm bg-brand-darker/40 border border-gray-800">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600">Make</p>
+                    <p className="text-sm font-semibold text-white mt-1">{booking.vehicleMake}</p>
+                  </div>
+                )}
+                {booking.vehicleModel && (
+                  <div className="text-center p-2.5 rounded-sm bg-brand-darker/40 border border-gray-800">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600">Model</p>
+                    <p className="text-sm font-semibold text-white mt-1">{booking.vehicleModel}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Assigned mechanic */}
           {booking.assignedTech && (
             <div className="flex items-start gap-3 sm:col-span-2">
-              <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
                 <Wrench className="w-4 h-4 text-brand-orange" />
               </div>
               <div>
@@ -588,13 +675,30 @@ export default function BookingDetail() {
               </div>
             </div>
           )}
+
+          {/* Service Variations */}
+          {booking.selectedVariations && booking.selectedVariations.length > 0 && (
+            <div className="sm:col-span-2 border-t border-gray-800 pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">Service Options</p>
+              <div className="space-y-2">
+                {booking.selectedVariations.map((v) => (
+                  <div key={`${v.serviceId}-${v.variationId}`} className="flex items-start gap-3 p-2.5 bg-brand-darker/40 rounded-sm border border-gray-800">
+                    <Package className="w-4 h-4 text-brand-orange shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-400">{v.variationName}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Notes */}
         {booking.notes && (
           <div className="mt-5 pt-5 border-t border-gray-800">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
                 <FileText className="w-4 h-4 text-brand-orange" />
               </div>
               <div>
@@ -604,14 +708,61 @@ export default function BookingDetail() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Contact info */}
-      <div className="bg-brand-dark border border-gray-800 rounded-sm p-6">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-5">Contact Information</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        {/* Booking Details Metadata */}
+        <div className="mt-5 pt-5 border-t border-gray-800">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Booking ID</p>
+              <p className="text-gray-300 text-xs font-mono">{booking.id}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Created</p>
+              <p className="text-gray-300 text-xs">
+                {new Date(booking.createdAt).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+          {/* Action buttons */}
+          {canModify && (
+            <div className="mt-6 pt-5 border-t border-gray-800">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">Actions</p>
+              <div className="flex flex-wrap gap-3">
+                {!rescheduling && (
+                  <button
+                    onClick={() => setRescheduling(true)}
+                    disabled={isConfirmed}
+                    className="flex items-center gap-2 border border-brand-orange/50 text-brand-orange hover:bg-brand-orange/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> Reschedule
+                  </button>
+                )}
+                <button
+                  onClick={() => setCancelTarget(true)}
+                  disabled={isConfirmed}
+                  className="flex items-center gap-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <XCircle className="w-3.5 h-3.5" /> Cancel Booking
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Contact info */}
+        <div className="bg-gradient-to-br from-brand-dark to-[#181818] border border-gray-800 rounded-xl p-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-5">Contact Information</p>
+          <div className="grid grid-cols-1 gap-5">
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
               <User className="w-4 h-4 text-gray-500" />
             </div>
             <div>
@@ -620,7 +771,7 @@ export default function BookingDetail() {
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
               <Mail className="w-4 h-4 text-gray-500" />
             </div>
             <div>
@@ -629,7 +780,7 @@ export default function BookingDetail() {
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
               <Phone className="w-4 h-4 text-gray-500" />
             </div>
             <div>
@@ -639,10 +790,11 @@ export default function BookingDetail() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Media attachments */}
       {hasMedia && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+        <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl overflow-hidden">
           <button
             onClick={() => setMediaExpanded(v => !v)}
             className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-900/30 transition-colors"
@@ -658,7 +810,7 @@ export default function BookingDetail() {
           {mediaExpanded && (
             <div className="px-6 pb-6 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-gray-800">
               {(booking.mediaUrls ?? []).map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group block aspect-video bg-brand-darker rounded-sm overflow-hidden border border-gray-700 hover:border-brand-orange/50 transition-colors">
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group block aspect-video bg-brand-darker rounded-md overflow-hidden border border-gray-700 hover:border-brand-orange/50 transition-colors">
                   <img src={url} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                 </a>
               ))}
@@ -669,7 +821,7 @@ export default function BookingDetail() {
 
       {/* Build Progress Feed */}
       {buildUpdates.length > 0 && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+        <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-2">
             <Camera className="w-4 h-4 text-brand-orange" />
             <span className="text-xs font-bold uppercase tracking-widest text-gray-300">
@@ -694,7 +846,7 @@ export default function BookingDetail() {
                       <button
                         key={j}
                         onClick={() => setLightboxUrl(url)}
-                        className="group block aspect-video bg-brand-darker rounded-sm overflow-hidden border border-gray-700 hover:border-brand-orange/50 transition-colors"
+                        className="group block aspect-video bg-brand-darker rounded-md overflow-hidden border border-gray-700 hover:border-brand-orange/50 transition-colors"
                       >
                         <img
                           src={url}
@@ -713,6 +865,99 @@ export default function BookingDetail() {
         </div>
       )}
 
+      {/* Booking Activity Log Timeline */}
+      {activityLogs.length > 0 && (
+        <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setActivityExpanded(v => !v)}
+            aria-expanded={activityExpanded}
+            className="w-full px-6 py-4 border-b border-gray-800 flex items-center justify-between gap-3 hover:bg-gray-900/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-brand-orange" />
+              <span className="text-xs font-bold uppercase tracking-widest text-gray-300">
+                Activity Log
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                {activityLogs.length} event{activityLogs.length !== 1 ? 's' : ''}
+              </span>
+              {activityExpanded ? (
+                <ChevronUp className="w-4 h-4 text-gray-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              )}
+            </div>
+          </button>
+
+          {!activityExpanded && (
+            <div className="px-6 py-3 text-xs text-gray-500">
+              Tap to view the full timeline.
+            </div>
+          )}
+
+          {activityExpanded && (
+            <ol className="px-4 md:px-6 py-2">
+              {activityLogs.slice().reverse().map((log, i) => {
+              const visual = getActivityPresentation(log);
+              const Icon = visual.icon;
+              const isLast = i === activityLogs.length - 1;
+              return (
+                <li key={log.id} className="relative pl-10 md:pl-12 py-3.5">
+                  {!isLast && (
+                    <span className="absolute left-[13px] md:left-[15px] top-12 bottom-0 w-px bg-gray-800" />
+                  )}
+                  <div className={`absolute left-0 top-4 w-7 h-7 rounded-full border flex items-center justify-center ${visual.dotClass}`}>
+                    <Icon className={`w-3.5 h-3.5 ${visual.iconClass}`} />
+                  </div>
+
+                  <div className={`rounded-lg border bg-black/20 px-4 py-3.5 ${visual.cardClass}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-100 leading-tight">
+                          {visual.title}
+                        </p>
+                        <p className="text-[10px] font-mono text-gray-500 mt-1">
+                          {new Date(log.createdAt).toLocaleString('en-US', {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                            hour: 'numeric', minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 inline-block px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded-sm ${
+                        log.actorRole === 'admin' ? 'bg-brand-orange/10 text-brand-orange' :
+                        log.actorRole === 'client' ? 'bg-blue-500/10 text-blue-400' :
+                        'bg-gray-700/40 text-gray-300'
+                      }`}>
+                        {log.actorRole === 'system' ? 'System' : formatActivityLabel(log.actorRole)}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="inline-block px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded-sm bg-gray-800 text-gray-300 border border-gray-700">
+                        {formatActivityLabel(log.eventType)}
+                      </span>
+                      <span className="inline-block px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded-sm bg-gray-900 text-gray-400 border border-gray-800">
+                        {formatActivityLabel(log.action)}
+                      </span>
+                    </div>
+
+                    {log.detail && (
+                      <p className="text-xs text-gray-300 mt-3 leading-relaxed whitespace-pre-wrap border-t border-gray-800 pt-3">
+                        {log.detail}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+              })}
+            </ol>
+          )}
+        </div>
+      )}
+
       {/* Review widget – only for completed bookings */}
       {booking.status === 'completed' && token && (
         <div>
@@ -725,14 +970,14 @@ export default function BookingDetail() {
 
       {/* Print Receipt */}
       {(booking.status === 'completed' || booking.status === 'confirmed') && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-white text-sm font-semibold">Receipt / Summary</p>
             <p className="text-gray-500 text-xs mt-0.5">Print or save as PDF</p>
           </div>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
+            className="flex items-center gap-2 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-md"
           >
             <Printer className="w-3.5 h-3.5" /> Print Receipt
           </button>
@@ -749,35 +994,10 @@ export default function BookingDetail() {
         />
       )}
 
-      {/* Action buttons */}
-      {canModify && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">Actions</p>
-          <div className="flex flex-wrap gap-3">
-            {!rescheduling && (
-              <button
-                onClick={() => setRescheduling(true)}
-                disabled={isConfirmed}
-                className="flex items-center gap-2 border border-brand-orange/50 text-brand-orange hover:bg-brand-orange/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Edit3 className="w-3.5 h-3.5" /> Reschedule
-              </button>
-            )}
-            <button
-              onClick={() => setCancelTarget(true)}
-              disabled={isConfirmed}
-              className="flex items-center gap-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <XCircle className="w-3.5 h-3.5" /> Cancel Booking
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Cancel confirmation modal */}
       {cancelTarget && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-brand-dark border border-gray-700 rounded-sm p-6 max-w-sm w-full space-y-4">
+          <div className="bg-brand-dark border border-gray-700 rounded-xl p-6 max-w-sm w-full space-y-4">
             <div className="flex items-center gap-2">
               <XCircle className="w-5 h-5 text-red-400" />
               <h3 className="text-white font-bold uppercase tracking-wide text-sm">Cancel Booking?</h3>
@@ -789,7 +1009,7 @@ export default function BookingDetail() {
               <button
                 onClick={handleCancelConfirm}
                 disabled={cancelBusy}
-                className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-50"
               >
                 {cancelBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
                 Yes, Cancel It
@@ -797,7 +1017,7 @@ export default function BookingDetail() {
               <button
                 onClick={() => setCancelTarget(false)}
                 disabled={cancelBusy}
-                className="flex-1 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                className="flex-1 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-50"
               >
                 No, Keep It
               </button>

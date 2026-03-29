@@ -13,11 +13,11 @@ import { fetchNotificationsAsync } from '../store/notificationsSlice';
  * stack and feels real-time enough for a booking-management app.
  *
  * Interval:
- *   backoffice (admin/manager/staff) → 15 seconds
- *   client → 30 seconds
+ *   backoffice (admin/manager/staff) → 8 seconds
+ *   client → 12 seconds
  */
-const ADMIN_INTERVAL_MS  = 15_000;
-const CLIENT_INTERVAL_MS = 30_000;
+const ADMIN_INTERVAL_MS  = 8_000;
+const CLIENT_INTERVAL_MS = 12_000;
 
 export function useNotificationPoller(): void {
   const dispatch = useDispatch<AppDispatch>();
@@ -47,7 +47,19 @@ export function useNotificationPoller(): void {
     const intervalMs = isBackoffice ? ADMIN_INTERVAL_MS : CLIENT_INTERVAL_MS;
     intervalRef.current = setInterval(poll, intervalMs);
 
+    // Refresh immediately when user returns to the tab/window.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        poll();
+      }
+    };
+    const onFocus = () => poll();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+
     return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
