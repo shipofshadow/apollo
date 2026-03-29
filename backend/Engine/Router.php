@@ -622,7 +622,7 @@ class Router
 
             // In-app notification for the client
             $uid = (int) ($booking['userId'] ?? 0);
-            if ($uid > 0 && DB_NAME !== '') {
+            if ($uid > 0) {
                 $svcName = (string) ($booking['serviceName'] ?? 'your service');
                 $snippet = $note !== '' ? ': ' . mb_strimwidth($note, 0, 60, '…') : '';
                 (new UserNotificationService())->createForUser(

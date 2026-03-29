@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
-import type { NotificationsState, AppNotification } from '../types';
+import type { NotificationsState } from '../types';
 import {
   fetchNotificationsApi,
   markNotificationReadApi,
@@ -54,16 +53,7 @@ const initialState: NotificationsState = {
 const notificationsSlice = createSlice({
   name: 'notifications',
   initialState,
-  reducers: {
-    /** Prepend a single notification that arrived via polling. */
-    prependNotification(state, action: PayloadAction<AppNotification>) {
-      const exists = state.items.some(n => n.id === action.payload.id);
-      if (!exists) {
-        state.items.unshift(action.payload);
-        if (!action.payload.isRead) state.unreadCount += 1;
-      }
-    },
-  },
+  reducers: {},
   extraReducers: builder => {
     // fetch
     builder
@@ -107,5 +97,4 @@ const notificationsSlice = createSlice({
   },
 });
 
-export const { prependNotification } = notificationsSlice.actions;
 export default notificationsSlice.reducer;
