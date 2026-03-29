@@ -152,17 +152,30 @@ class BlogPostService
         $params[':id'] = $id;
         $stmt->execute($params);
 
+        $oldCover = (string) ($current['coverImage'] ?? '');
+        $newCover = (string) ($merged['coverImage'] ?? ($merged['cover_image'] ?? ''));
+        if ($oldCover !== '' && $oldCover !== $newCover) {
+            $this->deleteManagedImageUrl($oldCover);
+        }
+
         return $this->dbGetById($id, false);
     }
 
     private function dbDelete(int $id): void
     {
+        $current = $this->dbGetById($id, false);
+
         $stmt = Database::getInstance()->prepare(
             'DELETE FROM blog_posts WHERE id = :id'
         );
         $stmt->execute([':id' => $id]);
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Blog post not found.', 404);
+        }
+
+        $oldCover = (string) ($current['coverImage'] ?? '');
+        if ($oldCover !== '') {
+            $this->deleteManagedImageUrl($oldCover);
         }
     }
 
@@ -213,9 +226,11 @@ class BlogPostService
         $all    = $this->fileRead();
         $found  = false;
         $result = null;
+        $oldCover = '';
 
         foreach ($all as &$p) {
             if ((int) ($p['id'] ?? 0) === $id) {
+                $oldCover = (string) ($p['coverImage'] ?? '');
                 $p      = $this->buildRecord($id, array_merge($p, $data));
                 $result = $p;
                 $found  = true;
@@ -226,17 +241,34 @@ class BlogPostService
 
         if (!$found) throw new RuntimeException('Blog post not found.', 404);
         $this->fileWrite($all);
+
+        $newCover = (string) ($result['coverImage'] ?? '');
+        if ($oldCover !== '' && $oldCover !== $newCover) {
+            $this->deleteManagedImageUrl($oldCover);
+        }
+
         return $result;
     }
 
     private function fileDelete(int $id): void
     {
         $all      = $this->fileRead();
+        $oldCover = '';
+        foreach ($all as $p) {
+            if ((int) ($p['id'] ?? 0) === $id) {
+                $oldCover = (string) ($p['coverImage'] ?? '');
+                break;
+            }
+        }
         $filtered = array_values(array_filter($all, fn ($p) => (int) ($p['id'] ?? 0) !== $id));
         if (count($filtered) === count($all)) {
             throw new RuntimeException('Blog post not found.', 404);
         }
         $this->fileWrite($filtered);
+
+        if ($oldCover !== '') {
+            $this->deleteManagedImageUrl($oldCover);
+        }
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -316,6 +348,15 @@ class BlogPostService
         }
         if (empty(trim($data['content'] ?? ''))) {
             throw new RuntimeException('Blog post content is required.', 422);
+        }
+    }
+
+    private function deleteManagedImageUrl(string $url): void
+    {
+        try {
+            (new UploadStorage())->deleteByUrl($url);
+        } catch (\Throwable) {
+            // Keep CRUD successful even if storage cleanup fails.
         }
     }
 }

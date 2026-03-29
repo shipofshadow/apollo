@@ -110,17 +110,31 @@ class TestimonialService
         $params        = $this->bindParams($merged);
         $params[':id'] = $id;
         $stmt->execute($params);
+
+        $oldImage = (string) ($current['imageUrl'] ?? '');
+        $newImage = (string) ($merged['imageUrl'] ?? ($merged['image_url'] ?? ''));
+        if ($oldImage !== '' && $oldImage !== $newImage) {
+            $this->deleteManagedImageUrl($oldImage);
+        }
+
         return $this->dbGetById($id);
     }
 
     private function dbDelete(int $id): void
     {
+        $current = $this->dbGetById($id);
+
         $stmt = Database::getInstance()->prepare(
             'DELETE FROM testimonials WHERE id = :id'
         );
         $stmt->execute([':id' => $id]);
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Testimonial not found.', 404);
+        }
+
+        $oldImage = (string) ($current['imageUrl'] ?? '');
+        if ($oldImage !== '') {
+            $this->deleteManagedImageUrl($oldImage);
         }
     }
 
@@ -167,9 +181,11 @@ class TestimonialService
         $all    = $this->fileRead();
         $found  = false;
         $result = null;
+        $oldImage = '';
 
         foreach ($all as &$t) {
             if ((int) ($t['id'] ?? 0) === $id) {
+                $oldImage = (string) ($t['imageUrl'] ?? '');
                 $t      = $this->buildRecord($id, array_merge($t, $data));
                 $result = $t;
                 $found  = true;
@@ -182,17 +198,34 @@ class TestimonialService
             throw new RuntimeException('Testimonial not found.', 404);
         }
         $this->fileWrite($all);
+
+        $newImage = (string) ($result['imageUrl'] ?? '');
+        if ($oldImage !== '' && $oldImage !== $newImage) {
+            $this->deleteManagedImageUrl($oldImage);
+        }
+
         return $result;
     }
 
     private function fileDelete(int $id): void
     {
         $all      = $this->fileRead();
+        $oldImage = '';
+        foreach ($all as $t) {
+            if ((int) ($t['id'] ?? 0) === $id) {
+                $oldImage = (string) ($t['imageUrl'] ?? '');
+                break;
+            }
+        }
         $filtered = array_values(array_filter($all, fn ($t) => (int) ($t['id'] ?? 0) !== $id));
         if (count($filtered) === count($all)) {
             throw new RuntimeException('Testimonial not found.', 404);
         }
         $this->fileWrite($filtered);
+
+        if ($oldImage !== '') {
+            $this->deleteManagedImageUrl($oldImage);
+        }
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -277,6 +310,15 @@ class TestimonialService
         }
         if (empty(trim($data['content'] ?? ''))) {
             throw new RuntimeException('Testimonial content is required.', 422);
+        }
+    }
+
+    private function deleteManagedImageUrl(string $url): void
+    {
+        try {
+            (new UploadStorage())->deleteByUrl($url);
+        } catch (\Throwable) {
+            // Keep CRUD successful even if storage cleanup fails.
         }
     }
 }

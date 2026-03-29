@@ -52,11 +52,13 @@ class Router
             $r->addRoute('POST',  '/api/bookings/media',            'handleBookingMediaUpload');
             $r->addRoute('GET',   '/api/bookings/{id}',             'handleBookingGet');
             $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/assign-tech', 'handleBookingAssignTech');
             $r->addRoute('PATCH', '/api/bookings/{id}/cancel',      'handleBookingCancel');
             $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',        'handleBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/admin-reschedule', 'handleAdminBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',             'handleBookingPartsUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/notes',             'handleBookingInternalNotes');
+            $r->addRoute('GET',   '/api/bookings/{id}/activity',          'handleBookingActivityList');
 
             // ── Build updates (progress photos – admin write, owner read) ────
             $r->addRoute('GET',  '/api/bookings/{id}/build-updates',       'handleBuildUpdateList');
@@ -84,6 +86,13 @@ class Router
 
             // ── Customer loyalty stats ────────────────────────────────────────
             $r->addRoute('GET', '/api/customers/{userId:\d+}/stats', 'handleCustomerStats');
+
+            // ── Client vehicle garage ─────────────────────────────────────────
+            $r->addRoute('GET',    '/api/client/vehicles',          'handleClientVehicleList');
+            $r->addRoute('POST',   '/api/client/vehicles',          'handleClientVehicleCreate');
+            $r->addRoute('POST',   '/api/client/vehicles/media',    'handleClientVehicleMediaUpload');
+            $r->addRoute('PUT',    '/api/client/vehicles/{id:\d+}', 'handleClientVehicleUpdate');
+            $r->addRoute('DELETE', '/api/client/vehicles/{id:\d+}', 'handleClientVehicleDelete');
 
             // ── Blog posts (public read, admin write) ───────────────────────
             $r->addRoute('GET',    '/api/blog',              'handleBlogList');
@@ -408,6 +417,27 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleBookingActivityList(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['logs' => []]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $id      = $vars['id'] ?? '';
+        $role    = (string) ($payload['role'] ?? '');
+        $userId  = (int) ($payload['sub'] ?? 0);
+
+        if ($role !== 'admin') {
+            (new BookingService())->getById($id, $userId);
+        }
+
+        $logs = (new BookingActivityService())->getForBooking($id);
+        echo json_encode(['logs' => $logs]);
+    }
+
+    /** @param array<string, string> $vars */
     private function handleBookingReschedule(array $vars = []): void
     {
         $payload = $this->requireAuth();
@@ -459,6 +489,26 @@ class Router
         $status = (string) ($data['status'] ?? '');
 
         $booking = (new BookingService())->updateStatus($id, $status);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingAssignTech(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id   = $vars['id'] ?? '';
+        $data = $this->jsonBody();
+
+        $rawTechId = $data['assignedTechId'] ?? ($data['assigned_tech_id'] ?? null);
+        $assignedTechId = null;
+        if ($rawTechId !== null && $rawTechId !== '') {
+            $assignedTechId = (int) $rawTechId;
+            if ($assignedTechId <= 0) {
+                throw new RuntimeException('assignedTechId must be a positive integer or null.', 422);
+            }
+        }
+
+        $booking = (new BookingService())->assignTechnician($id, $assignedTechId);
         echo json_encode(['booking' => $booking]);
     }
 
@@ -523,14 +573,10 @@ class Router
             throw new RuntimeException('No files provided.', 422);
         }
 
-        $uploadDir = UPLOAD_DIR;
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-
         $allowed  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
         $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
         $urls     = [];
+        $storage  = new UploadStorage();
 
         // $_FILES['files'] may be a single file or multiple (files[])
         $files = $_FILES['files'];
@@ -555,14 +601,7 @@ class Router
             $ext      = pathinfo((is_array($files['name']) ? $files['name'][$i] : $files['name']), PATHINFO_EXTENSION);
             $filename = bin2hex(random_bytes(16)) . '.' . strtolower($ext);
 
-            if (R2Uploader::isConfigured()) {
-                $uploader = new R2Uploader();
-                $urls[]   = $uploader->upload($tmpName, $filename, $mime, 'bookings/');
-            } else {
-                move_uploaded_file($tmpName, $uploadDir . $filename);
-                $base   = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
-                $urls[] = $base . '/storage/uploads/' . $filename;
-            }
+            $urls[] = $storage->upload($tmpName, $filename, $mime, 'bookings/');
         }
 
         echo json_encode(['urls' => $urls]);
@@ -617,7 +656,8 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBuildUpdateCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $payload   = $this->requireAuth('admin');
+        $actorId   = (int) ($payload['sub'] ?? 0);
         $id        = $vars['id'] ?? '';
         $data      = $this->jsonBody();
         $note      = trim((string) ($data['note'] ?? ''));
@@ -631,6 +671,22 @@ class Router
         }
 
         $update = (new BuildUpdateService())->create($id, $note, $photoUrls);
+
+        if (DB_NAME !== '') {
+            $photoCount = count($photoUrls);
+            $detail = $note !== '' ? $note : null;
+            if ($detail === null && $photoCount > 0) {
+                $detail = $photoCount . ' photo(s)';
+            }
+            (new BookingActivityService())->add(
+                $id,
+                'build_update_posted',
+                'Build update posted',
+                $detail,
+                $actorId > 0 ? $actorId : null,
+                'admin'
+            );
+        }
 
         // Notify the customer that a new build progress update was posted
         $booking = (new BookingService())->adminFindById($id);
@@ -665,14 +721,10 @@ class Router
             throw new RuntimeException('No files provided.', 422);
         }
 
-        $uploadDir = UPLOAD_DIR;
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-
         $allowed  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
         $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
         $urls     = [];
+        $storage  = new UploadStorage();
 
         $files = $_FILES['files'];
         $count = is_array($files['name']) ? count($files['name']) : 1;
@@ -697,14 +749,7 @@ class Router
             $ext      = strtolower(pathinfo((string) $origName, PATHINFO_EXTENSION));
             $filename = bin2hex(random_bytes(16)) . '.' . $ext;
 
-            if (R2Uploader::isConfigured()) {
-                $uploader = new R2Uploader();
-                $urls[]   = $uploader->upload($tmpName, $filename, $mime, 'builds/');
-            } else {
-                move_uploaded_file($tmpName, $uploadDir . $filename);
-                $base   = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
-                $urls[] = $base . '/storage/uploads/' . $filename;
-            }
+            $urls[] = $storage->upload($tmpName, $filename, $mime, 'builds/');
         }
 
         echo json_encode(['urls' => $urls]);
@@ -905,6 +950,83 @@ class Router
         $userId = (int) ($vars['userId'] ?? 0);
         $stats  = (new BookingService())->getCustomerStats($userId);
         echo json_encode(['stats' => $stats]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleClientVehicleList(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $vehicles = (new VehicleCrudService())->getByUserId($userId);
+        echo json_encode(['vehicles' => $vehicles]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleClientVehicleCreate(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $data    = $this->jsonBody();
+        $vehicle = (new VehicleCrudService())->create($userId, $data);
+        http_response_code(201);
+        echo json_encode(['vehicle' => $vehicle]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleClientVehicleMediaUpload(array $vars = []): void
+    {
+        $this->requireAuth();
+
+        if (empty($_FILES['file'])) {
+            throw new RuntimeException('No file provided.', 422);
+        }
+
+        $file     = $_FILES['file'];
+        $tmpName  = $file['tmp_name'];
+        $mime     = $file['type'];
+        $size     = $file['size'];
+        $error    = $file['error'];
+
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException("File upload error (code $error).", 422);
+        }
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!in_array($mime, $allowedMimes, true) || !@getimagesize($tmpName)) {
+            throw new RuntimeException('Only JPEG, PNG, WebP and GIF images are accepted.', 422);
+        }
+        $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
+        if ($size > $maxBytes) {
+            throw new RuntimeException('File must be under ' . UPLOAD_MAX_MB . ' MB.', 422);
+        }
+
+        $ext      = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+
+        $storage = new UploadStorage();
+        $url     = $storage->upload($tmpName, $filename, $mime, 'vehicles/');
+
+        echo json_encode(['url' => $url]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleClientVehicleUpdate(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = (int) ($vars['id'] ?? 0);
+        $data    = $this->jsonBody();
+        $vehicle = (new VehicleCrudService())->update($id, $userId, $data);
+        echo json_encode(['vehicle' => $vehicle]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleClientVehicleDelete(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = (int) ($vars['id'] ?? 0);
+        (new VehicleCrudService())->delete($id, $userId);
+        echo json_encode(['ok' => true]);
     }
 
     /** @param array<string, string> $vars */
@@ -1142,18 +1264,8 @@ class Router
         $filename = bin2hex(random_bytes(16)) . '.' . $ext;
         $subdir   = $type . '/';
 
-        if (R2Uploader::isConfigured()) {
-            $uploader = new R2Uploader();
-            $url      = $uploader->upload($tmpName, $filename, $mime, $subdir);
-        } else {
-            $uploadDir = UPLOAD_DIR . $subdir;
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            move_uploaded_file($tmpName, $uploadDir . $filename);
-            $base = UPLOAD_BASE_URL !== '' ? UPLOAD_BASE_URL : '';
-            $url  = $base . '/storage/uploads/' . $subdir . $filename;
-        }
+        $storage = new UploadStorage();
+        $url     = $storage->upload($tmpName, $filename, $mime, $subdir);
 
         echo json_encode(['url' => $url]);
     }

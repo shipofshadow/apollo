@@ -200,11 +200,17 @@ class PortfolioService
         $params[':id'] = $id;
         $stmt->execute($params);
 
+        $oldUrls = $this->collectPortfolioImageUrls($current);
+        $newUrls = $this->collectPortfolioImageUrls($this->dbGetById($id, false));
+        $this->deleteRemovedImageUrls($oldUrls, $newUrls);
+
         return $this->dbGetById($id, false);
     }
 
     private function dbDelete(int $id): void
     {
+        $current = $this->dbGetById($id, false);
+
         $stmt = Database::getInstance()->prepare(
             'DELETE FROM portfolio WHERE id = :id'
         );
@@ -212,6 +218,8 @@ class PortfolioService
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Portfolio item not found.', 404);
         }
+
+        $this->deleteRemovedImageUrls($this->collectPortfolioImageUrls($current), []);
     }
 
     // -------------------------------------------------------------------------
@@ -261,9 +269,11 @@ class PortfolioService
         $all    = $this->fileRead();
         $found  = false;
         $result = null;
+        $oldUrls = [];
 
         foreach ($all as &$p) {
             if ((int) ($p['id'] ?? 0) === $id) {
+                $oldUrls = $this->collectPortfolioImageUrls($p);
                 $p      = $this->buildRecord($id, array_merge($p, $data));
                 $result = $p;
                 $found  = true;
@@ -274,17 +284,30 @@ class PortfolioService
 
         if (!$found) throw new RuntimeException('Portfolio item not found.', 404);
         $this->fileWrite($all);
+
+        $newUrls = $result !== null ? $this->collectPortfolioImageUrls($result) : [];
+        $this->deleteRemovedImageUrls($oldUrls, $newUrls);
+
         return $result;
     }
 
     private function fileDelete(int $id): void
     {
         $all      = $this->fileRead();
+        $oldUrls  = [];
+        foreach ($all as $p) {
+            if ((int) ($p['id'] ?? 0) === $id) {
+                $oldUrls = $this->collectPortfolioImageUrls($p);
+                break;
+            }
+        }
         $filtered = array_values(array_filter($all, fn ($p) => (int) ($p['id'] ?? 0) !== $id));
         if (count($filtered) === count($all)) {
             throw new RuntimeException('Portfolio item not found.', 404);
         }
         $this->fileWrite($filtered);
+
+        $this->deleteRemovedImageUrls($oldUrls, []);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -414,6 +437,51 @@ class PortfolioService
     {
         if (empty(trim($data['title'] ?? ''))) {
             throw new RuntimeException('Portfolio item title is required.', 422);
+        }
+    }
+
+    /** @param array<string, mixed> $item @return string[] */
+    private function collectPortfolioImageUrls(array $item): array
+    {
+        $urls = [];
+
+        $imageUrl = trim((string) ($item['imageUrl'] ?? ($item['image_url'] ?? '')));
+        if ($imageUrl !== '') {
+            $urls[] = $imageUrl;
+        }
+
+        $images = $item['images'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        foreach ($images as $url) {
+            if (!is_string($url)) {
+                continue;
+            }
+            $trimmed = trim($url);
+            if ($trimmed !== '') {
+                $urls[] = $trimmed;
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    /** @param string[] $oldUrls @param string[] $newUrls */
+    private function deleteRemovedImageUrls(array $oldUrls, array $newUrls): void
+    {
+        $toDelete = array_diff($oldUrls, $newUrls);
+        if (empty($toDelete)) {
+            return;
+        }
+
+        $storage = new UploadStorage();
+        foreach ($toDelete as $url) {
+            try {
+                $storage->deleteByUrl($url);
+            } catch (\Throwable) {
+                // Keep CRUD successful even if storage cleanup fails.
+            }
         }
     }
 }

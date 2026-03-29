@@ -38,8 +38,12 @@ class BuildUpdateService
     public function getByBookingId(string $bookingId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, booking_id, note, photo_urls, created_at
-               FROM build_updates
+                'SELECT bu.id, bu.booking_id, bu.assigned_tech_id, bu.note, bu.photo_urls, bu.created_at,
+                          tm.name AS assigned_tech_name,
+                          tm.role AS assigned_tech_role,
+                          tm.image_url AS assigned_tech_image_url
+                    FROM build_updates bu
+             LEFT JOIN team_members tm ON tm.id = bu.assigned_tech_id
               WHERE booking_id = :bid
            ORDER BY created_at ASC'
         );
@@ -61,20 +65,31 @@ class BuildUpdateService
         $urlsJson  = json_encode(array_values($photoUrls));
 
         $stmt = $this->db->prepare(
-            'INSERT INTO build_updates (booking_id, note, photo_urls)
-                  VALUES (:bid, :note, :urls)'
+                        'INSERT INTO build_updates (booking_id, assigned_tech_id, note, photo_urls)
+                                    VALUES (
+                                        :bid,
+                                        (SELECT assigned_tech_id FROM bookings WHERE id = :booking_id_for_tech LIMIT 1),
+                                        :note,
+                                        :urls
+                                    )'
         );
         $stmt->execute([
-            ':bid'  => $bookingId,
-            ':note' => $note !== '' ? $note : null,
-            ':urls' => $urlsJson,
+                        ':bid'                 => $bookingId,
+                        ':booking_id_for_tech' => $bookingId,
+                        ':note'                => $note !== '' ? $note : null,
+                        ':urls'                => $urlsJson,
         ]);
 
         $id = (int) $this->db->lastInsertId();
 
         $fetch = $this->db->prepare(
-            'SELECT id, booking_id, note, photo_urls, created_at
-               FROM build_updates WHERE id = :id'
+            'SELECT bu.id, bu.booking_id, bu.assigned_tech_id, bu.note, bu.photo_urls, bu.created_at,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
+               FROM build_updates bu
+          LEFT JOIN team_members tm ON tm.id = bu.assigned_tech_id
+              WHERE bu.id = :id'
         );
         $fetch->execute([':id' => $id]);
         $row = $fetch->fetch(\PDO::FETCH_ASSOC);
@@ -100,6 +115,17 @@ class BuildUpdateService
         return [
             'id'        => (int) $row['id'],
             'bookingId' => (string) $row['booking_id'],
+            'assignedTechId' => isset($row['assigned_tech_id']) && $row['assigned_tech_id'] !== null
+                ? (int) $row['assigned_tech_id']
+                : null,
+            'assignedTech' => isset($row['assigned_tech_id']) && $row['assigned_tech_id'] !== null
+                ? [
+                    'id'       => (int) $row['assigned_tech_id'],
+                    'name'     => (string) ($row['assigned_tech_name'] ?? ''),
+                    'role'     => (string) ($row['assigned_tech_role'] ?? ''),
+                    'imageUrl' => $row['assigned_tech_image_url'] ?? null,
+                ]
+                : null,
             'note'      => (string) ($row['note'] ?? ''),
             'photoUrls' => $urls,
             'createdAt' => (string) $row['created_at'],

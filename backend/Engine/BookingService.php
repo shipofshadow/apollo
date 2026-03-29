@@ -117,6 +117,16 @@ class BookingService
 
         $this->useDb ? $this->dbInsert($booking) : $this->fileInsert($booking);
 
+        $this->addActivity(
+            (string) $booking['id'],
+            'booking_submitted',
+            'Booking submitted',
+            'Status: pending',
+            $userId,
+            $userId !== null ? 'client' : 'system',
+            (string) $booking['createdAt']
+        );
+
         (new NotificationService())->bookingCreated($booking);
 
         // In-app notification for admin
@@ -163,7 +173,7 @@ class BookingService
     /**
      * Return aggregate booking statistics for the admin dashboard.
      *
-     * @return array<string, int>
+     * @return array<string, mixed>
      */
     public function getStats(): array
     {
@@ -211,9 +221,22 @@ class BookingService
             );
         }
 
+        $before = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
         $booking = $this->useDb
             ? $this->dbUpdateStatus($id, $status)
             : $this->fileUpdateStatus($id, $status);
+
+        $fromStatus = (string) ($before['status'] ?? 'unknown');
+        $toStatus   = (string) ($booking['status'] ?? $status);
+        $this->addActivity(
+            (string) $booking['id'],
+            'status_changed',
+            'Status changed',
+            'From: ' . str_replace('_', ' ', $fromStatus) . ' -> ' . str_replace('_', ' ', $toStatus)
+        );
 
         (new NotificationService())->bookingStatusChanged($booking);
 
@@ -257,6 +280,14 @@ class BookingService
             ? $this->dbUpdateParts($id, $awaitingParts, $partsNotes)
             : $this->fileUpdateParts($id, $awaitingParts, $partsNotes);
 
+        $partsDetail = trim($partsNotes);
+        $this->addActivity(
+            (string) $booking['id'],
+            'parts_updated',
+            $awaitingParts ? 'Flagged: Awaiting Parts' : 'Parts status updated',
+            $partsDetail !== '' ? $partsDetail : null
+        );
+
         if ($awaitingParts) {
             (new NotificationService())->bookingAwaitingParts($booking);
 
@@ -296,15 +327,93 @@ class BookingService
         $stmt->execute([':notes' => $notes, ':id' => $id]);
 
         $row = $db->prepare(
-            'SELECT b.*, s.title AS service_name
+              'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+               LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              WHERE b.id = :id LIMIT 1'
         );
         $row->execute([':id' => $id]);
         $data = $row->fetch(\PDO::FETCH_ASSOC);
         if (!$data) throw new RuntimeException('Booking not found.', 404);
-        return $this->mapDbRow($data);
+        $booking = $this->mapDbRow($data);
+
+        $this->addActivity(
+            (string) $booking['id'],
+            'internal_notes_updated',
+            'Internal notes updated',
+            null
+        );
+
+        return $booking;
+    }
+
+    /**
+     * Assign or unassign a technician to a booking (admin-only workflow).
+     *
+     * @return array<string, mixed>
+     */
+    public function assignTechnician(string $id, ?int $assignedTechId): array
+    {
+        if (!$this->useDb) {
+            throw new RuntimeException('Technician assignment requires a database.', 501);
+        }
+
+        $before = $this->dbFindById($id);
+        if ($before === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $techName = null;
+        if ($assignedTechId !== null) {
+            $techStmt = Database::getInstance()->prepare(
+                'SELECT id, name FROM team_members WHERE id = :id LIMIT 1'
+            );
+            $techStmt->execute([':id' => $assignedTechId]);
+            $tech = $techStmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$tech) {
+                throw new RuntimeException('Technician not found.', 404);
+            }
+            $techName = (string) ($tech['name'] ?? '');
+        }
+
+        Database::getInstance()->prepare(
+            'UPDATE bookings SET assigned_tech_id = :tech_id WHERE id = :id'
+        )->execute([
+            ':tech_id' => $assignedTechId,
+            ':id'      => $id,
+        ]);
+
+        $updated = $this->dbFindById($id);
+        if ($updated === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $beforeId = isset($before['assignedTechId']) && $before['assignedTechId'] !== null
+            ? (int) $before['assignedTechId']
+            : null;
+        if ($beforeId !== $assignedTechId) {
+            if ($assignedTechId === null) {
+                $this->addActivity(
+                    $id,
+                    'technician_unassigned',
+                    'Technician unassigned',
+                    null
+                );
+            } else {
+                $this->addActivity(
+                    $id,
+                    'technician_assigned',
+                    'Technician assigned',
+                    $techName !== '' ? $techName : ('ID ' . $assignedTechId)
+                );
+            }
+        }
+
+        return $updated;
     }
 
     /**
@@ -418,6 +527,9 @@ class BookingService
             throw new RuntimeException('Booking not found.', 404);
         }
 
+        $oldDate = (string) ($booking['appointmentDate'] ?? '');
+        $oldTime = (string) ($booking['appointmentTime'] ?? '');
+
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             throw new RuntimeException('Invalid date format. Expected YYYY-MM-DD.', 422);
         }
@@ -443,9 +555,18 @@ class BookingService
             );
         }
 
-        return $this->useDb
+        $updated = $this->useDb
             ? $this->dbReschedule($id, $date, $time)
             : $this->fileReschedule($id, $date, $time);
+
+        $this->addActivity(
+            (string) $updated['id'],
+            'appointment_rescheduled',
+            'Rescheduled',
+            sprintf('%s %s -> %s %s', $oldDate, $oldTime, $date, $time)
+        );
+
+        return $updated;
     }
 
     /**
@@ -463,6 +584,9 @@ class BookingService
         if ($booking === null) {
             throw new RuntimeException('Booking not found.', 404);
         }
+
+        $oldDate = (string) ($booking['appointmentDate'] ?? '');
+        $oldTime = (string) ($booking['appointmentTime'] ?? '');
 
         if ((int) ($booking['userId'] ?? 0) !== $userId) {
             throw new RuntimeException('You are not authorized to reschedule this booking.', 403);
@@ -494,9 +618,48 @@ class BookingService
             );
         }
 
-        return $this->useDb
+        $updated = $this->useDb
             ? $this->dbReschedule($id, $date, $time)
             : $this->fileReschedule($id, $date, $time);
+
+        $this->addActivity(
+            (string) $updated['id'],
+            'appointment_rescheduled',
+            'Rescheduled',
+            sprintf('%s %s -> %s %s', $oldDate, $oldTime, $date, $time),
+            $userId,
+            'client'
+        );
+
+        return $updated;
+    }
+
+    private function addActivity(
+        string $bookingId,
+        string $eventType,
+        string $action,
+        ?string $detail = null,
+        ?int $actorUserId = null,
+        string $actorRole = 'system',
+        ?string $createdAt = null
+    ): void {
+        if (!$this->useDb) {
+            return;
+        }
+
+        try {
+            (new BookingActivityService())->add(
+                $bookingId,
+                $eventType,
+                $action,
+                $detail,
+                $actorUserId,
+                $actorRole,
+                $createdAt
+            );
+        } catch (\Throwable $e) {
+            error_log('[BookingService] Failed to write booking activity log: ' . $e->getMessage());
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -542,9 +705,13 @@ class BookingService
     private function dbGetAll(): array
     {
         $stmt = Database::getInstance()->query(
-            'SELECT b.*, s.title AS service_name
+            'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+             LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              ORDER BY b.created_at DESC'
         );
         return array_map([$this, 'mapDbRow'], $stmt->fetchAll());
@@ -554,9 +721,13 @@ class BookingService
     private function dbGetByUser(int $userId): array
     {
         $stmt = Database::getInstance()->prepare(
-            'SELECT b.*, s.title AS service_name
+            'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+             LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              WHERE b.user_id = :uid
              ORDER BY b.created_at DESC'
         );
@@ -573,27 +744,35 @@ class BookingService
         );
         $stmt->execute([':status' => $status, ':id' => $id]);
 
-        if ($stmt->rowCount() === 0) {
-            throw new RuntimeException('Booking not found.', 404);
-        }
-
         $row = $db->prepare(
-            'SELECT b.*, s.title AS service_name
+              'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+               LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              WHERE b.id = :id LIMIT 1'
         );
         $row->execute([':id' => $id]);
-        return $this->mapDbRow($row->fetch());
+        $data = $row->fetch();
+        if (!$data) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+        return $this->mapDbRow($data);
     }
 
     /** @return array<string, mixed>|null */
     private function dbFindById(string $id): ?array
     {
         $stmt = Database::getInstance()->prepare(
-            'SELECT b.*, s.title AS service_name
+            'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+             LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              WHERE b.id = :id LIMIT 1'
         );
         $stmt->execute([':id' => $id]);
@@ -621,18 +800,22 @@ class BookingService
         );
         $stmt->execute([':date' => $date, ':time' => $time, ':id' => $id]);
 
-        if ($stmt->rowCount() === 0) {
-            throw new RuntimeException('Booking not found.', 404);
-        }
-
         $row = $db->prepare(
-            'SELECT b.*, s.title AS service_name
+              'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+               LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              WHERE b.id = :id LIMIT 1'
         );
         $row->execute([':id' => $id]);
-        return $this->mapDbRow($row->fetch());
+        $data = $row->fetch();
+        if (!$data) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+        return $this->mapDbRow($data);
     }
 
     /** @return array<string, mixed> */
@@ -668,18 +851,22 @@ class BookingService
         );
         $stmt->execute([':ap' => (int) $awaitingParts, ':pn' => $partsNotes, ':id' => $id]);
 
-        if ($stmt->rowCount() === 0) {
-            throw new RuntimeException('Booking not found.', 404);
-        }
-
         $row = $db->prepare(
-            'SELECT b.*, s.title AS service_name
+              'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
+               LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
              WHERE b.id = :id LIMIT 1'
         );
         $row->execute([':id' => $id]);
-        return $this->mapDbRow($row->fetch());
+        $data = $row->fetch();
+        if (!$data) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+        return $this->mapDbRow($data);
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
@@ -696,9 +883,24 @@ class BookingService
         $rawVars = $row['selected_variations'] ?? null;
         $selectedVariations = $rawVars ? (json_decode((string) $rawVars, true) ?? []) : [];
 
+        $assignedTechId = isset($row['assigned_tech_id']) && $row['assigned_tech_id'] !== null
+            ? (int) $row['assigned_tech_id']
+            : null;
+        $assignedTech = null;
+        if ($assignedTechId !== null) {
+            $assignedTech = [
+                'id'       => $assignedTechId,
+                'name'     => (string) ($row['assigned_tech_name'] ?? ''),
+                'role'     => (string) ($row['assigned_tech_role'] ?? ''),
+                'imageUrl' => $row['assigned_tech_image_url'] ?? null,
+            ];
+        }
+
         return [
             'id'                 => $row['id'],
             'userId'             => $row['user_id'] !== null ? (int) $row['user_id'] : null,
+            'assignedTechId'     => $assignedTechId,
+            'assignedTech'       => $assignedTech,
             'name'               => $row['name'],
             'email'              => $row['email'],
             'phone'              => $row['phone'],
@@ -788,7 +990,7 @@ class BookingService
     // DB – stats
     // -------------------------------------------------------------------------
 
-    /** @return array<string, int> */
+    /** @return array<string, mixed> */
     private function dbGetStats(): array
     {
         $db = Database::getInstance();
@@ -830,6 +1032,26 @@ class BookingService
               LIMIT 5"
         )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
+        // Peak appointment hours by volume (completed and active bookings).
+        $peakHours = $db->query(
+            "SELECT appointment_time AS hour_label, COUNT(*) AS cnt
+               FROM bookings
+              WHERE status IN ('pending', 'confirmed', 'completed')
+              GROUP BY appointment_time
+              ORDER BY cnt DESC
+              LIMIT 8"
+        )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        usort($peakHours, static function (array $a, array $b): int {
+            $timeA = strtotime((string) ($a['hour_label'] ?? ''));
+            $timeB = strtotime((string) ($b['hour_label'] ?? ''));
+
+            if ($timeA === false && $timeB === false) return 0;
+            if ($timeA === false) return 1;
+            if ($timeB === false) return -1;
+            return $timeA <=> $timeB;
+        });
+
         // Review stats
         $reviewRow = null;
         try {
@@ -854,6 +1076,10 @@ class BookingService
                 'name'  => $r['service_name'],
                 'count' => (int) $r['cnt'],
             ], $topServices),
+            'peakHours'         => array_map(fn($r) => [
+                'time'  => (string) ($r['hour_label'] ?? ''),
+                'count' => (int) ($r['cnt'] ?? 0),
+            ], $peakHours),
             'reviewCount'       => $reviewRow ? (int)   $reviewRow['total']      : 0,
             'avgRating'         => $reviewRow ? (float) $reviewRow['avg_rating'] : 0.0,
         ];
@@ -938,7 +1164,7 @@ class BookingService
         file_put_contents(self::$storageFile, json_encode($bookings, JSON_PRETTY_PRINT));
     }
 
-    /** @return array<string, int> */
+    /** @return array<string, mixed> */
     private function fileGetStats(): array
     {
         $all = $this->fileGetAll();
@@ -952,9 +1178,16 @@ class BookingService
         $cancelled = 0;
         $thisWeek  = 0;
         $thisMonth = 0;
+        $todayBookings = 0;
+        $todayPending  = 0;
+        $topServiceCounts = [];
+        $peakHourCounts = [];
+        $todayIso = (new \DateTime('today'))->format('Y-m-d');
 
         foreach ($all as $b) {
-            switch ($b['status'] ?? '') {
+            $status = (string) ($b['status'] ?? '');
+
+            switch ($status) {
                 case 'pending':   $pending++;   break;
                 case 'confirmed': $confirmed++; break;
                 case 'completed': $completed++; break;
@@ -964,7 +1197,46 @@ class BookingService
             $created = new \DateTime($b['createdAt'] ?? 'now');
             if ($created >= $weekAgo)    $thisWeek++;
             if ($created >= $monthStart) $thisMonth++;
+
+            $appointmentDate = (string) ($b['appointmentDate'] ?? '');
+            if ($appointmentDate === $todayIso) {
+                $todayBookings++;
+                if (in_array($status, ['pending', 'confirmed'], true)) {
+                    $todayPending++;
+                }
+            }
+
+            $serviceLabel = trim((string) ($b['serviceName'] ?? ''));
+            if ($serviceLabel !== '') {
+                $topServiceCounts[$serviceLabel] = ($topServiceCounts[$serviceLabel] ?? 0) + 1;
+            }
+
+            $timeLabel = trim((string) ($b['appointmentTime'] ?? ''));
+            if ($timeLabel !== '' && in_array($status, ['pending', 'confirmed', 'completed'], true)) {
+                $peakHourCounts[$timeLabel] = ($peakHourCounts[$timeLabel] ?? 0) + 1;
+            }
         }
+
+        arsort($topServiceCounts);
+        $topServiceCounts = array_slice($topServiceCounts, 0, 5, true);
+
+        arsort($peakHourCounts);
+        $peakHourCounts = array_slice($peakHourCounts, 0, 8, true);
+
+        $peakHours = [];
+        foreach ($peakHourCounts as $time => $count) {
+            $peakHours[] = ['time' => (string) $time, 'count' => (int) $count];
+        }
+
+        usort($peakHours, static function (array $a, array $b): int {
+            $timeA = strtotime((string) ($a['time'] ?? ''));
+            $timeB = strtotime((string) ($b['time'] ?? ''));
+
+            if ($timeA === false && $timeB === false) return 0;
+            if ($timeA === false) return 1;
+            if ($timeB === false) return -1;
+            return $timeA <=> $timeB;
+        });
 
         return [
             'totalBookings'     => count($all),
@@ -975,6 +1247,16 @@ class BookingService
             'activeBookings'    => $pending + $confirmed,
             'bookingsThisWeek'  => $thisWeek,
             'bookingsThisMonth' => $thisMonth,
+            'todayBookings'     => $todayBookings,
+            'todayPending'      => $todayPending,
+            'topServices'       => array_map(
+                fn($name, $count) => ['name' => (string) $name, 'count' => (int) $count],
+                array_keys($topServiceCounts),
+                array_values($topServiceCounts)
+            ),
+            'peakHours'         => $peakHours,
+            'reviewCount'       => 0,
+            'avgRating'         => 0.0,
         ];
     }
 

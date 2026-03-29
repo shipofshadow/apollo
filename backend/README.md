@@ -125,15 +125,27 @@ php -S localhost:8000
 | `MAIL_FROM` | ❌ | _(empty)_ | From address for transactional emails |
 | `MAIL_FROM_NAME` | ❌ | `1625 Auto Lab` | From display name |
 | `MAIL_ADMIN` | ❌ | _(empty)_ | Admin notification recipient |
+| `SMTP_HOST` | ❌ | _(empty)_ | SMTP server host (recommended for reliable delivery) |
+| `SMTP_PORT` | ❌ | `587` | SMTP server port |
+| `SMTP_USERNAME` | ❌ | _(empty)_ | SMTP username/login |
+| `SMTP_PASSWORD` | ❌ | _(empty)_ | SMTP password/app password – **keep private** |
+| `SMTP_ENCRYPTION` | ❌ | `tls` | SMTP transport security (`tls`, `ssl`, `none`) |
+| `SMTP_AUTH` | ❌ | `true` | Enable SMTP authentication |
+| `SMTP_TIMEOUT` | ❌ | `10` | SMTP timeout in seconds |
 | **Vehicle data (CarAPI)** | | | |
 | `CARAPI_TOKEN` | ✅ (for vehicle lookup) | — | CarAPI token |
 | `CARAPI_SECRET` | ✅ (for vehicle lookup) | — | CarAPI secret |
 | `CARAPI_MAKES_TTL` | ❌ | `86400` | Cache TTL for vehicle makes (seconds) |
 | `CARAPI_MODELS_TTL` | ❌ | `43200` | Cache TTL for vehicle models (seconds) |
 | **Media uploads** | | | |
+| `FILESYSTEM_DISK` | ❌ | `local` | Upload disk driver: `local` or `s3` (Cloudflare R2) |
 | `UPLOAD_MAX_MB` | ❌ | `10` | Max upload size in MB |
 | `UPLOAD_BASE_URL` | ❌ | _(empty)_ | Public base URL for local uploads |
-| **Cloudflare R2 (optional)** | | | |
+| **SMS (Twilio, optional)** | | | |
+| `TWILIO_ACCOUNT_SID` | ❌ | _(empty)_ | Twilio Account SID (backend only) |
+| `TWILIO_AUTH_TOKEN` | ❌ | _(empty)_ | Twilio Auth Token – **keep private** |
+| `TWILIO_FROM` | ❌ | _(empty)_ | Twilio sender number in E.164 format (e.g. `+15551234567`) |
+| **Cloudflare R2 / S3 (used when `FILESYSTEM_DISK=s3`)** | | | |
 | `R2_ACCOUNT_ID` | ❌ | _(empty)_ | Cloudflare account ID (enables R2 uploads) |
 | `R2_ACCESS_KEY_ID` | ❌ | _(empty)_ | R2 API token key |
 | `R2_SECRET_ACCESS_KEY` | ❌ | _(empty)_ | R2 API token secret – **keep private** |

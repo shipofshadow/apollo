@@ -170,11 +170,20 @@ class ProductService
         $params[':id'] = $id;
         $stmt->execute($params);
 
+        $oldImage = trim((string) ($current['imageUrl'] ?? ''));
+        $newImage = trim((string) ($merged['imageUrl'] ?? ($merged['image_url'] ?? '')));
+        if ($oldImage !== '' && $oldImage !== $newImage) {
+            $this->deleteManagedImageUrl($oldImage);
+        }
+
         return $this->dbGetById($id, false);
     }
 
     private function dbDelete(int $id): void
     {
+        $current = $this->dbGetById($id, false);
+        $variations = $this->dbFetchVariations($id);
+
         $stmt = Database::getInstance()->prepare(
             'DELETE FROM products WHERE id = :id'
         );
@@ -182,6 +191,12 @@ class ProductService
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Product not found.', 404);
         }
+
+        $urls = $this->collectProductImageUrls($current);
+        foreach ($variations as $variation) {
+            $urls = array_merge($urls, $this->collectVariationImageUrls($variation));
+        }
+        $this->deleteManagedImageUrls($urls);
     }
 
     // -------------------------------------------------------------------------
@@ -231,9 +246,11 @@ class ProductService
         $all    = $this->fileRead();
         $found  = false;
         $result = null;
+        $oldImage = '';
 
         foreach ($all as &$p) {
             if ((int) ($p['id'] ?? 0) === $id) {
+                $oldImage = trim((string) ($p['imageUrl'] ?? ''));
                 $p      = $this->buildRecord($id, array_merge($p, $data));
                 $result = $p;
                 $found  = true;
@@ -244,17 +261,34 @@ class ProductService
 
         if (!$found) throw new RuntimeException('Product not found.', 404);
         $this->fileWrite($all);
+
+        $newImage = trim((string) ($result['imageUrl'] ?? ''));
+        if ($oldImage !== '' && $oldImage !== $newImage) {
+            $this->deleteManagedImageUrl($oldImage);
+        }
+
         return $result;
     }
 
     private function fileDelete(int $id): void
     {
         $all      = $this->fileRead();
+        $oldImage = '';
+        foreach ($all as $p) {
+            if ((int) ($p['id'] ?? 0) === $id) {
+                $oldImage = trim((string) ($p['imageUrl'] ?? ''));
+                break;
+            }
+        }
         $filtered = array_values(array_filter($all, fn ($p) => (int) ($p['id'] ?? 0) !== $id));
         if (count($filtered) === count($all)) {
             throw new RuntimeException('Product not found.', 404);
         }
         $this->fileWrite($filtered);
+
+        if ($oldImage !== '') {
+            $this->deleteManagedImageUrl($oldImage);
+        }
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -402,6 +436,14 @@ class ProductService
         if (!is_array($specs)) {
             $specs = [];
         }
+        $colors = json_decode($row['colors'] ?? '[]', true);
+        if (!is_array($colors)) {
+            $colors = [];
+        }
+        $colorImages = json_decode($row['color_images'] ?? '{}', true);
+        if (!is_array($colorImages)) {
+            $colorImages = [];
+        }
         return [
             'id'          => (int) $row['id'],
             'productId'   => (int) $row['product_id'],
@@ -410,6 +452,8 @@ class ProductService
             'price'       => $row['price'],
             'images'      => $images,
             'specs'       => $specs,
+            'colors'      => $colors,
+            'colorImages' => $colorImages,
             'sortOrder'   => (int) $row['sort_order'],
         ];
     }
@@ -425,8 +469,8 @@ class ProductService
         $this->dbGetById($productId, false); // throws 404 if product missing
         $db   = Database::getInstance();
         $stmt = $db->prepare(
-            'INSERT INTO product_variations (product_id, name, description, price, images, specs, sort_order)
-             VALUES (:product_id, :name, :description, :price, :images, :specs, :sort_order)'
+              'INSERT INTO product_variations (product_id, name, description, price, images, specs, colors, color_images, sort_order)
+               VALUES (:product_id, :name, :description, :price, :images, :specs, :colors, :color_images, :sort_order)'
         );
         $stmt->execute($this->bindVariationParams($productId, $data));
         $varId = (int) $db->lastInsertId();
@@ -449,6 +493,8 @@ class ProductService
             'price'       => $current['price'],
             'images'      => $current['images'],
             'specs'       => $current['specs'],
+            'colors'      => $current['colors'] ?? [],
+            'colorImages' => $current['colorImages'] ?? [],
             'sortOrder'   => $current['sortOrder'],
         ], $data);
 
@@ -459,12 +505,24 @@ class ProductService
                price       = :price,
                images      = :images,
                specs       = :specs,
+                             colors      = :colors,
+                             color_images = :color_images,
                sort_order  = :sort_order
              WHERE id = :id AND product_id = :product_id'
         );
         $params                = $this->bindVariationParams($productId, $merged);
         $params[':id']         = $varId;
         $stmt->execute($params);
+
+        $newVariation = [
+            'images'      => json_decode((string) ($params[':images'] ?? '[]'), true) ?: [],
+            'colorImages' => json_decode((string) ($params[':color_images'] ?? '{}'), true) ?: [],
+        ];
+        $this->deleteRemovedManagedUrls(
+            $this->collectVariationImageUrls($current),
+            $this->collectVariationImageUrls($newVariation)
+        );
+
         return $this->dbFetchVariationById($varId);
     }
 
@@ -473,6 +531,8 @@ class ProductService
      */
     public function deleteVariation(int $productId, int $varId): void
     {
+        $current = $this->dbFetchVariationById($varId);
+
         $stmt = Database::getInstance()->prepare(
             'DELETE FROM product_variations WHERE id = :id AND product_id = :product_id'
         );
@@ -480,6 +540,8 @@ class ProductService
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Variation not found.', 404);
         }
+
+        $this->deleteManagedImageUrls($this->collectVariationImageUrls($current));
     }
 
     /** @return array<string, mixed> */
@@ -507,6 +569,48 @@ class ProductService
         if (!is_array($specs)) {
             $specs = [];
         }
+        $colors = $data['colors'] ?? [];
+        if (!is_array($colors)) {
+            $colors = [];
+        }
+        $colors = array_values(array_filter(array_map(
+            fn ($color) => is_string($color) ? trim($color) : '',
+            $colors
+        ), fn ($color) => $color !== ''));
+        $colorImages = $data['colorImages'] ?? ($data['color_images'] ?? []);
+        if (!is_array($colorImages)) {
+            $colorImages = [];
+        }
+
+        $normalizedColorImages = [];
+        foreach ($colorImages as $color => $urls) {
+            if (!is_string($color)) {
+                continue;
+            }
+            $normalizedColor = trim($color);
+            if ($normalizedColor === '') {
+                continue;
+            }
+            if (!is_array($urls)) {
+                continue;
+            }
+            $normalizedUrls = array_values(array_filter(array_map(
+                fn ($url) => is_string($url) ? trim($url) : '',
+                $urls
+            ), fn ($url) => $url !== ''));
+            if (!empty($normalizedUrls)) {
+                $normalizedColorImages[$normalizedColor] = $normalizedUrls;
+            }
+        }
+
+        if (!empty($colors)) {
+            $normalizedColorImages = array_intersect_key(
+                $normalizedColorImages,
+                array_flip($colors)
+            );
+        } else {
+            $normalizedColorImages = [];
+        }
         return [
             ':product_id'  => $productId,
             ':name'        => $data['name']        ?? '',
@@ -514,6 +618,8 @@ class ProductService
             ':price'       => $data['price']       ?? '',
             ':images'      => json_encode($images),
             ':specs'       => json_encode($specs),
+            ':colors'      => json_encode($colors),
+            ':color_images' => json_encode($normalizedColorImages),
             ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
         ];
     }
@@ -526,6 +632,86 @@ class ProductService
         }
         if (!isset($data['price']) || !is_numeric($data['price']) || (float) $data['price'] < 0) {
             throw new RuntimeException('A valid product price is required.', 422);
+        }
+    }
+
+    /** @param array<string, mixed> $product @return string[] */
+    private function collectProductImageUrls(array $product): array
+    {
+        $url = trim((string) ($product['imageUrl'] ?? ($product['image_url'] ?? '')));
+        return $url !== '' ? [$url] : [];
+    }
+
+    /** @param array<string, mixed> $variation @return string[] */
+    private function collectVariationImageUrls(array $variation): array
+    {
+        $urls = [];
+
+        $images = $variation['images'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        foreach ($images as $url) {
+            if (!is_string($url)) {
+                continue;
+            }
+            $trimmed = trim($url);
+            if ($trimmed !== '') {
+                $urls[] = $trimmed;
+            }
+        }
+
+        $colorImages = $variation['colorImages'] ?? ($variation['color_images'] ?? []);
+        if (is_array($colorImages)) {
+            foreach ($colorImages as $group) {
+                if (!is_array($group)) {
+                    continue;
+                }
+                foreach ($group as $url) {
+                    if (!is_string($url)) {
+                        continue;
+                    }
+                    $trimmed = trim($url);
+                    if ($trimmed !== '') {
+                        $urls[] = $trimmed;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    /** @param string[] $oldUrls @param string[] $newUrls */
+    private function deleteRemovedManagedUrls(array $oldUrls, array $newUrls): void
+    {
+        $this->deleteManagedImageUrls(array_values(array_diff($oldUrls, $newUrls)));
+    }
+
+    /** @param string[] $urls */
+    private function deleteManagedImageUrls(array $urls): void
+    {
+        if (empty($urls)) {
+            return;
+        }
+
+        $storage = new UploadStorage();
+        foreach (array_values(array_unique($urls)) as $url) {
+            $this->deleteManagedImageUrl((string) $url, $storage);
+        }
+    }
+
+    private function deleteManagedImageUrl(string $url, ?UploadStorage $storage = null): void
+    {
+        $trimmed = trim($url);
+        if ($trimmed === '') {
+            return;
+        }
+
+        try {
+            ($storage ?? new UploadStorage())->deleteByUrl($trimmed);
+        } catch (\Throwable) {
+            // Keep CRUD successful even if storage cleanup fails.
         }
     }
 }

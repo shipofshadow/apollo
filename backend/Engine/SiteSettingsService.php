@@ -66,6 +66,8 @@ class SiteSettingsService
     /** @param array<string, string|null> $data @return array<string, string|null> */
     private function dbUpdate(array $data): array
     {
+        $before = $this->dbGetAll();
+
         $db   = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO site_settings (`key`, `value`) VALUES (:key, :value)
@@ -74,7 +76,11 @@ class SiteSettingsService
         foreach ($data as $key => $value) {
             $stmt->execute([':key' => $key, ':value' => $value]);
         }
-        return $this->dbGetAll();
+
+        $after = $this->dbGetAll();
+        $this->cleanupRemovedImageSettingUrls($before, $after);
+
+        return $after;
     }
 
     // -------------------------------------------------------------------------
@@ -104,7 +110,42 @@ class SiteSettingsService
             self::$storageFile,
             json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
         );
+
+        $this->cleanupRemovedImageSettingUrls($current, $merged);
+
         return $merged;
+    }
+
+    /**
+     * @param array<string, string|null> $before
+     * @param array<string, string|null> $after
+     */
+    private function cleanupRemovedImageSettingUrls(array $before, array $after): void
+    {
+        $storage = new UploadStorage();
+
+        foreach ($before as $key => $oldValue) {
+            if (!$this->isImageSettingKey($key)) {
+                continue;
+            }
+
+            $oldUrl = trim((string) ($oldValue ?? ''));
+            $newUrl = trim((string) ($after[$key] ?? ''));
+            if ($oldUrl === '' || $oldUrl === $newUrl) {
+                continue;
+            }
+
+            try {
+                $storage->deleteByUrl($oldUrl);
+            } catch (\Throwable) {
+                // Keep settings update successful even if cleanup fails.
+            }
+        }
+    }
+
+    private function isImageSettingKey(string $key): bool
+    {
+        return str_ends_with($key, 'image_url') || str_contains($key, 'image_url_');
     }
 
     // -------------------------------------------------------------------------

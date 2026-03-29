@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
+use PHPMailer\PHPMailer\PHPMailer;
+
 /**
  * Sends transactional email notifications for booking events.
  *
- * Uses PHP's built-in mail() function.  Set MAIL_FROM in the .env file to
- * enable notifications; if MAIL_FROM is empty, all sends are silently skipped
- * so the booking flow is never blocked by missing mail configuration.
- *
- * For production, swap mail() for an SMTP library such as PHPMailer or Symfony
- * Mailer by adding it via Composer and updating the send() method below.
+ * Uses SMTP via PHPMailer when SMTP_HOST is configured.
+ * Falls back to PHP's built-in mail() when SMTP is not configured.
+ * Set MAIL_FROM in .env to enable notifications.
  */
 class NotificationService
 {
@@ -111,13 +111,22 @@ class NotificationService
         $customerName  = (string) ($booking['name']  ?? 'Customer');
 
         if ($customerEmail === '') {
-            return;
+            // Continue to admin notification even if customer email is missing.
+        } else {
+            $status  = ucfirst((string) ($booking['status'] ?? ''));
+            $subject = "Your Booking is $status – 1625 Auto Lab";
+            $body    = $this->buildStatusUpdateBody($booking);
+            $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        $status  = ucfirst((string) ($booking['status'] ?? ''));
-        $subject = "Your Booking is $status – 1625 Auto Lab";
-        $body    = $this->buildStatusUpdateBody($booking);
-        $this->send($customerEmail, $customerName, $subject, $body);
+        if (MAIL_ADMIN !== '') {
+            $status  = ucfirst((string) ($booking['status'] ?? ''));
+            $service = (string) ($booking['serviceName'] ?? 'Service');
+            $name    = (string) ($booking['name'] ?? 'Customer');
+            $subject = "Booking Status Updated: {$service} – {$name} ({$status})";
+            $body    = $this->buildAdminStatusChangedBody($booking);
+            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+        }
     }
 
     /**
@@ -135,12 +144,20 @@ class NotificationService
         $customerName  = (string) ($booking['name']  ?? 'Customer');
 
         if ($customerEmail === '') {
-            return;
+            // Continue to admin notification even if customer email is missing.
+        } else {
+            $subject = 'Job Update: Awaiting Parts – 1625 Auto Lab';
+            $body    = $this->buildAwaitingPartsBody($booking);
+            $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        $subject = 'Job Update: Awaiting Parts – 1625 Auto Lab';
-        $body    = $this->buildAwaitingPartsBody($booking);
-        $this->send($customerEmail, $customerName, $subject, $body);
+        if (MAIL_ADMIN !== '') {
+            $service = (string) ($booking['serviceName'] ?? 'Service');
+            $name    = (string) ($booking['name'] ?? 'Customer');
+            $subject = "Booking Awaiting Parts: {$service} – {$name}";
+            $body    = $this->buildAdminAwaitingPartsBody($booking);
+            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+        }
     }
 
     /**
@@ -159,12 +176,20 @@ class NotificationService
         $customerName  = (string) ($booking['name']  ?? 'Customer');
 
         if ($customerEmail === '') {
-            return;
+            // Continue to admin notification even if customer email is missing.
+        } else {
+            $subject = 'Build Update on Your Vehicle – 1625 Auto Lab';
+            $body    = $this->buildProgressUpdateBody($booking, $update);
+            $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        $subject = 'Build Update on Your Vehicle – 1625 Auto Lab';
-        $body    = $this->buildProgressUpdateBody($booking, $update);
-        $this->send($customerEmail, $customerName, $subject, $body);
+        if (MAIL_ADMIN !== '') {
+            $service = (string) ($booking['serviceName'] ?? 'Service');
+            $name    = (string) ($booking['name'] ?? 'Customer');
+            $subject = "Build Progress Update Posted: {$service} – {$name}";
+            $body    = $this->buildAdminBuildUpdateBody($booking, $update);
+            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+        }
     }
 
     /**
@@ -310,6 +335,89 @@ class NotificationService
         ");
     }
 
+    /** @param array<string, mixed> $b */
+    private function buildAdminStatusChangedBody(array $b): string
+    {
+        $name        = htmlspecialchars((string) ($b['name'] ?? ''));
+        $email       = htmlspecialchars((string) ($b['email'] ?? ''));
+        $service     = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $status      = htmlspecialchars(ucfirst((string) ($b['status'] ?? '')));
+        $date        = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
+        $time        = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
+        $bookingId   = htmlspecialchars((string) ($b['id'] ?? ''));
+
+        return $this->wrapHtml("
+            <h2>Booking Status Updated</h2>
+            <table>
+                <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
+                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
+                <tr><td><strong>Status:</strong></td><td>$status</td></tr>
+                <tr><td><strong>Date:</strong></td><td>$date</td></tr>
+                <tr><td><strong>Time:</strong></td><td>$time</td></tr>
+                <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
+            </table>
+        ");
+    }
+
+    /** @param array<string, mixed> $b */
+    private function buildAdminAwaitingPartsBody(array $b): string
+    {
+        $name        = htmlspecialchars((string) ($b['name'] ?? ''));
+        $email       = htmlspecialchars((string) ($b['email'] ?? ''));
+        $service     = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $notes       = nl2br(htmlspecialchars((string) ($b['partsNotes'] ?? 'No additional details provided.')));
+        $bookingId   = htmlspecialchars((string) ($b['id'] ?? ''));
+
+        return $this->wrapHtml("
+            <h2>Booking Awaiting Parts</h2>
+            <table>
+                <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
+                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
+                <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
+            </table>
+            <h3>Parts Notes</h3>
+            <p style='white-space:pre-wrap'>$notes</p>
+        ");
+    }
+
+    /**
+     * @param array<string, mixed> $b
+     * @param array<string, mixed> $u
+     */
+    private function buildAdminBuildUpdateBody(array $b, array $u): string
+    {
+        $name      = htmlspecialchars((string) ($b['name'] ?? ''));
+        $email     = htmlspecialchars((string) ($b['email'] ?? ''));
+        $service   = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $bookingId = htmlspecialchars((string) ($b['id'] ?? ''));
+        $note      = nl2br(htmlspecialchars((string) ($u['note'] ?? '')));
+        $date      = htmlspecialchars((string) ($u['createdAt'] ?? ''));
+
+        $photosHtml = '';
+        $photoUrls  = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
+        foreach ($photoUrls as $url) {
+            $safeUrl = htmlspecialchars((string) $url);
+            $photosHtml .= "<li><a href='$safeUrl' style='color:#f97316'>$safeUrl</a></li>";
+        }
+        if ($photosHtml !== '') {
+            $photosHtml = "<h3>Photos</h3><ul>$photosHtml</ul>";
+        }
+
+        $noteSection = $note !== '' ? "<h3>Update Note</h3><p style='white-space:pre-wrap'>$note</p>" : '';
+
+        return $this->wrapHtml("
+            <h2>Build Progress Update Posted</h2>
+            <table>
+                <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
+                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
+                <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
+                <tr><td><strong>Posted At:</strong></td><td>$date</td></tr>
+            </table>
+            $noteSection
+            $photosHtml
+        ");
+    }
+
     private function wrapHtml(string $body): string
     {
         return "<!DOCTYPE html><html><body style='font-family:sans-serif;max-width:600px;margin:auto;padding:24px'>
@@ -369,6 +477,8 @@ class NotificationService
      */
     public function configStatus(): array
     {
+        $smtpConfigured = $this->smtpConfigured();
+
         return [
             'configured' => MAIL_FROM !== '',
             'fromSet'    => MAIL_FROM !== '',
@@ -376,6 +486,9 @@ class NotificationService
             'fromName'   => MAIL_FROM_NAME,
             'fromHint'   => MAIL_FROM !== '' ? $this->maskEmail(MAIL_FROM) : '',
             'adminHint'  => MAIL_ADMIN !== '' ? $this->maskEmail(MAIL_ADMIN) : '',
+            'transport'  => $smtpConfigured ? 'smtp' : 'mail',
+            'smtpHost'   => $smtpConfigured ? SMTP_HOST : '',
+            'smtpPort'   => $smtpConfigured ? SMTP_PORT : 0,
         ];
     }
 
@@ -385,6 +498,11 @@ class NotificationService
 
     private function send(string $to, string $toName, string $subject, string $htmlBody): void
     {
+        if ($this->smtpConfigured()) {
+            $this->sendViaSmtp($to, $toName, $subject, $htmlBody);
+            return;
+        }
+
         $fromName = MAIL_FROM_NAME;
         $from     = MAIL_FROM;
 
@@ -397,6 +515,44 @@ class NotificationService
         ]);
 
         @mail($to, $subject, $htmlBody, $headers);
+    }
+
+    private function smtpConfigured(): bool
+    {
+        return SMTP_HOST !== '';
+    }
+
+    private function sendViaSmtp(string $to, string $toName, string $subject, string $htmlBody): void
+    {
+        try {
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host       = SMTP_HOST;
+            $mail->Port       = SMTP_PORT;
+            $mail->SMTPAuth   = SMTP_AUTH;
+            $mail->Username   = SMTP_USERNAME;
+            $mail->Password   = SMTP_PASSWORD;
+            $mail->Timeout    = max(1, SMTP_TIMEOUT);
+
+            if (SMTP_ENCRYPTION === 'ssl') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            } elseif (SMTP_ENCRYPTION === 'tls') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            } else {
+                $mail->SMTPSecure = '';
+                $mail->SMTPAutoTLS = false;
+            }
+
+            $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+            $mail->addAddress($to, $toName);
+            $mail->addReplyTo(MAIL_FROM, MAIL_FROM_NAME);
+            $mail->Subject = $subject;
+            $mail->isHTML(true);
+            $mail->Body    = $htmlBody;
+            $mail->send();
+        } catch (PHPMailerException $e) {
+            error_log('[NotificationService] SMTP send failed for ' . $to . ': ' . $e->getMessage());
+        }
     }
 
     private function maskEmail(string $email): string

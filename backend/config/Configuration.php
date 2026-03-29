@@ -61,6 +61,13 @@ define('JWT_TTL',        (int)($_ENV['JWT_TTL']   ?? 3600));   // seconds
 define('MAIL_FROM',      $_ENV['MAIL_FROM']       ?? '');           // e.g. noreply@1625autolab.com
 define('MAIL_FROM_NAME', $_ENV['MAIL_FROM_NAME']  ?? '1625 Auto Lab');
 define('MAIL_ADMIN',     $_ENV['MAIL_ADMIN']       ?? '');           // admin notification recipient
+define('SMTP_HOST',      trim((string) ($_ENV['SMTP_HOST'] ?? '')));
+define('SMTP_PORT',      (int) ($_ENV['SMTP_PORT'] ?? 587));
+define('SMTP_USERNAME',  (string) ($_ENV['SMTP_USERNAME'] ?? ''));
+define('SMTP_PASSWORD',  (string) ($_ENV['SMTP_PASSWORD'] ?? ''));
+define('SMTP_ENCRYPTION', strtolower(trim((string) ($_ENV['SMTP_ENCRYPTION'] ?? 'tls'))));
+define('SMTP_AUTH',      filter_var($_ENV['SMTP_AUTH'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
+define('SMTP_TIMEOUT',   (int) ($_ENV['SMTP_TIMEOUT'] ?? 10));
 
 // ---------------------------------------------------------------------------
 // CarAPI – vehicle make / model / trim data
@@ -79,21 +86,21 @@ define('CARAPI_MODELS_TTL', (int) ($_ENV['CARAPI_MODELS_TTL'] ?? 43200));
 // Media upload constants
 // ---------------------------------------------------------------------------
 
+define('FILESYSTEM_DISK', strtolower(trim($_ENV['FILESYSTEM_DISK'] ?? 'local')));
 define('UPLOAD_DIR',      realpath(__DIR__ . '/../') . '/storage/uploads/');
 define('UPLOAD_MAX_MB',   (int)($_ENV['UPLOAD_MAX_MB']  ?? 10));
 define('UPLOAD_BASE_URL', rtrim($_ENV['UPLOAD_BASE_URL'] ?? '', '/'));
 
 // ---------------------------------------------------------------------------
 // Cloudflare R2 (S3-compatible object storage)
-// When R2_ACCOUNT_ID is set uploads go to R2; otherwise they fall back to
-// the local UPLOAD_DIR.
+// Used when FILESYSTEM_DISK is set to "s3".
 // ---------------------------------------------------------------------------
 
 define('R2_ACCOUNT_ID',       $_ENV['R2_ACCOUNT_ID']       ?? '');
 define('R2_ACCESS_KEY_ID',    $_ENV['R2_ACCESS_KEY_ID']     ?? '');
 define('R2_SECRET_ACCESS_KEY',$_ENV['R2_SECRET_ACCESS_KEY'] ?? '');
 define('R2_BUCKET_NAME',      $_ENV['R2_BUCKET_NAME']       ?? '');
-define('R2_KEY_PREFIX',       rtrim($_ENV['R2_KEY_PREFIX']   ?? 'chopaeng/1625autolab', '/') . '/');
+define('R2_KEY_PREFIX',       rtrim($_ENV['R2_KEY_PREFIX']   ?? '1625autolab', '/') . '/');
 define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));
 
 // ---------------------------------------------------------------------------
