@@ -9,7 +9,6 @@ type ComparisonCase = {
   beforeUrl: string;
   afterUrl: string;
   description?: string;
-  synthetic?: boolean;
 };
 
 function buildComparisonCases(items: BeforeAfterItem[]): ComparisonCase[] {
@@ -31,6 +30,7 @@ export default function BeforeAfterShowcase() {
   const [cases, setCases] = useState<ComparisonCase[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [splitPercent, setSplitPercent] = useState(52);
+  const [isSwitching, setIsSwitching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,33 +56,50 @@ export default function BeforeAfterShowcase() {
     return cases[Math.min(activeIndex, cases.length - 1)];
   }, [cases, activeIndex]);
 
+  const selectCase = (idx: number) => {
+    if (idx === activeIndex) return;
+    setIsSwitching(true);
+    setActiveIndex(idx);
+    setSplitPercent(52);
+    window.setTimeout(() => setIsSwitching(false), 220);
+  };
+
   if (loading) return null;
 
   if (!active) return null;
 
   return (
-    <section className="py-20 bg-brand-darker border-y border-gray-800">
-      <div className="container mx-auto px-4 md:px-6">
-        <div className="max-w-3xl mb-8">
-          <p className="text-brand-orange text-[11px] font-bold uppercase tracking-[0.22em] mb-3">
-            Interactive Transformation
-          </p>
-          <h2 className="text-white text-3xl md:text-5xl font-display font-black uppercase tracking-tight">
-            Drag To Reveal The Finish
-          </h2>
-          <p className="text-gray-400 text-sm md:text-base mt-4">
-            Slide left and right to compare check-in condition versus final output. Customers can instantly see the craftsmanship.
-          </p>
+    <section className="relative overflow-hidden py-16 md:py-20 border-y border-gray-800 bg-[radial-gradient(circle_at_10%_10%,rgba(243,111,33,0.14),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(255,255,255,0.06),transparent_30%),#0f0f0f] animate-[fadeIn_360ms_ease-out]">
+      <div className="pointer-events-none absolute -top-24 right-0 h-56 w-56 rounded-full bg-brand-orange/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 left-0 h-56 w-56 rounded-full bg-red-500/10 blur-3xl" />
+
+      <div className="container mx-auto px-4 md:px-6 relative z-10">
+        <div className="mb-8 md:mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-brand-orange text-[11px] font-bold uppercase tracking-[0.22em] mb-3">
+              Before & After
+            </p>
+            <h2 className="text-white text-3xl md:text-5xl font-display font-black uppercase tracking-tight leading-[0.95]">
+              Slide To Compare
+            </h2>
+            <p className="text-gray-400 text-sm md:text-base mt-4 max-w-2xl">
+              Drag the divider to view real check-in condition versus final finish on each project.
+            </p>
+          </div>
+
+          <div className="self-start md:self-auto px-3 py-2 rounded-sm border border-gray-700 bg-black/30">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Viewing</p>
+            <p className="text-sm font-semibold text-white">Case {activeIndex + 1} of {cases.length}</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6 items-start">
-          <div className="relative rounded-sm border border-gray-700 overflow-hidden bg-black">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5 md:gap-6 items-start">
+          <div className="rounded-sm border border-gray-700 bg-black/60 backdrop-blur-sm overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.35)] transition-shadow duration-300 hover:shadow-[0_24px_45px_rgba(0,0,0,0.45)]">
             <div className="relative aspect-[16/10] select-none">
               <img
                 src={active.beforeUrl}
                 alt={`${active.title} before`}
-                className="absolute inset-0 w-full h-full object-cover"
-                style={active.synthetic ? { filter: 'grayscale(1) contrast(0.9) brightness(0.7)' } : undefined}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${isSwitching ? 'opacity-0 scale-[1.01]' : 'opacity-100 scale-100'}`}
                 referrerPolicy="no-referrer"
                 draggable={false}
               />
@@ -94,17 +111,17 @@ export default function BeforeAfterShowcase() {
                 <img
                   src={active.afterUrl}
                   alt={`${active.title} after`}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${isSwitching ? 'opacity-0 scale-[1.01]' : 'opacity-100 scale-100'}`}
                   referrerPolicy="no-referrer"
                   draggable={false}
                 />
               </div>
 
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-white/95 shadow-[0_0_20px_rgba(243,111,33,0.6)]"
+                className="absolute top-0 bottom-0 w-0.5 bg-white/95 shadow-[0_0_20px_rgba(243,111,33,0.7)] transition-[left] duration-150"
                 style={{ left: `${splitPercent}%` }}
               >
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-white bg-brand-orange text-white flex items-center justify-center shadow-lg">
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-white bg-brand-orange text-white flex items-center justify-center shadow-lg transition-transform duration-200 hover:scale-110">
                   <MoveHorizontal className="w-4 h-4" />
                 </div>
               </div>
@@ -127,39 +144,82 @@ export default function BeforeAfterShowcase() {
               />
             </div>
 
-            <div className="px-4 py-3 border-t border-gray-800 bg-brand-dark/90">
-              <p className="text-white text-sm font-semibold truncate">{active.title}</p>
-              {active.description && (
-                <p className="text-gray-400 text-xs mt-1 line-clamp-2">{active.description}</p>
-              )}
+            <div className="p-4 md:p-5 border-t border-gray-800 bg-brand-dark/90 space-y-3">
+              <div>
+                <p className="text-white text-sm md:text-base font-semibold leading-tight">{active.title}</p>
+                {active.description && (
+                  <p className="text-gray-400 text-xs md:text-sm mt-1.5 line-clamp-2">{active.description}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-brand-orange rounded-full transition-all duration-150" style={{ width: `${splitPercent}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-gray-500">
+                  <span>More Before</span>
+                  <div className="flex gap-1.5">
+                    {[35, 50, 65].map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setSplitPercent(p)}
+                        className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
+                          splitPercent === p
+                            ? 'border-brand-orange text-brand-orange bg-brand-orange/10'
+                            : 'border-gray-700 text-gray-500 hover:border-gray-500'
+                        }`}
+                      >
+                        {p}%
+                      </button>
+                    ))}
+                  </div>
+                  <span>More After</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            {cases.map((item, idx) => {
-              const selected = idx === activeIndex;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveIndex(idx);
-                    setSplitPercent(52);
-                  }}
-                  className={[
-                    'w-full text-left rounded-sm border px-3 py-3 transition-colors',
-                    selected
-                      ? 'border-brand-orange bg-brand-orange/10'
-                      : 'border-gray-700 bg-brand-dark hover:border-gray-500',
-                  ].join(' ')}
-                >
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-1">
-                    Case {idx + 1}
-                  </p>
-                  <p className="text-sm text-gray-200 line-clamp-2">{item.title}</p>
-                </button>
-              );
-            })}
+          <div className="rounded-sm border border-gray-800 bg-brand-dark/80 p-2 md:p-3">
+            <div className="mb-2 px-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Project Cases</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-1 gap-2">
+              {cases.map((item, idx) => {
+                const selected = idx === activeIndex;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectCase(idx)}
+                    className={[
+                      'group w-full text-left rounded-sm border overflow-hidden transition-all duration-200',
+                      selected
+                        ? 'border-brand-orange bg-brand-orange/10 translate-y-0'
+                        : 'border-gray-700 bg-brand-dark hover:border-gray-500 hover:-translate-y-0.5',
+                    ].join(' ')}
+                  >
+                    <div className="relative h-20 xl:h-16">
+                      <img
+                        src={item.afterUrl}
+                        alt={`${item.title} preview`}
+                        className="h-full w-full object-cover opacity-80 group-hover:opacity-95 transition-opacity"
+                        referrerPolicy="no-referrer"
+                        draggable={false}
+                      />
+                      <span className="absolute left-1.5 top-1.5 px-1.5 py-0.5 rounded-sm text-[9px] font-bold tracking-widest uppercase bg-black/75 border border-gray-700 text-gray-300">
+                        #{idx + 1}
+                      </span>
+                    </div>
+                    <div className="px-2.5 py-2">
+                      <p className={`text-xs font-semibold line-clamp-2 ${selected ? 'text-white' : 'text-gray-200'}`}>
+                        {item.title}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
