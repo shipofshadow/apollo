@@ -817,9 +817,10 @@ class BookingService
 
         // Top 5 most-booked services
         $topServices = $db->query(
-            "SELECT service_name, COUNT(*) AS cnt
-               FROM bookings
-              GROUP BY service_name
+            "SELECT s.title AS service_name, COUNT(*) AS cnt
+               FROM bookings b
+               JOIN services s ON s.id = b.service_id
+              GROUP BY b.service_id, s.title
               ORDER BY cnt DESC
               LIMIT 5"
         )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
