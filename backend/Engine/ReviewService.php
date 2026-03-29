@@ -88,10 +88,11 @@ class ReviewService
     public function getAll(): array
     {
         $stmt = $this->db->query(
-            'SELECT r.*, u.name AS reviewer_name, b.service_name, b.vehicle_info
+            'SELECT r.*, u.name AS reviewer_name, s.title AS service_name, b.vehicle_info
                FROM booking_reviews r
                JOIN users    u ON u.id = r.user_id
                JOIN bookings b ON b.id = r.booking_id
+               LEFT JOIN services s ON s.id = b.service_id
               ORDER BY r.created_at DESC'
         );
         return array_map([$this, 'format'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
