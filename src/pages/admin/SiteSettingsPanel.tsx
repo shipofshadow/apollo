@@ -1437,43 +1437,108 @@ type Tab = 'company' | 'contact' | 'footer' | 'team' | 'testimonials' | 'system'
 export default function SiteSettingsPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('company');
 
-  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: 'company',      label: 'Company Info',    icon: <Settings className="w-4 h-4" /> },
-    { key: 'contact',      label: 'Contact Page',    icon: <MessageSquare className="w-4 h-4" /> },
-    { key: 'footer',       label: 'Footer',          icon: <Layout className="w-4 h-4" /> },
-    { key: 'team',         label: 'Team Members',    icon: <Users className="w-4 h-4" /> },
-    { key: 'testimonials', label: 'Testimonials',    icon: <MessageSquare className="w-4 h-4" /> },
-    { key: 'system',       label: 'System',          icon: <ServerCog className="w-4 h-4" /> },
+  const tabs: { key: Tab; label: string; hint: string; icon: React.ReactNode }[] = [
+    {
+      key: 'company',
+      label: 'Company Info',
+      hint: 'About section and map details',
+      icon: <Settings className="w-4 h-4" />,
+    },
+    {
+      key: 'contact',
+      label: 'Contact Page',
+      hint: 'Contact copy and support channels',
+      icon: <MessageSquare className="w-4 h-4" />,
+    },
+    {
+      key: 'footer',
+      label: 'Footer',
+      hint: 'Global footer links and legal text',
+      icon: <Layout className="w-4 h-4" />,
+    },
+    {
+      key: 'team',
+      label: 'Team Members',
+      hint: 'Staff profiles and showcase ordering',
+      icon: <Users className="w-4 h-4" />,
+    },
+    {
+      key: 'testimonials',
+      label: 'Testimonials',
+      hint: 'Client reviews and social proof',
+      icon: <MessageSquare className="w-4 h-4" />,
+    },
+    {
+      key: 'system',
+      label: 'System',
+      hint: 'Environment checks and migrations',
+      icon: <ServerCog className="w-4 h-4" />,
+    },
   ];
 
+  const activeTabMeta = useMemo(() => tabs.find(tab => tab.key === activeTab), [tabs, activeTab]);
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Site Settings</h2>
-      </div>
-
-      {/* Tab bar - scrollable on mobile */}
-      <div className="overflow-x-auto mb-8 border-b border-gray-800 -mx-4 px-4 md:mx-0 md:px-0">
-        <div className="flex gap-1 min-w-max">
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 -mb-px whitespace-nowrap ${
-                activeTab === t.key
-                  ? 'border-brand-orange text-brand-orange'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}>
-              {t.icon} {t.label}
-            </button>
-          ))}
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-brand-orange/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">Admin Controls</p>
+            <h2 className="mt-1 text-2xl font-display font-bold uppercase tracking-wide text-white">Site Settings</h2>
+            <p className="mt-2 max-w-2xl text-sm text-gray-300">
+              Configure public-facing content, team profiles, testimonials, and operational system settings.
+            </p>
+          </div>
+          <div className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-right">
+            <p className="text-[10px] uppercase tracking-widest text-gray-300">Current Section</p>
+            <p className="text-sm font-semibold text-white">{activeTabMeta?.label ?? 'Company Info'}</p>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {activeTab === 'company'      && <CompanyInfoPanel />}
-      {activeTab === 'contact'      && <ContactPanel />}
-      {activeTab === 'footer'       && <FooterSettingsPanel />}
-      {activeTab === 'team'         && <TeamMembersPanel />}
-      {activeTab === 'testimonials' && <TestimonialsPanel />}
-      {activeTab === 'system'       && <SystemPanel />}
+      <section className="rounded-xl border border-gray-800 bg-brand-dark p-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {tabs.map(t => {
+            const isActive = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={[
+                  'group rounded-lg border px-3 py-3 text-left transition-all',
+                  isActive
+                    ? 'border-brand-orange bg-brand-orange/15 text-white shadow-[0_0_0_1px_rgba(249,115,22,0.25)]'
+                    : 'border-gray-700 text-gray-300 hover:border-brand-orange/70 hover:text-white',
+                ].join(' ')}
+              >
+                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
+                  {t.icon} {t.label}
+                </span>
+                <span className="mt-1 block text-xs text-gray-500 group-hover:text-gray-300">{t.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-800 bg-brand-dark p-4 sm:p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Editing</p>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-white">{activeTabMeta?.label}</h3>
+          </div>
+          <p className="text-xs text-gray-400">{activeTabMeta?.hint}</p>
+        </div>
+
+        {activeTab === 'company'      && <CompanyInfoPanel />}
+        {activeTab === 'contact'      && <ContactPanel />}
+        {activeTab === 'footer'       && <FooterSettingsPanel />}
+        {activeTab === 'team'         && <TeamMembersPanel />}
+        {activeTab === 'testimonials' && <TestimonialsPanel />}
+        {activeTab === 'system'       && <SystemPanel />}
+      </section>
     </div>
   );
 }

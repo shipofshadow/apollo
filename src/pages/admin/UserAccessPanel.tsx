@@ -17,6 +17,7 @@ import {
 import type { ClientAdminSummary, UserRole } from '../../types';
 
 const FALLBACK_ROLES: UserRole[] = ['client', 'staff', 'manager', 'admin'];
+const TABLE_PAGE_SIZE = 8;
 
 const PERMISSION_CATALOG = [
   { key: 'analytics:view', label: 'View Analytics', description: 'Can view dashboard charts and reports.' },
@@ -115,6 +116,9 @@ export default function UserAccessPanel() {
   const [savingRoleId, setSavingRoleId] = useState<number | null>(null);
   const [deletingRoleId, setDeletingRoleId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'role-matrix' | 'roles' | 'users' | 'clients'>('role-matrix');
+  const [rolePage, setRolePage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
+  const [clientsPage, setClientsPage] = useState(1);
 
   const [userSearch, setUserSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
@@ -151,6 +155,25 @@ export default function UserAccessPanel() {
   const sortedRoles = useMemo(() => {
     return [...roles].sort((a, b) => a.name.localeCompare(b.name));
   }, [roles]);
+
+  const roleTotalPages = Math.max(1, Math.ceil(sortedRoles.length / TABLE_PAGE_SIZE));
+  const usersTotalPages = Math.max(1, Math.ceil(sortedUsers.length / TABLE_PAGE_SIZE));
+  const clientsTotalPages = Math.max(1, Math.ceil(clients.length / TABLE_PAGE_SIZE));
+
+  const pagedRoles = useMemo(() => {
+    const start = (rolePage - 1) * TABLE_PAGE_SIZE;
+    return sortedRoles.slice(start, start + TABLE_PAGE_SIZE);
+  }, [sortedRoles, rolePage]);
+
+  const pagedUsers = useMemo(() => {
+    const start = (usersPage - 1) * TABLE_PAGE_SIZE;
+    return sortedUsers.slice(start, start + TABLE_PAGE_SIZE);
+  }, [sortedUsers, usersPage]);
+
+  const pagedClients = useMemo(() => {
+    const start = (clientsPage - 1) * TABLE_PAGE_SIZE;
+    return clients.slice(start, start + TABLE_PAGE_SIZE);
+  }, [clients, clientsPage]);
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ key: 'role-matrix' | 'roles' | 'users' | 'clients'; label: string }> = [
@@ -242,6 +265,18 @@ export default function UserAccessPanel() {
     if (visibleTabs.some(tab => tab.key === activeTab)) return;
     setActiveTab(visibleTabs[0]?.key ?? 'role-matrix');
   }, [visibleTabs, activeTab]);
+
+  useEffect(() => {
+    setRolePage(prev => Math.min(prev, roleTotalPages));
+  }, [roleTotalPages]);
+
+  useEffect(() => {
+    setUsersPage(prev => Math.min(prev, usersTotalPages));
+  }, [usersTotalPages]);
+
+  useEffect(() => {
+    setClientsPage(prev => Math.min(prev, clientsTotalPages));
+  }, [clientsTotalPages]);
 
   const requestConfirmation = (config: ConfirmDialogState) => {
     setConfirmDialog(config);
@@ -442,12 +477,72 @@ export default function UserAccessPanel() {
     });
   };
 
+  const renderPager = (
+    page: number,
+    totalPages: number,
+    totalItems: number,
+    onPageChange: (next: number) => void,
+  ) => {
+    const from = totalItems === 0 ? 0 : (page - 1) * TABLE_PAGE_SIZE + 1;
+    const to = Math.min(page * TABLE_PAGE_SIZE, totalItems);
+
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-800 px-3 py-2">
+        <p className="text-xs text-gray-400">
+          Showing {from}-{to} of {totalItems}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="rounded-sm border border-gray-700 px-2 py-1 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-brand-orange hover:text-white disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <p className="text-xs text-gray-400">
+            Page {page} of {totalPages}
+          </p>
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+            disabled={page >= totalPages}
+            className="rounded-sm border border-gray-700 px-2 py-1 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-brand-orange hover:text-white disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">User Access</h2>
+      <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand-orange/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
+        <div className="relative space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">Admin Controls</p>
+              <h2 className="mt-1 text-2xl font-display font-bold uppercase tracking-wide text-white">User Access</h2>
+              <p className="mt-1 max-w-2xl text-sm text-gray-300">
+                Manage user accounts, role permissions, and client directory visibility from one control center.
+              </p>
+            </div>
+            <div className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-right">
+              <p className="text-[10px] uppercase tracking-widest text-gray-300">Active View</p>
+              <p className="text-sm font-semibold text-white">
+                {visibleTabs.find(tab => tab.key === activeTab)?.label ?? 'Role Matrix'}
+              </p>
+            </div>
+          </div>
 
-      <section className="bg-brand-dark border border-gray-800 rounded-sm p-3">
-        <div className="flex flex-wrap gap-2">
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-800 bg-brand-dark p-3">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           {visibleTabs.map(tab => {
             const isActive = activeTab === tab.key;
             return (
@@ -456,13 +551,13 @@ export default function UserAccessPanel() {
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={[
-                  'px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest transition-colors',
+                  'group rounded-lg border px-3 py-3 text-left transition-all',
                   isActive
-                    ? 'bg-brand-orange text-white'
-                    : 'border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white',
+                    ? 'border-brand-orange bg-brand-orange/15 text-white shadow-[0_0_0_1px_rgba(249,115,22,0.25)]'
+                    : 'border-gray-700 text-gray-300 hover:border-brand-orange/70 hover:text-white',
                 ].join(' ')}
               >
-                {tab.label}
+                <span className="block text-[11px] font-bold uppercase tracking-widest">{tab.label}</span>
               </button>
             );
           })}
@@ -470,23 +565,25 @@ export default function UserAccessPanel() {
       </section>
 
       {activeTab === 'role-matrix' && (
-      <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+      <section className="rounded-xl border border-gray-800 bg-brand-dark p-5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5" /> Role Access Matrix
         </p>
         {loadingRoles ? (
           <div className="py-8 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-orange" /></div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {sortedRoles.map(role => (
-              <article key={role.id} className="border border-gray-800 rounded-sm p-3 bg-brand-darker/70">
+              <article key={role.id} className="rounded-lg border border-gray-800 bg-brand-darker/70 p-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-1">{role.name}</p>
                 <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">{role.key}</p>
-                <p className="text-xs text-gray-400 mb-2">{role.description || 'No description.'}</p>
-                <ul className="space-y-1 text-xs text-gray-400">
+                <p className="text-xs text-gray-400 mb-3 min-h-[2.5rem]">{role.description || 'No description.'}</p>
+                <ul className="space-y-1.5 text-xs text-gray-300">
                   {role.permissions.length > 0 ? role.permissions.map(item => (
-                    <li key={item}>- {stringifyPermissionLabel(item)}</li>
-                  )) : <li>- No permissions listed</li>}
+                    <li key={item} className="rounded border border-gray-800 bg-brand-dark/70 px-2 py-1">
+                      {stringifyPermissionLabel(item)}
+                    </li>
+                  )) : <li className="text-gray-500">No permissions listed</li>}
                 </ul>
               </article>
             ))}
@@ -496,7 +593,7 @@ export default function UserAccessPanel() {
       )}
 
       {canManageUsers && activeTab === 'roles' && (
-        <section className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
+        <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5" /> Manage Roles
           </p>
@@ -546,11 +643,11 @@ export default function UserAccessPanel() {
             </div>
           </form>
 
-          <div className="border border-gray-800 rounded-sm p-3 bg-brand-darker/50">
+          <div className="border border-gray-800 rounded-lg p-3 bg-brand-darker/50">
             <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">Choose Access</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {PERMISSION_CATALOG.map(item => (
-                <label key={item.key} className="flex items-start gap-2 p-2 rounded-sm border border-gray-800 hover:border-gray-700 cursor-pointer">
+                <label key={item.key} className="flex items-start gap-2 p-2 rounded-md border border-gray-800 hover:border-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={hasPermissionInRaw(newRole.permissions, item.key)}
@@ -566,7 +663,7 @@ export default function UserAccessPanel() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border border-gray-800">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="text-gray-500 text-[11px] uppercase tracking-widest border-b border-gray-800">
@@ -578,7 +675,7 @@ export default function UserAccessPanel() {
                 </tr>
               </thead>
               <tbody>
-                {sortedRoles.map(role => {
+                {pagedRoles.map(role => {
                   const draft = roleEdits[role.id] ?? {
                     key: role.key,
                     name: role.name,
@@ -706,12 +803,13 @@ export default function UserAccessPanel() {
                 })}
               </tbody>
             </table>
+            {renderPager(rolePage, roleTotalPages, sortedRoles.length, setRolePage)}
           </div>
         </section>
       )}
 
       {canManageUsers && activeTab === 'users' && (
-        <section className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
+        <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
             <UserPlus className="w-3.5 h-3.5" /> Create User Account
           </p>
@@ -770,7 +868,7 @@ export default function UserAccessPanel() {
       )}
 
       {canManageUsers && activeTab === 'users' && (
-        <section className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
+        <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" /> Manage Users
@@ -784,7 +882,10 @@ export default function UserAccessPanel() {
               />
               <button
                 type="button"
-                onClick={() => void loadUsers()}
+                onClick={() => {
+                  setUsersPage(1);
+                  void loadUsers();
+                }}
                 className="px-3 py-2 rounded-sm border border-gray-700 text-gray-300 text-xs font-bold uppercase tracking-widest hover:border-brand-orange hover:text-white"
               >
                 Search
@@ -795,7 +896,7 @@ export default function UserAccessPanel() {
           {loadingUsers ? (
             <div className="py-10 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-orange" /></div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border border-gray-800">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="text-gray-500 text-[11px] uppercase tracking-widest border-b border-gray-800">
@@ -806,7 +907,7 @@ export default function UserAccessPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedUsers.map(item => (
+                  {pagedUsers.map(item => (
                     <tr key={item.id} className="border-b border-gray-800/70">
                       <td className="py-2.5 pr-4 text-white font-medium">{item.name}</td>
                       <td className="py-2.5 pr-4 text-gray-300">{item.email}</td>
@@ -827,13 +928,14 @@ export default function UserAccessPanel() {
                   ))}
                 </tbody>
               </table>
+              {renderPager(usersPage, usersTotalPages, sortedUsers.length, setUsersPage)}
             </div>
           )}
         </section>
       )}
 
       {activeTab === 'clients' && (
-      <section className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
+      <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" /> Manage Clients
@@ -847,7 +949,10 @@ export default function UserAccessPanel() {
             />
             <button
               type="button"
-              onClick={() => void loadClients()}
+              onClick={() => {
+                setClientsPage(1);
+                void loadClients();
+              }}
               className="px-3 py-2 rounded-sm border border-gray-700 text-gray-300 text-xs font-bold uppercase tracking-widest hover:border-brand-orange hover:text-white"
             >
               Search
@@ -858,7 +963,7 @@ export default function UserAccessPanel() {
         {loadingClients ? (
           <div className="py-10 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-orange" /></div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border border-gray-800">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="text-gray-500 text-[11px] uppercase tracking-widest border-b border-gray-800">
@@ -870,7 +975,7 @@ export default function UserAccessPanel() {
                 </tr>
               </thead>
               <tbody>
-                {clients.map(item => (
+                {pagedClients.map(item => (
                   <tr key={item.id} className="border-b border-gray-800/70">
                     <td className="py-2.5 pr-4 text-white font-medium">{item.name}</td>
                     <td className="py-2.5 pr-4 text-gray-300">{item.email}</td>
@@ -883,6 +988,7 @@ export default function UserAccessPanel() {
                 ))}
               </tbody>
             </table>
+            {renderPager(clientsPage, clientsTotalPages, clients.length, setClientsPage)}
           </div>
         )}
       </section>
