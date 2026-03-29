@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate, AppNotification } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -211,6 +211,16 @@ export const updateBookingStatusApi = (
     body: JSON.stringify({ status }),
   }, token);
 
+export const assignBookingTechnicianApi = (
+  token: string,
+  id: string,
+  assignedTechId: number | null
+) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${id}/assign-tech`, {
+    method: 'PATCH',
+    body: JSON.stringify({ assignedTechId }),
+  }, token);
+
 export const cancelMyBookingApi = (token: string, id: string) =>
   apiFetch<{ booking: Booking }>(`/api/bookings/${id}/cancel`, {
     method: 'PATCH',
@@ -246,6 +256,13 @@ export const adminRescheduleBookingApi = (
 export const fetchBuildUpdatesApi = (token: string, bookingId: string) =>
   apiFetch<{ updates: BuildUpdate[] }>(
     `/api/bookings/${encodeURIComponent(bookingId)}/build-updates`,
+    {},
+    token
+  );
+
+export const fetchBookingActivityApi = (token: string, bookingId: string) =>
+  apiFetch<{ logs: BookingActivityLog[] }>(
+    `/api/bookings/${encodeURIComponent(bookingId)}/activity`,
     {},
     token
   );
@@ -500,6 +517,7 @@ export interface AdminStats {
   todayBookings: number;
   todayPending: number;
   topServices: { name: string; count: number }[];
+  peakHours: { time: string; count: number }[];
   reviewCount: number;
   avgRating: number;
 }
@@ -821,3 +839,50 @@ export const updateInternalNotesApi = (token: string, bookingId: string, interna
 
 export const fetchCustomerStatsApi = (token: string, userId: number) =>
   apiFetch<{ stats: CustomerStats }>(`/api/customers/${userId}/stats`, {}, token);
+
+// ── Client Garage API ───────────────────────────────────────────────────────
+
+export const fetchMyVehiclesApi = (token: string) =>
+  apiFetch<{ vehicles: ClientVehicle[] }>('/api/client/vehicles', {}, token);
+
+export const createMyVehicleApi = (
+  token: string,
+  data: Pick<ClientVehicle, 'make' | 'model' | 'year'> & { imageUrl?: string; vin?: string; licensePlate?: string }
+) =>
+  apiFetch<{ vehicle: ClientVehicle }>('/api/client/vehicles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateMyVehicleApi = (
+  token: string,
+  id: number,
+  data: Pick<ClientVehicle, 'make' | 'model' | 'year'> & { imageUrl?: string; vin?: string; licensePlate?: string }
+) =>
+  apiFetch<{ vehicle: ClientVehicle }>(`/api/client/vehicles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const uploadMyVehicleImageApi = async (token: string, file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/client/vehicles/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch {
+    throw new Error('Unable to reach the backend server.');
+  }
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  return (data as { url: string }).url;
+};
+
+export const deleteMyVehicleApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/client/vehicles/${id}`, { method: 'DELETE' }, token);

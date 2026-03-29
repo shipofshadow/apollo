@@ -6,6 +6,7 @@ import {
   FileText, CheckCircle2, XCircle, Loader2, AlertCircle,
   Edit3, ChevronDown, ChevronUp, Image as ImageIcon,
   Package, BadgeCheck, ChevronLeft, ChevronRight, Camera, Printer,
+  Wrench,
 } from 'lucide-react';
 import {
   fetchBookingByIdAsync,
@@ -488,7 +489,7 @@ export default function BookingDetail() {
                       isActive    ? 'bg-brand-orange/20 border-brand-orange' :
                                     'bg-brand-darker border-gray-700'
                     }`}>
-                      <Icon className={`w-3.5 h-3.5 ${isCompleted || isActive ? 'text-brand-orange' : 'text-gray-600'}`} />
+                      <Icon className={`w-3.5 h-3.5 ${isCompleted ? 'text-white' : isActive ? 'text-brand-orange' : 'text-gray-600'}`} />
                     </div>
                     <span className={`text-[9px] font-bold uppercase tracking-widest mt-1.5 text-center leading-tight ${
                       isCompleted || isActive ? 'text-gray-300' : 'text-gray-600'
@@ -571,6 +572,22 @@ export default function BookingDetail() {
               <p className="text-white text-sm font-semibold">{booking.serviceName}</p>
             </div>
           </div>
+
+          {/* Assigned mechanic */}
+          {booking.assignedTech && (
+            <div className="flex items-start gap-3 sm:col-span-2">
+              <div className="w-8 h-8 bg-brand-darker border border-gray-700 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
+                <Wrench className="w-4 h-4 text-brand-orange" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Assigned Mechanic</p>
+                <p className="text-white text-sm font-semibold">{booking.assignedTech.name}</p>
+                {booking.assignedTech.role && (
+                  <p className="text-gray-500 text-xs mt-0.5">{booking.assignedTech.role}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Notes */}

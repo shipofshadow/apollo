@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Calendar, User, LogOut, ArrowLeft,
+  LayoutDashboard, Calendar, User, LogOut, ArrowLeft, Car,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.png';
@@ -9,6 +9,7 @@ import NotificationBell from '../../components/NotificationBell';
 const navItems = [
   { label: 'Dashboard',   href: '/client/dashboard', icon: LayoutDashboard },
   { label: 'My Bookings', href: '/client/bookings',  icon: Calendar },
+  { label: 'My Garage',   href: '/client/garage',    icon: Car },
   { label: 'Profile',     href: '/client/profile',   icon: User },
 ];
 

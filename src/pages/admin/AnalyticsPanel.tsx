@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3, Activity, TrendingUp, Calendar, CheckCircle2,
+  Activity, TrendingUp, Calendar, CheckCircle2,
   AlertCircle, Loader2, Sun, Star, Wrench,
 } from 'lucide-react';
+import ReactApexChart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import { fetchAdminStatsApi, type AdminStats } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -40,17 +42,142 @@ export default function AnalyticsPanel() {
     { label: 'New This Month',  value: stats?.bookingsThisMonth ?? 0, icon: TrendingUp,   color: 'text-brand-orange'  },
   ];
 
-  const statusRows = [
-    { label: 'Pending',   value: stats?.pendingBookings   ?? 0, color: 'text-yellow-400' },
-    { label: 'Confirmed', value: stats?.confirmedBookings ?? 0, color: 'text-green-400'  },
-    { label: 'Completed', value: stats?.completedBookings ?? 0, color: 'text-blue-400'   },
-    { label: 'Cancelled', value: stats?.cancelledBookings ?? 0, color: 'text-gray-400'   },
-  ];
-
   const topServices  = stats?.topServices  ?? [];
-  const maxSvcCount  = topServices[0]?.count ?? 1;
+  const peakHours    = stats?.peakHours    ?? [];
   const avgRating    = stats?.avgRating ?? 0;
   const reviewCount  = stats?.reviewCount ?? 0;
+
+  const statusRows = [
+    { label: 'Pending',   value: stats?.pendingBookings   ?? 0 },
+    { label: 'Confirmed', value: stats?.confirmedBookings ?? 0 },
+    { label: 'Completed', value: stats?.completedBookings ?? 0 },
+    { label: 'Cancelled', value: stats?.cancelledBookings ?? 0 },
+  ];
+
+  const commonAxisLabelStyle = {
+    colors: '#9ca3af',
+    fontSize: '12px',
+    fontFamily: 'inherit',
+  };
+
+  const peakHourOptions: ApexOptions = {
+    chart: {
+      type: 'area',
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      foreColor: '#9ca3af',
+    },
+    colors: ['#f97316'],
+    stroke: { curve: 'smooth', width: 3 },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 0.2,
+        opacityFrom: 0.45,
+        opacityTo: 0.05,
+        stops: [0, 95, 100],
+      },
+    },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories: peakHours.map(hour => hour.time),
+      labels: { style: commonAxisLabelStyle },
+    },
+    yaxis: {
+      min: 0,
+      forceNiceScale: true,
+      labels: { style: commonAxisLabelStyle },
+    },
+    grid: {
+      borderColor: '#1f2937',
+      strokeDashArray: 4,
+    },
+    tooltip: { theme: 'dark' },
+    markers: { size: 4, strokeWidth: 0 },
+  };
+
+  const peakHourSeries = [
+    {
+      name: 'Bookings',
+      data: peakHours.map(hour => hour.count),
+    },
+  ];
+
+  const serviceOptions: ApexOptions = {
+    chart: {
+      type: 'bar',
+      toolbar: { show: false },
+      foreColor: '#9ca3af',
+    },
+    colors: ['#f97316'],
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        borderRadius: 4,
+        barHeight: '60%',
+      },
+    },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories: topServices.map(service => service.name),
+      labels: { style: commonAxisLabelStyle },
+    },
+    yaxis: {
+      labels: {
+        style: commonAxisLabelStyle,
+        maxWidth: 260,
+      },
+    },
+    grid: {
+      borderColor: '#1f2937',
+      strokeDashArray: 4,
+    },
+    tooltip: { theme: 'dark' },
+  };
+
+  const serviceSeries = [
+    {
+      name: 'Bookings',
+      data: topServices.map(service => service.count),
+    },
+  ];
+
+  const statusDonutOptions: ApexOptions = {
+    chart: {
+      type: 'donut',
+      foreColor: '#d1d5db',
+    },
+    labels: statusRows.map(row => row.label),
+    colors: ['#fbbf24', '#22c55e', '#3b82f6', '#6b7280'],
+    legend: {
+      position: 'bottom',
+      labels: { colors: '#9ca3af' },
+    },
+    dataLabels: {
+      enabled: false,
+    },
+    stroke: { width: 0 },
+    tooltip: { theme: 'dark' },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '62%',
+          labels: {
+            show: true,
+            value: { color: '#ffffff', fontSize: '20px', fontWeight: 700 },
+            total: {
+              show: true,
+              label: 'Total',
+              color: '#9ca3af',
+              formatter: () => String(stats?.totalBookings ?? 0),
+            },
+          },
+        },
+      },
+    },
+  };
+
+  const statusDonutSeries = statusRows.map(row => row.value);
 
   return (
     <div className="space-y-6">
@@ -108,49 +235,78 @@ export default function AnalyticsPanel() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Bookings by status */}
         <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-800">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
-              <BarChart3 className="w-3.5 h-3.5" /> Bookings by Status
-            </h3>
+          <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Peak Booking Hours</h3>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Top time slots</span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-800">
-            {statusRows.map(({ label, value, color }) => (
-              <div key={label} className="p-5 text-center">
-                <p className={`text-2xl font-display font-bold ${color}`}>{value}</p>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mt-1">{label}</p>
+          <div className="px-3 pt-4 pb-2 min-h-[300px]">
+            {peakHours.length > 0 ? (
+              <ReactApexChart
+                type="area"
+                height={280}
+                series={peakHourSeries}
+                options={peakHourOptions}
+              />
+            ) : (
+              <div className="h-[280px] grid place-items-center text-sm text-gray-500">
+                Not enough booking data to plot peak hours yet.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+              <Wrench className="w-3.5 h-3.5" /> Popular Services
+            </h3>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">By booking count</span>
+          </div>
+          <div className="px-3 pt-4 pb-2 min-h-[300px]">
+            {topServices.length > 0 ? (
+              <ReactApexChart
+                type="bar"
+                height={280}
+                series={serviceSeries}
+                options={serviceOptions}
+              />
+            ) : (
+              <div className="h-[280px] grid place-items-center text-sm text-gray-500">
+                Popular services will appear after bookings are recorded.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Bookings by Status</h3>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Distribution</span>
+        </div>
+        <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-5 items-center">
+          <div className="lg:col-span-2">
+            <ReactApexChart
+              type="donut"
+              height={310}
+              series={statusDonutSeries}
+              options={statusDonutOptions}
+            />
+          </div>
+
+          <div className="space-y-2">
+            {statusRows.map(row => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between border border-gray-800 bg-black/20 rounded-sm px-3 py-2"
+              >
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{row.label}</span>
+                <span className="text-lg font-display font-bold text-white">{row.value}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Top services */}
-        {topServices.length > 0 && (
-          <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-800">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
-                <Wrench className="w-3.5 h-3.5" /> Top Services
-              </h3>
-            </div>
-            <div className="p-4 space-y-3">
-              {topServices.map(svc => (
-                <div key={svc.name}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-300 font-medium truncate">{svc.name}</span>
-                    <span className="text-gray-500 shrink-0 ml-2">{svc.count}</span>
-                  </div>
-                  <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-brand-orange rounded-full transition-all"
-                      style={{ width: `${Math.round((svc.count / maxSvcCount) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

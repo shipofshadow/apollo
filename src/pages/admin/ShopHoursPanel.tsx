@@ -83,7 +83,7 @@ export default function ShopHoursPanel() {
   );
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full max-w-6xl">
       <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide flex items-center gap-3">
         <Clock className="w-6 h-6 text-brand-orange" />
         Shop Hours

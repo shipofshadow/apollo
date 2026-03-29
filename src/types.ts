@@ -31,6 +31,8 @@ export interface ServiceVariation {
   price: string;
   images: string[];
   specs: ServiceVariationSpec[];
+  colors?: string[];
+  colorImages?: Record<string, string[]>;
   sortOrder: number;
 }
 
@@ -88,6 +90,19 @@ export interface BookingState {
   appointments: Booking[];
 }
 
+export interface ClientVehicle {
+  id: number;
+  userId: number;
+  make: string;
+  model: string;
+  year: string;
+  imageUrl?: string | null;
+  vin?: string | null;
+  licensePlate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ServiceItem {
   id: string;
   title: string;
@@ -138,6 +153,8 @@ export interface PortfolioCategoryState {
 export interface Booking {
   id: string;
   userId?: number | null;
+  assignedTechId?: number | null;
+  assignedTech?: AssignedTechnician | null;
   name: string;
   email: string;
   phone: string;
@@ -165,6 +182,13 @@ export interface Booking {
   createdAt: string;
 }
 
+export interface AssignedTechnician {
+  id: number;
+  name: string;
+  role: string;
+  imageUrl?: string | null;
+}
+
 export interface ProductVariationSpec {
   label: string;
   value: string;
@@ -178,6 +202,8 @@ export interface ProductVariation {
   price: string;
   images: string[];
   specs: ProductVariationSpec[];
+  colors?: string[];
+  colorImages?: Record<string, string[]>;
   sortOrder: number;
 }
 
@@ -371,8 +397,21 @@ export interface OfferState {
 export interface BuildUpdate {
   id: number;
   bookingId: string;
+  assignedTechId?: number | null;
+  assignedTech?: AssignedTechnician | null;
   note: string;
   photoUrls: string[];
+  createdAt: string;
+}
+
+export interface BookingActivityLog {
+  id: number;
+  bookingId: string;
+  actorUserId: number | null;
+  actorRole: 'system' | 'admin' | 'client';
+  eventType: string;
+  action: string;
+  detail: string | null;
   createdAt: string;
 }
 

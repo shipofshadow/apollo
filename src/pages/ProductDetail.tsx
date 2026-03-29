@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import VariationGallery from '../components/VariationGallery';
@@ -12,6 +12,8 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useDispatch<AppDispatch>();
   const { items: products, status } = useSelector((s: RootState) => s.products);
+  const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -19,15 +21,30 @@ export default function ProductDetail() {
     }
   }, [dispatch, status]);
 
+  const product = products.find(p => p.id === Number(id));
+
+  useEffect(() => {
+    if (!product?.variations?.length) {
+      setSelectedVariationId(null);
+      setSelectedColor(null);
+      return;
+    }
+    setSelectedVariationId(prev => {
+      if (prev && product.variations.some(v => v.id === prev)) {
+        return prev;
+      }
+      return product.variations[0].id;
+    });
+    setSelectedColor(null);
+  }, [product]);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-brand-darker pt-32 pb-24 flex items-center justify-center">
-        <div className="text-center text-gray-400">Loading…</div>
+        <Loader2 className="w-12 h-12 text-brand-orange animate-spin" />
       </div>
     );
   }
-
-  const product = products.find(p => p.id === Number(id));
 
   if (!product) {
     return (
@@ -43,9 +60,19 @@ export default function ProductDetail() {
   }
 
   const hasVariations = product.variations && product.variations.length > 0;
+  const selectedVariation = hasVariations
+    ? product.variations.find(v => v.id === selectedVariationId) ?? product.variations[0]
+    : null;
+
+  const handleVariationChange = useCallback((variation: { id: number }) => {
+    setSelectedVariationId(variation.id);
+    setSelectedColor(null);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-brand-darker pb-20">
+    <div className="min-h-screen bg-brand-darker pb-20 relative overflow-hidden">
+      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 bg-brand-orange/10 blur-3xl" />
+      <div className="pointer-events-none absolute top-[38rem] -left-24 w-72 h-72 bg-white/[0.04] blur-3xl" />
 
       {/* ── Hero Strip ──────────────────────────────────────────────────────── */}
       <div className="relative h-[460px] md:h-[540px] overflow-hidden">
@@ -103,8 +130,8 @@ export default function ProductDetail() {
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div className="container mx-auto px-4 md:px-8 pt-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="container mx-auto px-4 md:px-8 pt-10 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
 
           {/* ── Left 2/3 — variation gallery ──────────────────────────────── */}
           <div className="lg:col-span-2">
@@ -117,7 +144,14 @@ export default function ProductDetail() {
                   </h2>
                   <div className="flex-1 h-px bg-white/[0.07]" />
                 </div>
-                <VariationGallery variations={product.variations} />
+                <div className="rounded-sm border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent p-4 md:p-5">
+                  <VariationGallery
+                    variations={product.variations}
+                    selectedColor={selectedColor}
+                    onSelectColor={setSelectedColor}
+                    onVariationChange={handleVariationChange}
+                  />
+                </div>
               </>
             )}
             {!hasVariations && product.imageUrl && (
@@ -137,9 +171,9 @@ export default function ProductDetail() {
           <div className="lg:sticky lg:top-24 lg:self-start flex flex-col gap-4">
 
             {/* CTA card — gradient with orange border glow */}
-            <div className="bg-gradient-to-br from-[#1a0d00] to-brand-darker border border-brand-orange/20 rounded-sm p-6 text-center animate-fadeInUp">
+            <div className="bg-gradient-to-br from-[#1a0d00] via-brand-darker to-[#0f1215] border border-brand-orange/25 rounded-sm p-6 text-center animate-fadeInUp shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
               <div className="text-4xl font-display font-black text-brand-orange leading-none">
-                {formatPrice(product.price)}
+                {selectedVariation?.price ? formatPrice(selectedVariation.price) : formatPrice(product.price)}
               </div>
               <div className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-[0.12em] mt-1 mb-5">
                 Price
@@ -151,20 +185,27 @@ export default function ProductDetail() {
                 Inquire Now
               </Link>
               <p className="text-gray-600 text-[0.7rem]">Free consultation · No hidden fees</p>
+              {selectedVariation?.name && (
+                <p className="text-[0.65rem] text-gray-500 uppercase tracking-[0.12em] mt-2">
+                  Selected: {selectedVariation.name}
+                </p>
+              )}
             </div>
 
             {/* Description — left orange border */}
-            <p className="text-gray-400 text-sm leading-[1.85] border-l-2 border-brand-orange pl-4 animate-fadeInUp animate-delay-100">
-              {product.description}
-            </p>
+            <div className="border border-white/[0.08] bg-black/20 rounded-sm p-4 animate-fadeInUp animate-delay-100">
+              <p className="text-gray-400 text-sm leading-[1.85] border-l-2 border-brand-orange pl-4">
+                {product.description}
+              </p>
+            </div>
 
             {/* Features — row list with icon boxes */}
             {product.features && product.features.length > 0 && (
-              <div className="border border-white/[0.07] rounded-sm overflow-hidden animate-fadeInUp animate-delay-200">
+              <div className="border border-white/[0.08] bg-black/20 rounded-sm overflow-hidden animate-fadeInUp animate-delay-200">
                 {product.features.map((feature, index) => (
                   <div
                     key={index}
-                    className="flex items-start gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 hover:bg-white/[0.02] transition-colors"
+                    className="flex items-start gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 hover:bg-white/[0.03] transition-colors"
                   >
                     <span className="w-6 h-6 bg-brand-orange/10 border border-brand-orange/20 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3 h-3 text-brand-orange" />

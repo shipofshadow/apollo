@@ -231,7 +231,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex relative">
         {/* Mobile overlay */}
         {mobileOpen && (
           <div
@@ -242,12 +242,12 @@ export default function AdminPage() {
 
         {/* Sidebar */}
         <aside className={`
-          absolute md:relative inset-y-0 left-0 z-30 md:z-auto
+          absolute md:relative top-0 bottom-0 md:top-auto md:bottom-auto left-0 z-30 md:z-auto
           flex flex-col bg-brand-dark border-r border-gray-800 flex-shrink-0
           transition-all duration-300 ease-in-out
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           ${collapsed ? 'md:w-16' : 'md:w-60'}
-          w-64 h-full
+          w-64 h-full md:h-auto
         `}>
           {/* User card */}
           <div className={`border-b border-gray-800 ${collapsed ? 'p-3' : 'p-4 md:p-5'}`}>
@@ -267,7 +267,7 @@ export default function AdminPage() {
           </div>
 
           {/* Nav */}
-          <nav className={`${collapsed ? 'p-2' : 'p-2 md:p-3'} space-y-1 flex-grow overflow-y-auto scrollbar-hide`}>
+          <nav className={`${collapsed ? 'p-2' : 'p-2 md:p-3'} space-y-1 flex-grow`}>
             {navItems.map((item) => {
               if (item.isGroup && item.children) {
                 const isOpen = openGroups[item.key];
@@ -367,7 +367,7 @@ export default function AdminPage() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 min-w-0">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 min-w-0">
           {renderContent()}
         </main>
       </div>

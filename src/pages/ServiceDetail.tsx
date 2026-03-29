@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
@@ -12,6 +12,8 @@ export default function ServiceDetail() {
   const { slug }  = useParams<{ slug: string }>();
   const dispatch  = useDispatch<AppDispatch>();
   const { token } = useSelector((s: RootState) => s.auth);
+  const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
   const service = useSelector((s: RootState) =>
     s.services.items.find(sv => sv.slug === slug)
@@ -23,6 +25,22 @@ export default function ServiceDetail() {
       dispatch(fetchServiceBySlugAsync({ slug, token }));
     }
   }, [slug, service, token, dispatch]);
+
+  useEffect(() => {
+    if (!service?.variations?.length) {
+      setSelectedVariationId(null);
+      setSelectedColor(null);
+      return;
+    }
+
+    setSelectedVariationId(prev => {
+      if (prev && service.variations.some(v => v.id === prev)) {
+        return prev;
+      }
+      return service.variations[0].id;
+    });
+    setSelectedColor(null);
+  }, [service]);
 
   if (loadStatus === 'loading' && !service) {
     return (
@@ -44,9 +62,19 @@ export default function ServiceDetail() {
   }
 
   const hasVariations = service.variations && service.variations.length > 0;
+  const selectedVariation = hasVariations
+    ? service.variations.find(v => v.id === selectedVariationId) ?? service.variations[0]
+    : null;
+
+  const handleVariationChange = useCallback((variation: { id: number }) => {
+    setSelectedVariationId(variation.id);
+    setSelectedColor(null);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-brand-darker pb-20">
+    <div className="min-h-screen bg-brand-darker pb-20 relative overflow-hidden">
+      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 bg-brand-orange/10 blur-3xl" />
+      <div className="pointer-events-none absolute top-[38rem] -left-24 w-72 h-72 bg-white/[0.04] blur-3xl" />
 
       {/* ── Hero Strip ──────────────────────────────────────────────────────── */}
       <div className="relative h-[460px] md:h-[540px] overflow-hidden">
@@ -114,8 +142,8 @@ export default function ServiceDetail() {
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div className="container mx-auto px-4 md:px-8 pt-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="container mx-auto px-4 md:px-8 pt-10 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
 
           {/* ── Left 2/3 — variation gallery ──────────────────────────────── */}
           <div className="lg:col-span-2">
@@ -128,7 +156,14 @@ export default function ServiceDetail() {
                   </h2>
                   <div className="flex-1 h-px bg-white/[0.07]" />
                 </div>
-                <VariationGallery variations={service.variations} />
+                <div className="rounded-sm border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent p-4 md:p-5">
+                  <VariationGallery
+                    variations={service.variations}
+                    selectedColor={selectedColor}
+                    onSelectColor={setSelectedColor}
+                    onVariationChange={handleVariationChange}
+                  />
+                </div>
               </>
             )}
             {!hasVariations && service.imageUrl && (
@@ -147,7 +182,7 @@ export default function ServiceDetail() {
           <div className="lg:sticky lg:top-24 lg:self-start flex flex-col gap-4">
 
             {/* CTA card — gradient with orange border glow */}
-            <div className="bg-gradient-to-br from-[#1a0d00] to-brand-darker border border-brand-orange/20 rounded-sm p-6 text-center animate-fadeInUp">
+            <div className="bg-gradient-to-br from-[#1a0d00] via-brand-darker to-[#0f1215] border border-brand-orange/25 rounded-sm p-6 text-center animate-fadeInUp shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
               {service.startingPrice && (
                 <>
                   <div className="text-4xl font-display font-black text-brand-orange leading-none">
@@ -160,12 +195,21 @@ export default function ServiceDetail() {
               )}
               <Link
                 to="/booking"
-                state={{ serviceId: service.id }}
+                state={{
+                  serviceId: service.id,
+                  variationId: selectedVariation?.id,
+                  selectedColor: selectedColor ?? undefined,
+                }}
                 className="block w-full bg-brand-orange hover:bg-orange-500 text-white font-display font-bold uppercase tracking-widest text-sm px-5 py-3 rounded-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(243,111,33,0.4)] mb-3"
               >
                 Book This Service
               </Link>
               <p className="text-gray-600 text-[0.7rem]">Free consultation · No hidden fees</p>
+              {selectedVariation?.name && (
+                <p className="text-[0.65rem] text-gray-500 uppercase tracking-[0.12em] mt-2">
+                  Selected: {selectedVariation.name}
+                </p>
+              )}
               {service.duration && (
                 <div className="mt-4 pt-4 border-t border-white/[0.07]">
                   <span className="bg-brand-gray/40 border border-white/[0.07] text-gray-400 font-bold px-3 py-1.5 rounded-sm text-[0.65rem] uppercase tracking-widest">
@@ -176,17 +220,19 @@ export default function ServiceDetail() {
             </div>
 
             {/* Description — left orange border */}
-            <p className="text-gray-400 text-sm leading-[1.85] border-l-2 border-brand-orange pl-4 animate-fadeInUp animate-delay-100">
-              {service.fullDescription || service.description}
-            </p>
+            <div className="border border-white/[0.08] bg-black/20 rounded-sm p-4 animate-fadeInUp animate-delay-100">
+              <p className="text-gray-400 text-sm leading-[1.85] border-l-2 border-brand-orange pl-4">
+                {service.fullDescription || service.description}
+              </p>
+            </div>
 
             {/* Features — row list with icon boxes */}
             {service.features.length > 0 && (
-              <div className="border border-white/[0.07] rounded-sm overflow-hidden animate-fadeInUp animate-delay-200">
+              <div className="border border-white/[0.08] bg-black/20 rounded-sm overflow-hidden animate-fadeInUp animate-delay-200">
                 {service.features.map((feature, idx) => (
                   <div
                     key={idx}
-                    className="flex items-start gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 hover:bg-white/[0.02] transition-colors"
+                    className="flex items-start gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 hover:bg-white/[0.03] transition-colors"
                   >
                     <span className="w-6 h-6 bg-brand-orange/10 border border-brand-orange/20 rounded-sm flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3 h-3 text-brand-orange" />

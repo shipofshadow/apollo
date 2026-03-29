@@ -12,10 +12,10 @@ import { useAuth } from '../context/AuthContext';
 import {
   fetchAvailabilityApi, uploadBookingMediaApi,
   fetchVehicleMakesApi, fetchVehicleModelsApi,
-  fetchShopHoursApi,
+  fetchShopHoursApi, fetchMyVehiclesApi,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
-import type { ShopDayHours } from '../types';
+import type { ClientVehicle, ShopDayHours } from '../types';
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
 import SignaturePad from '../components/SignaturePad';
 import { formatPrice } from '../utils/formatPrice';
@@ -87,10 +87,15 @@ export default function BookingPage() {
   const [step, setStep] = useState(1);
 
   // Step 1 – single-select service (pre-select from location state if present)
-  const preselectedId = (location.state as { serviceId?: number } | null)?.serviceId ?? null;
-  const [selectedId, setSelectedId] = useState<number | null>(preselectedId ?? null);
+  const preselectedState = (location.state as { serviceId?: number; variationId?: number } | null) ?? null;
+  const preselectedId = preselectedState?.serviceId ?? null;
+  const [selectedId, setSelectedId] = useState<number | null>(preselectedId);
   // Step 1 – variation selection for the selected service: { [serviceId]: variationId }
-  const [selectedVariationIds, setSelectedVariationIds] = useState<Record<number, number>>({});
+  const [selectedVariationIds, setSelectedVariationIds] = useState<Record<number, number>>(
+    preselectedId !== null && preselectedState?.variationId
+      ? { [preselectedId]: preselectedState.variationId }
+      : {}
+  );
 
   // Shop hours – loaded on mount to filter the date picker
   const [shopHours,       setShopHours]       = useState<ShopDayHours[]>([]);
@@ -117,6 +122,11 @@ export default function BookingPage() {
   const [vehicleMake,  setVehicleMake]  = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear,  setVehicleYear]  = useState('');
+  const [myVehicles, setMyVehicles] = useState<ClientVehicle[]>([]);
+  const [myVehiclesLoading, setMyVehiclesLoading] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const suppressYearResetRef = useRef(false);
+  const suppressMakeResetRef = useRef(false);
 
   // Vehicle data – loaded from CarAPI proxy, fall back to static dataset
   const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
@@ -174,12 +184,30 @@ export default function BookingPage() {
     }
   }, [dispatch, token]);
 
+  useEffect(() => {
+    if (!token || !user) {
+      setMyVehicles([]);
+      setSelectedVehicleId('');
+      return;
+    }
+    setMyVehiclesLoading(true);
+    fetchMyVehiclesApi(token)
+      .then(({ vehicles }) => setMyVehicles(vehicles))
+      .catch(() => setMyVehicles([]))
+      .finally(() => setMyVehiclesLoading(false));
+  }, [token, user]);
+
   // Re-fetch makes whenever year changes; passes year to the API when selected
   useEffect(() => {
+    const shouldResetVehicleFields = !suppressYearResetRef.current;
+    suppressYearResetRef.current = false;
+
     setDynamicMakes([]);
-    setVehicleMake('');
-    setDynamicModels([]);
-    setVehicleModel('');
+    if (shouldResetVehicleFields) {
+      setVehicleMake('');
+      setDynamicModels([]);
+      setVehicleModel('');
+    }
     if (!BACKEND_URL) return;
     setMakesLoading(true);
     const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
@@ -191,8 +219,11 @@ export default function BookingPage() {
 
   // Load models when make changes, passing year when available
   useEffect(() => {
+    const shouldResetModel = !suppressMakeResetRef.current;
+    suppressMakeResetRef.current = false;
+
     setDynamicModels([]);
-    setVehicleModel('');
+    if (shouldResetModel) setVehicleModel('');
     if (!vehicleMake || !BACKEND_URL) return;
     setModelsLoading(true);
     const year = vehicleYear ? parseInt(vehicleYear, 10) : undefined;
@@ -204,14 +235,15 @@ export default function BookingPage() {
 
   const toggleService = (id: number) => {
     if (selectedId === id) {
-      // Deselect: clear service and its variation
+      // Deselect current service and clear package selection
       setSelectedId(null);
       setSelectedVariationIds({});
-    } else {
-      // Select new service, clearing any previous variation choice
-      setSelectedId(id);
-      setSelectedVariationIds({});
+      return;
     }
+
+    // Switch selected service and clear old package selection
+    setSelectedId(id);
+    setSelectedVariationIds({});
   };
 
   const selectVariation = (serviceId: number, variationId: number) => {
@@ -301,7 +333,9 @@ export default function BookingPage() {
           vehicleModel,
           vehicleYear,
           serviceIds:      selectedId !== null ? [selectedId] : [],
-          selectedVariations: Object.entries(selectedVariationIds).map(([svcId, varId]) => {
+          selectedVariations: Object.entries(selectedVariationIds)
+            .filter(([svcId]) => selectedId !== null && Number(svcId) === selectedId)
+            .map(([svcId, varId]) => {
             const svc = services.find(s => s.id === Number(svcId));
             const variation = svc?.variations?.find(v => v.id === varId);
             return {
@@ -309,7 +343,7 @@ export default function BookingPage() {
               variationId:   varId,
               variationName: variation?.name ?? '',
             };
-          }),
+            }),
           appointmentDate: selectedDate!.toISOString().split('T')[0],
           appointmentTime: selectedTime,
           notes:           form.notes,
@@ -335,6 +369,7 @@ export default function BookingPage() {
     setShopDayIsOpen(true);
     setForm({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '', notes: '' });
     setVehicleMake(''); setVehicleModel(''); setVehicleYear('');
+    setSelectedVehicleId('');
     setDynamicModels([]);
     setMediaFiles([]); setMediaPreviews([]);
     setSignatureData('');
@@ -377,8 +412,8 @@ export default function BookingPage() {
           {/* ── Step 1: Services ── */}
           {step === 1 && (
             <div>
-              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">1. Select Services</h2>
-              <p className="text-sm text-gray-400 mb-6">Tap the services you'd like — you can choose more than one. Prices and estimated times are shown on each card.</p>
+              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">1. Select a Service</h2>
+              <p className="text-sm text-gray-400 mb-6">Tap the service you'd like. Price and estimated time are shown on each card.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {services.map(svc => {
                   const active = selectedId === svc.id;
@@ -620,10 +655,50 @@ export default function BookingPage() {
                     {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading makes…</span>}
                   </p>
                   <p className="text-xs text-gray-600 mb-3">Select the year first, then the make and model of your car.</p>
+                  {!!user && (
+                    <div className="mb-4 space-y-2">
+                      <label className="text-xs text-gray-600 uppercase tracking-widest">
+                        Saved Vehicle
+                        {myVehiclesLoading && <span className="ml-1 normal-case">Loading…</span>}
+                      </label>
+                      <select
+                        value={selectedVehicleId}
+                        onChange={e => {
+                          const id = e.target.value;
+                          setSelectedVehicleId(id);
+                          if (!id) return;
+                          const picked = myVehicles.find(v => String(v.id) === id);
+                          if (!picked) return;
+                          suppressYearResetRef.current = true;
+                          suppressMakeResetRef.current = true;
+                          setVehicleYear(picked.year);
+                          setVehicleMake(picked.make);
+                          setVehicleModel(picked.model);
+                        }}
+                        className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none"
+                      >
+                        <option value="">{myVehicles.length ? 'Choose from My Garage…' : 'No saved vehicles yet'}</option>
+                        {myVehicles.map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.year} {v.make} {v.model}{v.licensePlate ? ` (${v.licensePlate})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedVehicleId && (() => {
+                        const selectedVehicle = myVehicles.find(v => String(v.id) === selectedVehicleId);
+                        if (!selectedVehicle?.imageUrl) return null;
+                        return (
+                          <div className="rounded-sm border border-gray-700 overflow-hidden bg-black/20">
+                            <img src={selectedVehicle.imageUrl} alt={`${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}`} className="w-full h-28 object-cover" />
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs text-gray-600 uppercase tracking-widest">Year</label>
-                      <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
+                      <select required value={vehicleYear} onChange={e => { setSelectedVehicleId(''); setVehicleYear(e.target.value); }}
                         className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none">
                         <option value="">Select year…</option>
                         {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
@@ -632,7 +707,7 @@ export default function BookingPage() {
                     <div className="space-y-2">
                       <label className="text-xs text-gray-600 uppercase tracking-widest">Make</label>
                       <select required value={vehicleMake}
-                        onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
+                        onChange={e => { setSelectedVehicleId(''); setVehicleMake(e.target.value); setVehicleModel(''); }}
                         disabled={makesLoading}
                         className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-60">
                         <option value="">{makesLoading ? 'Loading…' : 'Select make…'}</option>
@@ -644,7 +719,7 @@ export default function BookingPage() {
                         Model
                         {modelsLoading && <span className="ml-1 text-gray-600 normal-case font-normal">Loading…</span>}
                       </label>
-                      <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
+                      <select required value={vehicleModel} onChange={e => { setSelectedVehicleId(''); setVehicleModel(e.target.value); }}
                         disabled={!vehicleMake || modelsLoading}
                         className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm appearance-none disabled:opacity-40">
                         <option value="">{modelsLoading ? 'Loading…' : 'Select model…'}</option>

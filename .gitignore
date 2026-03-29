@@ -15,6 +15,7 @@ dist-ssr
 # PHP backend
 backend/vendor
 backend/.env
+backend/storage/
 
 # Editor directories and files
 .vscode/*

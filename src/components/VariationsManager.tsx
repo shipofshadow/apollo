@@ -35,6 +35,8 @@ interface VariationForm {
   price: string;
   images: string[];
   specs: Spec[];
+  colorsCsv: string;
+  colorImages: Record<string, string[]>;
   sortOrder: number;
 }
 
@@ -44,6 +46,8 @@ const EMPTY_FORM: VariationForm = {
   price: '',
   images: [],
   specs: [],
+  colorsCsv: '',
+  colorImages: {},
   sortOrder: 0,
 };
 
@@ -54,6 +58,8 @@ function variationToForm(v: Variation): VariationForm {
     price:       v.price,
     images:      [...v.images],
     specs:       v.specs.map(s => ({ ...s })),
+    colorsCsv:   (v.colors ?? []).join(', '),
+    colorImages: { ...(v.colorImages ?? {}) },
     sortOrder:   v.sortOrder,
   };
 }
@@ -113,16 +119,33 @@ export default function VariationsManager({ variations, parentId, parentType, to
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setSaveError('Variation name is required.'); return; }
+    const colors = form.colorsCsv
+      .split(',')
+      .map(color => color.trim())
+      .filter(Boolean);
+    const colorImages = colors.reduce<Record<string, string[]>>((acc, color) => {
+      const urls = form.colorImages[color] ?? [];
+      const filtered = urls.map(url => url.trim()).filter(Boolean);
+      if (filtered.length > 0) {
+        acc[color] = filtered;
+      }
+      return acc;
+    }, {});
+    const payload = {
+      ...form,
+      colors,
+      colorImages,
+    };
     setSaving(true);
     setSaveError(null);
     try {
       let result: Variation;
       if (editingId === 'new') {
-        const { variation } = await createVariation(form as never);
+        const { variation } = await createVariation(payload as never);
         result = variation;
         onSaved([...variations, result]);
       } else {
-        const { variation } = await updateVariation(editingId as number, form as never);
+        const { variation } = await updateVariation(editingId as number, payload as never);
         result = variation;
         onSaved(variations.map(v => (v.id === result.id ? result : v)));
       }
@@ -167,6 +190,38 @@ export default function VariationsManager({ variations, parentId, parentType, to
   const removeImage = (idx: number) =>
     setForm(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
 
+  const handleUploadColorImage = async (color: string, file: File) => {
+    if (file.size > UPLOAD_MAX_MB * 1024 * 1024) {
+      setSaveError(`Image must be under ${UPLOAD_MAX_MB} MB.`);
+      return;
+    }
+    setImgBusy(true);
+    try {
+      const url = await uploadAdminImageApi(token, file, parentType === 'service' ? 'services' : 'products');
+      setForm(p => ({
+        ...p,
+        colorImages: {
+          ...p.colorImages,
+          [color]: [...(p.colorImages[color] ?? []), url],
+        },
+      }));
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Image upload failed.');
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
+  const removeColorImage = (color: string, idx: number) => {
+    setForm(p => ({
+      ...p,
+      colorImages: {
+        ...p.colorImages,
+        [color]: (p.colorImages[color] ?? []).filter((_, i) => i !== idx),
+      },
+    }));
+  };
+
   // ── Spec helpers ────────────────────────────────────────────────────────────
 
   const addSpec = () =>
@@ -180,6 +235,11 @@ export default function VariationsManager({ variations, parentId, parentType, to
 
   const removeSpec = (idx: number) =>
     setForm(p => ({ ...p, specs: p.specs.filter((_, i) => i !== idx) }));
+
+  const parsedColors = form.colorsCsv
+    .split(',')
+    .map(color => color.trim())
+    .filter(Boolean);
 
   // ── Render form ─────────────────────────────────────────────────────────────
 
@@ -234,6 +294,69 @@ export default function VariationsManager({ variations, parentId, parentType, to
               placeholder="Brief description of this variation…"
             />
           </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              Colors <span className="font-normal text-gray-600">(optional)</span>
+            </label>
+            <input
+              value={form.colorsCsv}
+              onChange={e => setForm(p => ({ ...p, colorsCsv: e.target.value }))}
+              className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm"
+              placeholder="e.g. Red, Matte Black, Gloss White"
+            />
+          </div>
+
+          {parsedColors.length > 0 && (
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                Color Images
+              </label>
+              {parsedColors.map(color => {
+                const colorUrls = form.colorImages[color] ?? [];
+                return (
+                  <div key={color} className="border border-gray-800 rounded-sm p-3 bg-brand-dark/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-300">{color}</p>
+                      <label className={`flex items-center gap-1.5 px-2.5 py-1 border border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange text-[10px] font-bold uppercase tracking-widest rounded-sm cursor-pointer transition-colors ${imgBusy ? 'opacity-60 pointer-events-none' : ''}`}>
+                        {imgBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                        Add
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={imgBusy}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadColorImage(color, file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {colorUrls.length > 0 ? (
+                      <div className="grid grid-cols-4 gap-2">
+                        {colorUrls.map((url, idx) => (
+                          <div key={idx} className="relative group aspect-square rounded-sm overflow-hidden border border-gray-700 bg-gray-800">
+                            <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <button
+                              type="button"
+                              onClick={() => removeColorImage(color, idx)}
+                              className="absolute top-1 right-1 p-0.5 bg-black/70 hover:bg-red-600 text-white rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600 text-xs italic">No images for this color yet.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Images */}
           <div className="space-y-2">

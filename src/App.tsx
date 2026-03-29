@@ -34,6 +34,7 @@ import ClientLayout from './pages/client/ClientLayout';
 import ClientDashboard from './pages/client/ClientDashboard';
 import MyBookings from './pages/client/MyBookings';
 import BookingDetail from './pages/client/BookingDetail';
+import MyGarage from './pages/client/MyGarage';
 import Profile from './pages/client/Profile';
 
 // Admin
@@ -91,6 +92,7 @@ function AppInner() {
         <Route path="dashboard"     element={<ClientDashboard />} />
         <Route path="bookings"      element={<MyBookings />} />
         <Route path="bookings/:id"  element={<BookingDetail />} />
+        <Route path="garage"        element={<MyGarage />} />
         <Route path="profile"       element={<Profile />} />
       </Route>
 

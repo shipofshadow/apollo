@@ -18,24 +18,21 @@ import {
   fetchAvailabilityApi,
   fetchShopHoursApi,
   fetchBuildUpdatesApi,
+  fetchBookingActivityApi,
   createBuildUpdateApi,
   uploadBuildUpdateMediaApi,
   updateInternalNotesApi,
   fetchCustomerStatsApi,
+  fetchTeamMembersApi,
+  assignBookingTechnicianApi,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, BuildUpdate, ShopDayHours, CustomerStats } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog, TeamMember } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface LogEntry {
-  timestamp: string;
-  action: string;
-  detail?: string;
-}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -72,7 +69,7 @@ function isoFromDate(d: Date): string {
 interface ReschedulePanelProps {
   booking: Booking;
   token: string;
-  onSuccess: (updated: Booking, logEntry: LogEntry) => void;
+  onSuccess: (updated: Booking) => void;
   onCancel: () => void;
 }
 
@@ -133,11 +130,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
         adminRescheduleBookingAsync({ token, id: booking.id, appointmentDate: dateStr, appointmentTime: selectedTime })
       ).unwrap();
       showToast('Appointment rescheduled.', 'success');
-      onSuccess(updated, {
-        timestamp: new Date().toISOString(),
-        action: 'Rescheduled',
-        detail: `${booking.appointmentDate} ${booking.appointmentTime} → ${dateStr} ${selectedTime}`,
-      });
+      onSuccess(updated);
     } catch (e: unknown) {
       showToast((e as Error).message ?? 'Failed to reschedule.', 'error');
     } finally {
@@ -308,7 +301,10 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [partsNotes,    setPartsNotes]    = useState('');
   const [partsBusy,     setPartsBusy]     = useState(false);
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
-  const [log,           setLog]           = useState<LogEntry[]>([]);
+  const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
+  const [teamMembers,   setTeamMembers]   = useState<TeamMember[]>([]);
+  const [selectedTechId, setSelectedTechId] = useState('');
+  const [assignTechBusy, setAssignTechBusy] = useState(false);
 
   // Internal notes state
   const [internalNotes,     setInternalNotes]     = useState('');
@@ -335,25 +331,26 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   }, [token, dispatch]);
 
   useEffect(() => {
-    if (booking) {
-      setLog([{
-        timestamp: booking.createdAt,
-        action: 'Booking submitted',
-        detail: `Status: ${formatStatus(booking.status)}`,
-      }]);
-      setPartsNotes(booking.partsNotes ?? '');
-      setInternalNotes(booking.internalNotes ?? '');
+    if (!booking) return;
 
-      // Load customer loyalty stats
-      if (token && booking.userId) {
-        fetchCustomerStatsApi(token, booking.userId)
-          .then(r => setCustomerStats(r.stats))
-          .catch(() => {});
-      }
+    setPartsNotes(booking.partsNotes ?? '');
+    setInternalNotes(booking.internalNotes ?? '');
+    setSelectedTechId(booking.assignedTechId != null ? String(booking.assignedTechId) : '');
+
+    // Load customer loyalty stats
+    if (token && booking.userId) {
+      fetchCustomerStatsApi(token, booking.userId)
+        .then(r => setCustomerStats(r.stats))
+        .catch(() => {});
     }
-  // only run once when booking first loads
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]);
+  }, [booking, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchTeamMembersApi(token)
+      .then(({ members }) => setTeamMembers(members.filter(m => m.isActive)))
+      .catch(() => setTeamMembers([]));
+  }, [token]);
 
   // Load build updates whenever the booking changes
   useEffect(() => {
@@ -363,7 +360,19 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       .catch(() => {});
   }, [token, bookingId]);
 
-  const addLog = (entry: LogEntry) => setLog(prev => [...prev, entry]);
+  const reloadActivity = async () => {
+    if (!token || !bookingId) return;
+    try {
+      const { logs } = await fetchBookingActivityApi(token, bookingId);
+      setActivityLogs(logs);
+    } catch {
+      setActivityLogs([]);
+    }
+  };
+
+  useEffect(() => {
+    void reloadActivity();
+  }, [token, bookingId]);
 
   const handleSaveInternalNotes = async () => {
     if (!token || !booking) return;
@@ -372,6 +381,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       await updateInternalNotesApi(token, booking.id, internalNotes);
       setNotesEditing(false);
       showToast('Internal notes saved.', 'success');
+      await reloadActivity();
     } catch (e) {
       showToast((e as Error).message, 'error');
     } finally {
@@ -385,15 +395,32 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     try {
       await dispatch(updateBookingStatusAsync({ token, id: booking.id, status: newStatus })).unwrap();
       showToast(`Status updated to ${formatStatus(newStatus)}.`, 'success');
-      addLog({
-        timestamp: new Date().toISOString(),
-        action: `Status changed to ${formatStatus(newStatus)}`,
-        detail: `From: ${formatStatus(booking.status)}`,
-      });
+      await reloadActivity();
     } catch (e: unknown) {
       showToast((e as Error).message ?? 'Failed to update status.', 'error');
     } finally {
       setStatusBusy(null);
+    }
+  };
+
+  const handleAssignTechnician = async () => {
+    if (!token || !booking) return;
+    const assignedTechId = selectedTechId === '' ? null : Number(selectedTechId);
+    if (assignedTechId !== null && (!Number.isInteger(assignedTechId) || assignedTechId <= 0)) {
+      showToast('Please select a valid technician.', 'error');
+      return;
+    }
+
+    setAssignTechBusy(true);
+    try {
+      await assignBookingTechnicianApi(token, booking.id, assignedTechId);
+      await dispatch(fetchAllBookingsAsync(token)).unwrap();
+      await reloadActivity();
+      showToast(assignedTechId ? 'Technician assigned.' : 'Technician unassigned.', 'success');
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to assign technician.', 'error');
+    } finally {
+      setAssignTechBusy(false);
     }
   };
 
@@ -404,11 +431,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       await updateBookingPartsApi(token, booking.id, true, partsNotes);
       await dispatch(updateBookingStatusAsync({ token, id: booking.id, status: 'awaiting_parts' })).unwrap();
       showToast('Parts info saved. Customer notified.', 'success');
-      addLog({
-        timestamp: new Date().toISOString(),
-        action: 'Flagged: Awaiting Parts',
-        detail: partsNotes,
-      });
+      await reloadActivity();
       setPartsOpen(false);
     } catch (e: unknown) {
       showToast((e as Error).message ?? 'Failed to save parts info.', 'error');
@@ -445,11 +468,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       setBuildUpdatePhotos([]);
       setBuildUpdateOpen(false);
       showToast('Build update posted.', 'success');
-      addLog({
-        timestamp: new Date().toISOString(),
-        action: 'Build update posted',
-        detail: buildUpdateNote.trim() || `${buildUpdatePhotos.length} photo(s)`,
-      });
+      await reloadActivity();
     } catch (err: unknown) {
       showToast((err as Error).message ?? 'Failed to post update.', 'error');
     } finally {
@@ -478,7 +497,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const canCancel   = canModify;
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5 w-full max-w-7xl">
 
       {/* Lightbox */}
       {lightboxUrl && (
@@ -590,6 +609,44 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             </div>
           </section>
 
+          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> Technician Assignment
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 block">Assigned Mechanic</label>
+                <select
+                  value={selectedTechId}
+                  onChange={e => setSelectedTechId(e.target.value)}
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers.map(member => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}{member.role ? ` (${member.role})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={handleAssignTechnician}
+                disabled={assignTechBusy || !token}
+                className="h-[42px] px-5 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50 inline-flex items-center gap-2 justify-center"
+              >
+                {assignTechBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
+                Save Assignment
+              </button>
+            </div>
+            {booking.assignedTech && (
+              <p className="text-xs text-gray-400 mt-3">
+                Current: <span className="text-white font-semibold">{booking.assignedTech.name}</span>
+                {booking.assignedTech.role ? <span className="text-gray-500"> · {booking.assignedTech.role}</span> : null}
+              </p>
+            )}
+          </section>
+
           {/* Notes */}
           {booking.notes && (
             <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
@@ -687,9 +744,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 <AdminReschedulePanel
                   booking={booking}
                   token={token}
-                  // TypeScript fix is here!
-                  onSuccess={(_updated, entry) => {
-                    addLog(entry);
+                  onSuccess={async (_updated) => {
+                    await reloadActivity();
                     setRescheduling(false);
                   }}
                   onCancel={() => setRescheduling(false)}
@@ -1033,19 +1089,19 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
               <ClipboardList className="w-3.5 h-3.5" /> Activity Log
             </p>
-            {log.length === 0 ? (
-              <p className="text-gray-600 text-xs italic">No activity yet this session.</p>
+            {activityLogs.length === 0 ? (
+              <p className="text-gray-600 text-xs italic">No activity recorded for this booking.</p>
             ) : (
               <ol className="relative border-l border-gray-800 space-y-4 ml-2">
-                {log.slice().reverse().map((entry, i) => (
-                  <li key={i} className="ml-4">
+                {activityLogs.slice().reverse().map((entry) => (
+                  <li key={entry.id} className="ml-4">
                     <span className="absolute -left-1.5 w-3 h-3 rounded-full bg-brand-orange/80 border-2 border-brand-darker" />
                     <p className="text-xs font-bold text-white">{entry.action}</p>
                     {entry.detail && (
                       <p className="text-gray-500 text-[11px] mt-0.5 leading-snug">{entry.detail}</p>
                     )}
                     <p className="text-gray-700 text-[10px] mt-1">
-                      {new Date(entry.timestamp).toLocaleString()}
+                      {new Date(entry.createdAt).toLocaleString()}
                     </p>
                   </li>
                 ))}

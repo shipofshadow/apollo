@@ -8,7 +8,7 @@
  *      Right – description paragraph + specifications table
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ServiceVariation, ProductVariation } from '../types';
 import { formatPrice } from '../utils/formatPrice';
@@ -17,16 +17,55 @@ type Variation = ServiceVariation | ProductVariation;
 
 interface Props {
   variations: Variation[];
+  selectedColor?: string | null;
+  onSelectColor?: (color: string | null) => void;
+  onVariationChange?: (variation: Variation) => void;
 }
 
-export default function VariationGallery({ variations }: Props) {
+export default function VariationGallery({
+  variations,
+  selectedColor,
+  onSelectColor,
+  onVariationChange,
+}: Props) {
   const [activeIdx, setActiveIdx] = useState(0);
   const [imgIdx,    setImgIdx]    = useState(0);
 
   if (!variations || variations.length === 0) return null;
 
   const active = variations[activeIdx];
-  const images = active?.images ?? [];
+  const availableColors = Array.from(new Set([
+    ...(active?.colors ?? []),
+    ...Object.keys(active?.colorImages ?? {}),
+  ])).filter(Boolean);
+
+  const getColorImages = (color: string): string[] => {
+    const map = active?.colorImages ?? {};
+    const exact = map[color];
+    if (Array.isArray(exact)) {
+      return exact;
+    }
+
+    const normalized = color.trim().toLowerCase();
+    const entry = Object.entries(map).find(([key]) => key.trim().toLowerCase() === normalized);
+    if (entry && Array.isArray(entry[1])) {
+      return entry[1];
+    }
+    return [];
+  };
+
+  const colorImages = selectedColor ? getColorImages(selectedColor) : [];
+  const images = colorImages.length > 0 ? colorImages : (active?.images ?? []);
+
+  useEffect(() => {
+    if (active && onVariationChange) {
+      onVariationChange(active);
+    }
+  }, [active, onVariationChange]);
+
+  useEffect(() => {
+    setImgIdx(0);
+  }, [selectedColor, activeIdx]);
 
   const prevImg = () => setImgIdx(i => (i - 1 + images.length) % images.length);
   const nextImg = () => setImgIdx(i => (i + 1) % images.length);
@@ -34,21 +73,27 @@ export default function VariationGallery({ variations }: Props) {
   const selectVariation = (idx: number) => {
     setActiveIdx(idx);
     setImgIdx(0);
+    if (onSelectColor) {
+      onSelectColor(null);
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* ── Variation selector tabs ─────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2">
+      <div className="relative rounded-sm border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent p-2 overflow-x-auto">
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-brand-darker to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-brand-darker to-transparent" />
+        <div className="flex gap-2 min-w-max">
         {variations.map((v, idx) => (
           <button
             key={v.id}
             onClick={() => selectVariation(idx)}
             /* min-h-[3.5rem] keeps all tabs the same height whether or not a price sub-label is shown */
-            className={`flex flex-col items-start min-h-[3.5rem] px-4 py-2.5 border rounded-sm cursor-pointer transition-all text-left ${
+            className={`flex flex-col items-start min-h-[3.7rem] px-4 py-2.5 border rounded-sm cursor-pointer transition-all text-left whitespace-nowrap ${
               idx === activeIdx
-                ? 'border-brand-orange bg-brand-orange/10 shadow-[0_4px_16px_rgba(243,111,33,0.25)]'
-                : 'border-white/[0.07] bg-brand-dark hover:border-white/20 hover:bg-brand-dark'
+                ? 'border-brand-orange bg-brand-orange/15 shadow-[0_8px_24px_rgba(243,111,33,0.28)]'
+                : 'border-white/[0.07] bg-black/25 hover:border-white/20 hover:bg-white/[0.03]'
             }`}
           >
             <span className={`text-xs font-bold uppercase tracking-[0.08em] leading-tight ${
@@ -63,20 +108,21 @@ export default function VariationGallery({ variations }: Props) {
             )}
           </button>
         ))}
+        </div>
       </div>
 
       {/* ── Selected variation card – animates in on tab switch ─────────── */}
       {active && (
         <div
           key={activeIdx}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-brand-dark/40 border border-white/[0.07] rounded-sm p-5 animate-slideUp"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-sm p-5 md:p-6 animate-slideUp shadow-[0_24px_50px_rgba(0,0,0,0.25)]"
         >
           {/* ── Left column – cross-fade image carousel ───────────────────── */}
           <div className="space-y-2">
             {images.length > 0 ? (
               <>
                 {/* Main image — all images stacked, cross-fade via opacity */}
-                <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden border border-white/[0.07] bg-brand-dark group">
+                <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden border border-white/[0.1] bg-brand-dark group shadow-[0_16px_30px_rgba(0,0,0,0.35)]">
                   {images.map((url, i) => (
                     <img
                       key={url + i}
@@ -141,8 +187,8 @@ export default function VariationGallery({ variations }: Props) {
                         onClick={() => setImgIdx(i)}
                         className={`shrink-0 w-14 h-14 rounded-sm overflow-hidden border-[1.5px] transition-all ${
                           i === imgIdx
-                            ? 'border-brand-orange opacity-100'
-                            : 'border-white/[0.07] opacity-50 hover:opacity-80'
+                            ? 'border-brand-orange opacity-100 shadow-[0_0_0_2px_rgba(243,111,33,0.2)]'
+                            : 'border-white/[0.07] opacity-50 hover:opacity-80 hover:border-white/25'
                         }`}
                       >
                         <img
@@ -165,13 +211,69 @@ export default function VariationGallery({ variations }: Props) {
 
           {/* ── Right column – description + specs ────────────────────────── */}
           <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs uppercase tracking-[0.14em] font-bold text-gray-500">Selected Option</p>
+              {active.price && (
+                <span className="text-brand-orange font-bold text-sm">{formatPrice(active.price)}</span>
+              )}
+            </div>
+
+            <h3 className="text-white text-xl font-display font-black uppercase tracking-tight leading-tight">
+              {active.name}
+            </h3>
+
             {active.description && (
               <p className="text-gray-400 text-sm leading-[1.75] font-light">{active.description}</p>
             )}
 
+            {availableColors.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.12em] text-gray-500">
+                  Available Colors
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {availableColors.map(color => {
+                    const isActive = selectedColor === color;
+                    const colorPreviewImages = getColorImages(color);
+                    const previewUrl = colorPreviewImages[0] ?? active?.images?.[0] ?? null;
+                    const hasPreview = Boolean(previewUrl);
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => onSelectColor?.(isActive ? null : color)}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 border rounded-sm text-xs font-bold uppercase tracking-widest transition-all ${
+                          isActive
+                            ? 'border-brand-orange bg-brand-orange/10 text-brand-orange shadow-[0_6px_16px_rgba(243,111,33,0.2)]'
+                            : 'border-white/[0.1] text-gray-300 hover:border-brand-orange/40 hover:text-white hover:bg-white/[0.03]'
+                        }`}
+                      >
+                        {hasPreview && (
+                          <span className="relative w-6 h-6 rounded-sm overflow-hidden border border-white/10 shrink-0">
+                            <img
+                              src={previewUrl as string}
+                              alt={`${color} preview`}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            {colorPreviewImages.length > 1 && (
+                              <span className="absolute -top-px -right-px text-[9px] bg-black/75 text-white px-1 leading-4">
+                                {colorPreviewImages.length}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {color}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {active.specs && active.specs.length > 0 && (
-              <div className="border border-white/[0.07] rounded-sm overflow-hidden">
-                <div className="px-4 py-2 border-b border-white/[0.07] bg-brand-dark">
+              <div className="border border-white/[0.08] rounded-sm overflow-hidden bg-black/20">
+                <div className="px-4 py-2 border-b border-white/[0.07] bg-black/20">
                   <span className="text-[0.65rem] font-bold uppercase tracking-[0.12em] text-gray-500">
                     Specifications
                   </span>
