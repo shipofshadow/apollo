@@ -295,7 +295,12 @@ class BookingService
         );
         $stmt->execute([':notes' => $notes, ':id' => $id]);
 
-        $row = $db->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
+        $row = $db->prepare(
+            'SELECT b.*, s.title AS service_name
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             WHERE b.id = :id LIMIT 1'
+        );
         $row->execute([':id' => $id]);
         $data = $row->fetch(\PDO::FETCH_ASSOC);
         if (!$data) throw new RuntimeException('Booking not found.', 404);
@@ -703,7 +708,7 @@ class BookingService
             'vehicleYear'        => $row['vehicle_year']  ?? null,
             'serviceId'          => (int) $row['service_id'],
             'serviceIds'         => $serviceIds,
-            'serviceName'        => $row['service_name'],
+            'serviceName'        => $row['service_name'] ?? null,
             'selectedVariations' => $selectedVariations,
             'appointmentDate'    => $row['appointment_date'],
             'appointmentTime'    => $row['appointment_time'],
