@@ -30,7 +30,6 @@ export default function BeforeAfterShowcase() {
   const [cases, setCases] = useState<ComparisonCase[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [splitPercent, setSplitPercent] = useState(52);
-  const [isSwitching, setIsSwitching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,11 +56,8 @@ export default function BeforeAfterShowcase() {
   }, [cases, activeIndex]);
 
   const selectCase = (idx: number) => {
-    if (idx === activeIndex) return;
-    setIsSwitching(true);
     setActiveIndex(idx);
     setSplitPercent(52);
-    window.setTimeout(() => setIsSwitching(false), 220);
   };
 
   if (loading) return null;
@@ -69,7 +65,7 @@ export default function BeforeAfterShowcase() {
   if (!active) return null;
 
   return (
-    <section className="relative overflow-hidden py-16 md:py-20 border-y border-gray-800 bg-[radial-gradient(circle_at_10%_10%,rgba(243,111,33,0.14),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(255,255,255,0.06),transparent_30%),#0f0f0f] animate-[fadeIn_360ms_ease-out]">
+    <section className="relative overflow-hidden py-16 md:py-20 border-y border-gray-800 bg-[radial-gradient(circle_at_10%_10%,rgba(243,111,33,0.14),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(255,255,255,0.06),transparent_30%),#0f0f0f]">
       <div className="pointer-events-none absolute -top-24 right-0 h-56 w-56 rounded-full bg-brand-orange/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 left-0 h-56 w-56 rounded-full bg-red-500/10 blur-3xl" />
 
@@ -94,12 +90,12 @@ export default function BeforeAfterShowcase() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5 md:gap-6 items-start">
-          <div className="rounded-sm border border-gray-700 bg-black/60 backdrop-blur-sm overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.35)] transition-shadow duration-300 hover:shadow-[0_24px_45px_rgba(0,0,0,0.45)]">
+          <div className="rounded-sm border border-gray-700 bg-black/60 backdrop-blur-sm overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.35)]">
             <div className="relative aspect-[16/10] select-none">
               <img
                 src={active.beforeUrl}
                 alt={`${active.title} before`}
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${isSwitching ? 'opacity-0 scale-[1.01]' : 'opacity-100 scale-100'}`}
+                className="absolute inset-0 w-full h-full object-cover"
                 referrerPolicy="no-referrer"
                 draggable={false}
               />
@@ -111,17 +107,17 @@ export default function BeforeAfterShowcase() {
                 <img
                   src={active.afterUrl}
                   alt={`${active.title} after`}
-                  className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${isSwitching ? 'opacity-0 scale-[1.01]' : 'opacity-100 scale-100'}`}
+                  className="absolute inset-0 w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                   draggable={false}
                 />
               </div>
 
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-white/95 shadow-[0_0_20px_rgba(243,111,33,0.7)] transition-[left] duration-150"
+                className="absolute top-0 bottom-0 w-0.5 bg-white/95 shadow-[0_0_20px_rgba(243,111,33,0.7)]"
                 style={{ left: `${splitPercent}%` }}
               >
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-white bg-brand-orange text-white flex items-center justify-center shadow-lg transition-transform duration-200 hover:scale-110">
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-white bg-brand-orange text-white flex items-center justify-center shadow-lg">
                   <MoveHorizontal className="w-4 h-4" />
                 </div>
               </div>
@@ -152,31 +148,7 @@ export default function BeforeAfterShowcase() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-brand-orange rounded-full transition-all duration-150" style={{ width: `${splitPercent}%` }} />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-gray-500">
-                  <span>More Before</span>
-                  <div className="flex gap-1.5">
-                    {[35, 50, 65].map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setSplitPercent(p)}
-                        className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
-                          splitPercent === p
-                            ? 'border-brand-orange text-brand-orange bg-brand-orange/10'
-                            : 'border-gray-700 text-gray-500 hover:border-gray-500'
-                        }`}
-                      >
-                        {p}%
-                      </button>
-                    ))}
-                  </div>
-                  <span>More After</span>
-                </div>
-              </div>
+              <p className="text-[11px] text-gray-500">Drag the divider to compare before and after.</p>
             </div>
           </div>
 
@@ -193,17 +165,17 @@ export default function BeforeAfterShowcase() {
                     type="button"
                     onClick={() => selectCase(idx)}
                     className={[
-                      'group w-full text-left rounded-sm border overflow-hidden transition-all duration-200',
+                      'group w-full text-left rounded-sm border overflow-hidden',
                       selected
-                        ? 'border-brand-orange bg-brand-orange/10 translate-y-0'
-                        : 'border-gray-700 bg-brand-dark hover:border-gray-500 hover:-translate-y-0.5',
+                        ? 'border-brand-orange bg-brand-orange/10'
+                        : 'border-gray-700 bg-brand-dark hover:border-gray-500',
                     ].join(' ')}
                   >
                     <div className="relative h-20 xl:h-16">
                       <img
                         src={item.afterUrl}
                         alt={`${item.title} preview`}
-                        className="h-full w-full object-cover opacity-80 group-hover:opacity-95 transition-opacity"
+                        className="h-full w-full object-cover opacity-80 group-hover:opacity-95"
                         referrerPolicy="no-referrer"
                         draggable={false}
                       />
