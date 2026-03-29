@@ -51,6 +51,26 @@ function slotCompletionLabel(slot: string, totalHours: number): string {
   if (end === 12) return `~12:00 PM`;
   return `~${end}:00 AM`;
 }
+function formatDateYMD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+/** Parse "09:30 AM" / "01:00 PM" into minutes from midnight. */
+function slotToMinutes(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  const [hRaw, mRaw] = timePart.split(':').map(Number);
+  let h = hRaw;
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + (mRaw || 0);
+}
 
 /** Build date list from shop hours (falls back to Mon–Sat if hours not loaded) */
 function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
@@ -60,9 +80,9 @@ function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): 
 
   const dates: Date[] = [];
   const cursor = new Date();
-  cursor.setDate(cursor.getDate() + 1);
+  cursor.setHours(0, 0, 0, 0);
   while (dates.length < 14) {
-    const iso = cursor.toISOString().slice(0, 10);
+    const iso = formatDateYMD(cursor);
     if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -277,7 +297,7 @@ export default function BookingPage() {
     if (!BACKEND_URL) return;
     setAvailabilityLoading(true);
     try {
-      const res = await fetchAvailabilityApi(date.toISOString().split('T')[0]);
+      const res = await fetchAvailabilityApi(formatDateYMD(date));
       setShopDayIsOpen(res.isOpen);
       setClosureReason(res.closureReason ?? null);
       setShopCloseTime(res.closeTime);
@@ -354,7 +374,7 @@ export default function BookingPage() {
               variationName: variation?.name ?? '',
             };
             }),
-          appointmentDate: selectedDate!.toISOString().split('T')[0],
+          appointmentDate: formatDateYMD(selectedDate!),
           appointmentTime: selectedTime,
           notes:           form.notes,
           signatureData:   signatureData || undefined,
@@ -565,8 +585,13 @@ export default function BookingPage() {
 
                   {!availabilityLoading && shopDayIsOpen && (() => {
                     const [closeH] = shopCloseTime.split(':').map(Number);
+                    const now = new Date();
+                    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                    const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
                     const visibleSlots = availableSlots.filter(time =>
-                      !bookedSlots.includes(time) && slotToHour(time) + totalMaxHours <= closeH
+                      !bookedSlots.includes(time)
+                      && slotToHour(time) + totalMaxHours <= closeH
+                      && (!isTodaySelected || slotToMinutes(time) > nowMinutes)
                     );
                     return (
                       <>
@@ -575,7 +600,11 @@ export default function BookingPage() {
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                           {visibleSlots.length === 0 && (
-                            <p className="col-span-full text-sm text-gray-500 py-2">No available slots for this date.</p>
+                            <p className="col-span-full text-sm text-gray-500 py-2">
+                              {isTodaySelected
+                                ? 'No available slots left for today.'
+                                : 'No available slots for this date.'}
+                            </p>
                           )}
                           {visibleSlots.map(time => {
                             const isSelected  = selectedTime === time;
