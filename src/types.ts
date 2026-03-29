@@ -159,6 +159,7 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'awaiting_parts';
   awaitingParts?: boolean;
   partsNotes?: string;
+  internalNotes?: string;
   signatureData?: string;
   mediaUrls?: string[];
   createdAt: string;
@@ -400,4 +401,47 @@ export interface NotificationsState {
   unreadCount: number;
   status: 'idle' | 'loading' | 'success' | 'error';
   error: string | null;
+}
+
+// ── Booking Review ─────────────────────────────────────────────────────────────
+
+export interface BookingReview {
+  id: number;
+  bookingId: string;
+  userId: number;
+  reviewerName: string;
+  serviceName: string;
+  vehicleInfo: string;
+  rating: number;       // 1-5
+  review: string | null;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Notification Preferences ───────────────────────────────────────────────────
+
+export interface NotificationPreferences {
+  emailNewBooking:    boolean;
+  emailStatusChanged: boolean;
+  emailBuildUpdate:   boolean;
+  emailPartsUpdate:   boolean;
+  inappStatusChanged: boolean;
+  inappBuildUpdate:   boolean;
+  inappPartsUpdate:   boolean;
+}
+
+// ── Customer Loyalty Stats ─────────────────────────────────────────────────────
+
+export interface CustomerStats {
+  totalVisits:     number;
+  completedVisits: number;
+  memberSince:     string | null;
+}
+
+// ── Extended Admin Stats ───────────────────────────────────────────────────────
+
+export interface TopService {
+  name:  string;
+  count: number;
 }

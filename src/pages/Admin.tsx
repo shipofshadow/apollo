@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
-  Menu, X, ChevronLeft, ChevronRight, ChevronDown
+  Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,8 @@ import ShopHoursPanel       from './admin/ShopHoursPanel';
 import SiteSettingsPanel    from './admin/SiteSettingsPanel';
 import FaqPanel             from './admin/FaqPanel';
 import OffersPanel          from './admin/OffersPanel';
+import ReviewsPanel         from './admin/ReviewsPanel';
+import CalendarPanel        from './admin/CalendarPanel';
 
 // ── Admin login screen (Unchanged) ────────────────────────────────────────────
 function AdminLogin() {
@@ -141,6 +143,8 @@ export default function AdminPage() {
   const navItems = [
     { key: 'analytics',    label: 'Analytics',  icon: BarChart3 },
     { key: 'appointments', label: 'Bookings',   icon: Calendar },
+    { key: 'calendar',     label: 'Calendar',   icon: CalendarDays },
+    { key: 'reviews',      label: 'Reviews',    icon: Star },
     {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
@@ -172,6 +176,8 @@ export default function AdminPage() {
       case 'services':      return <ServicesPanel />;
       case 'offers':        return <OffersPanel />;
       case 'content':       return <ContentPanel />;
+      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); }} />;
+      case 'reviews':       return <ReviewsPanel />;
       case 'appointments':
         if (activeBookingId) {
           return (

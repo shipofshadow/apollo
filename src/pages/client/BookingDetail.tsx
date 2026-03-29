@@ -5,7 +5,7 @@ import {
   ArrowLeft, Calendar, Clock, Car, User, Mail, Phone,
   FileText, CheckCircle2, XCircle, Loader2, AlertCircle,
   Edit3, ChevronDown, ChevronUp, Image as ImageIcon,
-  Package, BadgeCheck, ChevronLeft, ChevronRight, Camera,
+  Package, BadgeCheck, ChevronLeft, ChevronRight, Camera, Printer,
 } from 'lucide-react';
 import {
   fetchBookingByIdAsync,
@@ -18,6 +18,7 @@ import type { Booking, BuildUpdate, ShopDayHours } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
+import BookingReviewWidget from '../../components/BookingReviewWidget';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -692,6 +693,32 @@ export default function BookingDetail() {
               </li>
             ))}
           </ol>
+        </div>
+      )}
+
+      {/* Review widget – only for completed bookings */}
+      {booking.status === 'completed' && token && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 ml-1">
+            Rate Your Experience
+          </p>
+          <BookingReviewWidget bookingId={booking.id} token={token} />
+        </div>
+      )}
+
+      {/* Print Receipt */}
+      {(booking.status === 'completed' || booking.status === 'confirmed') && (
+        <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-white text-sm font-semibold">Receipt / Summary</p>
+            <p className="text-gray-500 text-xs mt-0.5">Print or save as PDF</p>
+          </div>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print Receipt
+          </button>
         </div>
       )}
 

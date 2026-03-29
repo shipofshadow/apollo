@@ -217,19 +217,29 @@ class BookingService
 
         (new NotificationService())->bookingStatusChanged($booking);
 
+        // SMS notification for status changes
+        if ($status === 'confirmed') {
+            (new SmsService())->bookingConfirmed($booking);
+        } else {
+            (new SmsService())->bookingStatusChanged($booking);
+        }
+
         // In-app notification for the client who made the booking
         if ($this->useDb) {
             $uid = (int) ($booking['userId'] ?? 0);
             if ($uid > 0) {
                 $label   = ucwords(str_replace('_', ' ', $status));
                 $svcName = (string) ($booking['serviceName'] ?? 'your service');
-                (new UserNotificationService())->createForUser(
-                    $uid,
-                    'status_changed',
-                    "Booking Status: {$label}",
-                    "Your booking for {$svcName} is now {$label}.",
-                    ['bookingId' => $booking['id'], 'status' => $status]
-                );
+                $prefSvc = new NotificationPreferencesService();
+                if ($prefSvc->inappEnabled($uid, 'status_changed')) {
+                    (new UserNotificationService())->createForUser(
+                        $uid,
+                        'status_changed',
+                        "Booking Status: {$label}",
+                        "Your booking for {$svcName} is now {$label}.",
+                        ['bookingId' => $booking['id'], 'status' => $status]
+                    );
+                }
             }
         }
 
@@ -267,6 +277,59 @@ class BookingService
         }
 
         return $booking;
+    }
+
+    /**
+     * Update the internal (admin-only) notes for a booking.
+     *
+     * @return array<string, mixed>  Updated booking
+     */
+    public function updateInternalNotes(string $id, string $notes): array
+    {
+        if (!$this->useDb) {
+            throw new RuntimeException('Internal notes require a database.', 501);
+        }
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE bookings SET internal_notes = :notes WHERE id = :id'
+        );
+        $stmt->execute([':notes' => $notes, ':id' => $id]);
+
+        $row = $db->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
+        $row->execute([':id' => $id]);
+        $data = $row->fetch(\PDO::FETCH_ASSOC);
+        if (!$data) throw new RuntimeException('Booking not found.', 404);
+        return $this->mapDbRow($data);
+    }
+
+    /**
+     * Return visit statistics for a specific user (loyalty tracking).
+     *
+     * @return array{totalVisits: int, completedVisits: int, memberSince: string|null}
+     */
+    public function getCustomerStats(int $userId): array
+    {
+        if (!$this->useDb) {
+            return ['totalVisits' => 0, 'completedVisits' => 0, 'memberSince' => null];
+        }
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare(
+            'SELECT
+               COUNT(*) AS total,
+               SUM(status = \'completed\') AS completed,
+               MIN(created_at) AS first_booking
+             FROM bookings
+             WHERE user_id = :uid'
+        );
+        $stmt->execute([':uid' => $userId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return [
+            'totalVisits'     => (int)    ($row['total']         ?? 0),
+            'completedVisits' => (int)    ($row['completed']     ?? 0),
+            'memberSince'     => $row['first_booking'] ? (string) $row['first_booking'] : null,
+        ];
     }
 
     /**
@@ -649,7 +712,8 @@ class BookingService
             'mediaUrls'          => $mediaUrls,
             'status'             => $row['status'],
             'awaitingParts'      => (bool) ($row['awaiting_parts'] ?? false),
-            'partsNotes'         => $row['parts_notes'] ?? null,
+            'partsNotes'         => $row['parts_notes']     ?? null,
+            'internalNotes'      => $row['internal_notes']  ?? null,
             'createdAt'          => $row['created_at'],
         ];
     }
@@ -743,6 +807,32 @@ class BookingService
             "SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
         )->fetchColumn();
 
+        $todayBookings = (int) $db->query(
+            "SELECT COUNT(*) FROM bookings WHERE appointment_date = CURDATE()"
+        )->fetchColumn();
+
+        $todayPending = (int) $db->query(
+            "SELECT COUNT(*) FROM bookings WHERE appointment_date = CURDATE() AND status IN ('pending','confirmed')"
+        )->fetchColumn();
+
+        // Top 5 most-booked services
+        $topServices = $db->query(
+            "SELECT service_name, COUNT(*) AS cnt
+               FROM bookings
+              GROUP BY service_name
+              ORDER BY cnt DESC
+              LIMIT 5"
+        )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Review stats
+        $reviewRow = null;
+        try {
+            $reviewRow = $db->query(
+                'SELECT COUNT(*) AS total, COALESCE(AVG(rating), 0) AS avg_rating
+                   FROM booking_reviews WHERE is_approved = 1'
+            )->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable) { /* table may not exist yet */ }
+
         return [
             'totalBookings'     => $total,
             'pendingBookings'   => $pending,
@@ -752,6 +842,14 @@ class BookingService
             'activeBookings'    => $pending + $confirmed,
             'bookingsThisWeek'  => $thisWeek,
             'bookingsThisMonth' => $thisMonth,
+            'todayBookings'     => $todayBookings,
+            'todayPending'      => $todayPending,
+            'topServices'       => array_map(fn($r) => [
+                'name'  => $r['service_name'],
+                'count' => (int) $r['cnt'],
+            ], $topServices),
+            'reviewCount'       => $reviewRow ? (int)   $reviewRow['total']      : 0,
+            'avgRating'         => $reviewRow ? (float) $reviewRow['avg_rating'] : 0.0,
         ];
     }
 

@@ -103,7 +103,7 @@ export default function NotificationBell({ className = '' }: Props) {
         aria-label={`Notifications${hasUnread ? ` (${unreadCount} unread)` : ''}`}
       >
         {hasUnread
-          ? <BellRing className="w-4 h-4 text-brand-orange animate-wiggle" />
+          ? <BellRing className="w-4 h-4 text-brand-orange motion-safe:animate-wiggle" />
           : <Bell className="w-4 h-4 text-gray-400" />}
         {hasUnread && (
           <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-brand-orange text-white text-[10px] font-bold rounded-full px-1 leading-none">

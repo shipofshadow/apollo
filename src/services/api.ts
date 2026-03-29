@@ -497,6 +497,11 @@ export interface AdminStats {
   activeBookings: number;
   bookingsThisWeek: number;
   bookingsThisMonth: number;
+  todayBookings: number;
+  todayPending: number;
+  topServices: { name: string; count: number }[];
+  reviewCount: number;
+  avgRating: number;
 }
 
 export const fetchAdminStatsApi = (token: string) =>
@@ -755,3 +760,59 @@ export const markAllNotificationsReadApi = (token: string) =>
 
 export const deleteNotificationApi = (token: string, id: number) =>
   apiFetch<{ ok: boolean }>(`/api/notifications/${id}`, { method: 'DELETE' }, token);
+
+// ── Reviews API ───────────────────────────────────────────────────────────────
+
+import type { BookingReview, NotificationPreferences, CustomerStats } from '../types';
+
+export const getBookingReviewApi = (token: string, bookingId: string) =>
+  apiFetch<{ review: BookingReview | null }>(`/api/bookings/${encodeURIComponent(bookingId)}/review`, {}, token);
+
+export const submitBookingReviewApi = (
+  token: string,
+  bookingId: string,
+  data: { rating: number; review: string }
+) =>
+  apiFetch<{ review: BookingReview }>(
+    `/api/bookings/${encodeURIComponent(bookingId)}/review`,
+    { method: 'POST', body: JSON.stringify(data) },
+    token
+  );
+
+export const fetchAllReviewsApi = (token: string) =>
+  apiFetch<{ reviews: BookingReview[] }>('/api/reviews', {}, token);
+
+export const approveReviewApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/reviews/${id}/approve`, { method: 'PATCH' }, token);
+
+export const rejectReviewApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/reviews/${id}/reject`, { method: 'PATCH' }, token);
+
+export const deleteReviewApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/reviews/${id}`, { method: 'DELETE' }, token);
+
+// ── Notification Preferences API ──────────────────────────────────────────────
+
+export const getNotificationPrefsApi = (token: string) =>
+  apiFetch<{ preferences: NotificationPreferences | null }>('/api/auth/notification-preferences', {}, token);
+
+export const saveNotificationPrefsApi = (token: string, prefs: Partial<NotificationPreferences> | Record<string, boolean>) =>
+  apiFetch<{ preferences: NotificationPreferences }>(
+    '/api/auth/notification-preferences',
+    { method: 'PUT', body: JSON.stringify(prefs) },
+    token
+  );
+
+// ── Internal Notes API ────────────────────────────────────────────────────────
+
+export const updateInternalNotesApi = (token: string, bookingId: string, internalNotes: string) =>
+  apiFetch<{ booking: import('../types').Booking }>(
+    `/api/bookings/${encodeURIComponent(bookingId)}/notes`,
+    { method: 'PATCH', body: JSON.stringify({ internalNotes }) },
+    token
+  );
+
+// ── Customer Stats API ────────────────────────────────────────────────────────
+
+export const fetchCustomerStatsApi = (token: string, userId: number) =>
+  apiFetch<{ stats: CustomerStats }>(`/api/customers/${userId}/stats`, {}, token);

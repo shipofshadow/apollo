@@ -95,3 +95,12 @@ define('R2_SECRET_ACCESS_KEY',$_ENV['R2_SECRET_ACCESS_KEY'] ?? '');
 define('R2_BUCKET_NAME',      $_ENV['R2_BUCKET_NAME']       ?? '');
 define('R2_KEY_PREFIX',       rtrim($_ENV['R2_KEY_PREFIX']   ?? 'chopaeng/1625autolab', '/') . '/');
 define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));
+
+// ---------------------------------------------------------------------------
+// SMS (Twilio)
+// Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM to enable SMS.
+// ---------------------------------------------------------------------------
+
+define('TWILIO_ACCOUNT_SID', $_ENV['TWILIO_ACCOUNT_SID'] ?? '');
+define('TWILIO_AUTH_TOKEN',  $_ENV['TWILIO_AUTH_TOKEN']  ?? '');
+define('TWILIO_FROM',        $_ENV['TWILIO_FROM']        ?? '');
