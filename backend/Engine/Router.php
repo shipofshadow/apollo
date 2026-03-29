@@ -64,6 +64,7 @@ class Router
             $r->addRoute('POST', '/api/bookings/{id}/build-updates/media', 'handleBuildUpdateMediaUpload');
 
             // ── Reviews (client write after completed, admin moderate) ───────
+            $r->addRoute('GET',    '/api/reviews/published',        'handlePublishedReviewList');
             $r->addRoute('GET',    '/api/bookings/{id}/review',    'handleBookingReviewGet');
             $r->addRoute('POST',   '/api/bookings/{id}/review',    'handleBookingReviewCreate');
             $r->addRoute('GET',    '/api/reviews',                 'handleReviewList');
@@ -785,6 +786,14 @@ class Router
     // -------------------------------------------------------------------------
     // Review handlers
     // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handlePublishedReviewList(array $vars = []): void
+    {
+        $serviceId = isset($_GET['service_id']) ? (int) $_GET['service_id'] : null;
+        $reviews   = (new ReviewService())->getPublished($serviceId);
+        echo json_encode(['reviews' => $reviews]);
+    }
 
     /** @param array<string, string> $vars */
     private function handleBookingReviewGet(array $vars = []): void

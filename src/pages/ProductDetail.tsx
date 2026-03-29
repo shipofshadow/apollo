@@ -5,6 +5,7 @@ import { ArrowLeft, Check } from 'lucide-react';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import VariationGallery from '../components/VariationGallery';
+import PublishedReviews from '../components/PublishedReviews';
 import { formatPrice } from '../utils/formatPrice';
 
 export default function ProductDetail() {
@@ -177,6 +178,10 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Published Reviews ───────────────────────────────────────────────── */}
+      <PublishedReviews />
+
     </div>
   );
 }

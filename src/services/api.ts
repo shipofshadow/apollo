@@ -782,6 +782,11 @@ export const submitBookingReviewApi = (
 export const fetchAllReviewsApi = (token: string) =>
   apiFetch<{ reviews: BookingReview[] }>('/api/reviews', {}, token);
 
+export const fetchPublishedReviewsApi = (serviceId?: number) => {
+  const qs = serviceId != null ? `?service_id=${serviceId}` : '';
+  return apiFetch<{ reviews: BookingReview[] }>(`/api/reviews/published${qs}`);
+};
+
 export const approveReviewApi = (token: string, id: number) =>
   apiFetch<{ ok: boolean }>(`/api/reviews/${id}/approve`, { method: 'PATCH' }, token);
 
