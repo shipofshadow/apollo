@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  Calendar, Clock, Loader2, XCircle, Eye,
+  Calendar, Clock, Loader2, XCircle, Eye, Search, X as XIcon,
 } from 'lucide-react';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
@@ -28,6 +28,7 @@ export default function BookingsPanel({ onView }: Props) {
   const { showToast } = useToast();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
   const [statusFilter, setStatusFilter] = useState<'all' | Booking['status']>('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));
@@ -39,9 +40,18 @@ export default function BookingsPanel({ onView }: Props) {
     showToast('Booking cancelled.', 'success');
   };
 
-  const filtered = statusFilter === 'all'
-    ? appointments
-    : appointments.filter(b => b.status === statusFilter);
+  const term = search.trim().toLowerCase();
+
+  const filtered = appointments
+    .filter(b => statusFilter === 'all' || b.status === statusFilter)
+    .filter(b =>
+      term === '' ||
+      b.name.toLowerCase().includes(term) ||
+      b.phone.toLowerCase().includes(term) ||
+      b.vehicleInfo.toLowerCase().includes(term) ||
+      b.serviceName.toLowerCase().includes(term) ||
+      b.email.toLowerCase().includes(term)
+    );
 
   const filters: Array<{ key: 'all' | Booking['status']; label: string }> = [
     { key: 'all',            label: 'All' },
@@ -55,6 +65,30 @@ export default function BookingsPanel({ onView }: Props) {
   return (
     <div>
       <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">Client Bookings</h2>
+
+      {/* Search + filter row */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        {/* Search box */}
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name, phone, vehicle…"
+            className="w-full bg-brand-darker border border-gray-700 text-white text-sm pl-9 pr-8 py-2 rounded-sm focus:outline-none focus:border-brand-orange transition-colors placeholder-gray-600"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+              aria-label="Clear search"
+            >
+              <XIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
@@ -82,7 +116,16 @@ export default function BookingsPanel({ onView }: Props) {
       {filtered.length === 0 && status !== 'loading' && (
         <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
           <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No {statusFilter !== 'all' ? statusFilter : ''} bookings found.</p>
+          <p>
+            {term
+              ? `No bookings matching "${search}".`
+              : `No ${statusFilter !== 'all' ? statusFilter : ''} bookings found.`}
+          </p>
+          {term && (
+            <button onClick={() => setSearch('')} className="mt-3 text-xs text-brand-orange hover:text-orange-400 font-bold uppercase tracking-widest">
+              Clear search
+            </button>
+          )}
         </div>
       )}
 

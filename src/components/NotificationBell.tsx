@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, BellRing, X, CheckCheck, Package, CalendarCheck2, Wrench, AlertCircle } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
@@ -44,8 +45,9 @@ interface Props {
 
 export default function NotificationBell({ className = '' }: Props) {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const { items, unreadCount } = useSelector((s: RootState) => s.notifications);
-  const token = useSelector((s: RootState) => s.auth.token);
+  const { token, user } = useSelector((s: RootState) => s.auth);
 
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -61,10 +63,23 @@ export default function NotificationBell({ className = '' }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleMarkRead = useCallback((n: AppNotification) => {
-    if (!token || n.isRead) return;
-    dispatch(markReadAsync({ token, id: n.id }));
-  }, [dispatch, token]);
+  const handleNotificationClick = useCallback((n: AppNotification) => {
+    // Mark as read first
+    if (!n.isRead && token) {
+      dispatch(markReadAsync({ token, id: n.id }));
+    }
+    setOpen(false);
+
+    // Navigate to the related booking
+    const bookingId = n.data?.bookingId as string | undefined;
+    if (!bookingId) return;
+
+    if (user?.role === 'admin') {
+      navigate('/admin', { state: { openBookingId: String(bookingId) } });
+    } else {
+      navigate(`/client/bookings/${bookingId}`);
+    }
+  }, [dispatch, token, user, navigate]);
 
   const handleMarkAllRead = useCallback(() => {
     if (!token) return;
@@ -127,7 +142,7 @@ export default function NotificationBell({ className = '' }: Props) {
                 return (
                   <div
                     key={n.id}
-                    onClick={() => handleMarkRead(n)}
+                    onClick={() => handleNotificationClick(n)}
                     className={`group relative flex gap-3 px-4 py-3 border-b border-gray-800 cursor-pointer transition-colors hover:bg-gray-800/60 ${
                       !n.isRead ? 'bg-brand-orange/5' : ''
                     }`}

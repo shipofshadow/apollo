@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
@@ -84,6 +84,7 @@ function AdminLogin() {
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, isAdmin, logout } = useAuth();
+  const location = useLocation();
   const [activeTab,       setActiveTab]       = useState('analytics');
   const [collapsed,       setCollapsed]       = useState(false);
   const [mobileOpen,      setMobileOpen]      = useState(false);
@@ -95,6 +96,17 @@ export default function AdminPage() {
     content: true,
     settings: false,
   });
+
+  // When navigated here from a notification click, auto-open the booking
+  useEffect(() => {
+    const state = location.state as { openBookingId?: string } | null;
+    if (state?.openBookingId) {
+      setActiveTab('appointments');
+      setActiveBookingId(state.openBookingId);
+      // Clear the state so a back-navigation doesn't re-trigger it
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
