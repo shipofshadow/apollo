@@ -98,6 +98,40 @@ class ReviewService
         return array_map([$this, 'format'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
     }
 
+    /**
+     * Return all approved (published) reviews, optionally filtered by service.
+     *
+     * @param  int|null $serviceId  When provided, only reviews for that service are returned.
+     * @return array<int, array<string, mixed>>
+     */
+    public function getPublished(?int $serviceId = null): array
+    {
+        if ($serviceId !== null) {
+            $stmt = $this->db->prepare(
+                'SELECT r.*, u.name AS reviewer_name, s.title AS service_name, b.vehicle_info
+                   FROM booking_reviews r
+                   JOIN users    u ON u.id = r.user_id
+                   JOIN bookings b ON b.id = r.booking_id
+                   LEFT JOIN services s ON s.id = b.service_id
+                  WHERE r.is_approved = 1
+                    AND b.service_id = :sid
+                  ORDER BY r.created_at DESC'
+            );
+            $stmt->execute([':sid' => $serviceId]);
+        } else {
+            $stmt = $this->db->query(
+                'SELECT r.*, u.name AS reviewer_name, s.title AS service_name, b.vehicle_info
+                   FROM booking_reviews r
+                   JOIN users    u ON u.id = r.user_id
+                   JOIN bookings b ON b.id = r.booking_id
+                   LEFT JOIN services s ON s.id = b.service_id
+                  WHERE r.is_approved = 1
+                  ORDER BY r.created_at DESC'
+            );
+        }
+        return array_map([$this, 'format'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
+    }
+
     /** Approve a review. */
     public function approve(int $id): void
     {

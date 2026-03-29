@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { fetchServiceBySlugAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import VariationGallery from '../components/VariationGallery';
+import PublishedReviews from '../components/PublishedReviews';
 import { formatPrice } from '../utils/formatPrice';
 
 export default function ServiceDetail() {
@@ -199,6 +200,10 @@ export default function ServiceDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Published Reviews ───────────────────────────────────────────────── */}
+      <PublishedReviews serviceId={service.id} />
+
     </div>
   );
 }
