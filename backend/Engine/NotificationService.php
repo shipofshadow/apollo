@@ -143,6 +143,65 @@ class NotificationService
         $this->send($customerEmail, $customerName, $subject, $body);
     }
 
+    /**
+     * Notify the customer that a new build progress update has been posted.
+     *
+     * @param array<string, mixed> $booking  Full booking row (must include email, name, serviceName)
+     * @param array<string, mixed> $update   Build update row (note, photoUrls, createdAt)
+     */
+    public function buildUpdateCreated(array $booking, array $update): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = (string) ($booking['email'] ?? '');
+        $customerName  = (string) ($booking['name']  ?? 'Customer');
+
+        if ($customerEmail === '') {
+            return;
+        }
+
+        $subject = 'Build Update on Your Vehicle – 1625 Auto Lab';
+        $body    = $this->buildProgressUpdateBody($booking, $update);
+        $this->send($customerEmail, $customerName, $subject, $body);
+    }
+
+    /**
+     * Send a password-reset link to the given email address.
+     *
+     * @param string $email     Recipient address (already validated as a known user).
+     * @param string $resetUrl  Full URL containing the reset token.
+     */
+    public function passwordReset(string $email, string $resetUrl): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $safeUrl = htmlspecialchars($resetUrl);
+        $body    = $this->wrapHtml("
+            <h2>Reset Your Password</h2>
+            <p>We received a request to reset the password for your 1625 Auto Lab account.</p>
+            <p>Click the button below to choose a new password. This link will expire in <strong>1 hour</strong>.</p>
+            <p style='text-align:center;margin:32px 0'>
+                <a href='$safeUrl'
+                   style='background:#f97316;color:#fff;padding:14px 28px;text-decoration:none;
+                          font-weight:bold;border-radius:4px;display:inline-block'>
+                    Reset Password
+                </a>
+            </p>
+            <p>If you did not request a password reset, you can safely ignore this email.
+               Your password will not be changed.</p>
+            <p>Or copy this link into your browser:<br>
+               <a href='$safeUrl' style='color:#f97316;word-break:break-all'>$safeUrl</a>
+            </p>
+            <p style='color:#888'>1625 Auto Lab</p>
+        ");
+
+        $this->send($email, 'Customer', 'Reset Your Password – 1625 Auto Lab', $body);
+    }
+
     // -------------------------------------------------------------------------
     // Email body builders
     // -------------------------------------------------------------------------
@@ -215,6 +274,38 @@ class NotificationService
             <p><strong>Details:</strong> $notes</p>
             <p>We will notify you as soon as the parts arrive and work resumes.
                In the meantime, feel free to reach us at <strong>0939 330 8263</strong>.</p>
+            <p style='color:#888'>1625 Auto Lab</p>
+        ");
+    }
+
+    /**
+     * @param array<string, mixed> $b
+     * @param array<string, mixed> $u
+     */
+    private function buildProgressUpdateBody(array $b, array $u): string
+    {
+        $name    = htmlspecialchars((string) ($b['name']        ?? ''));
+        $service = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $note    = nl2br(htmlspecialchars((string) ($u['note']  ?? '')));
+        $date    = htmlspecialchars((string) ($u['createdAt']   ?? ''));
+
+        $photosHtml = '';
+        $photoUrls  = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
+        foreach ($photoUrls as $url) {
+            $safeUrl     = htmlspecialchars((string) $url);
+            $photosHtml .= "<img src='$safeUrl' alt='Build photo' style='max-width:100%;margin:8px 0;display:block;border-radius:4px'>";
+        }
+
+        $noteSection = $note !== '' ? "<p><strong>Update:</strong> $note</p>" : '';
+
+        return $this->wrapHtml("
+            <h2>Hi $name,</h2>
+            <p>There is a new progress update on your <strong>$service</strong> job!</p>
+            $noteSection
+            $photosHtml
+            <p style='color:#888;font-size:12px'>Posted on $date</p>
+            <p>If you have any questions, call us at <strong>0939 330 8263</strong>
+               or email <a href='mailto:1625autolab@gmail.com'>1625autolab@gmail.com</a>.</p>
             <p style='color:#888'>1625 Auto Lab</p>
         ");
     }

@@ -36,11 +36,13 @@ class Router
             $r->addRoute('DELETE', '/api/services/{id:\d+}/variations/{vid:\d+}',    'handleServiceVariationDelete');
 
             // ── Auth ────────────────────────────────────────────────────────
-            $r->addRoute('POST', '/api/auth/register',  'handleAuthRegister');
-            $r->addRoute('POST', '/api/auth/login',     'handleAuthLogin');
-            $r->addRoute('POST', '/api/auth/logout',    'handleAuthLogout');
-            $r->addRoute('GET',  '/api/auth/me',        'handleAuthMe');
-            $r->addRoute('PUT',  '/api/auth/profile',   'handleAuthProfile');
+            $r->addRoute('POST', '/api/auth/register',         'handleAuthRegister');
+            $r->addRoute('POST', '/api/auth/login',            'handleAuthLogin');
+            $r->addRoute('POST', '/api/auth/logout',           'handleAuthLogout');
+            $r->addRoute('GET',  '/api/auth/me',               'handleAuthMe');
+            $r->addRoute('PUT',  '/api/auth/profile',          'handleAuthProfile');
+            $r->addRoute('POST', '/api/auth/forgot-password',  'handleAuthForgotPassword');
+            $r->addRoute('POST', '/api/auth/reset-password',   'handleAuthResetPassword');
 
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
@@ -54,11 +56,33 @@ class Router
             $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',        'handleBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/admin-reschedule', 'handleAdminBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',             'handleBookingPartsUpdate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/notes',             'handleBookingInternalNotes');
 
             // ── Build updates (progress photos – admin write, owner read) ────
             $r->addRoute('GET',  '/api/bookings/{id}/build-updates',       'handleBuildUpdateList');
             $r->addRoute('POST', '/api/bookings/{id}/build-updates',       'handleBuildUpdateCreate');
             $r->addRoute('POST', '/api/bookings/{id}/build-updates/media', 'handleBuildUpdateMediaUpload');
+
+            // ── Reviews (client write after completed, admin moderate) ───────
+            $r->addRoute('GET',    '/api/bookings/{id}/review',    'handleBookingReviewGet');
+            $r->addRoute('POST',   '/api/bookings/{id}/review',    'handleBookingReviewCreate');
+            $r->addRoute('GET',    '/api/reviews',                 'handleReviewList');
+            $r->addRoute('PATCH',  '/api/reviews/{id:\d+}/approve','handleReviewApprove');
+            $r->addRoute('PATCH',  '/api/reviews/{id:\d+}/reject', 'handleReviewReject');
+            $r->addRoute('DELETE', '/api/reviews/{id:\d+}',        'handleReviewDelete');
+
+            // ── In-app notifications ────────────────────────────────────────
+            $r->addRoute('GET',    '/api/notifications',              'handleNotificationList');
+            $r->addRoute('PATCH',  '/api/notifications/read-all',     'handleNotificationReadAll');
+            $r->addRoute('PATCH',  '/api/notifications/{id:\d+}/read','handleNotificationRead');
+            $r->addRoute('DELETE', '/api/notifications/{id:\d+}',     'handleNotificationDelete');
+
+            // ── Notification preferences ─────────────────────────────────────
+            $r->addRoute('GET', '/api/auth/notification-preferences', 'handleNotificationPrefsGet');
+            $r->addRoute('PUT', '/api/auth/notification-preferences', 'handleNotificationPrefsSave');
+
+            // ── Customer loyalty stats ────────────────────────────────────────
+            $r->addRoute('GET', '/api/customers/{userId:\d+}/stats', 'handleCustomerStats');
 
             // ── Blog posts (public read, admin write) ───────────────────────
             $r->addRoute('GET',    '/api/blog',              'handleBlogList');
@@ -288,6 +312,46 @@ class Router
         $data    = $this->jsonBody();
         $user    = (new UserService())->updateProfile((int) $payload['sub'], $data);
         echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthForgotPassword(array $vars = []): void
+    {
+        $data  = $this->jsonBody();
+        $email = strtolower(trim((string) ($data['email'] ?? '')));
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid email address is required.', 422);
+        }
+
+        $token = Auth::generatePasswordResetToken($email);
+
+        if ($token !== null) {
+            $resetUrl = APP_URL . '/reset-password?token=' . urlencode($token);
+            (new NotificationService())->passwordReset($email, $resetUrl);
+        }
+
+        // Always return 200 to prevent email enumeration
+        echo json_encode(['message' => 'If that email is registered, a reset link has been sent.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthResetPassword(array $vars = []): void
+    {
+        $data     = $this->jsonBody();
+        $token    = trim((string) ($data['token']    ?? ''));
+        $password = (string) ($data['password']       ?? '');
+        $confirm  = (string) ($data['passwordConfirm'] ?? '');
+
+        if ($token === '') {
+            throw new RuntimeException('Reset token is required.', 422);
+        }
+        if ($password !== $confirm) {
+            throw new RuntimeException('Passwords do not match.', 422);
+        }
+
+        Auth::resetPassword($token, $password);
+        echo json_encode(['message' => 'Your password has been updated. You can now sign in.']);
     }
 
     // -------------------------------------------------------------------------
@@ -566,6 +630,27 @@ class Router
         }
 
         $update = (new BuildUpdateService())->create($id, $note, $photoUrls);
+
+        // Notify the customer that a new build progress update was posted
+        $booking = (new BookingService())->adminFindById($id);
+        if ($booking !== null) {
+            (new NotificationService())->buildUpdateCreated($booking, $update);
+
+            // In-app notification for the client
+            $uid = (int) ($booking['userId'] ?? 0);
+            if ($uid > 0) {
+                $svcName = (string) ($booking['serviceName'] ?? 'your service');
+                $snippet = $note !== '' ? ': ' . mb_strimwidth($note, 0, 60, '…') : '';
+                (new UserNotificationService())->createForUser(
+                    $uid,
+                    'build_update',
+                    'Build Progress Update',
+                    "New update on your {$svcName} job{$snippet}",
+                    ['bookingId' => $id]
+                );
+            }
+        }
+
         http_response_code(201);
         echo json_encode(['update' => $update]);
     }
@@ -622,6 +707,195 @@ class Router
         }
 
         echo json_encode(['urls' => $urls]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Notification handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationList(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['notifications' => [], 'unreadCount' => 0]);
+            return;
+        }
+
+        $payload   = $this->requireAuth();
+        $isAdmin   = ($payload['role'] ?? '') === 'admin';
+        $userId    = (int) ($payload['sub'] ?? 0);
+        $svc       = new UserNotificationService();
+
+        $notifications = $svc->getForViewer($isAdmin, $userId);
+        $unreadCount   = $svc->getUnreadCount($isAdmin, $userId);
+
+        echo json_encode(['notifications' => $notifications, 'unreadCount' => $unreadCount]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationRead(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $isAdmin = ($payload['role'] ?? '') === 'admin';
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = (int) ($vars['id'] ?? 0);
+
+        (new UserNotificationService())->markRead($id, $isAdmin, $userId);
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationReadAll(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $isAdmin = ($payload['role'] ?? '') === 'admin';
+        $userId  = (int) ($payload['sub'] ?? 0);
+
+        (new UserNotificationService())->markAllRead($isAdmin, $userId);
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationDelete(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $isAdmin = ($payload['role'] ?? '') === 'admin';
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = (int) ($vars['id'] ?? 0);
+
+        (new UserNotificationService())->delete($id, $isAdmin, $userId);
+        echo json_encode(['ok' => true]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Review handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleBookingReviewGet(array $vars = []): void
+    {
+        $id      = $vars['id'] ?? '';
+        $review  = (new ReviewService())->getForBooking($id);
+        echo json_encode(['review' => $review]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingReviewCreate(array $vars = []): void
+    {
+        $payload = $this->requireAuth('client');
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = $vars['id'] ?? '';
+
+        $data    = json_decode(file_get_contents('php://input') ?: '{}', true) ?? [];
+        $review  = (new ReviewService())->create($id, $userId, $data);
+        http_response_code(201);
+        echo json_encode(['review' => $review]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleReviewList(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $reviews = (new ReviewService())->getAll();
+        echo json_encode(['reviews' => $reviews]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleReviewApprove(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        (new ReviewService())->approve((int) ($vars['id'] ?? 0));
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleReviewReject(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        (new ReviewService())->reject((int) ($vars['id'] ?? 0));
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleReviewDelete(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        (new ReviewService())->delete((int) ($vars['id'] ?? 0));
+        echo json_encode(['ok' => true]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal notes handler
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleBookingInternalNotes(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $id   = $vars['id'] ?? '';
+        $data = json_decode(file_get_contents('php://input') ?: '{}', true) ?? [];
+        $notes = mb_substr((string) ($data['internalNotes'] ?? ''), 0, 5000);
+        $booking = (new BookingService())->updateInternalNotes($id, $notes);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Notification preferences handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationPrefsGet(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['preferences' => null]);
+            return;
+        }
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $prefs   = (new NotificationPreferencesService())->getForUser($userId);
+        echo json_encode(['preferences' => $prefs]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationPrefsSave(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['preferences' => null]);
+            return;
+        }
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $data    = json_decode(file_get_contents('php://input') ?: '{}', true) ?? [];
+        $prefs   = (new NotificationPreferencesService())->save($userId, $data);
+        echo json_encode(['preferences' => $prefs]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Customer loyalty stats handler
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleCustomerStats(array $vars = []): void
+    {
+        $this->requireAuth('admin');
+        $userId = (int) ($vars['userId'] ?? 0);
+        $stats  = (new BookingService())->getCustomerStats($userId);
+        echo json_encode(['stats' => $stats]);
     }
 
     /** @param array<string, string> $vars */

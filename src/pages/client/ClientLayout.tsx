@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.png';
+import NotificationBell from '../../components/NotificationBell';
 
 const navItems = [
   { label: 'Dashboard',   href: '/client/dashboard', icon: LayoutDashboard },
@@ -38,8 +39,10 @@ export default function ClientLayout() {
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Site
+            <span className="hidden sm:inline">Back to Site</span>
           </a>
+          <div className="w-px h-5 bg-gray-700" />
+          <NotificationBell />
           <div className="w-px h-5 bg-gray-700" />
           <button
             onClick={handleLogout}

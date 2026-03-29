@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const LOGO_URL = 'https://cdn.1625autolab.com/1625autolab/logos/logo.png';
 
@@ -105,7 +106,9 @@ export default function Header() {
               </Link>
             </>
           ) : (
-            <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(v => !v)}
                 className="flex items-center gap-2 bg-brand-dark border border-gray-700 hover:border-brand-orange px-4 py-2.5 rounded-sm transition-colors"
@@ -144,6 +147,7 @@ export default function Header() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           )}
         </div>

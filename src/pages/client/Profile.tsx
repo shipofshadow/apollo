@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2 } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
 import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { getNotificationPrefsApi, saveNotificationPrefsApi } from '../../services/api';
+import type { NotificationPreferences } from '../../types';
 
 export default function Profile() {
   const dispatch               = useDispatch<AppDispatch>();
@@ -16,11 +18,52 @@ export default function Profile() {
   const [showPw,   setShowPw]  = useState(false);
   const [localErr, setLocalErr] = useState('');
 
+  // Notification preferences
+  const [prefs,      setPrefs]      = useState<NotificationPreferences | null>(null);
+  const [prefsBusy,  setPrefsBusy]  = useState(false);
+  const [prefsSaved, setPrefsSaved] = useState(false);
+
   useEffect(() => {
     if (user) setInfo({ name: user.name, phone: user.phone });
   }, [user]);
 
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
+
+  useEffect(() => {
+    if (!token) return;
+    getNotificationPrefsApi(token)
+      .then(r => r.preferences && setPrefs(r.preferences))
+      .catch(() => {});
+  }, [token]);
+
+  const handlePrefsToggle = (key: keyof NotificationPreferences) => {
+    setPrefs(prev => prev ? { ...prev, [key]: !prev[key] } : null);
+  };
+
+  const handlePrefsSave = async () => {
+    if (!token || !prefs) return;
+    setPrefsBusy(true);
+    try {
+      // Map camelCase → snake_case for the API
+      const payload: Record<string, boolean> = {
+        email_new_booking:    prefs.emailNewBooking,
+        email_status_changed: prefs.emailStatusChanged,
+        email_build_update:   prefs.emailBuildUpdate,
+        email_parts_update:   prefs.emailPartsUpdate,
+        inapp_status_changed: prefs.inappStatusChanged,
+        inapp_build_update:   prefs.inappBuildUpdate,
+        inapp_parts_update:   prefs.inappPartsUpdate,
+      };
+      const r = await saveNotificationPrefsApi(token, payload);
+      setPrefs(r.preferences);
+      setPrefsSaved(true);
+      setTimeout(() => setPrefsSaved(false), 3000);
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    } finally {
+      setPrefsBusy(false);
+    }
+  };
 
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,6 +230,84 @@ export default function Profile() {
           </div>
         </form>
       </div>
+
+      {/* Notification Preferences */}
+      {prefs && (
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-white flex items-center gap-2">
+            <Bell className="w-4 h-4 text-brand-orange" /> Notification Preferences
+          </h2>
+
+          {prefsSaved && (
+            <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-2 rounded-sm">
+              <CheckCircle2 className="w-4 h-4 shrink-0" /> Preferences saved!
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Email channel */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                <Mail className="w-3 h-3" /> Email Notifications
+              </p>
+              <div className="space-y-2.5">
+                {([
+                  ['emailStatusChanged', 'Booking status changes'],
+                  ['emailBuildUpdate',   'Build progress updates'],
+                  ['emailPartsUpdate',   'Parts availability updates'],
+                ] as [keyof NotificationPreferences, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center justify-between cursor-pointer group">
+                    <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() => handlePrefsToggle(key)}
+                      className={`relative w-10 h-5 rounded-full transition-colors ${prefs[key] ? 'bg-brand-orange' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${prefs[key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* In-app channel */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                <Bell className="w-3 h-3" /> In-App Notifications
+              </p>
+              <div className="space-y-2.5">
+                {([
+                  ['inappStatusChanged', 'Booking status changes'],
+                  ['inappBuildUpdate',   'Build progress updates'],
+                  ['inappPartsUpdate',   'Parts availability updates'],
+                ] as [keyof NotificationPreferences, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center justify-between cursor-pointer group">
+                    <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() => handlePrefsToggle(key)}
+                      className={`relative w-10 h-5 rounded-full transition-colors ${prefs[key] ? 'bg-brand-orange' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${prefs[key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={handlePrefsSave}
+              disabled={prefsBusy}
+              className="flex items-center gap-2 bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+            >
+              {prefsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Save Preferences
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

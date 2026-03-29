@@ -9,6 +9,7 @@ import faqReducer                 from './faqSlice';
 import portfolioReducer           from './portfolioSlice';
 import portfolioCategoriesReducer from './portfolioCategoriesSlice';
 import offersReducer              from './offersSlice';
+import notificationsReducer       from './notificationsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
     portfolio:           portfolioReducer,
     portfolioCategories: portfolioCategoriesReducer,
     offers:              offersReducer,
+    notifications:       notificationsReducer,
   },
 });
 

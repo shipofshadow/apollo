@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
-  Menu, X, ChevronLeft, ChevronRight, ChevronDown
+  Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from '../components/NotificationBell';
 import AnalyticsPanel       from './admin/AnalyticsPanel';
 import BookingsPanel        from './admin/BookingsPanel';
 import AdminBookingDetail   from './admin/AdminBookingDetail';
@@ -18,6 +19,8 @@ import ShopHoursPanel       from './admin/ShopHoursPanel';
 import SiteSettingsPanel    from './admin/SiteSettingsPanel';
 import FaqPanel             from './admin/FaqPanel';
 import OffersPanel          from './admin/OffersPanel';
+import ReviewsPanel         from './admin/ReviewsPanel';
+import CalendarPanel        from './admin/CalendarPanel';
 
 // ── Admin login screen (Unchanged) ────────────────────────────────────────────
 function AdminLogin() {
@@ -83,6 +86,7 @@ function AdminLogin() {
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, isAdmin, logout } = useAuth();
+  const location = useLocation();
   const [activeTab,       setActiveTab]       = useState('analytics');
   const [collapsed,       setCollapsed]       = useState(false);
   const [mobileOpen,      setMobileOpen]      = useState(false);
@@ -94,6 +98,17 @@ export default function AdminPage() {
     content: true,
     settings: false,
   });
+
+  // When navigated here from a notification click, auto-open the booking
+  useEffect(() => {
+    const state = location.state as { openBookingId?: string } | null;
+    if (state?.openBookingId) {
+      setActiveTab('appointments');
+      setActiveBookingId(state.openBookingId);
+      // Clear the state so a back-navigation doesn't re-trigger it
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
@@ -128,6 +143,8 @@ export default function AdminPage() {
   const navItems = [
     { key: 'analytics',    label: 'Analytics',  icon: BarChart3 },
     { key: 'appointments', label: 'Bookings',   icon: Calendar },
+    { key: 'calendar',     label: 'Calendar',   icon: CalendarDays },
+    { key: 'reviews',      label: 'Reviews',    icon: Star },
     {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
@@ -159,6 +176,8 @@ export default function AdminPage() {
       case 'services':      return <ServicesPanel />;
       case 'offers':        return <OffersPanel />;
       case 'content':       return <ContentPanel />;
+      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); }} />;
+      case 'reviews':       return <ReviewsPanel />;
       case 'appointments':
         if (activeBookingId) {
           return (
@@ -201,6 +220,8 @@ export default function AdminPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Back to Site</span>
           </a>
+          <div className="w-px h-5 bg-gray-700" />
+          <NotificationBell />
           <div className="w-px h-5 bg-gray-700" />
           <button onClick={() => logout()}
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">

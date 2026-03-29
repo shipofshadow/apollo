@@ -5,7 +5,8 @@ import {
   FileText, Hash, Image as ImageIcon, Loader2, Mail,
   Package, PenLine, Phone, User, Wrench, X, XCircle,
   ChevronLeft, ChevronRight, AlertTriangle, RefreshCw,
-  ClipboardList, BadgeCheck, Camera, Plus,
+  ClipboardList, BadgeCheck, Camera, Plus, StickyNote,
+  Shield, Award,
 } from 'lucide-react';
 import {
   fetchAllBookingsAsync,
@@ -19,9 +20,11 @@ import {
   fetchBuildUpdatesApi,
   createBuildUpdateApi,
   uploadBuildUpdateMediaApi,
+  updateInternalNotesApi,
+  fetchCustomerStatsApi,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, BuildUpdate, ShopDayHours } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours, CustomerStats } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -307,6 +310,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
   const [log,           setLog]           = useState<LogEntry[]>([]);
 
+  // Internal notes state
+  const [internalNotes,     setInternalNotes]     = useState('');
+  const [notesEditing,      setNotesEditing]      = useState(false);
+  const [notesBusy,         setNotesBusy]         = useState(false);
+
+  // Customer loyalty stats
+  const [customerStats,     setCustomerStats]     = useState<CustomerStats | null>(null);
+
   // Build updates state
   const [buildUpdates,      setBuildUpdates]      = useState<BuildUpdate[]>([]);
   const [buildUpdateOpen,   setBuildUpdateOpen]   = useState(false);
@@ -331,6 +342,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
         detail: `Status: ${formatStatus(booking.status)}`,
       }]);
       setPartsNotes(booking.partsNotes ?? '');
+      setInternalNotes(booking.internalNotes ?? '');
+
+      // Load customer loyalty stats
+      if (token && booking.userId) {
+        fetchCustomerStatsApi(token, booking.userId)
+          .then(r => setCustomerStats(r.stats))
+          .catch(() => {});
+      }
     }
   // only run once when booking first loads
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -345,6 +364,20 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   }, [token, bookingId]);
 
   const addLog = (entry: LogEntry) => setLog(prev => [...prev, entry]);
+
+  const handleSaveInternalNotes = async () => {
+    if (!token || !booking) return;
+    setNotesBusy(true);
+    try {
+      await updateInternalNotesApi(token, booking.id, internalNotes);
+      setNotesEditing(false);
+      showToast('Internal notes saved.', 'success');
+    } catch (e) {
+      showToast((e as Error).message, 'error');
+    } finally {
+      setNotesBusy(false);
+    }
+  };
 
   const handleStatus = async (newStatus: Booking['status']) => {
     if (!token || !booking) return;
@@ -911,6 +944,88 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 </div>
               )}
             </div>
+          </section>
+
+          {/* Customer Loyalty Stats */}
+          {customerStats && (
+            <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
+                <Award className="w-3.5 h-3.5 text-brand-orange" /> Customer History
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-brand-darker border border-gray-800 rounded-sm p-3 text-center">
+                  <p className="text-2xl font-display font-bold text-white">{customerStats.totalVisits}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-0.5">Total Visits</p>
+                </div>
+                <div className="bg-brand-darker border border-gray-800 rounded-sm p-3 text-center">
+                  <p className="text-2xl font-display font-bold text-blue-400">{customerStats.completedVisits}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-0.5">Completed</p>
+                </div>
+              </div>
+              {customerStats.memberSince && (
+                <p className="text-[10px] text-gray-600 mt-3">
+                  Member since {new Date(customerStats.memberSince).toLocaleDateString('en-PH', { year: 'numeric', month: 'long' })}
+                </p>
+              )}
+              {customerStats.totalVisits >= 5 && (
+                <div className="mt-3 flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 rounded-sm px-3 py-2">
+                  <Shield className="w-3.5 h-3.5 text-brand-orange shrink-0" />
+                  <span className="text-xs font-bold text-brand-orange">Loyal Customer</span>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Internal Notes */}
+          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+                <StickyNote className="w-3.5 h-3.5" /> Internal Notes
+              </p>
+              {!notesEditing && (
+                <button
+                  onClick={() => setNotesEditing(true)}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-brand-orange transition-colors"
+                >
+                  <Edit3 className="w-3 h-3" /> {internalNotes ? 'Edit' : 'Add'}
+                </button>
+              )}
+            </div>
+
+            {!notesEditing ? (
+              internalNotes ? (
+                <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{internalNotes}</p>
+              ) : (
+                <p className="text-gray-600 text-xs italic">No internal notes. Admin-only, never shown to client.</p>
+              )
+            ) : (
+              <div className="space-y-3">
+                <textarea
+                  value={internalNotes}
+                  onChange={e => setInternalNotes(e.target.value)}
+                  rows={5}
+                  placeholder="Private notes visible only to admins…"
+                  maxLength={5000}
+                  className="w-full bg-brand-darker border border-gray-700 text-white text-sm px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange resize-y placeholder-gray-600 transition-colors"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveInternalNotes}
+                    disabled={notesBusy}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
+                  >
+                    {notesBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => { setNotesEditing(false); setInternalNotes(booking.internalNotes ?? ''); }}
+                    className="text-xs text-gray-500 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Activity Log */}

@@ -22,14 +22,17 @@ define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN'] ?? '');
 
 define('CACHE_TTL_SECONDS', (int)($_ENV['CACHE_TTL_SECONDS'] ?? 60));
 
-define(
-    'CORS_ORIGINS',
+define('CORS_ORIGINS',
     array_values(
         array_filter(
             array_map('trim', explode(',', $_ENV['CORS_ORIGINS'] ?? 'http://localhost:5173,http://localhost:4173'))
         )
     )
 );
+
+// Public-facing URL of the frontend app, used for password reset links.
+// Defaults to the first CORS origin when not explicitly set.
+define('APP_URL', rtrim($_ENV['APP_URL'] ?? (CORS_ORIGINS[0] ?? 'http://localhost:5173'), '/'));
 
 // ---------------------------------------------------------------------------
 // Database constants
@@ -92,3 +95,12 @@ define('R2_SECRET_ACCESS_KEY',$_ENV['R2_SECRET_ACCESS_KEY'] ?? '');
 define('R2_BUCKET_NAME',      $_ENV['R2_BUCKET_NAME']       ?? '');
 define('R2_KEY_PREFIX',       rtrim($_ENV['R2_KEY_PREFIX']   ?? 'chopaeng/1625autolab', '/') . '/');
 define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));
+
+// ---------------------------------------------------------------------------
+// SMS (Twilio)
+// Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM to enable SMS.
+// ---------------------------------------------------------------------------
+
+define('TWILIO_ACCOUNT_SID', $_ENV['TWILIO_ACCOUNT_SID'] ?? '');
+define('TWILIO_AUTH_TOKEN',  $_ENV['TWILIO_AUTH_TOKEN']  ?? '');
+define('TWILIO_FROM',        $_ENV['TWILIO_FROM']        ?? '');
