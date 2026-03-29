@@ -37,12 +37,12 @@ export default function MyBookings() {
     if (token) dispatch(fetchMyBookingsAsync(token));
   }, [token, dispatch]);
 
-  // Only show real bookings that belong to the logged-in user.
+  // Only show bookings that belong to the logged-in user.
   // Guard against null user — if user isn't loaded yet, show nothing.
   const myBookings = !user
     ? []
     : appointments.filter(
-        b => !b.id.startsWith('mock') && b.userId === user.id
+        b => b.userId === user.id
       );
 
   const filtered = filter === 'all'

@@ -16,7 +16,6 @@ import {
 } from '../../services/api';
 import type { ClientAdminSummary, UserRole } from '../../types';
 
-const FALLBACK_ROLES: UserRole[] = ['client', 'staff', 'manager', 'admin'];
 const TABLE_PAGE_SIZE = 8;
 
 const PERMISSION_CATALOG = [
@@ -148,8 +147,7 @@ export default function UserAccessPanel() {
 
   const roleOptions = useMemo<UserRole[]>(() => {
     const dynamic = roles.map(r => r.key).filter(Boolean);
-    if (dynamic.length > 0) return dynamic;
-    return FALLBACK_ROLES;
+    return dynamic;
   }, [roles]);
 
   const sortedRoles = useMemo(() => {
@@ -316,7 +314,7 @@ export default function UserAccessPanel() {
         email: '',
         phone: '',
         password: '',
-        role: roleOptions.includes('staff') ? 'staff' : (roleOptions[0] ?? 'client'),
+        role: roleOptions.includes('staff') ? 'staff' : (roleOptions[0] ?? newUser.role),
       });
       showToast('User account created.', 'success');
       await loadClients();
@@ -329,6 +327,11 @@ export default function UserAccessPanel() {
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
+    if (roleOptions.length === 0) {
+      showToast('API is offline.', 'error');
+      return;
+    }
+
     const payload = {
       name: newUser.name.trim(),
       email: newUser.email.trim(),
@@ -849,21 +852,27 @@ export default function UserAccessPanel() {
               <select
                 value={newUser.role}
                 onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
+                disabled={roleOptions.length === 0}
                 className="flex-1 bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
               >
-                {roleOptions.map(role => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
+                {roleOptions.length > 0
+                  ? roleOptions.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))
+                  : <option value="" disabled>No roles available</option>}
               </select>
               <button
                 type="submit"
-                disabled={creatingUser}
+                disabled={creatingUser || roleOptions.length === 0}
                 className="px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
               >
                 {creatingUser ? 'Creating...' : 'Create'}
               </button>
             </div>
           </form>
+          {roleOptions.length === 0 && (
+            <p className="text-xs text-yellow-400">No roles loaded from API. User creation is disabled while API is offline.</p>
+          )}
         </section>
       )}
 
@@ -914,7 +923,7 @@ export default function UserAccessPanel() {
                       <td className="py-1.5 md:py-2.5 px-3 md:px-4">
                         <select
                           value={item.role}
-                          disabled={updatingRoleId === item.id}
+                          disabled={updatingRoleId === item.id || roleOptions.length === 0}
                           onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
                           className="bg-brand-darker border border-gray-700 text-white px-1.5 md:px-2 py-1 md:py-1.5 rounded-sm text-xs focus:outline-none focus:border-brand-orange disabled:opacity-60"
                         >

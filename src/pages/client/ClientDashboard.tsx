@@ -38,7 +38,7 @@ export default function ClientDashboard() {
   const myBookings = !user
     ? []
     : appointments.filter(
-        b => !b.id.startsWith('mock') && b.userId === user.id
+        b => b.userId === user.id
       );
   const recent     = myBookings.slice(0, 5);
 

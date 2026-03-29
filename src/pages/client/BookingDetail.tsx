@@ -410,7 +410,7 @@ export default function BookingDetail() {
     if (!id || !token) return;
 
     const cached = appointments.find(
-      b => b.id === id && !b.id.startsWith('mock') && b.userId != null && b.userId === user?.id
+      b => b.id === id && b.userId != null && b.userId === user?.id
     );
     if (cached) {
       setBooking(cached);

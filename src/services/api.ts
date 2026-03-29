@@ -3,6 +3,14 @@ import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+export const API_OFFLINE_EVENT = 'apollo:api-offline';
+
+function notifyApiOffline(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(API_OFFLINE_EVENT));
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -18,7 +26,8 @@ async function apiFetch<T>(
   try {
     response = await fetch(`${BACKEND_URL}${path}`, { ...options, headers });
   } catch {
-    throw new Error('Unable to reach the backend server. Please check your connection.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
 
   const data = await response.json();
@@ -66,7 +75,8 @@ export const uploadProfileAvatarApi = async (token: string, file: File): Promise
       body: form,
     });
   } catch {
-    throw new Error('Unable to reach the backend server.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
   const data = await response.json();
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
@@ -138,7 +148,8 @@ export const exportSecurityAuditCsvApi = async (token: string, limit = 1000): Pr
       }
     );
   } catch {
-    throw new Error('Unable to reach the backend server. Please check your connection.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
 
   if (!response.ok) {
@@ -243,7 +254,8 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
   try {
     response = await fetch(`${BACKEND_URL}/api/bookings/media`, { method: 'POST', body: form });
   } catch {
-    throw new Error('Unable to reach the backend server.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
   const data = await response.json();
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
@@ -267,7 +279,8 @@ export const uploadAdminImageApi = async (
       body: form,
     });
   } catch {
-    throw new Error('Unable to reach the backend server.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
   const data = await response.json();
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
@@ -387,7 +400,8 @@ export const uploadBuildUpdateMediaApi = async (
       { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
     );
   } catch {
-    throw new Error('Unable to reach the backend server.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
   const data = await response.json();
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
@@ -899,26 +913,6 @@ export const deleteBeforeAfterItemApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
-// ── Legacy / mock (kept for offline fallback) ────────────────────────────────
-
-export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const primaryId = payload.serviceIds[0] ?? 0;
-      resolve({
-        ...payload,
-        serviceId:  primaryId,
-        serviceIds: payload.serviceIds,
-        serviceName: `Service #${primaryId}`,
-        id: Math.random().toString(36).substr(2, 9),
-        referenceNumber: `BK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      });
-    }, 800);
-  });
-};
-
 // ── Facebook feed ─────────────────────────────────────────────────────────────
 
 export interface FacebookPostsPage {
@@ -936,7 +930,8 @@ export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<F
   try {
     response = await fetch(url);
   } catch {
-    throw new Error('Unable to reach the backend server. Please check your connection.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
 
   const data = await response.json();
@@ -1096,7 +1091,8 @@ export const uploadMyVehicleImageApi = async (token: string, file: File): Promis
       body: form,
     });
   } catch {
-    throw new Error('Unable to reach the backend server.');
+    notifyApiOffline();
+    throw new Error('API is offline.');
   }
 
   const data = await response.json();

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, MoveHorizontal } from 'lucide-react';
+import { MoveHorizontal } from 'lucide-react';
 import { fetchBeforeAfterItemsApi } from '../services/api';
 import type { BeforeAfterItem } from '../types';
-import heroImage from '../assets/hero.png';
 
 type ComparisonCase = {
   id: number | string;
@@ -27,23 +26,6 @@ function buildComparisonCases(items: BeforeAfterItem[]): ComparisonCase[] {
     .slice(0, 8);
 }
 
-const FALLBACK_CASES: ComparisonCase[] = [
-  {
-    id: 'fallback-1',
-    title: 'Headlight Restoration Preview',
-    beforeUrl: heroImage,
-    afterUrl: heroImage,
-    synthetic: true,
-  },
-  {
-    id: 'fallback-2',
-    title: 'Retrofit Beam Alignment Preview',
-    beforeUrl: heroImage,
-    afterUrl: heroImage,
-    synthetic: true,
-  },
-];
-
 export default function BeforeAfterShowcase() {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<ComparisonCase[]>([]);
@@ -55,11 +37,10 @@ export default function BeforeAfterShowcase() {
     fetchBeforeAfterItemsApi()
       .then(({ items }) => {
         if (cancelled) return;
-        const built = buildComparisonCases(items);
-        setCases(built.length > 0 ? built : FALLBACK_CASES);
+        setCases(buildComparisonCases(items));
       })
       .catch(() => {
-        if (!cancelled) setCases(FALLBACK_CASES);
+        if (!cancelled) setCases([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -75,15 +56,7 @@ export default function BeforeAfterShowcase() {
     return cases[Math.min(activeIndex, cases.length - 1)];
   }, [cases, activeIndex]);
 
-  if (loading) {
-    return (
-      <section className="py-20 bg-brand-darker border-y border-gray-800">
-        <div className="container mx-auto px-4 md:px-6 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-brand-orange" />
-        </div>
-      </section>
-    );
-  }
+  if (loading) return null;
 
   if (!active) return null;
 

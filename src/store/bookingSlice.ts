@@ -9,11 +9,9 @@ import {
   fetchBookingByIdApi,
   rescheduleBookingApi,
   adminRescheduleBookingApi,
-  submitBooking as submitBookingMock,
 } from '../services/api';
-import { BACKEND_URL } from '../config';
 
-// Try the real API; fall back to mock when backend is not reachable
+// Submit booking via API only.
 export const submitBookingAsync = createAsyncThunk(
   'booking/submit',
   async (
@@ -21,11 +19,8 @@ export const submitBookingAsync = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      if (BACKEND_URL) {
-        const { booking } = await submitBookingApi(arg.payload, arg.token);
-        return booking;
-      }
-      return await submitBookingMock(arg.payload);
+      const { booking } = await submitBookingApi(arg.payload, arg.token);
+      return booking;
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Failed to submit booking.');
     }
@@ -132,48 +127,7 @@ export const adminRescheduleBookingAsync = createAsyncThunk(
 const initialState: BookingState = {
   status: 'idle',
   error: null,
-  appointments: [
-    {
-      id: 'mock-1',
-      referenceNumber: 'BK-20260325-1001',
-      userId: null,
-      name: 'John Smith',
-      email: 'john@example.com',
-      phone: '09171234567',
-      vehicleInfo: '2020 Ford Mustang',
-      vehicleMake: 'Ford',
-      vehicleModel: 'Mustang',
-      vehicleYear: '2020',
-      serviceId: 1,
-      serviceIds: [1],
-      serviceName: 'Headlight Retrofit',
-      appointmentDate: '2026-03-25',
-      appointmentTime: '09:00 AM',
-      notes: 'Want RGB halos and demon eyes.',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'mock-2',
-      referenceNumber: 'BK-20260324-1002',
-      userId: null,
-      name: 'Sarah Connor',
-      email: 'sarah@example.com',
-      phone: '09189876543',
-      vehicleInfo: '2018 Toyota Tacoma',
-      vehicleMake: 'Toyota',
-      vehicleModel: 'Hilux',
-      vehicleYear: '2018',
-      serviceId: 2,
-      serviceIds: [2],
-      serviceName: 'Android Headunit Installation',
-      appointmentDate: '2026-03-24',
-      appointmentTime: '11:00 AM',
-      notes: 'Need wireless CarPlay.',
-      status: 'confirmed',
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ],
+  appointments: [],
 };
 
 const bookingSlice = createSlice({
@@ -207,12 +161,7 @@ const bookingSlice = createSlice({
         state.error  = action.payload as string;
       })
       .addCase(fetchMyBookingsAsync.fulfilled, (state, action) => {
-        // Replace all real bookings with the current user's fresh data.
-        // Keep only mock/demo entries so they can still serve as UI placeholders.
-        state.appointments = [
-          ...action.payload,
-          ...state.appointments.filter(a => a.id.startsWith('mock')),
-        ];
+        state.appointments = action.payload;
       })
       .addCase(fetchAllBookingsAsync.fulfilled, (state, action) => {
         state.appointments = action.payload;
