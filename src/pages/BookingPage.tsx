@@ -18,6 +18,7 @@ import {
 import { BACKEND_URL } from '../config';
 import type { ClientVehicle, ShopDayHours } from '../types';
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+import PageSEO from '../components/PageSEO';
 import SignaturePad from '../components/SignaturePad';
 import { formatPrice } from '../utils/formatPrice';
 
@@ -408,6 +409,10 @@ export default function BookingPage() {
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
+      <PageSEO
+        title="Book a Service"
+        description="Schedule your automotive retrofitting or customization service at 1625 Auto Lab. Book online in minutes with live availability."
+      />
       <div className="container mx-auto px-4 md:px-6 max-w-4xl">
         <div className="text-center mb-12">
           <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-3">Schedule Your Visit</span>

@@ -7,6 +7,7 @@ import { fetchProductsAsync } from '../store/productsSlice';
 import { SkeletonCard } from '../components/Skeleton';
 import ServicesGrid from '../components/ServicesGrid';
 import { formatPrice } from '../utils/formatPrice';
+import PageSEO from '../components/PageSEO';
 
 export default function ServicesPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,6 +38,10 @@ export default function ServicesPage() {
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
+      <PageSEO
+        title="Services & Products"
+        description="Browse our full range of automotive retrofitting services and products — projector headlights, HID/LED conversions, suspension upgrades, custom accessories, and more."
+      />
       <div className="container mx-auto px-4 md:px-6 mb-16 text-center">
         <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-4">
           Our Offerings

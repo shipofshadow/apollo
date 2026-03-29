@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ChevronDown, HelpCircle, Loader2, AlertCircle } from 'lucide-react';
 import { fetchFaqsAsync } from '../store/faqSlice';
 import type { AppDispatch, RootState } from '../store';
+import PageSEO from '../components/PageSEO';
 
 export default function FaqPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -24,6 +25,10 @@ export default function FaqPage() {
 
   return (
     <div className="min-h-screen bg-brand-dark">
+      <PageSEO
+        title="Frequently Asked Questions"
+        description="Get answers to common questions about automotive retrofitting services, pricing, booking, and more at 1625 Auto Lab."
+      />
       {/* Hero */}
       <section className="bg-brand-darker border-b border-gray-800 pt-32 pb-16">
         <div className="container mx-auto px-4 md:px-6 text-center">
