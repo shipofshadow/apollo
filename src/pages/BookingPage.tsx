@@ -485,7 +485,7 @@ export default function BookingPage() {
                           const variation = svc?.variations?.find(v => v.id === varId);
                           return variation ? (
                             <span key={svcId} className="mr-3">
-                              {svc?.title}: <strong>{variation.name}</strong>
+                              <strong>{variation.name}</strong>
                             </span>
                           ) : null;
                         })}
@@ -496,7 +496,6 @@ export default function BookingPage() {
                         const price = getEffectivePrice(svc.id);
                         return price ? (
                           <div key={svc.id}>
-                            <span className="text-gray-500">{svc.title}:</span>{' '}
                             <span className="text-brand-orange font-bold">{formatPrice(price)}</span>
                           </div>
                         ) : null;
