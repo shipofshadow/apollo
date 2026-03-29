@@ -77,6 +77,7 @@ export interface AuthContextValue {
   updateProfile: (data: {
     name?: string;
     phone?: string;
+    avatar_url?: string | null;
     password?: string;
     password_confirmation?: string;
   }) => Promise<void>;
@@ -127,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (data: {
     name?: string;
     phone?: string;
+    avatar_url?: string | null;
     password?: string;
     password_confirmation?: string;
   }): Promise<void> => {

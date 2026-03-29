@@ -74,7 +74,7 @@ export default function NotificationBell({ className = '' }: Props) {
     const bookingId = n.data?.bookingId as string | undefined;
     if (!bookingId) return;
 
-    if (user?.role === 'admin') {
+    if (user?.role && user.role !== 'client') {
       navigate('/admin', { state: { openBookingId: String(bookingId) } });
     } else {
       navigate(`/client/bookings/${bookingId}`);

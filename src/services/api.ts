@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -47,12 +47,31 @@ export const fetchMeApi = (token: string) =>
 
 export const updateProfileApi = (
   token: string,
-  data: { name?: string; phone?: string; password?: string; password_confirmation?: string }
+  data: { name?: string; phone?: string; avatar_url?: string | null; password?: string; password_confirmation?: string }
 ) =>
   apiFetch<{ user: User }>('/api/auth/profile', {
     method: 'PUT',
     body: JSON.stringify(data),
   }, token);
+
+export const uploadProfileAvatarApi = async (token: string, file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/auth/avatar-upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch {
+    throw new Error('Unable to reach the backend server.');
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  return (data as { url: string }).url;
+};
 
 export const logoutApi = (token: string) =>
   apiFetch<{ message: string }>('/api/auth/logout', { method: 'POST' }, token);
@@ -214,11 +233,11 @@ export const updateBookingStatusApi = (
 export const assignBookingTechnicianApi = (
   token: string,
   id: string,
-  assignedTechId: number | null
+  data: { assignedTechId?: number | null; assignedUserId?: number | null }
 ) =>
   apiFetch<{ booking: Booking }>(`/api/bookings/${id}/assign-tech`, {
     method: 'PATCH',
-    body: JSON.stringify({ assignedTechId }),
+    body: JSON.stringify(data),
   }, token);
 
 export const cancelMyBookingApi = (token: string, id: string) =>
@@ -521,6 +540,85 @@ export interface AdminStats {
   reviewCount: number;
   avgRating: number;
 }
+
+export interface AdminManagedUser {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  created_at: string;
+}
+
+export interface AdminRole {
+  id: number;
+  key: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  isSystem: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export const fetchAdminUsersApi = (token: string, params?: { search?: string; role?: UserRole | '' }) => {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.role) q.set('role', params.role);
+  const query = q.toString();
+  const path = query ? `/api/admin/users?${query}` : '/api/admin/users';
+  return apiFetch<{ users: AdminManagedUser[] }>(path, {}, token);
+};
+
+export const createAdminUserApi = (
+  token: string,
+  data: { name: string; email: string; phone?: string; password: string; role: UserRole }
+) =>
+  apiFetch<{ user: AdminManagedUser }>('/api/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateAdminUserRoleApi = (token: string, id: number, role: UserRole) =>
+  apiFetch<{ user: AdminManagedUser }>(`/api/admin/users/${id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  }, token);
+
+export const fetchAdminClientsApi = (token: string, params?: { search?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  const query = q.toString();
+  const path = query ? `/api/admin/clients?${query}` : '/api/admin/clients';
+  return apiFetch<{ clients: ClientAdminSummary[] }>(path, {}, token);
+};
+
+export const fetchAdminRolesApi = (token: string) =>
+  apiFetch<{ roles: AdminRole[] }>('/api/admin/roles', {}, token);
+
+export const createAdminRoleApi = (
+  token: string,
+  data: { key: string; name: string; description?: string; permissions?: string[] }
+) =>
+  apiFetch<{ role: AdminRole }>('/api/admin/roles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateAdminRoleApi = (
+  token: string,
+  id: number,
+  data: { key?: string; name?: string; description?: string; permissions?: string[] }
+) =>
+  apiFetch<{ role: AdminRole }>(`/api/admin/roles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteAdminRoleApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/admin/roles/${id}`, {
+    method: 'DELETE',
+  }, token);
 
 export const fetchAdminStatsApi = (token: string) =>
   apiFetch<AdminStats>('/api/admin/stats', {}, token);

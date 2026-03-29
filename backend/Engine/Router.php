@@ -13,6 +13,52 @@ use function FastRoute\simpleDispatcher;
  */
 class Router
 {
+    /** @var array<string, string[]>|null */
+    private ?array $rolePermissionsCache = null;
+
+    /** @var array<string, string[]> */
+    private const FALLBACK_ROLE_PERMISSIONS = [
+        'admin' => [
+            'analytics:view',
+            'bookings:manage',
+            'bookings:assign-tech',
+            'bookings:notes',
+            'build-updates:manage',
+            'clients:manage',
+            'users:manage',
+            'roles:view',
+            'roles:manage',
+            'reviews:manage',
+            'services:manage',
+            'products:manage',
+            'content:manage',
+            'settings:manage',
+            'shop-hours:manage',
+            'media:upload',
+        ],
+        'manager' => [
+            'analytics:view',
+            'bookings:manage',
+            'bookings:assign-tech',
+            'bookings:notes',
+            'build-updates:manage',
+            'clients:manage',
+            'roles:view',
+            'reviews:manage',
+            'services:manage',
+            'products:manage',
+            'media:upload',
+        ],
+        'staff' => [
+            'bookings:manage',
+            'build-updates:manage',
+            'clients:manage',
+            'roles:view',
+            'media:upload',
+        ],
+        'client' => ['client:self'],
+    ];
+
     public function dispatch(): void
     {
         header('Content-Type: application/json');
@@ -41,6 +87,7 @@ class Router
             $r->addRoute('POST', '/api/auth/logout',           'handleAuthLogout');
             $r->addRoute('GET',  '/api/auth/me',               'handleAuthMe');
             $r->addRoute('PUT',  '/api/auth/profile',          'handleAuthProfile');
+            $r->addRoute('POST', '/api/auth/avatar-upload',    'handleAuthAvatarUpload');
             $r->addRoute('POST', '/api/auth/forgot-password',  'handleAuthForgotPassword');
             $r->addRoute('POST', '/api/auth/reset-password',   'handleAuthResetPassword');
 
@@ -168,6 +215,15 @@ class Router
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
+            $r->addRoute('GET',  '/api/admin/users',   'handleAdminUserList');
+            $r->addRoute('POST', '/api/admin/users',   'handleAdminUserCreate');
+            $r->addRoute('PATCH', '/api/admin/users/{id:\d+}/role', 'handleAdminUserRoleUpdate');
+            $r->addRoute('GET',  '/api/admin/clients', 'handleAdminClientList');
+            $r->addRoute('GET',  '/api/admin/roles',   'handleAdminRoleList');
+            $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
+            $r->addRoute('POST', '/api/admin/roles',   'handleAdminRoleCreate');
+            $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
+            $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
 
             // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
@@ -229,6 +285,114 @@ class Router
         $payload = Auth::user();
 
         if ($role !== null && ($payload['role'] ?? '') !== $role) {
+            throw new RuntimeException('Forbidden.', 403);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Require one of the provided roles.
+     *
+     * @param string[] $roles
+     * @return array<string, mixed>
+     */
+    private function requireRoles(array $roles): array
+    {
+        $payload = Auth::user();
+        $role = (string) ($payload['role'] ?? '');
+
+        if (!in_array($role, $roles, true)) {
+            throw new RuntimeException('Forbidden.', 403);
+        }
+
+        return $payload;
+    }
+
+    private function isBackofficeRole(string $role): bool
+    {
+        return in_array($role, ['admin', 'manager', 'staff'], true);
+    }
+
+    /** @return array<string, string[]> */
+    private function getPermissionMap(): array
+    {
+        if ($this->rolePermissionsCache !== null) {
+            return $this->rolePermissionsCache;
+        }
+
+        $map = self::FALLBACK_ROLE_PERMISSIONS;
+
+        try {
+            $roles = (new UserService())->listRoles();
+            if (!empty($roles)) {
+                $dynamic = [];
+                foreach ($roles as $role) {
+                    $key = strtolower(trim((string) ($role['key'] ?? '')));
+                    if ($key === '') {
+                        continue;
+                    }
+
+                    $permissions = is_array($role['permissions'] ?? null)
+                        ? array_values(array_filter(array_map('strval', $role['permissions']), static fn (string $v): bool => $v !== ''))
+                        : [];
+
+                    $dynamic[$key] = $permissions;
+                }
+
+                if (!empty($dynamic)) {
+                    $map = $dynamic;
+                }
+            }
+        } catch (\Throwable) {
+            // Keep static fallback map when role records are unavailable.
+        }
+
+        $this->rolePermissionsCache = $map;
+        return $map;
+    }
+
+    private function hasPermissionByRole(string $role, string $permission): bool
+    {
+        $role = strtolower(trim($role));
+        if ($role === '') {
+            return false;
+        }
+
+        $permissions = $this->getPermissionMap()[$role] ?? [];
+        if ($role === 'admin') {
+            return true;
+        }
+
+        return in_array($permission, $permissions, true);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function hasPermission(array $payload, string $permission): bool
+    {
+        return $this->hasPermissionByRole((string) ($payload['role'] ?? ''), $permission);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param string[] $permissions
+     */
+    private function hasAnyPermission(array $payload, array $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->hasPermission($payload, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return array<string, mixed> */
+    private function requirePermission(string $permission): array
+    {
+        $payload = Auth::user();
+        if (!$this->hasPermission($payload, $permission)) {
             throw new RuntimeException('Forbidden.', 403);
         }
 
@@ -325,6 +489,42 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleAuthAvatarUpload(array $vars = []): void
+    {
+        $this->requireAuth();
+
+        if (empty($_FILES['file'])) {
+            throw new RuntimeException('No file provided.', 422);
+        }
+
+        $file     = $_FILES['file'];
+        $tmpName  = $file['tmp_name'];
+        $mime     = $file['type'];
+        $size     = $file['size'];
+        $error    = $file['error'];
+
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException("File upload error (code $error).", 422);
+        }
+        $allowed_mimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!in_array($mime, $allowed_mimes, true) || !@getimagesize($tmpName)) {
+            throw new RuntimeException('Only JPEG, PNG, WebP and GIF images are accepted.', 422);
+        }
+        $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
+        if ($size > $maxBytes) {
+            throw new RuntimeException('File must be under ' . UPLOAD_MAX_MB . ' MB.', 422);
+        }
+
+        $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+
+        $storage = new UploadStorage();
+        $url     = $storage->upload($tmpName, $filename, $mime, 'users/');
+
+        echo json_encode(['url' => $url]);
+    }
+
+    /** @param array<string, string> $vars */
     private function handleAuthForgotPassword(array $vars = []): void
     {
         $data  = $this->jsonBody();
@@ -392,7 +592,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingList(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('bookings:manage');
         $bookings = (new BookingService())->getAll();
         echo json_encode(['bookings' => $bookings]);
     }
@@ -412,6 +612,15 @@ class Router
         $id      = $vars['id'] ?? '';
         $userId  = (int) ($payload['sub'] ?? 0);
 
+        if ($this->hasPermission($payload, 'bookings:manage')) {
+            $booking = (new BookingService())->adminFindById($id);
+            if ($booking === null) {
+                throw new RuntimeException('Booking not found.', 404);
+            }
+            echo json_encode(['booking' => $booking]);
+            return;
+        }
+
         $booking = (new BookingService())->getById($id, $userId);
         echo json_encode(['booking' => $booking]);
     }
@@ -426,10 +635,9 @@ class Router
 
         $payload = $this->requireAuth();
         $id      = $vars['id'] ?? '';
-        $role    = (string) ($payload['role'] ?? '');
         $userId  = (int) ($payload['sub'] ?? 0);
 
-        if ($role !== 'admin') {
+        if (!$this->hasPermission($payload, 'bookings:manage')) {
             (new BookingService())->getById($id, $userId);
         }
 
@@ -462,7 +670,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminBookingReschedule(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('bookings:manage');
         $id   = $vars['id'] ?? '';
         $data = $this->jsonBody();
 
@@ -483,7 +691,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('bookings:manage');
         $id     = $vars['id'] ?? '';
         $data   = $this->jsonBody();
         $status = (string) ($data['status'] ?? '');
@@ -495,13 +703,40 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingAssignTech(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('bookings:assign-tech');
         $id   = $vars['id'] ?? '';
         $data = $this->jsonBody();
 
+        $rawUserId = $data['assignedUserId'] ?? ($data['assigned_user_id'] ?? null);
         $rawTechId = $data['assignedTechId'] ?? ($data['assigned_tech_id'] ?? null);
         $assignedTechId = null;
-        if ($rawTechId !== null && $rawTechId !== '') {
+        if ($rawUserId !== null && $rawUserId !== '') {
+            $assignedUserId = (int) $rawUserId;
+            if ($assignedUserId <= 0) {
+                throw new RuntimeException('assignedUserId must be a positive integer or null.', 422);
+            }
+
+            $stmt = Database::getInstance()->prepare(
+                'SELECT id FROM team_members WHERE user_id = :user_id LIMIT 1'
+            );
+            $stmt->execute([':user_id' => $assignedUserId]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            if ($existing) {
+                $assignedTechId = (int) ($existing['id'] ?? 0);
+            } else {
+                $created = (new TeamMemberService())->create([
+                    'userId' => $assignedUserId,
+                    'sortOrder' => 999,
+                    'isActive' => true,
+                ]);
+                $assignedTechId = (int) ($created['id'] ?? 0);
+            }
+
+            if ($assignedTechId <= 0) {
+                throw new RuntimeException('Unable to link selected user to a technician profile.', 422);
+            }
+        } elseif ($rawTechId !== null && $rawTechId !== '') {
             $assignedTechId = (int) $rawTechId;
             if ($assignedTechId <= 0) {
                 throw new RuntimeException('assignedTechId must be a positive integer or null.', 422);
@@ -554,7 +789,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleShopHoursPut(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('shop-hours:manage');
         $data  = $this->jsonBody();
         $input = $data['hours'] ?? $data; // accept both {hours:[...]} and [...] directly
 
@@ -610,7 +845,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingPartsUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('bookings:manage');
         $id          = $vars['id'] ?? '';
         $data        = $this->jsonBody();
         $waiting     = (bool) ($data['awaitingParts'] ?? false);
@@ -640,11 +875,10 @@ class Router
     {
         $payload = $this->requireAuth();
         $id      = $vars['id'] ?? '';
-        $role    = (string) ($payload['role'] ?? '');
         $userId  = (int) ($payload['sub'] ?? 0);
 
-        // Admins see any booking's updates; clients may only see their own
-        if ($role !== 'admin') {
+        // Users with build update permission see any booking; clients only their own.
+        if (!$this->hasAnyPermission($payload, ['build-updates:manage', 'bookings:manage'])) {
             // Verify this booking belongs to the authenticated user
             (new BookingService())->getById($id, $userId);
         }
@@ -656,7 +890,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBuildUpdateCreate(array $vars = []): void
     {
-        $payload   = $this->requireAuth('admin');
+        $payload   = $this->requirePermission('build-updates:manage');
         $actorId   = (int) ($payload['sub'] ?? 0);
         $id        = $vars['id'] ?? '';
         $data      = $this->jsonBody();
@@ -715,7 +949,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBuildUpdateMediaUpload(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('build-updates:manage');
 
         if (empty($_FILES['files'])) {
             throw new RuntimeException('No files provided.', 422);
@@ -768,7 +1002,7 @@ class Router
         }
 
         $payload   = $this->requireAuth();
-        $isAdmin   = ($payload['role'] ?? '') === 'admin';
+        $isAdmin   = $this->hasAnyPermission($payload, ['bookings:manage', 'clients:manage', 'analytics:view', 'users:manage', 'roles:view']);
         $userId    = (int) ($payload['sub'] ?? 0);
         $svc       = new UserNotificationService();
 
@@ -787,7 +1021,7 @@ class Router
         }
 
         $payload = $this->requireAuth();
-        $isAdmin = ($payload['role'] ?? '') === 'admin';
+    $isAdmin = $this->hasAnyPermission($payload, ['bookings:manage', 'clients:manage', 'analytics:view', 'users:manage', 'roles:view']);
         $userId  = (int) ($payload['sub'] ?? 0);
         $id      = (int) ($vars['id'] ?? 0);
 
@@ -804,7 +1038,7 @@ class Router
         }
 
         $payload = $this->requireAuth();
-        $isAdmin = ($payload['role'] ?? '') === 'admin';
+    $isAdmin = $this->hasAnyPermission($payload, ['bookings:manage', 'clients:manage', 'analytics:view', 'users:manage', 'roles:view']);
         $userId  = (int) ($payload['sub'] ?? 0);
 
         (new UserNotificationService())->markAllRead($isAdmin, $userId);
@@ -820,7 +1054,7 @@ class Router
         }
 
         $payload = $this->requireAuth();
-        $isAdmin = ($payload['role'] ?? '') === 'admin';
+    $isAdmin = $this->hasAnyPermission($payload, ['bookings:manage', 'clients:manage', 'analytics:view', 'users:manage', 'roles:view']);
         $userId  = (int) ($payload['sub'] ?? 0);
         $id      = (int) ($vars['id'] ?? 0);
 
@@ -864,7 +1098,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleReviewList(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('reviews:manage');
         $reviews = (new ReviewService())->getAll();
         echo json_encode(['reviews' => $reviews]);
     }
@@ -872,7 +1106,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleReviewApprove(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('reviews:manage');
         (new ReviewService())->approve((int) ($vars['id'] ?? 0));
         echo json_encode(['ok' => true]);
     }
@@ -880,7 +1114,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleReviewReject(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('reviews:manage');
         (new ReviewService())->reject((int) ($vars['id'] ?? 0));
         echo json_encode(['ok' => true]);
     }
@@ -888,7 +1122,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleReviewDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('reviews:manage');
         (new ReviewService())->delete((int) ($vars['id'] ?? 0));
         echo json_encode(['ok' => true]);
     }
@@ -900,12 +1134,124 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingInternalNotes(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('bookings:notes');
         $id   = $vars['id'] ?? '';
         $data = json_decode(file_get_contents('php://input') ?: '{}', true) ?? [];
         $notes = mb_substr((string) ($data['internalNotes'] ?? ''), 0, 5000);
         $booking = (new BookingService())->updateInternalNotes($id, $notes);
         echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminUserList(array $vars = []): void
+    {
+        $this->requirePermission('users:manage');
+        $filters = [
+            'search' => (string) ($_GET['search'] ?? ''),
+            'role'   => (string) ($_GET['role'] ?? ''),
+        ];
+        $users = (new UserService())->listUsers($filters);
+        echo json_encode(['users' => $users]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminUserCreate(array $vars = []): void
+    {
+        $this->requirePermission('users:manage');
+        $data = $this->jsonBody();
+        $user = (new UserService())->createByAdmin($data);
+        http_response_code(201);
+        echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminUserRoleUpdate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('users:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid user id.', 422);
+        }
+
+        $data = $this->jsonBody();
+        $role = (string) ($data['role'] ?? '');
+        if ($role === '') {
+            throw new RuntimeException('role is required.', 422);
+        }
+
+        $actorId = (int) ($payload['sub'] ?? 0);
+        $actorName = (string) ($payload['name'] ?? '');
+        $user = (new UserService())->updateRole($id, $role, $actorId > 0 ? $actorId : null, $actorName);
+        echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminClientList(array $vars = []): void
+    {
+        $this->requirePermission('clients:manage');
+        $filters = ['search' => (string) ($_GET['search'] ?? '')];
+        $clients = (new UserService())->listClients($filters);
+        echo json_encode(['clients' => $clients]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminRoleList(array $vars = []): void
+    {
+        $this->requirePermission('roles:view');
+        $roles = (new UserService())->listRoles();
+        echo json_encode(['roles' => $roles]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminRoleAuditList(array $vars = []): void
+    {
+        $this->requirePermission('roles:view');
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 120;
+        $logs = (new UserService())->listRoleAuditLogs($limit);
+        echo json_encode(['logs' => $logs]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminRoleCreate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('roles:manage');
+        $data = $this->jsonBody();
+        $actorId = (int) ($payload['sub'] ?? 0);
+        $actorName = (string) ($payload['name'] ?? '');
+        $role = (new UserService())->createRole($data, $actorId > 0 ? $actorId : null, $actorName);
+        http_response_code(201);
+        echo json_encode(['role' => $role]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminRoleUpdate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('roles:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid role id.', 422);
+        }
+
+        $data = $this->jsonBody();
+        $actorId = (int) ($payload['sub'] ?? 0);
+        $actorName = (string) ($payload['name'] ?? '');
+        $role = (new UserService())->updateRoleDefinition($id, $data, $actorId > 0 ? $actorId : null, $actorName);
+        echo json_encode(['role' => $role]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminRoleDelete(array $vars = []): void
+    {
+        $payload = $this->requirePermission('roles:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid role id.', 422);
+        }
+
+        $actorId = (int) ($payload['sub'] ?? 0);
+        $actorName = (string) ($payload['name'] ?? '');
+        (new UserService())->deleteRole($id, $actorId > 0 ? $actorId : null, $actorName);
+        echo json_encode(['message' => 'Role deleted.']);
     }
 
     // -------------------------------------------------------------------------
@@ -1032,13 +1378,13 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceList(array $vars = []): void
     {
-        // Admin sees all; public sees only active
+        // Service managers see inactive entries; public sees active only.
         $includeInactive = false;
         $token = Auth::tokenFromHeader();
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $includeInactive = ($payload['role'] ?? '') === 'admin';
+                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'services:manage');
             } catch (RuntimeException) { /* treat as public */ }
         }
 
@@ -1055,7 +1401,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $requireActive = ($payload['role'] ?? '') !== 'admin';
+                $requireActive = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'services:manage');
             } catch (RuntimeException) { /* stay public */ }
         }
 
@@ -1072,7 +1418,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $requireActive = ($payload['role'] ?? '') !== 'admin';
+                $requireActive = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'services:manage');
             } catch (RuntimeException) { /* stay public */ }
         }
 
@@ -1083,7 +1429,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('services:manage');
         $data    = $this->jsonBody();
         $service = (new ServiceCrudService())->create($data);
         http_response_code(201);
@@ -1093,7 +1439,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('services:manage');
         $id      = (int) ($vars['id'] ?? 0);
         $data    = $this->jsonBody();
         $service = (new ServiceCrudService())->update($id, $data);
@@ -1103,7 +1449,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('services:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new ServiceCrudService())->delete($id);
         echo json_encode(['message' => 'Service deleted.']);
@@ -1124,7 +1470,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceVariationCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('services:manage');
         $id        = (int) ($vars['id'] ?? 0);
         $data      = $this->jsonBody();
         $variation = (new ServiceCrudService())->createVariation($id, $data);
@@ -1135,7 +1481,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceVariationUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('services:manage');
         $id        = (int) ($vars['id']  ?? 0);
         $vid       = (int) ($vars['vid'] ?? 0);
         $data      = $this->jsonBody();
@@ -1146,7 +1492,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleServiceVariationDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('services:manage');
         $id  = (int) ($vars['id']  ?? 0);
         $vid = (int) ($vars['vid'] ?? 0);
         (new ServiceCrudService())->deleteVariation($id, $vid);
@@ -1165,7 +1511,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $publishedOnly = ($payload['role'] ?? '') !== 'admin';
+                $publishedOnly = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
             } catch (RuntimeException) { /* treat as public */ }
         }
 
@@ -1182,7 +1528,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $publishedOnly = ($payload['role'] ?? '') !== 'admin';
+                $publishedOnly = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
             } catch (RuntimeException) { /* treat as public */ }
         }
 
@@ -1193,7 +1539,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBlogCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data = $this->jsonBody();
         $post = (new BlogPostService())->create($data);
         http_response_code(201);
@@ -1203,7 +1549,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBlogUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id   = (int) ($vars['id'] ?? 0);
         $data = $this->jsonBody();
         $post = (new BlogPostService())->update($id, $data);
@@ -1213,7 +1559,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBlogDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new BlogPostService())->delete($id);
         echo json_encode(['message' => 'Blog post deleted.']);
@@ -1222,7 +1568,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminStats(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('analytics:view');
         $stats = (new BookingService())->getStats();
         echo json_encode($stats);
     }
@@ -1230,7 +1576,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminMediaUpload(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('media:upload');
 
         $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio'];
         $type = $_POST['type'] ?? '';
@@ -1282,7 +1628,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $includeInactive = ($payload['role'] ?? '') === 'admin';
+                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'products:manage');
             } catch (RuntimeException) { /* treat as public */ }
         }
 
@@ -1299,7 +1645,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $requireActive = ($payload['role'] ?? '') !== 'admin';
+                $requireActive = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'products:manage');
             } catch (RuntimeException) { /* stay public */ }
         }
 
@@ -1310,7 +1656,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('products:manage');
         $data    = $this->jsonBody();
         $product = (new ProductService())->create($data);
         http_response_code(201);
@@ -1320,7 +1666,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('products:manage');
         $id      = (int) ($vars['id'] ?? 0);
         $data    = $this->jsonBody();
         $product = (new ProductService())->update($id, $data);
@@ -1330,7 +1676,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('products:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new ProductService())->delete($id);
         echo json_encode(['message' => 'Product deleted.']);
@@ -1351,7 +1697,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductVariationCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('products:manage');
         $id        = (int) ($vars['id'] ?? 0);
         $data      = $this->jsonBody();
         $variation = (new ProductService())->createVariation($id, $data);
@@ -1362,7 +1708,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductVariationUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('products:manage');
         $id        = (int) ($vars['id']  ?? 0);
         $vid       = (int) ($vars['vid'] ?? 0);
         $data      = $this->jsonBody();
@@ -1373,7 +1719,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductVariationDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('products:manage');
         $id  = (int) ($vars['id']  ?? 0);
         $vid = (int) ($vars['vid'] ?? 0);
         (new ProductService())->deleteVariation($id, $vid);
@@ -1392,7 +1738,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $includeInactive = ($payload['role'] ?? '') === 'admin';
+                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
             } catch (RuntimeException) { /* treat as public */ }
         }
 
@@ -1409,7 +1755,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload = Auth::decodeToken($token);
-                $requireActive = ($payload['role'] ?? '') !== 'admin';
+                $requireActive = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
             } catch (RuntimeException) { /* stay public */ }
         }
 
@@ -1420,7 +1766,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePortfolioCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data = $this->jsonBody();
         $item = (new PortfolioService())->create($data);
         http_response_code(201);
@@ -1430,7 +1776,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePortfolioUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id   = (int) ($vars['id'] ?? 0);
         $data = $this->jsonBody();
         $item = (new PortfolioService())->update($id, $data);
@@ -1440,7 +1786,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePortfolioDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new PortfolioService())->delete($id);
         echo json_encode(['message' => 'Portfolio item deleted.']);
@@ -1468,7 +1814,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePortfolioCategoryCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data     = $this->jsonBody();
         $category = (new PortfolioCategoryService())->create($data);
         http_response_code(201);
@@ -1478,7 +1824,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePortfolioCategoryUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id       = (int) ($vars['id'] ?? 0);
         $data     = $this->jsonBody();
         $category = (new PortfolioCategoryService())->update($id, $data);
@@ -1488,7 +1834,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handlePortfolioCategoryDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new PortfolioCategoryService())->delete($id);
         echo json_encode(['message' => 'Portfolio category deleted.']);
@@ -1501,7 +1847,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleMigrateRun(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('settings:manage');
         $result = (new MigrationRunner())->run();
         echo json_encode($result);
     }
@@ -1509,7 +1855,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleMigrateStatus(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('settings:manage');
         $status = (new MigrationRunner())->status();
         echo json_encode(['migrations' => $status]);
     }
@@ -1575,7 +1921,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleSiteSettingsPut(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('settings:manage');
         $data     = $this->jsonBody();
         $settings = (new SiteSettingsService())->update($data);
         echo json_encode(['settings' => $settings]);
@@ -1604,7 +1950,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleTeamMemberCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data   = $this->jsonBody();
         $member = (new TeamMemberService())->create($data);
         http_response_code(201);
@@ -1614,7 +1960,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleTeamMemberUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id     = (int) ($vars['id'] ?? 0);
         $data   = $this->jsonBody();
         $member = (new TeamMemberService())->update($id, $data);
@@ -1624,7 +1970,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleTeamMemberDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new TeamMemberService())->delete($id);
         echo json_encode(['message' => 'Team member deleted.']);
@@ -1653,7 +1999,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleTestimonialCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data        = $this->jsonBody();
         $testimonial = (new TestimonialService())->create($data);
         http_response_code(201);
@@ -1663,7 +2009,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleTestimonialUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id          = (int) ($vars['id'] ?? 0);
         $data        = $this->jsonBody();
         $testimonial = (new TestimonialService())->update($id, $data);
@@ -1673,7 +2019,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleTestimonialDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new TestimonialService())->delete($id);
         echo json_encode(['message' => 'Testimonial deleted.']);
@@ -1702,7 +2048,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleFaqCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data = $this->jsonBody();
         $faq  = (new FaqService())->create($data);
         http_response_code(201);
@@ -1712,7 +2058,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleFaqUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id   = (int) ($vars['id'] ?? 0);
         $data = $this->jsonBody();
         $faq  = (new FaqService())->update($id, $data);
@@ -1722,7 +2068,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleFaqDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new FaqService())->delete($id);
         echo json_encode(['message' => 'FAQ deleted.']);
@@ -1740,7 +2086,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload         = Auth::decodeToken($token);
-                $includeInactive = ($payload['role'] ?? '') === 'admin';
+                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
             } catch (RuntimeException) { /* treat as public */ }
         }
 
@@ -1757,7 +2103,7 @@ class Router
         if ($token !== null) {
             try {
                 $payload       = Auth::decodeToken($token);
-                $requireActive = ($payload['role'] ?? '') !== 'admin';
+                $requireActive = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
             } catch (RuntimeException) { /* stay public */ }
         }
 
@@ -1768,7 +2114,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleOfferCreate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $data  = $this->jsonBody();
         $offer = (new OfferService())->create($data);
         http_response_code(201);
@@ -1778,7 +2124,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleOfferUpdate(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id    = (int) ($vars['id'] ?? 0);
         $data  = $this->jsonBody();
         $offer = (new OfferService())->update($id, $data);
@@ -1788,7 +2134,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleOfferDelete(array $vars = []): void
     {
-        $this->requireAuth('admin');
+        $this->requirePermission('content:manage');
         $id = (int) ($vars['id'] ?? 0);
         (new OfferService())->delete($id);
         echo json_encode(['message' => 'Offer deleted.']);

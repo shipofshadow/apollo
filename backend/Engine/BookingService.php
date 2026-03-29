@@ -330,6 +330,7 @@ class BookingService
               'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
+                                        tm.user_id AS assigned_tech_user_id,
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -708,6 +709,7 @@ class BookingService
             'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
+                    tm.user_id AS assigned_tech_user_id,
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -724,6 +726,7 @@ class BookingService
             'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
+                    tm.user_id AS assigned_tech_user_id,
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -748,6 +751,7 @@ class BookingService
               'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
+                                        tm.user_id AS assigned_tech_user_id,
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -769,6 +773,7 @@ class BookingService
             'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
+                    tm.user_id AS assigned_tech_user_id,
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -804,6 +809,7 @@ class BookingService
               'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
+                                        tm.user_id AS assigned_tech_user_id,
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -890,6 +896,7 @@ class BookingService
         if ($assignedTechId !== null) {
             $assignedTech = [
                 'id'       => $assignedTechId,
+                'userId'   => isset($row['assigned_tech_user_id']) && $row['assigned_tech_user_id'] !== null ? (int) $row['assigned_tech_user_id'] : null,
                 'name'     => (string) ($row['assigned_tech_name'] ?? ''),
                 'role'     => (string) ($row['assigned_tech_role'] ?? ''),
                 'imageUrl' => $row['assigned_tech_image_url'] ?? null,

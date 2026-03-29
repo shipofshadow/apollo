@@ -1,11 +1,14 @@
 // ── Auth ───────────────────────────────────────────────────────────────────
 
+export type UserRole = string;
+
 export interface User {
   id: number;
   name: string;
   email: string;
   phone: string;
-  role: 'client' | 'admin';
+  avatar_url?: string | null;
+  role: UserRole;
   created_at: string;
 }
 
@@ -103,6 +106,17 @@ export interface ClientVehicle {
   updatedAt: string;
 }
 
+export interface ClientAdminSummary {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  created_at: string;
+  bookingCount: number;
+  lastBookingAt: string | null;
+}
+
 export interface ServiceItem {
   id: string;
   title: string;
@@ -184,6 +198,7 @@ export interface Booking {
 
 export interface AssignedTechnician {
   id: number;
+  userId?: number | null;
   name: string;
   role: string;
   imageUrl?: string | null;
@@ -319,6 +334,7 @@ export interface SiteSettings {
 
 export interface TeamMember {
   id: number;
+  userId: number | null;
   name: string;
   role: string;
   imageUrl: string | null;

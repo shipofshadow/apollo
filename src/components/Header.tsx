@@ -62,6 +62,30 @@ export default function Header() {
     { label: 'Profile', href: '/client/profile', icon: User },
   ];
 
+  const renderUserAvatar = (sizeClass = 'w-7 h-7') => {
+    const initials = user?.name?.[0] ?? 'A';
+
+    return (
+      <div className={`${sizeClass} rounded-full bg-brand-orange/20 border border-brand-orange/40 flex items-center justify-center overflow-hidden shrink-0`}>
+        {user?.avatar_url ? (
+          <img
+            src={user.avatar_url}
+            alt="User avatar"
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+            onError={e => {
+              const img = e.currentTarget;
+              img.style.display = 'none';
+              const fallback = img.nextElementSibling as HTMLElement | null;
+              if (fallback) fallback.style.display = 'inline';
+            }}
+          />
+        ) : null}
+        <span className={`text-brand-orange text-xs font-bold uppercase ${user?.avatar_url ? 'hidden' : ''}`}>{initials}</span>
+      </div>
+    );
+  };
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled || isMobileMenuOpen 
@@ -109,9 +133,7 @@ export default function Header() {
                   onClick={() => setIsDropdownOpen(v => !v)}
                   className="flex items-center gap-2 bg-brand-dark border border-gray-700 hover:border-brand-orange px-3 py-2 rounded-sm transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-brand-orange/20 flex items-center justify-center">
-                    <span className="text-brand-orange text-xs font-bold uppercase">{user.name[0]}</span>
-                  </div>
+                  {renderUserAvatar('w-7 h-7')}
                   <span className="text-white text-sm font-bold max-w-[120px] truncate">{user.name.split(' ')[0]}</span>
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -122,7 +144,7 @@ export default function Header() {
                       <p className="text-white font-bold text-sm truncate">{user.name}</p>
                       <p className="text-gray-500 text-xs truncate">{user.email}</p>
                     </div>
-                    {user.role === 'admin' ? (
+                    {user.role !== 'client' ? (
                       <Link to="/admin" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors">
                         <LayoutDashboard className="w-4 h-4 text-brand-orange" /> Admin Panel
                       </Link>
@@ -181,8 +203,11 @@ export default function Header() {
             </div>
           ) : (
             <div className="mt-4 border-t border-gray-800 pt-4 space-y-1">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-500 px-2 mb-3">{user.name}</p>
-              {user.role === 'admin' ? (
+              <div className="flex items-center gap-2 px-2 mb-3">
+                {renderUserAvatar('w-8 h-8')}
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">{user.name}</p>
+              </div>
+              {user.role !== 'client' ? (
                 <Link to="/admin" className="flex items-center gap-3 px-2 py-3 text-sm text-gray-300 hover:text-brand-orange transition-colors font-bold uppercase tracking-widest">
                   <LayoutDashboard className="w-5 h-5" /> Admin Panel
                 </Link>

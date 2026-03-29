@@ -61,10 +61,20 @@ export default function ClientLayout() {
           {/* User card */}
           <div className="p-4 md:p-5 border-b border-gray-800">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0">
-                <span className="text-brand-orange font-black text-sm uppercase">
-                  {user?.name?.[0] ?? '?'}
-                </span>
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0 overflow-hidden">
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt="User avatar"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <span className="text-brand-orange font-black text-sm uppercase">
+                    {user?.name?.[0] ?? '?'}
+                  </span>
+                )}
               </div>
               <div className="hidden md:block min-w-0">
                 <p className="text-white font-bold text-sm truncate leading-tight">{user?.name}</p>

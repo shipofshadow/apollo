@@ -87,12 +87,13 @@ class TeamMemberService
     /** @return array<string, mixed> */
     private function dbCreate(array $data): array
     {
+        $payload = $this->withUserIdentity($data);
         $db   = Database::getInstance();
         $stmt = $db->prepare(
-            'INSERT INTO team_members (name, role, image_url, bio, full_bio, email, phone, facebook, instagram, sort_order, is_active)
-             VALUES (:name, :role, :image_url, :bio, :full_bio, :email, :phone, :facebook, :instagram, :sort_order, :is_active)'
+            'INSERT INTO team_members (user_id, name, role, image_url, bio, full_bio, email, phone, facebook, instagram, sort_order, is_active)
+             VALUES (:user_id, :name, :role, :image_url, :bio, :full_bio, :email, :phone, :facebook, :instagram, :sort_order, :is_active)'
         );
-        $stmt->execute($this->bindParams($data));
+        $stmt->execute($this->bindParams($payload));
         return $this->dbGetById((int) $db->lastInsertId());
     }
 
@@ -100,10 +101,10 @@ class TeamMemberService
     private function dbUpdate(int $id, array $data): array
     {
         $current = $this->dbGetById($id);
-        $merged  = array_merge($current, $data);
+        $merged  = $this->withUserIdentity(array_merge($current, $data));
 
         $stmt = Database::getInstance()->prepare(
-            'UPDATE team_members SET name = :name, role = :role, image_url = :image_url,
+            'UPDATE team_members SET user_id = :user_id, name = :name, role = :role, image_url = :image_url,
              bio = :bio, full_bio = :full_bio, email = :email, phone = :phone,
              facebook = :facebook, instagram = :instagram,
              sort_order = :sort_order, is_active = :is_active
@@ -171,7 +172,7 @@ class TeamMemberService
     {
         $all  = $this->fileRead();
         $id   = empty($all) ? 1 : (int) max(array_column($all, 'id')) + 1;
-        $record = $this->buildRecord($id, $data);
+        $record = $this->buildRecord($id, $this->withUserIdentity($data));
         $all[]  = $record;
         $this->fileWrite($all);
         return $record;
@@ -188,7 +189,7 @@ class TeamMemberService
         foreach ($all as &$m) {
             if ((int) ($m['id'] ?? 0) === $id) {
                 $oldImage = (string) ($m['imageUrl'] ?? '');
-                $m      = $this->buildRecord($id, array_merge($m, $data));
+                $m      = $this->buildRecord($id, $this->withUserIdentity(array_merge($m, $data)));
                 $result = $m;
                 $found  = true;
                 break;
@@ -262,6 +263,7 @@ class TeamMemberService
     {
         return [
             'id'        => (int) $row['id'],
+            'userId'    => isset($row['user_id']) ? (int) $row['user_id'] : null,
             'name'      => $row['name'],
             'role'      => $row['role'] ?? '',
             'imageUrl'  => $row['image_url'] ?? null,
@@ -282,6 +284,7 @@ class TeamMemberService
     private function bindParams(array $data): array
     {
         return [
+            ':user_id'    => isset($data['userId']) ? (int) $data['userId'] : ($data['user_id'] ?? null),
             ':name'       => $data['name']      ?? '',
             ':role'       => $data['role']       ?? '',
             ':image_url'  => $data['imageUrl']   ?? ($data['image_url']  ?? null),
@@ -301,6 +304,7 @@ class TeamMemberService
     {
         return [
             'id'        => $id,
+            'userId'    => isset($data['userId']) ? (int) $data['userId'] : null,
             'name'      => $data['name']      ?? '',
             'role'      => $data['role']       ?? '',
             'imageUrl'  => $data['imageUrl']   ?? null,
@@ -319,9 +323,42 @@ class TeamMemberService
 
     private function validatePayload(array $data): void
     {
-        if (empty(trim($data['name'] ?? ''))) {
+        $hasUser = (int) ($data['userId'] ?? 0) > 0 || (int) ($data['user_id'] ?? 0) > 0;
+        if ($this->useDb && !$hasUser) {
+            throw new RuntimeException('Team member must be linked to an existing user.', 422);
+        }
+        if (!$hasUser && empty(trim((string) ($data['name'] ?? '')))) {
             throw new RuntimeException('Team member name is required.', 422);
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function withUserIdentity(array $data): array
+    {
+        $userId = (int) ($data['userId'] ?? ($data['user_id'] ?? 0));
+        if ($userId <= 0 || !$this->useDb) {
+            return $data;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT id, name, email, phone, role FROM users WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$user) {
+            throw new RuntimeException('Selected user was not found.', 422);
+        }
+        if (strtolower(trim((string) ($user['role'] ?? ''))) === 'client') {
+            throw new RuntimeException('Client accounts cannot be assigned as team members.', 422);
+        }
+
+        $data['userId'] = (int) $user['id'];
+        $data['name'] = (string) ($user['name'] ?? '');
+        $data['email'] = (string) ($user['email'] ?? '');
+        $data['phone'] = (string) ($user['phone'] ?? '');
+        $data['role'] = (string) ($user['role'] ?? ($data['role'] ?? ''));
+
+        return $data;
     }
 
     private function deleteManagedImageUrl(string $url): void

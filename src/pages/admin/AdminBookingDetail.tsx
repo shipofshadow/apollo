@@ -24,7 +24,9 @@ import {
   updateInternalNotesApi,
   fetchCustomerStatsApi,
   fetchTeamMembersApi,
+  fetchAdminUsersApi,
   assignBookingTechnicianApi,
+  type AdminManagedUser,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog, TeamMember } from '../../types';
@@ -87,6 +89,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
   const [shopDayIsOpen,  setShopDayIsOpen]  = useState(true);
   const [slotsLoading,   setSlotsLoading]   = useState(false);
   const [saveBusy,       setSaveBusy]       = useState(false);
+  const [confirmOpen,    setConfirmOpen]    = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -261,7 +264,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
       {/* Actions */}
       <div className="flex items-center gap-3 pt-1 border-t border-gray-800">
         <button
-          onClick={handleSave}
+          onClick={() => setConfirmOpen(true)}
           disabled={saveBusy || !selectedDate || !selectedTime || unchanged}
           className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm disabled:opacity-50"
         >
@@ -276,6 +279,36 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
           Cancel
         </button>
       </div>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Confirm Reschedule</h3>
+            <p className="mt-2 text-sm text-gray-300">Apply the selected date and time for this booking?</p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                disabled={saveBusy}
+                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSave();
+                  setConfirmOpen(false);
+                }}
+                disabled={saveBusy}
+                className="px-3 py-2 rounded-sm bg-brand-orange text-xs font-bold uppercase tracking-widest text-white hover:bg-orange-600 disabled:opacity-50"
+              >
+                {saveBusy ? 'Please wait...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -286,6 +319,13 @@ interface Props {
   bookingId: string;
   onBack: () => void;
 }
+
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: 'default' | 'danger';
+};
 
 export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const dispatch = useDispatch<AppDispatch>();
@@ -303,7 +343,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
   const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
   const [teamMembers,   setTeamMembers]   = useState<TeamMember[]>([]);
-  const [selectedTechId, setSelectedTechId] = useState('');
+  const [assignableUsers, setAssignableUsers] = useState<AdminManagedUser[]>([]);
+  const [selectedTechUserId, setSelectedTechUserId] = useState('');
   const [assignTechBusy, setAssignTechBusy] = useState(false);
 
   // Internal notes state
@@ -322,6 +363,9 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [buildUpdateBusy,   setBuildUpdateBusy]   = useState(false);
   const [photoUploading,    setPhotoUploading]    = useState(false);
   const buildPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
 
   // Seed the log with the booking's submission time on mount
   useEffect(() => {
@@ -335,7 +379,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
     setPartsNotes(booking.partsNotes ?? '');
     setInternalNotes(booking.internalNotes ?? '');
-    setSelectedTechId(booking.assignedTechId != null ? String(booking.assignedTechId) : '');
+    if (booking.assignedTech?.userId != null) {
+      setSelectedTechUserId(String(booking.assignedTech.userId));
+    } else if (booking.assignedTechId != null) {
+      const linked = teamMembers.find(member => member.id === booking.assignedTechId);
+      setSelectedTechUserId(linked?.userId != null ? String(linked.userId) : '');
+    } else {
+      setSelectedTechUserId('');
+    }
 
     // Load customer loyalty stats
     if (token && booking.userId) {
@@ -343,13 +394,20 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
         .then(r => setCustomerStats(r.stats))
         .catch(() => {});
     }
-  }, [booking, token]);
+  }, [booking, token, teamMembers]);
 
   useEffect(() => {
     if (!token) return;
     fetchTeamMembersApi(token)
-      .then(({ members }) => setTeamMembers(members.filter(m => m.isActive)))
+      .then(({ members }) => setTeamMembers(members))
       .catch(() => setTeamMembers([]));
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchAdminUsersApi(token)
+      .then(({ users }) => setAssignableUsers(users.filter(user => user.role !== 'client')))
+      .catch(() => setAssignableUsers([]));
   }, [token]);
 
   // Load build updates whenever the booking changes
@@ -373,6 +431,29 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   useEffect(() => {
     void reloadActivity();
   }, [token, bookingId]);
+
+  const requestConfirmation = (dialog: ConfirmDialogState, action: () => Promise<void>) => {
+    setConfirmDialog(dialog);
+    setConfirmAction(() => action);
+  };
+
+  const closeConfirmation = () => {
+    if (confirmBusy) return;
+    setConfirmDialog(null);
+    setConfirmAction(null);
+  };
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      await confirmAction();
+      setConfirmDialog(null);
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  };
 
   const handleSaveInternalNotes = async () => {
     if (!token || !booking) return;
@@ -405,18 +486,18 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
   const handleAssignTechnician = async () => {
     if (!token || !booking) return;
-    const assignedTechId = selectedTechId === '' ? null : Number(selectedTechId);
-    if (assignedTechId !== null && (!Number.isInteger(assignedTechId) || assignedTechId <= 0)) {
+    const assignedUserId = selectedTechUserId === '' ? null : Number(selectedTechUserId);
+    if (assignedUserId !== null && (!Number.isInteger(assignedUserId) || assignedUserId <= 0)) {
       showToast('Please select a valid technician.', 'error');
       return;
     }
 
     setAssignTechBusy(true);
     try {
-      await assignBookingTechnicianApi(token, booking.id, assignedTechId);
+      await assignBookingTechnicianApi(token, booking.id, { assignedUserId });
       await dispatch(fetchAllBookingsAsync(token)).unwrap();
       await reloadActivity();
-      showToast(assignedTechId ? 'Technician assigned.' : 'Technician unassigned.', 'success');
+      showToast(assignedUserId ? 'Technician assigned.' : 'Technician unassigned.', 'success');
     } catch (e: unknown) {
       showToast((e as Error).message ?? 'Failed to assign technician.', 'error');
     } finally {
@@ -495,6 +576,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const canComplete = booking.status === 'confirmed';
   const canResume   = booking.status === 'awaiting_parts';
   const canCancel   = canModify;
+  const isFinalized = booking.status === 'completed' || booking.status === 'cancelled';
 
   return (
     <div className="space-y-5 w-full max-w-7xl">
@@ -617,12 +699,13 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               <div>
                 <label className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 block">Assigned Mechanic</label>
                 <select
-                  value={selectedTechId}
-                  onChange={e => setSelectedTechId(e.target.value)}
+                  value={selectedTechUserId}
+                  onChange={e => setSelectedTechUserId(e.target.value)}
+                  disabled={isFinalized}
                   className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange text-sm"
                 >
                   <option value="">Unassigned</option>
-                  {teamMembers.map(member => (
+                  {assignableUsers.map(member => (
                     <option key={member.id} value={member.id}>
                       {member.name}{member.role ? ` (${member.role})` : ''}
                     </option>
@@ -631,8 +714,17 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               </div>
               <button
                 type="button"
-                onClick={handleAssignTechnician}
-                disabled={assignTechBusy || !token}
+                onClick={() => requestConfirmation(
+                  {
+                    title: 'Save Assignment?',
+                    message: selectedTechUserId
+                      ? 'This will update the assigned technician for this booking.'
+                      : 'This will clear the current technician assignment.',
+                    confirmLabel: 'Save Assignment',
+                  },
+                  handleAssignTechnician,
+                )}
+                disabled={assignTechBusy || !token || isFinalized}
                 className="h-[42px] px-5 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50 inline-flex items-center gap-2 justify-center"
               >
                 {assignTechBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
@@ -644,6 +736,9 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 Current: <span className="text-white font-semibold">{booking.assignedTech.name}</span>
                 {booking.assignedTech.role ? <span className="text-gray-500"> · {booking.assignedTech.role}</span> : null}
               </p>
+            )}
+            {isFinalized && (
+              <p className="text-xs text-gray-500 mt-3">Assignment is locked after completion or cancellation.</p>
             )}
           </section>
 
@@ -694,7 +789,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 />
                 <div className="flex gap-3">
                   <button
-                    onClick={handlePartsSave}
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Save Parts Update?',
+                        message: 'This will save parts notes and notify the client.',
+                        confirmLabel: 'Save & Notify',
+                      },
+                      handlePartsSave,
+                    )}
                     disabled={partsBusy || !partsNotes.trim()}
                     className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                   >
@@ -722,6 +824,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               {!rescheduling && (
                 <button
                   onClick={() => setRescheduling(true)}
+                  disabled={isFinalized}
                   className="text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" /> Reschedule
@@ -729,7 +832,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               )}
             </div>
             {!rescheduling ? (
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-6 flex-wrap">
                 <div className="flex items-center gap-2 text-gray-400 text-sm">
                   <Calendar className="w-4 h-4 text-gray-600" />
                   <span>{booking.appointmentDate}</span>
@@ -738,6 +841,9 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   <Clock className="w-4 h-4 text-gray-600" />
                   <span>{booking.appointmentTime}</span>
                 </div>
+                {isFinalized && (
+                  <p className="text-xs text-gray-500">Reschedule is locked after completion or cancellation.</p>
+                )}
               </div>
             ) : (
               token && (
@@ -788,6 +894,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               {!buildUpdateOpen && (
                 <button
                   onClick={() => setBuildUpdateOpen(true)}
+                  disabled={isFinalized}
                   className="text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> Add Update
@@ -814,12 +921,13 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                     accept="image/*"
                     multiple
                     className="hidden"
+                    disabled={isFinalized}
                     onChange={handleBuildPhotoUpload}
                   />
                   <button
                     type="button"
                     onClick={() => buildPhotoInputRef.current?.click()}
-                    disabled={photoUploading}
+                    disabled={photoUploading || isFinalized}
                     className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
                   >
                     {photoUploading
@@ -852,8 +960,15 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
                 <div className="flex gap-3">
                   <button
-                    onClick={handleBuildUpdateSubmit}
-                    disabled={buildUpdateBusy || photoUploading || (!buildUpdateNote.trim() && buildUpdatePhotos.length === 0)}
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Post Build Update?',
+                        message: 'This update will be visible in the booking progress timeline.',
+                        confirmLabel: 'Post Update',
+                      },
+                      handleBuildUpdateSubmit,
+                    )}
+                    disabled={isFinalized || buildUpdateBusy || photoUploading || (!buildUpdateNote.trim() && buildUpdatePhotos.length === 0)}
                     className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                   >
                     {buildUpdateBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
@@ -905,6 +1020,9 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 ))}
               </ol>
             )}
+            {isFinalized && !buildUpdateOpen && (
+              <p className="text-xs text-gray-500 mt-4">Progress updates are locked after completion or cancellation.</p>
+            )}
           </section>
 
           {/* Signature */}
@@ -935,7 +1053,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             <div className="space-y-2">
               {canConfirm && (
                 <button
-                  onClick={() => handleStatus('confirmed')}
+                  onClick={() => requestConfirmation(
+                    {
+                      title: 'Confirm Booking?',
+                      message: 'This will move the booking status to confirmed.',
+                      confirmLabel: 'Confirm Booking',
+                    },
+                    async () => handleStatus('confirmed'),
+                  )}
                   disabled={statusBusy !== null}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                 >
@@ -945,7 +1070,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               )}
               {canComplete && (
                 <button
-                  onClick={() => handleStatus('completed')}
+                  onClick={() => requestConfirmation(
+                    {
+                      title: 'Mark Booking Completed?',
+                      message: 'Completing this booking locks assignment, reschedule, and progress updates.',
+                      confirmLabel: 'Mark Completed',
+                    },
+                    async () => handleStatus('completed'),
+                  )}
                   disabled={statusBusy !== null}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                 >
@@ -955,7 +1087,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               )}
               {canResume && (
                 <button
-                  onClick={() => handleStatus('confirmed')}
+                  onClick={() => requestConfirmation(
+                    {
+                      title: 'Resume Booking?',
+                      message: 'This will move the booking back to confirmed status.',
+                      confirmLabel: 'Resume Booking',
+                    },
+                    async () => handleStatus('confirmed'),
+                  )}
                   disabled={statusBusy !== null}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                 >
@@ -965,7 +1104,15 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               )}
               {canCancel && (
                 <button
-                  onClick={() => handleStatus('cancelled')}
+                  onClick={() => requestConfirmation(
+                    {
+                      title: 'Cancel Booking?',
+                      message: 'This action sets the booking status to cancelled.',
+                      confirmLabel: 'Cancel Booking',
+                      tone: 'danger',
+                    },
+                    async () => handleStatus('cancelled'),
+                  )}
                   disabled={statusBusy !== null}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                 >
@@ -1066,7 +1213,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 />
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleSaveInternalNotes}
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Save Internal Notes?',
+                        message: 'This will update admin-only notes for this booking.',
+                        confirmLabel: 'Save Notes',
+                      },
+                      handleSaveInternalNotes,
+                    )}
                     disabled={notesBusy}
                     className="flex items-center gap-1.5 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
                   >
@@ -1110,6 +1264,36 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
           </section>
         </div>
       </div>
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white">{confirmDialog.title}</h3>
+            <p className="mt-2 text-sm text-gray-300">{confirmDialog.message}</p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeConfirmation}
+                disabled={confirmBusy}
+                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void runConfirmedAction()}
+                disabled={confirmBusy}
+                className={[
+                  'px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50',
+                  confirmDialog.tone === 'danger' ? 'bg-red-700 hover:bg-red-600' : 'bg-brand-orange hover:bg-orange-600',
+                ].join(' ')}
+              >
+                {confirmBusy ? 'Please wait...' : confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

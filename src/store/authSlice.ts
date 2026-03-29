@@ -91,7 +91,7 @@ export const updateProfileAsync = createAsyncThunk(
   async (
     arg: {
       token: string;
-      data: { name?: string; phone?: string; password?: string; password_confirmation?: string };
+      data: { name?: string; phone?: string; avatar_url?: string | null; password?: string; password_confirmation?: string };
     },
     { rejectWithValue }
   ) => {

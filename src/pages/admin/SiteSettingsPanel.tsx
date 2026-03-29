@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Settings, Users, MessageSquare, Loader2, AlertCircle,
@@ -12,7 +12,11 @@ import {
 } from '../../store/siteSettingsSlice';
 import {
   uploadAdminImageApi,
+  fetchAdminUsersApi,
+  fetchAdminRolesApi,
+  type AdminManagedUser,
   fetchMigrationStatusApi, runMigrationsApi,
+  type AdminRole,
   type MigrationEntry,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
@@ -206,12 +210,13 @@ function CompanyInfoPanel() {
 
 type MemberForm = {
   id: number | null;
+  userId: number | null;
   name: string; role: string; imageUrl: string;
   bio: string; fullBio: string; email: string; phone: string;
   facebook: string; instagram: string; sortOrder: number; isActive: boolean;
 };
 const EMPTY_MEMBER: MemberForm = {
-  id: null, name: '', role: '', imageUrl: '', bio: '', fullBio: '',
+  id: null, userId: null, name: '', role: '', imageUrl: '', bio: '', fullBio: '',
   email: '', phone: '', facebook: '', instagram: '', sortOrder: 0, isActive: true,
 };
 
@@ -226,30 +231,138 @@ function TeamMembersPanel() {
   const [saveError,    setSaveError]    = useState<string | null>(null);
   const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
+  const [roleCatalog,  setRoleCatalog]  = useState<AdminRole[]>([]);
+  const [userCatalog,  setUserCatalog]  = useState<AdminManagedUser[]>([]);
+  const [linkedUserSearch, setLinkedUserSearch] = useState('');
 
   useEffect(() => {
     if (token) dispatch(fetchTeamMembersAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = () => { setCurrent(EMPTY_MEMBER); setSaveError(null); setEditing(true); };
+  useEffect(() => {
+    if (!token) {
+      setRoleCatalog([]);
+      return;
+    }
+
+    let cancelled = false;
+    fetchAdminRolesApi(token)
+      .then(({ roles }) => {
+        if (!cancelled) setRoleCatalog(roles);
+      })
+      .catch(() => {
+        if (!cancelled) setRoleCatalog([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setUserCatalog([]);
+      return;
+    }
+
+    let cancelled = false;
+    fetchAdminUsersApi(token)
+      .then(({ users }) => {
+        if (!cancelled) setUserCatalog(users);
+      })
+      .catch(() => {
+        if (!cancelled) setUserCatalog([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const roleLabelByKey = useMemo(() => {
+    return roleCatalog.reduce<Record<string, string>>((acc, role) => {
+      acc[role.key] = role.name;
+      return acc;
+    }, {});
+  }, [roleCatalog]);
+
+  const userLabelById = useMemo(() => {
+    return userCatalog.reduce<Record<number, string>>((acc, entry) => {
+      acc[entry.id] = `${entry.name} (${entry.email})`;
+      return acc;
+    }, {});
+  }, [userCatalog]);
+
+  const selectableUsers = useMemo(() => {
+    const q = linkedUserSearch.trim().toLowerCase();
+    return userCatalog
+      .filter(entry => entry.role !== 'client')
+      .filter(entry => {
+        if (q === '') return true;
+        return entry.name.toLowerCase().includes(q)
+          || entry.email.toLowerCase().includes(q)
+          || (entry.phone ?? '').toLowerCase().includes(q);
+      });
+  }, [userCatalog, linkedUserSearch]);
+
+  const openNew  = () => {
+    setCurrent(EMPTY_MEMBER);
+    setLinkedUserSearch('');
+    setSaveError(null);
+    setEditing(true);
+  };
   const openEdit = (m: TeamMember) => {
     setCurrent({
-      id: m.id, name: m.name, role: m.role, imageUrl: m.imageUrl ?? '',
+      id: m.id, userId: m.userId ?? null, name: m.name, role: m.role, imageUrl: m.imageUrl ?? '',
       bio: m.bio ?? '', fullBio: m.fullBio ?? '', email: m.email ?? '',
       phone: m.phone ?? '', facebook: m.facebook ?? '', instagram: m.instagram ?? '',
       sortOrder: m.sortOrder, isActive: m.isActive,
     });
     setSaveError(null);
+    setLinkedUserSearch(m.name);
     setEditing(true);
   };
-  const cancel = () => { setEditing(false); setSaveError(null); };
+  const cancel = () => {
+    setEditing(false);
+    setSaveError(null);
+    setLinkedUserSearch('');
+  };
+
+  const handleUserPick = (userIdRaw: string) => {
+    const userId = Number(userIdRaw);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      setCurrent(prev => ({ ...prev, userId: null }));
+      return;
+    }
+
+    const picked = userCatalog.find(item => item.id === userId);
+    if (!picked) {
+      setCurrent(prev => ({ ...prev, userId: null }));
+      return;
+    }
+
+    setCurrent(prev => ({
+      ...prev,
+      userId: picked.id,
+      name: picked.name,
+      email: picked.email,
+      phone: picked.phone ?? '',
+      role: picked.role,
+    }));
+    setLinkedUserSearch(`${picked.name} ${picked.email}`);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    if (!current.userId) {
+      setSaveError('Please select an existing user account for this team member.');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     const data = {
+      userId: current.userId,
       name: current.name, role: current.role,
       imageUrl: current.imageUrl || null, bio: current.bio || null,
       fullBio: current.fullBio || null, email: current.email || null,
@@ -298,14 +411,52 @@ function TeamMembersPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Linked User *</label>
+              <input
+                value={linkedUserSearch}
+                onChange={e => setLinkedUserSearch(e.target.value)}
+                placeholder="Search user by name, email, or phone"
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+              />
+              <select
+                required
+                value={current.userId ?? ''}
+                onChange={e => handleUserPick(e.target.value)}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+              >
+                <option value="">Select user account</option>
+                {selectableUsers.map(entry => (
+                  <option key={entry.id} value={entry.id}>{entry.name} ({entry.email})</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500">Client accounts are excluded from team members.</p>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Name *</label>
-              <input required value={current.name} onChange={e => setCurrent(p => ({ ...p, name: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+              <input required value={current.name}
+                className="w-full bg-brand-darker border border-gray-700 text-gray-300 px-4 py-3 rounded-sm"
+                readOnly />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Role / Position</label>
-              <input value={current.role} onChange={e => setCurrent(p => ({ ...p, role: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+              <select value={current.role} onChange={e => setCurrent(p => ({ ...p, role: e.target.value }))}
+                required
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+              >
+                <option value="">Select role</option>
+                {current.role && !roleCatalog.some(role => role.key === current.role) ? (
+                  <option value={current.role}>{current.role}</option>
+                ) : null}
+                {roleCatalog.map(role => (
+                  <option key={role.id} value={role.key}>{role.name}</option>
+                ))}
+              </select>
+              {roleCatalog.length > 0 && (
+                <p className="text-[11px] text-gray-500">
+                  Role is restricted to configured access roles.
+                </p>
+              )}
             </div>
 
             <div className="md:col-span-2 space-y-2">
@@ -352,13 +503,15 @@ function TeamMembersPanel() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
-              <input type="email" value={current.email} onChange={e => setCurrent(p => ({ ...p, email: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+              <input type="email" value={current.email}
+                className="w-full bg-brand-darker border border-gray-700 text-gray-300 px-4 py-3 rounded-sm"
+                readOnly />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Phone</label>
-              <input value={current.phone} onChange={e => setCurrent(p => ({ ...p, phone: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+              <input value={current.phone}
+                className="w-full bg-brand-darker border border-gray-700 text-gray-300 px-4 py-3 rounded-sm"
+                readOnly />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Facebook URL</label>
@@ -452,7 +605,12 @@ function TeamMembersPanel() {
                       <span className="text-white font-bold">{m.name}</span>
                     </div>
                   </td>
-                  <td className="p-4 text-gray-400 text-sm">{m.role}</td>
+                  <td className="p-4 text-gray-400 text-sm">
+                    <div>{roleLabelByKey[m.role] ?? m.role}</div>
+                    {m.userId ? (
+                      <div className="text-[11px] text-gray-600">{userLabelById[m.userId] ?? `User #${m.userId}`}</div>
+                    ) : null}
+                  </td>
                   <td className="p-4">
                     <span className={`px-2 py-1 text-xs font-bold uppercase tracking-widest rounded-sm ${m.isActive ? 'bg-green-500/10 text-green-500' : 'bg-gray-800 text-gray-400'}`}>
                       {m.isActive ? 'Active' : 'Hidden'}

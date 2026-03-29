@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
-  Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays,
+  Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +21,7 @@ import FaqPanel             from './admin/FaqPanel';
 import OffersPanel          from './admin/OffersPanel';
 import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
+import UserAccessPanel      from './admin/UserAccessPanel';
 
 // ── Admin login screen (Unchanged) ────────────────────────────────────────────
 function AdminLogin() {
@@ -85,7 +86,7 @@ function AdminLogin() {
 
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [activeTab,       setActiveTab]       = useState('analytics');
   const [collapsed,       setCollapsed]       = useState(false);
@@ -136,8 +137,26 @@ export default function AdminPage() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  if (!user)    return <AdminLogin />;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!user) return <AdminLogin />;
+  if (user.role === 'client') return <Navigate to="/" replace />;
+
+  const role = user.role;
+  const isAdmin = role === 'admin';
+
+  const canAccessTab = (key: string) => {
+    if (isAdmin) return true;
+
+    if (role === 'manager') {
+      return ['analytics', 'appointments', 'calendar', 'user-access', 'settings'].includes(key);
+    }
+
+    if (role === 'staff') {
+      return ['appointments', 'calendar', 'user-access', 'settings'].includes(key);
+    }
+
+    // Unknown non-client roles get the safest minimum surface.
+    return ['user-access', 'settings'].includes(key);
+  };
 
   // Grouped Navigation Structure
   const navItems = [
@@ -165,10 +184,18 @@ export default function AdminPage() {
       isGroup: true, key: 'settings', label: 'Settings', icon: SlidersHorizontal,
       children: [
         { key: 'site-settings', label: 'Site Config', icon: SlidersHorizontal },
+        { key: 'user-access',   label: 'User Access', icon: ShieldCheck },
         { key: 'settings',      label: 'Account',     icon: UserCog },
       ]
     }
   ];
+
+  useEffect(() => {
+    if (canAccessTab(activeTab)) return;
+    const fallback = role === 'staff' ? 'appointments' : (role === 'manager' ? 'analytics' : 'user-access');
+    setActiveTab(fallback);
+    setActiveBookingId(null);
+  }, [activeTab, role]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -192,6 +219,7 @@ export default function AdminPage() {
       case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;
       case 'site-settings': return <SiteSettingsPanel />;
+      case 'user-access':   return <UserAccessPanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;
     }
@@ -222,6 +250,26 @@ export default function AdminPage() {
           </a>
           <div className="w-px h-5 bg-gray-700" />
           <NotificationBell />
+          <button
+            type="button"
+            onClick={() => handleTabChange('settings')}
+            title="Open account settings"
+            className="w-8 h-8 rounded-full bg-brand-orange/20 border border-brand-orange/40 hover:border-brand-orange flex items-center justify-center overflow-hidden shrink-0 transition-colors"
+          >
+            {user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt="Open account settings"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : (
+              <span className="text-brand-orange font-black text-xs uppercase">
+                {user.name?.[0] ?? 'A'}
+              </span>
+            )}
+          </button>
           <div className="w-px h-5 bg-gray-700" />
           <button onClick={() => logout()}
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
@@ -252,10 +300,20 @@ export default function AdminPage() {
           {/* User card */}
           <div className={`border-b border-gray-800 ${collapsed ? 'p-3' : 'p-4 md:p-5'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0">
-                <span className="text-brand-orange font-black text-sm uppercase">
-                  {user.name?.[0] ?? 'A'}
-                </span>
+              <div className="w-9 h-9 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0 overflow-hidden">
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt="User avatar"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <span className="text-brand-orange font-black text-sm uppercase">
+                    {user.name?.[0] ?? 'A'}
+                  </span>
+                )}
               </div>
               {!collapsed && (
                 <div className="min-w-0">
@@ -270,6 +328,9 @@ export default function AdminPage() {
           <nav className={`${collapsed ? 'p-2' : 'p-2 md:p-3'} space-y-1 flex-grow`}>
             {navItems.map((item) => {
               if (item.isGroup && item.children) {
+                const visibleChildren = item.children.filter(child => canAccessTab(child.key));
+                if (visibleChildren.length === 0) return null;
+
                 const isOpen = openGroups[item.key];
                 const GroupIcon = item.icon;
                 
@@ -293,7 +354,7 @@ export default function AdminPage() {
                     {/* Group Children */}
                     {isOpen && (
                       <div className={`mt-0.5 space-y-0.5 ${collapsed ? '' : 'pl-3 border-l border-gray-800/50 ml-3'}`}>
-                        {item.children.map(child => {
+                        {visibleChildren.map(child => {
                           const ChildIcon = child.icon;
                           const isActive = activeTab === child.key;
                           return (
@@ -322,6 +383,7 @@ export default function AdminPage() {
               // Flat Items
               const FlatIcon = item.icon as React.ElementType;
               const isActive = activeTab === item.key;
+              if (!canAccessTab(item.key)) return null;
               return (
                 <div key={item.key} className="mb-1">
                   <button

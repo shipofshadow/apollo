@@ -24,7 +24,7 @@ export default function LoginPage() {
         hasShownToast.current = true;
         showToast(`Welcome back, ${user.name.split(' ')[0]}!`, 'success');
       }
-      navigate(redirect || (user.role === 'admin' ? '/admin' : '/client/dashboard'), { replace: true });
+      navigate(redirect || (user.role === 'client' ? '/client/dashboard' : '/admin'), { replace: true });
     }
   }, [user, navigate, redirect, showToast]);
 

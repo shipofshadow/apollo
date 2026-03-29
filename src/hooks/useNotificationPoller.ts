@@ -13,7 +13,7 @@ import { fetchNotificationsAsync } from '../store/notificationsSlice';
  * stack and feels real-time enough for a booking-management app.
  *
  * Interval:
- *   admin → 15 seconds  (needs to know about new bookings quickly)
+ *   backoffice (admin/manager/staff) → 15 seconds
  *   client → 30 seconds
  */
 const ADMIN_INTERVAL_MS  = 15_000;
@@ -43,7 +43,8 @@ export function useNotificationPoller(): void {
     // Fetch immediately on login
     poll();
 
-    const intervalMs = user.role === 'admin' ? ADMIN_INTERVAL_MS : CLIENT_INTERVAL_MS;
+    const isBackoffice = user.role === 'admin' || user.role === 'manager' || user.role === 'staff';
+    const intervalMs = isBackoffice ? ADMIN_INTERVAL_MS : CLIENT_INTERVAL_MS;
     intervalRef.current = setInterval(poll, intervalMs);
 
     return () => {

@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2 } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2, Upload, Trash2 } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
 import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getNotificationPrefsApi, saveNotificationPrefsApi } from '../../services/api';
+import { getNotificationPrefsApi, saveNotificationPrefsApi, uploadProfileAvatarApi } from '../../services/api';
 import type { NotificationPreferences } from '../../types';
+
+const UPLOAD_MAX_MB = 10;
+
+function validateImageFile(file: File): string | null {
+  return file.size > UPLOAD_MAX_MB * 1024 * 1024
+    ? `Image must be under ${UPLOAD_MAX_MB} MB.`
+    : null;
+}
 
 export default function Profile() {
   const dispatch               = useDispatch<AppDispatch>();
@@ -17,6 +25,8 @@ export default function Profile() {
   const [pw,       setPw]      = useState({ newPw: '', confirm: '' });
   const [showPw,   setShowPw]  = useState(false);
   const [localErr, setLocalErr] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [removingAvatar, setRemovingAvatar] = useState(false);
 
   // Notification preferences
   const [prefs,      setPrefs]      = useState<NotificationPreferences | null>(null);
@@ -104,10 +114,20 @@ export default function Profile() {
 
       {/* Avatar card */}
       <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-5 flex items-center gap-4">
-        <div className="w-14 h-14 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0">
-          <span className="text-brand-orange font-black text-xl uppercase">
-            {user?.name?.[0] ?? '?'}
-          </span>
+        <div className="w-14 h-14 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0 overflow-hidden">
+          {user?.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt="Profile"
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <span className="text-brand-orange font-black text-xl uppercase">
+              {user?.name?.[0] ?? '?'}
+            </span>
+          )}
         </div>
         <div className="min-w-0">
           <p className="text-white font-bold text-base truncate">{user?.name}</p>
@@ -115,9 +135,63 @@ export default function Profile() {
             <Mail className="w-3.5 h-3.5 shrink-0" /> {user?.email}
           </p>
         </div>
-        <span className="ml-auto shrink-0 px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border border-brand-orange/30 text-brand-orange bg-brand-orange/10">
-          {user?.role}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <label className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white transition-colors cursor-pointer ${uploadingAvatar ? 'opacity-60 pointer-events-none' : ''}`}>
+            {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            <span>Change Image</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploadingAvatar || !token}
+              onChange={async e => {
+                const file = e.target.files?.[0];
+                if (!file || !token) return;
+
+                const sizeErr = validateImageFile(file);
+                if (sizeErr) {
+                  setLocalErr(sizeErr);
+                  e.target.value = '';
+                  return;
+                }
+
+                setLocalErr('');
+                setUploadingAvatar(true);
+                try {
+                  const url = await uploadProfileAvatarApi(token, file);
+                  await dispatch(updateProfileAsync({ token, data: { avatar_url: url } })).unwrap();
+                  showToast('Profile image updated successfully.', 'success');
+                } catch (err: unknown) {
+                  setLocalErr((err as Error)?.message ?? 'Failed to upload profile image.');
+                } finally {
+                  setUploadingAvatar(false);
+                  e.target.value = '';
+                }
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              if (!token || !user?.avatar_url) return;
+              setLocalErr('');
+              setRemovingAvatar(true);
+              dispatch(updateProfileAsync({ token, data: { avatar_url: null } }))
+                .unwrap()
+                .then(() => showToast('Profile image removed.', 'success'))
+                .catch(() => {})
+                .finally(() => setRemovingAvatar(false));
+            }}
+            disabled={!user?.avatar_url || removingAvatar}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 disabled:opacity-40"
+          >
+            {removingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            <span>Remove</span>
+          </button>
+          <span className="shrink-0 px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border border-brand-orange/30 text-brand-orange bg-brand-orange/10">
+            {user?.role}
+          </span>
+        </div>
       </div>
 
       {/* Feedback */}
