@@ -108,6 +108,7 @@ class Router
             $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',        'handleBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/admin-reschedule', 'handleAdminBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',             'handleBookingPartsUpdate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/qa-photos',         'handleBookingQaPhotosUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/notes',             'handleBookingInternalNotes');
             $r->addRoute('GET',   '/api/bookings/{id}/activity',          'handleBookingActivityList');
 
@@ -179,8 +180,11 @@ class Router
             $r->addRoute('DELETE', '/api/portfolio-categories/{id:\d+}',      'handlePortfolioCategoryDelete');
 
             // ── Shop hours ──────────────────────────────────────────────────
-            $r->addRoute('GET', '/api/shop/hours', 'handleShopHoursGet');
-            $r->addRoute('PUT', '/api/shop/hours', 'handleShopHoursPut');
+            $r->addRoute('GET', '/api/shop/hours',                       'handleShopHoursGet');
+            $r->addRoute('PUT', '/api/shop/hours',                       'handleShopHoursPut');
+            $r->addRoute('GET',    '/api/shop/closed-dates',             'handleShopClosedDatesGet');
+            $r->addRoute('POST',   '/api/shop/closed-dates',             'handleShopClosedDatesAdd');
+            $r->addRoute('DELETE', '/api/shop/closed-dates/{date}',      'handleShopClosedDatesRemove');
 
             // ── Site settings (public read, admin write) ─────────────────────
             $r->addRoute('GET', '/api/site-settings', 'handleSiteSettingsGet');
@@ -210,6 +214,13 @@ class Router
             $r->addRoute('POST',   '/api/offers',          'handleOfferCreate');
             $r->addRoute('PUT',    '/api/offers/{id:\d+}', 'handleOfferUpdate');
             $r->addRoute('DELETE', '/api/offers/{id:\d+}', 'handleOfferDelete');
+
+            // ── Before/After (public read, admin write) ─────────────────────
+            $r->addRoute('GET',    '/api/before-after',          'handleBeforeAfterList');
+            $r->addRoute('GET',    '/api/before-after/{id:\d+}', 'handleBeforeAfterGet');
+            $r->addRoute('POST',   '/api/before-after',          'handleBeforeAfterCreate');
+            $r->addRoute('PUT',    '/api/before-after/{id:\d+}', 'handleBeforeAfterUpdate');
+            $r->addRoute('DELETE', '/api/before-after/{id:\d+}', 'handleBeforeAfterDelete');
 
             // ── Contact message (public) ─────────────────────────────────────
             $r->addRoute('POST', '/api/contact', 'handleContactMessage');
@@ -964,10 +975,11 @@ class Router
             : [];
 
         echo json_encode([
-            'isOpen'        => $dayHours['isOpen'],
-            'openTime'      => $dayHours['openTime'],
-            'closeTime'     => $dayHours['closeTime'],
-            'slotIntervalH' => $dayHours['slotIntervalH'],
+            'isOpen'         => $dayHours['isOpen'],
+            'openTime'       => $dayHours['openTime'],
+            'closeTime'      => $dayHours['closeTime'],
+            'slotIntervalH'  => $dayHours['slotIntervalH'],
+            'closureReason'  => $dayHours['closureReason'] ?? null,
             'availableSlots' => $allSlots,
             'bookedSlots'    => $bookedSlots,
             'slotCapacity'   => $bookingSvc->getSlotCapacity(),
@@ -995,6 +1007,38 @@ class Router
 
         $updated = (new ShopHoursService())->updateAll(array_values($input));
         echo json_encode(['hours' => $updated]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleShopClosedDatesGet(array $vars = []): void
+    {
+        $dates = (new ShopHoursService())->getClosedDates();
+        echo json_encode(['closedDates' => $dates]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleShopClosedDatesAdd(array $vars = []): void
+    {
+        $this->requirePermission('shop-hours:manage');
+        $data     = $this->jsonBody();
+        $date     = trim((string) ($data['date']   ?? ''));
+        $reason   = isset($data['reason']) ? trim((string) $data['reason']) : null;
+        $isYearly = (bool) ($data['isYearly'] ?? false);
+        if ($reason === '') $reason = null;
+
+        (new ShopHoursService())->addClosedDate($date, $reason, $isYearly);
+        $dates = (new ShopHoursService())->getClosedDates();
+        echo json_encode(['closedDates' => $dates]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleShopClosedDatesRemove(array $vars = []): void
+    {
+        $this->requirePermission('shop-hours:manage');
+        $date = trim($vars['date'] ?? '');
+        (new ShopHoursService())->removeClosedDate($date);
+        $dates = (new ShopHoursService())->getClosedDates();
+        echo json_encode(['closedDates' => $dates]);
     }
 
     /** @param array<string, string> $vars */
@@ -1048,6 +1092,29 @@ class Router
         $partsNotes  = trim((string) ($data['partsNotes'] ?? ''));
 
         $booking = (new BookingService())->updatePartsStatus($id, $waiting, $partsNotes);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingQaPhotosUpdate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('bookings:manage');
+        $id      = $vars['id'] ?? '';
+        $data    = $this->jsonBody();
+
+        $stage = trim((string) ($data['stage'] ?? ''));
+        $photoUrls = array_values(array_filter(
+            is_array($data['photoUrls'] ?? null) ? $data['photoUrls'] : [],
+            fn($v) => is_string($v) && trim($v) !== ''
+        ));
+
+        $booking = (new BookingService())->updateQaPhotos(
+            $id,
+            $stage,
+            $photoUrls,
+            (int) ($payload['sub'] ?? 0) ?: null
+        );
+
         echo json_encode(['booking' => $booking]);
     }
 
@@ -1851,7 +1918,7 @@ class Router
     {
         $this->requirePermission('media:upload');
 
-        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio'];
+        $allowed_types = ['services', 'products', 'blog', 'team', 'testimonials', 'portfolio', 'before-after'];
         $type = $_POST['type'] ?? '';
         if (!in_array($type, $allowed_types, true)) {
             throw new RuntimeException('Invalid upload type. Must be one of: ' . implode(', ', $allowed_types) . '.', 422);
@@ -2411,6 +2478,68 @@ class Router
         $id = (int) ($vars['id'] ?? 0);
         (new OfferService())->delete($id);
         echo json_encode(['message' => 'Offer deleted.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBeforeAfterList(array $vars = []): void
+    {
+        $includeInactive = false;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $items = (new BeforeAfterService())->getAll($includeInactive);
+        echo json_encode(['items' => $items]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBeforeAfterGet(array $vars = []): void
+    {
+        $id = (int) ($vars['id'] ?? 0);
+        $requireActive = true;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $requireActive = !$this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'content:manage');
+            } catch (RuntimeException) { /* stay public */ }
+        }
+
+        $item = (new BeforeAfterService())->getById($id, $requireActive);
+        echo json_encode(['item' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBeforeAfterCreate(array $vars = []): void
+    {
+        $this->requirePermission('content:manage');
+        $data = $this->jsonBody();
+        $item = (new BeforeAfterService())->create($data);
+        http_response_code(201);
+        echo json_encode(['item' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBeforeAfterUpdate(array $vars = []): void
+    {
+        $this->requirePermission('content:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $item = (new BeforeAfterService())->update($id, $data);
+        echo json_encode(['item' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBeforeAfterDelete(array $vars = []): void
+    {
+        $this->requirePermission('content:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        (new BeforeAfterService())->delete($id);
+        echo json_encode(['message' => 'Before/After item deleted.']);
     }
 
     // -------------------------------------------------------------------------

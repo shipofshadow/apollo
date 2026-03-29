@@ -17,11 +17,13 @@ import {
   updateBookingPartsApi,
   fetchAvailabilityApi,
   fetchShopHoursApi,
+  fetchShopClosedDatesApi,
   fetchBuildUpdatesApi,
   fetchBookingActivityApi,
   createBuildUpdateApi,
   uploadBuildUpdateMediaApi,
   updateInternalNotesApi,
+  updateBookingQaPhotosApi,
   fetchCustomerStatsApi,
   fetchTeamMembersApi,
   fetchAdminUsersApi,
@@ -48,7 +50,7 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildDateList(shopHours: ShopDayHours[]): Date[] {
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]);
@@ -56,7 +58,8 @@ function buildDateList(shopHours: ShopDayHours[]): Date[] {
   const cursor = new Date();
   cursor.setDate(cursor.getDate() + 1);
   while (dates.length < 30) {
-    if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
+    const iso = cursor.toISOString().slice(0, 10);
+    if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
@@ -80,6 +83,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
   const { showToast } = useToast();
 
   const [shopHours,   setShopHours]   = useState<ShopDayHours[]>([]);
+  const [closedDatesSet, setClosedDatesSet] = useState<Set<string>>(new Set());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -94,12 +98,16 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchShopHoursApi()
-      .then(({ hours }) => setShopHours(hours))
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
+      .then(([{ hours }, cdData]) => {
+        setShopHours(hours);
+        const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
+        setClosedDatesSet(new Set(cd.map(d => d.date)));
+      })
       .catch(() => {});
   }, []);
 
-  const availableDates = buildDateList(shopHours);
+  const availableDates = buildDateList(shopHours, closedDatesSet);
 
   const handleDateSelect = async (date: Date) => {
     setSelectedDate(date);
@@ -363,6 +371,16 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [buildUpdateBusy,   setBuildUpdateBusy]   = useState(false);
   const [photoUploading,    setPhotoUploading]    = useState(false);
   const buildPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [beforePhotos,      setBeforePhotos]      = useState<string[]>([]);
+  const [afterPhotos,       setAfterPhotos]       = useState<string[]>([]);
+  const [qaUploadingStage,  setQaUploadingStage]  = useState<'before' | 'after' | null>(null);
+  const [qaSavingStage,     setQaSavingStage]     = useState<'before' | 'after' | null>(null);
+  const [checkInOpen,       setCheckInOpen]       = useState(false);
+  const [checkInBusy,       setCheckInBusy]       = useState(false);
+  const [completeOpen,      setCompleteOpen]      = useState(false);
+  const [completeBusy,      setCompleteBusy]      = useState(false);
+  const beforePhotoInputRef = useRef<HTMLInputElement>(null);
+  const afterPhotoInputRef = useRef<HTMLInputElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
@@ -379,6 +397,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
     setPartsNotes(booking.partsNotes ?? '');
     setInternalNotes(booking.internalNotes ?? '');
+    setBeforePhotos(booking.beforePhotos ?? []);
+    setAfterPhotos(booking.afterPhotos ?? []);
     if (booking.assignedTech?.userId != null) {
       setSelectedTechUserId(String(booking.assignedTech.userId));
     } else if (booking.assignedTechId != null) {
@@ -557,6 +577,91 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     }
   };
 
+  const handleQaPhotoUpload = async (
+    stage: 'before' | 'after',
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!token || !booking || !e.target.files?.length) return;
+
+    setQaUploadingStage(stage);
+    try {
+      const urls = await uploadBuildUpdateMediaApi(token, booking.id, Array.from(e.target.files));
+      if (stage === 'before') {
+        setBeforePhotos(prev => [...prev, ...urls]);
+      } else {
+        setAfterPhotos(prev => [...prev, ...urls]);
+      }
+      showToast(`${urls.length} ${stage} photo(s) uploaded.`, 'success');
+    } catch (err: unknown) {
+      showToast((err as Error).message ?? 'Photo upload failed.', 'error');
+    } finally {
+      setQaUploadingStage(null);
+      if (stage === 'before' && beforePhotoInputRef.current) beforePhotoInputRef.current.value = '';
+      if (stage === 'after' && afterPhotoInputRef.current) afterPhotoInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveQaPhotos = async (stage: 'before' | 'after') => {
+    if (!token || !booking) return;
+    const photoUrls = stage === 'before' ? beforePhotos : afterPhotos;
+    if (photoUrls.length === 0) {
+      showToast(`Add at least one ${stage} photo.`, 'error');
+      return;
+    }
+
+    setQaSavingStage(stage);
+    try {
+      await updateBookingQaPhotosApi(token, booking.id, { stage, photoUrls });
+      await dispatch(fetchAllBookingsAsync(token)).unwrap();
+      await reloadActivity();
+      showToast(`${stage === 'before' ? 'Before' : 'After'} photos saved.`, 'success');
+    } catch (err: unknown) {
+      showToast((err as Error).message ?? 'Failed to save photos.', 'error');
+    } finally {
+      setQaSavingStage(null);
+    }
+  };
+
+  const handleCheckInConfirm = async () => {
+    if (!token || !booking) return;
+    if (beforePhotos.length === 0) {
+      showToast('Add at least one before photo to continue.', 'error');
+      return;
+    }
+
+    setCheckInBusy(true);
+    try {
+      await updateBookingQaPhotosApi(token, booking.id, { stage: 'before', photoUrls: beforePhotos });
+      await dispatch(fetchAllBookingsAsync(token)).unwrap();
+      await handleStatus('confirmed');
+      setCheckInOpen(false);
+    } catch (err: unknown) {
+      showToast((err as Error).message ?? 'Failed to confirm booking.', 'error');
+    } finally {
+      setCheckInBusy(false);
+    }
+  };
+
+  const handleCompleteConfirm = async () => {
+    if (!token || !booking) return;
+    if (afterPhotos.length === 0) {
+      showToast('Add at least one after photo to continue.', 'error');
+      return;
+    }
+
+    setCompleteBusy(true);
+    try {
+      await updateBookingQaPhotosApi(token, booking.id, { stage: 'after', photoUrls: afterPhotos });
+      await dispatch(fetchAllBookingsAsync(token)).unwrap();
+      await handleStatus('completed');
+      setCompleteOpen(false);
+    } catch (err: unknown) {
+      showToast((err as Error).message ?? 'Failed to complete booking.', 'error');
+    } finally {
+      setCompleteBusy(false);
+    }
+  };
+
   if (!booking) {
     return (
       <div className="space-y-4">
@@ -577,6 +682,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const canResume   = booking.status === 'awaiting_parts';
   const canCancel   = canModify;
   const isFinalized = booking.status === 'completed' || booking.status === 'cancelled';
+  const hasBeforePhotos = beforePhotos.length > 0;
+  const hasAfterPhotos = (booking.afterPhotos?.length ?? 0) > 0;
 
   return (
     <div className="space-y-5 w-full max-w-7xl">
@@ -620,9 +727,16 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               <span className="hidden sm:inline text-gray-600 font-normal"> · </span>
               <span className="hidden sm:inline text-gray-400 text-base">{booking.serviceName}</span>
             </h2>
-            <p className="text-gray-600 text-xs font-mono flex items-center gap-1 mt-0.5">
-              <Hash className="w-3 h-3" />{booking.id}
-            </p>
+            <div className="mt-1.5 space-y-0.5">
+              {booking.referenceNumber && (
+                <p className="text-brand-orange text-xs font-mono font-bold flex items-center gap-1.5">
+                  Ref: {booking.referenceNumber}
+                </p>
+              )}
+              <p className="text-gray-600 text-xs font-mono flex items-center gap-1">
+                <Hash className="w-3 h-3" />{booking.id}
+              </p>
+            </div>
           </div>
           <span className={`ml-auto px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border shrink-0 ${STATUS_STYLES[booking.status]}`}>
             {formatStatus(booking.status)}
@@ -1025,6 +1139,121 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             )}
           </section>
 
+          {/* QA Before/After Photos */}
+          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5" /> QA Before / After Photos
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Before Photos (Check-in)</p>
+                  <span className="text-[10px] text-gray-600">{beforePhotos.length} file(s)</span>
+                </div>
+                <input
+                  ref={beforePhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => void handleQaPhotoUpload('before', e)}
+                />
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => beforePhotoInputRef.current?.click()}
+                    disabled={qaUploadingStage !== null}
+                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                  >
+                    {qaUploadingStage === 'before'
+                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
+                      : <><Camera className="w-3 h-3" /> Add Before</>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveQaPhotos('before')}
+                    disabled={qaSavingStage !== null || beforePhotos.length === 0}
+                    className="px-3 py-1.5 bg-brand-orange text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {qaSavingStage === 'before' ? 'Saving…' : 'Save Before'}
+                  </button>
+                </div>
+                {beforePhotos.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {beforePhotos.map((url, i) => (
+                      <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
+                        <img src={url} alt={`Before ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <button
+                          type="button"
+                          onClick={() => setBeforePhotos(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                        >
+                          <X className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600 italic">Required before confirming/check-in.</p>
+                )}
+              </div>
+
+              <div className="border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">After Photos (Completion)</p>
+                  <span className="text-[10px] text-gray-600">{afterPhotos.length} file(s)</span>
+                </div>
+                <input
+                  ref={afterPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => void handleQaPhotoUpload('after', e)}
+                />
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => afterPhotoInputRef.current?.click()}
+                    disabled={qaUploadingStage !== null}
+                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                  >
+                    {qaUploadingStage === 'after'
+                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
+                      : <><Camera className="w-3 h-3" /> Add After</>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveQaPhotos('after')}
+                    disabled={qaSavingStage !== null || afterPhotos.length === 0}
+                    className="px-3 py-1.5 bg-brand-orange text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {qaSavingStage === 'after' ? 'Saving…' : 'Save After'}
+                  </button>
+                </div>
+                {afterPhotos.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {afterPhotos.map((url, i) => (
+                      <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
+                        <img src={url} alt={`After ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <button
+                          type="button"
+                          onClick={() => setAfterPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                        >
+                          <X className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600 italic">Required before marking completed.</p>
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* Signature */}
           {booking.signatureData && (
             <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
@@ -1053,14 +1282,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             <div className="space-y-2">
               {canConfirm && (
                 <button
-                  onClick={() => requestConfirmation(
-                    {
-                      title: 'Confirm Booking?',
-                      message: 'This will move the booking status to confirmed.',
-                      confirmLabel: 'Confirm Booking',
-                    },
-                    async () => handleStatus('confirmed'),
-                  )}
+                  onClick={() => setCheckInOpen(true)}
                   disabled={statusBusy !== null}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                 >
@@ -1070,14 +1292,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               )}
               {canComplete && (
                 <button
-                  onClick={() => requestConfirmation(
-                    {
-                      title: 'Mark Booking Completed?',
-                      message: 'Completing this booking locks assignment, reschedule, and progress updates.',
-                      confirmLabel: 'Mark Completed',
-                    },
-                    async () => handleStatus('completed'),
-                  )}
+                  onClick={() => setCompleteOpen(true)}
                   disabled={statusBusy !== null}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
                 >
@@ -1122,6 +1337,12 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               )}
               {!canModify && (
                 <p className="text-gray-600 text-xs italic">No actions available for a {formatStatus(booking.status).toLowerCase()} booking.</p>
+              )}
+              {canConfirm && !hasBeforePhotos && (
+                <p className="text-[11px] text-yellow-400">Before photos are required and can be uploaded in the check-in popup.</p>
+              )}
+              {canComplete && !hasAfterPhotos && (
+                <p className="text-[11px] text-yellow-400">After photos are required and can be uploaded in the completion popup.</p>
               )}
             </div>
           </section>
@@ -1289,6 +1510,156 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 ].join(' ')}
               >
                 {confirmBusy ? 'Please wait...' : confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {checkInOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Confirm Check-In</h3>
+            <p className="mt-2 text-sm text-gray-300">
+              Upload at least one before photo, then confirm the booking.
+            </p>
+
+            <div className="mt-4 border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Before Photos (Check-in)</p>
+                <span className="text-[10px] text-gray-600">{beforePhotos.length} file(s)</span>
+              </div>
+              <input
+                ref={beforePhotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => void handleQaPhotoUpload('before', e)}
+              />
+              <button
+                type="button"
+                onClick={() => beforePhotoInputRef.current?.click()}
+                disabled={qaUploadingStage !== null || checkInBusy}
+                className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+              >
+                {qaUploadingStage === 'before'
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
+                  : <><Camera className="w-3 h-3" /> Add Before Photos</>}
+              </button>
+
+              {beforePhotos.length > 0 ? (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+                  {beforePhotos.map((url, i) => (
+                    <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
+                      <img src={url} alt={`Before ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <button
+                        type="button"
+                        onClick={() => setBeforePhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        disabled={checkInBusy}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center disabled:opacity-50"
+                      >
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-yellow-400 italic mt-3">At least one before photo is required.</p>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCheckInOpen(false)}
+                disabled={checkInBusy}
+                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCheckInConfirm()}
+                disabled={checkInBusy || qaUploadingStage !== null || beforePhotos.length === 0}
+                className="px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white bg-brand-orange hover:bg-orange-600 disabled:opacity-50"
+              >
+                {checkInBusy ? 'Please wait...' : 'Upload & Confirm Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {completeOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Complete Booking</h3>
+            <p className="mt-2 text-sm text-gray-300">
+              Upload at least one after photo, then mark this booking as completed.
+            </p>
+
+            <div className="mt-4 border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">After Photos (Completion)</p>
+                <span className="text-[10px] text-gray-600">{afterPhotos.length} file(s)</span>
+              </div>
+              <input
+                ref={afterPhotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => void handleQaPhotoUpload('after', e)}
+              />
+              <button
+                type="button"
+                onClick={() => afterPhotoInputRef.current?.click()}
+                disabled={qaUploadingStage !== null || completeBusy}
+                className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+              >
+                {qaUploadingStage === 'after'
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
+                  : <><Camera className="w-3 h-3" /> Add After Photos</>}
+              </button>
+
+              {afterPhotos.length > 0 ? (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+                  {afterPhotos.map((url, i) => (
+                    <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
+                      <img src={url} alt={`After ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <button
+                        type="button"
+                        onClick={() => setAfterPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        disabled={completeBusy}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center disabled:opacity-50"
+                      >
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-yellow-400 italic mt-3">At least one after photo is required.</p>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCompleteOpen(false)}
+                disabled={completeBusy}
+                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCompleteConfirm()}
+                disabled={completeBusy || qaUploadingStage !== null || afterPhotos.length === 0}
+                className="px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white bg-brand-orange hover:bg-orange-600 disabled:opacity-50"
+              >
+                {completeBusy ? 'Please wait...' : 'Upload & Mark Completed'}
               </button>
             </div>
           </div>

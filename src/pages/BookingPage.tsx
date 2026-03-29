@@ -13,6 +13,7 @@ import {
   fetchAvailabilityApi, uploadBookingMediaApi,
   fetchVehicleMakesApi, fetchVehicleModelsApi,
   fetchShopHoursApi, fetchMyVehiclesApi,
+  fetchShopClosedDatesApi,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
 import type { ClientVehicle, ShopDayHours } from '../types';
@@ -52,7 +53,7 @@ function slotCompletionLabel(slot: string, totalHours: number): string {
 }
 
 /** Build date list from shop hours (falls back to Mon–Sat if hours not loaded) */
-function buildDateList(shopHours: ShopDayHours[]): Date[] {
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]); // Mon–Sat default
@@ -61,7 +62,8 @@ function buildDateList(shopHours: ShopDayHours[]): Date[] {
   const cursor = new Date();
   cursor.setDate(cursor.getDate() + 1);
   while (dates.length < 14) {
-    if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
+    const iso = cursor.toISOString().slice(0, 10);
+    if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
@@ -81,7 +83,7 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token } = useAuth();
-  const { status: bookStatus, error: bookError } = useSelector((s: RootState) => s.booking);
+  const { status: bookStatus, error: bookError, appointments } = useSelector((s: RootState) => s.booking);
   const services = useSelector((s: RootState) => s.services.items.filter(sv => sv.isActive));
 
   const [step, setStep] = useState(1);
@@ -100,6 +102,7 @@ export default function BookingPage() {
   // Shop hours – loaded on mount to filter the date picker
   const [shopHours,       setShopHours]       = useState<ShopDayHours[]>([]);
   const [shopHoursLoaded, setShopHoursLoaded] = useState(false);
+  const [closedDatesSet,  setClosedDatesSet]  = useState<Set<string>>(new Set());
 
   // Step 2 – date / time / availability
   const [selectedDate,        setSelectedDate]        = useState<Date | null>(null);
@@ -109,6 +112,7 @@ export default function BookingPage() {
   const [slotCounts,          setSlotCounts]          = useState<Record<string, number>>({});
   const [slotCapacity,        setSlotCapacity]        = useState(3);
   const [shopDayIsOpen,       setShopDayIsOpen]       = useState(true);
+  const [closureReason,       setClosureReason]       = useState<string | null>(null);
   const [shopCloseTime,       setShopCloseTime]       = useState('18:00');
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
@@ -151,7 +155,7 @@ export default function BookingPage() {
   // Step 3 – validation errors
   const [formErrors, setFormErrors] = useState<{ phone?: string; email?: string }>({});
 
-  const availableDates = buildDateList(shopHoursLoaded ? shopHours : []);
+  const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
 
   const selectedServices = services.filter(s => s.id === selectedId);
   const totalMaxHours    = selectedServices.reduce(
@@ -171,12 +175,16 @@ export default function BookingPage() {
     return svc.startingPrice || null;
   };
 
-  // Load services + shop hours on mount
+  // Load services + shop hours + closed dates on mount
   useEffect(() => {
     dispatch(fetchServicesAsync(token));
     if (BACKEND_URL) {
-      fetchShopHoursApi()
-        .then(({ hours }) => setShopHours(hours))
+      Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
+        .then(([{ hours }, cdData]) => {
+          setShopHours(hours);
+          const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
+          setClosedDatesSet(new Set(cd.map(d => d.date)));
+        })
         .catch(() => { /* use default Mon–Sat */ })
         .finally(() => setShopHoursLoaded(true));
     } else {
@@ -265,11 +273,13 @@ export default function BookingPage() {
     setBookedSlots([]);
     setSlotCounts({});
     setShopDayIsOpen(true);
+    setClosureReason(null);
     if (!BACKEND_URL) return;
     setAvailabilityLoading(true);
     try {
       const res = await fetchAvailabilityApi(date.toISOString().split('T')[0]);
       setShopDayIsOpen(res.isOpen);
+      setClosureReason(res.closureReason ?? null);
       setShopCloseTime(res.closeTime);
       setAvailableSlots(res.availableSlots);
       setBookedSlots(res.bookedSlots);
@@ -388,33 +398,32 @@ export default function BookingPage() {
         </div>
 
         {/* Step indicators */}
-        <div className="flex justify-between items-center mb-12 relative">
-          <div className="absolute left-0 top-5 -translate-y-1/2 w-full h-0.5 bg-gray-800 z-0" />
-          <div className="absolute left-0 top-5 -translate-y-1/2 h-0.5 bg-brand-orange z-0 transition-all duration-500"
+        <div className="flex justify-between items-center mb-6 md:mb-12 relative">
+          <div className="absolute left-0 top-3.5 md:top-5 -translate-y-1/2 w-full h-0.5 bg-gray-800 z-0" />
+          <div className="absolute left-0 top-3.5 md:top-5 -translate-y-1/2 h-0.5 bg-brand-orange z-0 transition-all duration-500"
             style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }} />
-          {STEPS.map(({ label, desc }, i) => {
+          {STEPS.map((stepItem, i) => {
             const n = i + 1;
             const active = step >= n;
             return (
-              <div key={n} className="relative z-10 flex flex-col items-center gap-2">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${active ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-500'}`}>
-                  {n === STEPS.length && step === STEPS.length ? <CheckCircle className="w-5 h-5" /> : n}
+              <div key={n} className="relative z-10 flex flex-col items-center gap-0.5 md:gap-2">
+                <div className={`w-7 md:w-10 h-7 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-colors ${active ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-500'}`}>
+                  {n === STEPS.length && step === STEPS.length ? <CheckCircle className="w-3.5 md:w-5 h-3.5 md:h-5" /> : n}
                 </div>
-                <span className={`hidden md:block text-xs font-bold uppercase tracking-widest ${active ? 'text-brand-orange' : 'text-gray-600'}`}>{label}</span>
-                <span className={`hidden lg:block text-[11px] -mt-1 ${active ? 'text-gray-400' : 'text-gray-700'}`}>{desc}</span>
+                <span className={`hidden sm:block text-[8px] md:text-xs font-bold uppercase tracking-widest line-clamp-1 text-center max-w-12 md:max-w-none ${active ? 'text-brand-orange' : 'text-gray-600'}`}>{stepItem.label}</span>
               </div>
             );
           })}
         </div>
 
-        <div className="bg-brand-dark border border-gray-800 p-6 md:p-10 rounded-sm">
+        <div className="bg-brand-dark border border-gray-800 p-3 md:p-6 lg:p-10 rounded-sm">
 
           {/* ── Step 1: Services ── */}
           {step === 1 && (
             <div>
-              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">1. Select a Service</h2>
-              <p className="text-sm text-gray-400 mb-6">Tap the service you'd like. Price and estimated time are shown on each card.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <h2 className="text-lg md:text-2xl font-display font-bold text-white uppercase mb-1 md:mb-2">1. Select a Service</h2>
+              <p className="text-xs md:text-sm text-gray-400 mb-4 md:mb-6">Tap the service you'd like. Price and estimated time are shown on each card.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
                 {services.map(svc => {
                   const active = selectedId === svc.id;
                   return (
@@ -548,7 +557,9 @@ export default function BookingPage() {
 
                   {!availabilityLoading && !shopDayIsOpen && (
                     <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-sm">
-                      The shop is closed on this date. Please choose a different day.
+                      {closureReason
+                        ? `Shop closed – ${closureReason}. Please choose a different day.`
+                        : 'The shop is closed on this date. Please choose a different day.'}
                     </p>
                   )}
 
@@ -617,34 +628,34 @@ export default function BookingPage() {
           {/* ── Step 3: Details ── */}
           {step === 3 && (
             <div>
-              <h2 className="text-2xl font-display font-bold text-white uppercase mb-2">3. Your Details</h2>
-              <p className="text-sm text-gray-400 mb-6">Fill in your contact info and vehicle details so we can prepare for your visit.</p>
+              <h2 className="text-lg md:text-2xl font-display font-bold text-white uppercase mb-1 md:mb-2">3. Your Details</h2>
+              <p className="text-xs md:text-sm text-gray-400 mb-4 md:mb-6">Fill in your contact info and vehicle details so we can prepare for your visit.</p>
               {!user && (
-                <div className="mb-6 flex items-center justify-between bg-brand-orange/10 border border-brand-orange/30 px-4 py-3 rounded-sm text-sm">
+                <div className="mb-4 md:mb-6 flex items-center justify-between bg-brand-orange/10 border border-brand-orange/30 px-3 md:px-4 py-2 md:py-3 rounded-sm text-xs md:text-sm gap-2">
                   <span className="text-gray-300">Have an account? Sign in to pre-fill your details.</span>
-                  <Link to="/login?redirect=/booking" className="text-brand-orange font-bold hover:text-orange-400 transition-colors ml-4 shrink-0">Sign In</Link>
+                  <Link to="/login?redirect=/booking" className="text-brand-orange font-bold hover:text-orange-400 transition-colors shrink-0">Sign In</Link>
                 </div>
               )}
-              <form id="booking-form" onSubmit={handleSubmit} className="space-y-6">
+              <form id="booking-form" onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
                 {/* Contact */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-5">
+                  <div className="space-y-1.5 md:space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Full Name *</label>
                     <input type="text" required value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm" placeholder="Juan dela Cruz" />
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-2 md:px-4 py-2 md:py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-xs md:text-sm" placeholder="Juan dela Cruz" />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 md:space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Phone Number *</label>
                     <input type="tel" required value={form.phone}
                       onChange={handlePhoneChange}
-                      className={`w-full bg-brand-darker border text-white px-4 py-3 focus:outline-none transition-colors rounded-sm ${formErrors.phone ? 'border-red-500 focus:border-red-400' : 'border-gray-700 focus:border-brand-orange'}`}
+                      className={`w-full bg-brand-darker border text-white px-2 md:px-4 py-2 md:py-3 focus:outline-none transition-colors rounded-sm text-xs md:text-sm ${formErrors.phone ? 'border-red-500 focus:border-red-400' : 'border-gray-700 focus:border-brand-orange'}`}
                       placeholder="09XXXXXXXXX" />
-                    {formErrors.phone && <p className="text-xs text-red-400 mt-1">{formErrors.phone}</p>}
+                    {formErrors.phone && <p className="text-xs text-red-400 mt-0.5">{formErrors.phone}</p>}
                   </div>
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-1.5 md:space-y-2 md:col-span-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Email Address *</label>
                     <input type="email" required value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                      className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm" placeholder="juan@email.com" />
+                      className="w-full bg-brand-darker border border-gray-700 text-white px-2 md:px-4 py-2 md:py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-xs md:text-sm" placeholder="juan@email.com" />
                   </div>
                 </div>
                 {/* Vehicle */}
@@ -806,6 +817,12 @@ export default function BookingPage() {
             <div className="text-center py-12">
               <CheckCircle className="w-24 h-24 text-brand-orange mx-auto mb-6" />
               <h2 className="text-3xl md:text-4xl font-display font-bold text-white uppercase mb-4">You're All Set!</h2>
+                            {appointments.length > 0 && appointments[0].referenceNumber && (
+                              <div className="mb-6 inline-block bg-black/40 border border-brand-orange/50 rounded-sm px-4 py-3">
+                                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Your Reference Number</p>
+                                <p className="text-xl font-mono font-bold text-brand-orange">{appointments[0].referenceNumber}</p>
+                              </div>
+                            )}
               <p className="text-gray-400 text-lg mb-2 max-w-md mx-auto">
                 Thank you, <span className="text-white font-bold">{form.name}</span>! Your appointment has been booked for{" "}
                 <span className="text-white">{selectedDate?.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}</span>{" "}

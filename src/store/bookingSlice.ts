@@ -135,6 +135,7 @@ const initialState: BookingState = {
   appointments: [
     {
       id: 'mock-1',
+      referenceNumber: 'BK-20260325-1001',
       userId: null,
       name: 'John Smith',
       email: 'john@example.com',
@@ -154,6 +155,7 @@ const initialState: BookingState = {
     },
     {
       id: 'mock-2',
+      referenceNumber: 'BK-20260324-1002',
       userId: null,
       name: 'Sarah Connor',
       email: 'sarah@example.com',

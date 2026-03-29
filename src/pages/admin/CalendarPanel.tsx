@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Loader2, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Loader2, Clock, CalendarX } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllBookingsAsync } from '../../store/bookingSlice';
+import { fetchShopClosedDatesApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -42,9 +43,13 @@ export default function CalendarPanel({ onView }: Props) {
   const [year,  setYear]  = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [closedDates, setClosedDates] = useState<{ date: string; reason: string | null; isYearly: boolean }[]>([]);
 
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));
+    fetchShopClosedDatesApi()
+      .then(data => setClosedDates((data as { closedDates: { date: string; reason: string | null; isYearly: boolean }[] }).closedDates ?? []))
+      .catch(() => {});
   }, [token, dispatch]);
 
   const prevMonth = () => {
@@ -85,6 +90,17 @@ export default function CalendarPanel({ onView }: Props) {
     `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   const todayIso = today.toISOString().split('T')[0];
+
+  // Helper to find closure for a specific date (handles yearly closures)
+  const getClosureForDate = (dateIso: string) => {
+    // First check exact match (one-time closure)
+    const exactMatch = closedDates.find(cd => cd.date === dateIso && !cd.isYearly);
+    if (exactMatch) return exactMatch;
+
+    // Then check yearly closures by month-day
+    const targetMonthDay = dateIso.slice(5); // MM-DD
+    return closedDates.find(cd => cd.isYearly && cd.date.slice(5) === targetMonthDay);
+  };
 
   const selectedBookings = selectedDate ? (bookingsByDate.get(selectedDate) ?? []) : [];
 
@@ -146,6 +162,7 @@ export default function CalendarPanel({ onView }: Props) {
               }
               const iso   = isoForDay(day);
               const bks   = bookingsByDate.get(iso) ?? [];
+              const closure = getClosureForDate(iso);
               const isToday     = iso === todayIso;
               const isSelected  = iso === selectedDate;
               const activeCount = bks.filter(b => b.status !== 'cancelled').length;
@@ -155,18 +172,27 @@ export default function CalendarPanel({ onView }: Props) {
                   key={iso}
                   onClick={() => setSelectedDate(iso === selectedDate ? null : iso)}
                   className={`min-h-[72px] border-r border-b border-gray-800 p-1.5 cursor-pointer transition-colors hover:bg-gray-800/60 ${
-                    isSelected ? 'bg-brand-orange/10 border-brand-orange' : ''
+                    isSelected ? 'bg-brand-orange/10 border-brand-orange' : closure ? 'bg-red-500/5 border-red-500/30' : ''
                   }`}
                 >
                   <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold mb-1 ${
                     isToday
                       ? 'bg-brand-orange text-white'
+                      : closure
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                       : isSelected
                       ? 'text-brand-orange'
                       : 'text-gray-400'
                   }`}>
                     {day}
                   </div>
+
+                  {closure && (
+                    <div className="flex items-center gap-1 mb-1 px-1 py-0.5 bg-red-500/10 border border-red-500/20 rounded text-[9px] truncate">
+                      <CalendarX className="w-3 h-3 text-red-400 shrink-0" />
+                      <span className="text-red-400 font-bold truncate">Closed</span>
+                    </div>
+                  )}
 
                   {/* Show up to 2 booking dots / labels */}
                   <div className="space-y-0.5">
@@ -212,7 +238,7 @@ export default function CalendarPanel({ onView }: Props) {
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {!selectedDate && (
               <div className="flex flex-col items-center justify-center py-10 text-gray-600 gap-2">
                 <Calendar className="w-8 h-8 opacity-30" />
@@ -220,33 +246,54 @@ export default function CalendarPanel({ onView }: Props) {
               </div>
             )}
 
-            {selectedDate && selectedBookings.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-600 gap-2">
-                <Calendar className="w-8 h-8 opacity-30" />
-                <p className="text-xs">No bookings on this day</p>
-              </div>
-            )}
-
-            {selectedBookings.map(b => (
-              <div
-                key={b.id}
-                onClick={() => onView(b.id)}
-                className="group flex gap-3 p-3 mb-2 bg-brand-darker border border-gray-800 rounded-sm cursor-pointer hover:border-gray-700 transition-colors"
-              >
-                <div className={`shrink-0 w-0.5 self-stretch rounded-full ${STATUS_DOT[b.status]}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-white text-xs font-semibold truncate">{b.name}</p>
-                  <p className="text-gray-500 text-xs truncate">{b.serviceName}</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Clock className="w-2.5 h-2.5 text-gray-600" />
-                    <span className="text-gray-600 text-[10px]">{b.appointmentTime}</span>
-                  </div>
-                  <span className={`inline-block mt-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded-sm border ${STATUS_BADGE[b.status]}`}>
-                    {formatStatus(b.status)}
-                  </span>
-                </div>
-              </div>
-            ))}
+            {selectedDate && (() => {
+              const closure = getClosureForDate(selectedDate);
+              const hasBookings = selectedBookings.length > 0;
+              return (
+                <>
+                  {closure && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-sm p-3 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <CalendarX className="w-4 h-4 text-red-400 shrink-0" />
+                        <span className="text-sm font-bold text-red-400 uppercase tracking-widest">Shop Closed</span>
+                        {closure.isYearly && (
+                          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-400 ml-auto shrink-0">Yearly</span>
+                        )}
+                      </div>
+                      {closure.reason && (
+                        <p className="text-xs text-red-300">{closure.reason}</p>
+                      )}
+                    </div>
+                  )}
+                  {!hasBookings && !closure && (
+                    <div className="flex flex-col items-center justify-center py-10 text-gray-600 gap-2">
+                      <Calendar className="w-8 h-8 opacity-30" />
+                      <p className="text-xs">No bookings on this day</p>
+                    </div>
+                  )}
+                  {selectedBookings.map(b => (
+                    <div
+                      key={b.id}
+                      onClick={() => onView(b.id)}
+                      className="group flex gap-3 p-3 bg-brand-darker border border-gray-800 rounded-sm cursor-pointer hover:border-gray-700 transition-colors"
+                    >
+                      <div className={`shrink-0 w-0.5 self-stretch rounded-full ${STATUS_DOT[b.status]}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-white text-xs font-semibold truncate">{b.name}</p>
+                        <p className="text-gray-500 text-xs truncate">{b.serviceName}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Clock className="w-2.5 h-2.5 text-gray-600" />
+                          <span className="text-gray-600 text-[10px]">{b.appointmentTime}</span>
+                        </div>
+                        <span className={`inline-block mt-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded-sm border ${STATUS_BADGE[b.status]}`}>
+                          {formatStatus(b.status)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

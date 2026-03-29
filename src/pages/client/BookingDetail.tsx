@@ -13,7 +13,7 @@ import {
   cancelMyBookingAsync,
   rescheduleMyBookingAsync,
 } from '../../store/bookingSlice';
-import { fetchAvailabilityApi, fetchShopHoursApi, fetchBuildUpdatesApi, fetchBookingActivityApi } from '../../services/api';
+import { fetchAvailabilityApi, fetchShopHoursApi, fetchShopClosedDatesApi, fetchBuildUpdatesApi, fetchBookingActivityApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking, BuildUpdate, ShopDayHours, BookingActivityLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -156,7 +156,7 @@ function getActivityPresentation(log: BookingActivityLog) {
   };
 }
 
-function buildRescheduleDateList(shopHours: ShopDayHours[]): Date[] {
+function buildRescheduleDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]); // Mon–Sat default
@@ -164,7 +164,8 @@ function buildRescheduleDateList(shopHours: ShopDayHours[]): Date[] {
   const cursor = new Date();
   cursor.setDate(cursor.getDate() + 1);
   while (dates.length < 30) {
-    if (openDays.has(cursor.getDay())) dates.push(new Date(cursor));
+    const iso = cursor.toISOString().slice(0, 10);
+    if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
@@ -184,6 +185,7 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
   const { showToast } = useToast();
 
   const [shopHours,      setShopHours]      = useState<ShopDayHours[]>([]);
+  const [closedDatesSet, setClosedDatesSet] = useState<Set<string>>(new Set());
   const [selectedDate,   setSelectedDate]   = useState<Date | null>(null);
   const [selectedTime,   setSelectedTime]   = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -196,12 +198,16 @@ function ReschedulePanel({ booking, token, onSuccess, onCancel }: ReschedulePane
 
   // Load shop hours once to build the date list
   useEffect(() => {
-    fetchShopHoursApi()
-      .then(({ hours }) => setShopHours(hours))
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
+      .then(([{ hours }, cdData]) => {
+        setShopHours(hours);
+        const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
+        setClosedDatesSet(new Set(cd.map(d => d.date)));
+      })
       .catch(() => {});
   }, []);
 
-  const availableDates = buildRescheduleDateList(shopHours);
+  const availableDates = buildRescheduleDateList(shopHours, closedDatesSet);
 
   // Fetch availability whenever a date is selected
   const handleDateSelect = (date: Date) => {
@@ -540,7 +546,12 @@ export default function BookingDetail() {
             <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tight leading-tight">
               {booking.serviceName}
             </h1>
-            <p className="text-gray-500 text-xs mt-2 font-mono">#{booking.id}</p>
+            <div className="mt-3 flex flex-col gap-1">
+              {booking.referenceNumber && (
+                <p className="text-brand-orange text-sm font-mono font-bold">Ref: {booking.referenceNumber}</p>
+              )}
+              <p className="text-gray-600 text-xs font-mono">#{booking.id}</p>
+            </div>
           </div>
           <span className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded-md border ${STATUS_STYLES[booking.status]}`}>
             {formatStatus(booking.status)}
@@ -712,6 +723,12 @@ export default function BookingDetail() {
         {/* Booking Details Metadata */}
         <div className="mt-5 pt-5 border-t border-gray-800">
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                        {booking.referenceNumber && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Reference Number</p>
+                            <p className="text-brand-orange text-xs font-mono font-bold">{booking.referenceNumber}</p>
+                          </div>
+                        )}
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Booking ID</p>
               <p className="text-gray-300 text-xs font-mono">{booking.id}</p>

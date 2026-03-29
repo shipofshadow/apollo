@@ -116,21 +116,130 @@ class ShopHoursService
 
     /**
      * Return the hours record for a specific calendar date.
+     * If the date is in shop_closed_dates it is treated as closed (isOpen=false)
+     * regardless of the weekly schedule.
      *
      * @param  string $date  YYYY-MM-DD
-     * @return array{dayOfWeek:int,isOpen:bool,openTime:string,closeTime:string,slotIntervalH:int}
+     * @return array{dayOfWeek:int,isOpen:bool,openTime:string,closeTime:string,slotIntervalH:int,closureReason:string|null}
      */
     public function getForDate(string $date): array
     {
         $dow = (int) date('w', strtotime($date)); // 0=Sun … 6=Sat
+
+        // Check one-off closure override first
+        $closure = $this->getClosureForDate($date);
+        if ($closure !== null) {
+            return [
+                'dayOfWeek'    => $dow,
+                'isOpen'       => false,
+                'openTime'     => '09:00',
+                'closeTime'    => '18:00',
+                'slotIntervalH' => 2,
+                'closureReason' => $closure['reason'],
+            ];
+        }
+
         $all = $this->getAll();
         foreach ($all as $row) {
             if ($row['dayOfWeek'] === $dow) {
-                return $row;
+                return array_merge($row, ['closureReason' => null]);
             }
         }
         // Fallback: closed
-        return ['dayOfWeek' => $dow, 'isOpen' => false, 'openTime' => '09:00', 'closeTime' => '18:00', 'slotIntervalH' => 2];
+        return ['dayOfWeek' => $dow, 'isOpen' => false, 'openTime' => '09:00', 'closeTime' => '18:00', 'slotIntervalH' => 2, 'closureReason' => null];
+    }
+
+    // -------------------------------------------------------------------------
+    // Closed-dates (holidays / special closures) CRUD
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return all future and recent closed dates (ordered ascending).
+     * Returns dates from 30 days ago forward so the admin can see recent ones.
+     *
+     * @return array<int, array{date:string,reason:string|null,isYearly:bool}>
+     */
+    public function getClosedDates(): array
+    {
+        if (!$this->useDb) {
+            return [];
+        }
+
+        $rows = Database::getInstance()
+            ->prepare(
+                'SELECT closed_date, reason, is_yearly FROM shop_closed_dates
+                  WHERE closed_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                  ORDER BY closed_date ASC'
+            );
+        $rows->execute();
+        return array_map(static fn(array $r): array => [
+            'date'     => $r['closed_date'],
+            'reason'   => $r['reason'],
+            'isYearly' => (bool)$r['is_yearly'],
+        ], $rows->fetchAll(\PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Add a closure date.
+     *
+     * @param  string      $date     YYYY-MM-DD
+     * @param  string|null $reason   Optional label
+     * @param  bool        $isYearly Whether this closure repeats yearly
+     */
+    public function addClosedDate(string $date, ?string $reason, bool $isYearly = false): void
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('Invalid date format. Expected YYYY-MM-DD.', 422);
+        }
+
+        if (!$this->useDb) {
+            return;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'INSERT INTO shop_closed_dates (closed_date, reason, is_yearly)
+             VALUES (:date, :reason, :isYearly)
+             ON DUPLICATE KEY UPDATE reason = VALUES(reason), is_yearly = VALUES(is_yearly)'
+        );
+        $stmt->execute([':date' => $date, ':reason' => $reason, ':isYearly' => (int)$isYearly]);
+    }
+
+    /**
+     * Remove a one-off closure date.
+     *
+     * @param  string $date  YYYY-MM-DD
+     */
+    public function removeClosedDate(string $date): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+
+        Database::getInstance()
+            ->prepare('DELETE FROM shop_closed_dates WHERE closed_date = :date')
+            ->execute([':date' => $date]);
+    }
+
+    /**
+     * Return the closure record for a specific date, or null if not found.
+     *
+     * @return array{date:string,reason:string|null,isYearly:bool}|null
+     */
+    private function getClosureForDate(string $date): ?array
+    {
+        if (!$this->useDb) {
+            return null;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT closed_date, reason, is_yearly FROM shop_closed_dates WHERE closed_date = :date LIMIT 1'
+        );
+        $stmt->execute([':date' => $date]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return ['date' => $row['closed_date'], 'reason' => $row['reason'], 'isYearly' => (bool)$row['is_yearly']];
     }
 
     /**

@@ -240,6 +240,7 @@ class NotificationService
         $time        = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
         $vehicle     = htmlspecialchars((string) ($b['vehicleInfo']     ?? ''));
         $id          = htmlspecialchars((string) ($b['id']              ?? ''));
+    $refNum      = htmlspecialchars((string) ($b['referenceNumber']  ?? ''));
 
         return $this->wrapHtml("
             <h2>Hi $name,</h2>
@@ -249,6 +250,7 @@ class NotificationService
                 <tr><td><strong>Date:</strong></td><td>$date</td></tr>
                 <tr><td><strong>Time:</strong></td><td>$time</td></tr>
                 <tr><td><strong>Vehicle:</strong></td><td>$vehicle</td></tr>
+                                <tr><td><strong>Reference:</strong></td><td>$refNum</td></tr>
                 <tr><td><strong>Booking ID:</strong></td><td>#$id</td></tr>
             </table>
             <p>We will contact you to confirm the appointment or if we need additional information.</p>

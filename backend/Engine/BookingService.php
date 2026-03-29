@@ -92,6 +92,7 @@ class BookingService
 
         $booking = [
             'id'                 => $this->uuid(),
+            'referenceNumber'    => $this->generateReferenceNumber(),
             'userId'             => $userId,
             'name'               => trim($data['name']),
             'email'              => strtolower(trim($data['email'])),
@@ -109,6 +110,8 @@ class BookingService
             'notes'              => trim($data['notes']          ?? ''),
             'signatureData'      => $data['signatureData']        ?? null,
             'mediaUrls'          => $data['mediaUrls']            ?? [],
+            'beforePhotos'       => [],
+            'afterPhotos'        => [],
             'status'             => 'pending',
             'awaitingParts'      => false,
             'partsNotes'         => null,
@@ -225,6 +228,21 @@ class BookingService
             ? $this->dbFindById($id)
             : $this->fileFindById($id);
 
+        if ($before === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $beforePhotos = is_array($before['beforePhotos'] ?? null) ? $before['beforePhotos'] : [];
+        $afterPhotos  = is_array($before['afterPhotos'] ?? null) ? $before['afterPhotos'] : [];
+
+        // Enforce QA workflow: check-in requires before photos; completion requires after photos.
+        if ($status === 'confirmed' && count($beforePhotos) === 0) {
+            throw new RuntimeException('Add at least one before photo before check-in.', 422);
+        }
+        if ($status === 'completed' && count($afterPhotos) === 0) {
+            throw new RuntimeException('Add at least one after photo before completion.', 422);
+        }
+
         $booking = $this->useDb
             ? $this->dbUpdateStatus($id, $status)
             : $this->fileUpdateStatus($id, $status);
@@ -267,6 +285,47 @@ class BookingService
         }
 
         return $booking;
+    }
+
+    /**
+     * Save QA photos captured during check-in/completion workflow.
+     *
+     * @param string[] $photoUrls
+     * @return array<string, mixed>
+     */
+    public function updateQaPhotos(
+        string $id,
+        string $stage,
+        array $photoUrls,
+        ?int $actorUserId = null
+    ): array {
+        if (!in_array($stage, ['before', 'after'], true)) {
+            throw new RuntimeException('Invalid QA stage. Use "before" or "after".', 422);
+        }
+
+        $cleanUrls = array_values(array_filter(
+            array_map(static fn($v) => is_string($v) ? trim($v) : '', $photoUrls),
+            static fn(string $u) => $u !== ''
+        ));
+
+        if (count($cleanUrls) === 0) {
+            throw new RuntimeException('At least one photo is required.', 422);
+        }
+
+        $updated = $this->useDb
+            ? $this->dbUpdateQaPhotos($id, $stage, $cleanUrls)
+            : $this->fileUpdateQaPhotos($id, $stage, $cleanUrls);
+
+        $this->addActivity(
+            (string) $updated['id'],
+            $stage === 'before' ? 'before_photos_updated' : 'after_photos_updated',
+            $stage === 'before' ? 'Before photos updated' : 'After photos updated',
+            count($cleanUrls) . ' photo(s)',
+            $actorUserId,
+            'admin'
+        );
+
+        return $updated;
     }
 
     /**
@@ -676,15 +735,16 @@ class BookingService
         $db = Database::getInstance();
         $db->prepare(
             'INSERT INTO bookings
-             (id, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
+             (id, reference_number, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
               vehicle_year, service_id, service_ids, selected_variations, appointment_date, appointment_time,
-              notes, signature_data, media_urls, status)
+              notes, signature_data, media_urls, before_media_urls, after_media_urls, status)
              VALUES
-             (:id, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
+             (:id, :reference_number, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
               :vehicle_year, :service_id, :service_ids, :selected_variations, :appointment_date, :appointment_time,
-              :notes, :signature_data, :media_urls, :status)'
+              :notes, :signature_data, :media_urls, :before_media_urls, :after_media_urls, :status)'
         )->execute([
             ':id'                  => $booking['id'],
+            ':reference_number'    => $booking['referenceNumber'],
             ':user_id'             => $booking['userId'],
             ':name'                => $booking['name'],
             ':email'               => $booking['email'],
@@ -701,6 +761,8 @@ class BookingService
             ':notes'               => $booking['notes'],
             ':signature_data'      => $booking['signatureData'] ?? null,
             ':media_urls'          => json_encode($booking['mediaUrls'] ?? []),
+            ':before_media_urls'   => json_encode($booking['beforePhotos'] ?? []),
+            ':after_media_urls'    => json_encode($booking['afterPhotos'] ?? []),
             ':status'              => $booking['status'],
         ]);
     }
@@ -878,6 +940,41 @@ class BookingService
         return $this->mapDbRow($data);
     }
 
+    /**
+     * @param string[] $photoUrls
+     * @return array<string, mixed>
+     */
+    private function dbUpdateQaPhotos(string $id, string $stage, array $photoUrls): array
+    {
+        $column = $stage === 'before' ? 'before_media_urls' : 'after_media_urls';
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare(
+            "UPDATE bookings SET {$column} = :urls WHERE id = :id"
+        );
+        $stmt->execute([
+            ':urls' => json_encode($photoUrls),
+            ':id'   => $id,
+        ]);
+
+        $row = $db->prepare(
+              'SELECT b.*, s.title AS service_name,
+                    tm.name AS assigned_tech_name,
+                    tm.role AS assigned_tech_role,
+                    tm.image_url AS assigned_tech_image_url
+             FROM bookings b
+             LEFT JOIN services s ON s.id = b.service_id
+             LEFT JOIN team_members tm ON tm.id = b.assigned_tech_id
+             WHERE b.id = :id LIMIT 1'
+        );
+        $row->execute([':id' => $id]);
+        $data = $row->fetch();
+        if (!$data) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+        return $this->mapDbRow($data);
+    }
+
     /** @param array<string, mixed> $row @return array<string, mixed> */
     private function mapDbRow(array $row): array
     {
@@ -888,6 +985,12 @@ class BookingService
 
         $rawMedia = $row['media_urls'] ?? null;
         $mediaUrls = $rawMedia ? (json_decode((string) $rawMedia, true) ?? []) : [];
+
+        $rawBeforeMedia = $row['before_media_urls'] ?? null;
+        $beforePhotos = $rawBeforeMedia ? (json_decode((string) $rawBeforeMedia, true) ?? []) : [];
+
+        $rawAfterMedia = $row['after_media_urls'] ?? null;
+        $afterPhotos = $rawAfterMedia ? (json_decode((string) $rawAfterMedia, true) ?? []) : [];
 
         $rawVars = $row['selected_variations'] ?? null;
         $selectedVariations = $rawVars ? (json_decode((string) $rawVars, true) ?? []) : [];
@@ -908,6 +1011,7 @@ class BookingService
 
         return [
             'id'                 => $row['id'],
+            'referenceNumber'    => $row['reference_number'],
             'userId'             => $row['user_id'] !== null ? (int) $row['user_id'] : null,
             'assignedTechId'     => $assignedTechId,
             'assignedTech'       => $assignedTech,
@@ -927,6 +1031,8 @@ class BookingService
             'notes'              => $row['notes']          ?? '',
             'signatureData'      => $row['signature_data'] ?? null,
             'mediaUrls'          => $mediaUrls,
+            'beforePhotos'       => $beforePhotos,
+            'afterPhotos'        => $afterPhotos,
             'status'             => $row['status'],
             'awaitingParts'      => (bool) ($row['awaiting_parts'] ?? false),
             'partsNotes'         => $row['parts_notes']     ?? null,
@@ -1151,6 +1257,33 @@ class BookingService
                 $b['awaitingParts'] = $awaitingParts;
                 $b['partsNotes']    = $partsNotes;
                 $found              = $b;
+                break;
+            }
+        }
+        unset($b);
+
+        if ($found === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->fileWrite($all);
+        return $found;
+    }
+
+    /**
+     * @param string[] $photoUrls
+     * @return array<string, mixed>
+     */
+    private function fileUpdateQaPhotos(string $id, string $stage, array $photoUrls): array
+    {
+        $all   = array_reverse($this->fileGetAll());
+        $found = null;
+        $key   = $stage === 'before' ? 'beforePhotos' : 'afterPhotos';
+
+        foreach ($all as &$b) {
+            if ($b['id'] === $id) {
+                $b[$key] = $photoUrls;
+                $found   = $b;
                 break;
             }
         }
@@ -1390,5 +1523,12 @@ class BookingService
             mt_rand(0, 0x3fff) | 0x8000,
             mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
         );
+    }
+
+    private function generateReferenceNumber(): string
+    {
+        $date = date('Ymd');
+        $randomPart = str_pad((string) mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        return 'BK-' . $date . '-' . $randomPart;
     }
 }

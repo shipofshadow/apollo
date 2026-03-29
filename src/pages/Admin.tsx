@@ -4,6 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
+  Camera,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ import ShopHoursPanel       from './admin/ShopHoursPanel';
 import SiteSettingsPanel    from './admin/SiteSettingsPanel';
 import FaqPanel             from './admin/FaqPanel';
 import OffersPanel          from './admin/OffersPanel';
+import BeforeAfterPanel     from './admin/BeforeAfterPanel';
 import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
 import UserAccessPanel      from './admin/UserAccessPanel';
@@ -179,6 +181,7 @@ export default function AdminPage() {
       isGroup: true, key: 'content', label: 'Site Content', icon: FileText,
       children: [
         { key: 'offers',    label: 'Offers',    icon: Tag },
+        { key: 'before-after', label: 'Before/After', icon: Camera },
         { key: 'content',   label: 'Content',   icon: FileText },
         { key: 'faq',       label: 'FAQ',       icon: HelpCircle },
       ]
@@ -210,6 +213,7 @@ export default function AdminPage() {
       case 'analytics':     return <AnalyticsPanel />;
       case 'services':      return <ServicesPanel />;
       case 'offers':        return <OffersPanel />;
+      case 'before-after':  return <BeforeAfterPanel />;
       case 'content':       return <ContentPanel />;
       case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); }} />;
       case 'reviews':       return <ReviewsPanel />;

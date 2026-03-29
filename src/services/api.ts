@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
 export const uploadAdminImageApi = async (
   token: string,
   file: File,
-  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials' | 'portfolio'
+  type: 'services' | 'products' | 'blog' | 'team' | 'testimonials' | 'portfolio' | 'before-after'
 ): Promise<string> => {
   const form = new FormData();
   form.append('file', file);
@@ -293,6 +293,16 @@ export const updateBookingStatusApi = (
   apiFetch<{ booking: Booking }>(`/api/bookings/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  }, token);
+
+export const updateBookingQaPhotosApi = (
+  token: string,
+  id: string,
+  data: { stage: 'before' | 'after'; photoUrls: string[] }
+) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${id}/qa-photos`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   }, token);
 
 export const assignBookingTechnicianApi = (
@@ -432,6 +442,20 @@ export const updateShopHoursApi = (token: string, hours: import('../types').Shop
   apiFetch<{ hours: import('../types').ShopDayHours[] }>('/api/shop/hours', {
     method: 'PUT',
     body: JSON.stringify({ hours }),
+  }, token);
+
+export const fetchShopClosedDatesApi = () =>
+  apiFetch<{ closedDates: { date: string; reason: string | null; isYearly: boolean }[] }>('/api/shop/closed-dates');
+
+export const addShopClosedDateApi = (token: string, date: string, reason?: string, isYearly?: boolean) =>
+  apiFetch<{ closedDates: { date: string; reason: string | null; isYearly: boolean }[] }>('/api/shop/closed-dates', {
+    method: 'POST',
+    body: JSON.stringify({ date, reason: reason ?? null, isYearly: isYearly ?? false }),
+  }, token);
+
+export const removeShopClosedDateApi = (token: string, date: string) =>
+  apiFetch<{ closedDates: { date: string; reason: string | null; isYearly: boolean }[] }>(`/api/shop/closed-dates/${date}`, {
+    method: 'DELETE',
   }, token);
 
 // ── Blog API ─────────────────────────────────────────────────────────────────
@@ -843,6 +867,38 @@ export const deleteOfferApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
+// ── Before/After API ─────────────────────────────────────────────────────────
+
+export const fetchBeforeAfterItemsApi = (token?: string | null) =>
+  apiFetch<{ items: BeforeAfterItem[] }>('/api/before-after', {}, token);
+
+export const fetchBeforeAfterItemApi = (id: number, token?: string | null) =>
+  apiFetch<{ item: BeforeAfterItem }>(`/api/before-after/${id}`, {}, token);
+
+export const createBeforeAfterItemApi = (
+  token: string,
+  data: Partial<Omit<BeforeAfterItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ item: BeforeAfterItem }>('/api/before-after', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateBeforeAfterItemApi = (
+  token: string,
+  id: number,
+  data: Partial<Omit<BeforeAfterItem, 'id' | 'createdAt' | 'updatedAt'>>
+) =>
+  apiFetch<{ item: BeforeAfterItem }>(`/api/before-after/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteBeforeAfterItemApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/before-after/${id}`, {
+    method: 'DELETE',
+  }, token);
+
 // ── Legacy / mock (kept for offline fallback) ────────────────────────────────
 
 export const submitBooking = async (payload: BookingPayload): Promise<Booking> => {
@@ -855,6 +911,7 @@ export const submitBooking = async (payload: BookingPayload): Promise<Booking> =
         serviceIds: payload.serviceIds,
         serviceName: `Service #${primaryId}`,
         id: Math.random().toString(36).substr(2, 9),
+        referenceNumber: `BK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 9000 + 1000)}`,
         status: 'pending',
         createdAt: new Date().toISOString(),
       });

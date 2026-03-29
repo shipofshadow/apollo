@@ -166,6 +166,7 @@ export interface PortfolioCategoryState {
 
 export interface Booking {
   id: string;
+  referenceNumber: string;
   userId?: number | null;
   assignedTechId?: number | null;
   assignedTech?: AssignedTechnician | null;
@@ -193,6 +194,8 @@ export interface Booking {
   internalNotes?: string;
   signatureData?: string;
   mediaUrls?: string[];
+  beforePhotos?: string[];
+  afterPhotos?: string[];
   createdAt: string;
 }
 
@@ -312,6 +315,8 @@ export interface AvailabilityResponse {
   openTime: string;
   closeTime: string;
   slotIntervalH: number;
+  /** Set when the shop is closed due to a one-off holiday/closure (not the weekly schedule). */
+  closureReason?: string | null;
   availableSlots: string[];
   bookedSlots: string[];
   /** Maximum number of bookings allowed per time slot. */
@@ -406,6 +411,20 @@ export interface OfferState {
   items: Offer[];
   status: 'idle' | 'loading' | 'success' | 'error';
   error: string | null;
+}
+
+// ── Before/After ─────────────────────────────────────────────────────────────
+
+export interface BeforeAfterItem {
+  id: number;
+  title: string;
+  description: string;
+  beforeImageUrl: string;
+  afterImageUrl: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ── Build Update ───────────────────────────────────────────────────────────────

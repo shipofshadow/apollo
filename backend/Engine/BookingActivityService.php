@@ -51,6 +51,12 @@ class BookingActivityService
             $actorRole = 'system';
         }
 
+        // Accept ISO 8601 and normalize to MySQL DATETIME when provided.
+        if ($createdAt !== null) {
+            $ts = strtotime($createdAt);
+            $createdAt = $ts === false ? null : date('Y-m-d H:i:s', $ts);
+        }
+
         $stmt = Database::getInstance()->prepare(
             'INSERT INTO booking_activity_logs
                 (booking_id, actor_user_id, actor_role, event_type, action, detail, created_at)
