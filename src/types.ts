@@ -375,3 +375,29 @@ export interface BuildUpdate {
   createdAt: string;
 }
 
+
+// ── In-app Notification ────────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'new_booking'
+  | 'status_changed'
+  | 'build_update'
+  | 'parts_update';
+
+export interface AppNotification {
+  id: number;
+  userId: number | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationsState {
+  items: AppNotification[];
+  unreadCount: number;
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+}

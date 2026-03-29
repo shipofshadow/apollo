@@ -62,6 +62,12 @@ class Router
             $r->addRoute('POST', '/api/bookings/{id}/build-updates',       'handleBuildUpdateCreate');
             $r->addRoute('POST', '/api/bookings/{id}/build-updates/media', 'handleBuildUpdateMediaUpload');
 
+            // ── In-app notifications ────────────────────────────────────────
+            $r->addRoute('GET',    '/api/notifications',              'handleNotificationList');
+            $r->addRoute('PATCH',  '/api/notifications/read-all',     'handleNotificationReadAll');
+            $r->addRoute('PATCH',  '/api/notifications/{id:\d+}/read','handleNotificationRead');
+            $r->addRoute('DELETE', '/api/notifications/{id:\d+}',     'handleNotificationDelete');
+
             // ── Blog posts (public read, admin write) ───────────────────────
             $r->addRoute('GET',    '/api/blog',              'handleBlogList');
             $r->addRoute('GET',    '/api/blog/{id:\d+}',     'handleBlogGet');
@@ -613,6 +619,20 @@ class Router
         $booking = (new BookingService())->adminFindById($id);
         if ($booking !== null) {
             (new NotificationService())->buildUpdateCreated($booking, $update);
+
+            // In-app notification for the client
+            $uid = (int) ($booking['userId'] ?? 0);
+            if ($uid > 0 && DB_NAME !== '') {
+                $svcName = (string) ($booking['serviceName'] ?? 'your service');
+                $snippet = $note !== '' ? ': ' . mb_strimwidth($note, 0, 60, '…') : '';
+                (new UserNotificationService())->createForUser(
+                    $uid,
+                    'build_update',
+                    'Build Progress Update',
+                    "New update on your {$svcName} job{$snippet}",
+                    ['bookingId' => $id]
+                );
+            }
         }
 
         http_response_code(201);
@@ -671,6 +691,79 @@ class Router
         }
 
         echo json_encode(['urls' => $urls]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Notification handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationList(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['notifications' => [], 'unreadCount' => 0]);
+            return;
+        }
+
+        $payload   = $this->requireAuth();
+        $isAdmin   = ($payload['role'] ?? '') === 'admin';
+        $userId    = (int) ($payload['sub'] ?? 0);
+        $svc       = new UserNotificationService();
+
+        $notifications = $svc->getForViewer($isAdmin, $userId);
+        $unreadCount   = $svc->getUnreadCount($isAdmin, $userId);
+
+        echo json_encode(['notifications' => $notifications, 'unreadCount' => $unreadCount]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationRead(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $isAdmin = ($payload['role'] ?? '') === 'admin';
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = (int) ($vars['id'] ?? 0);
+
+        (new UserNotificationService())->markRead($id, $isAdmin, $userId);
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationReadAll(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $isAdmin = ($payload['role'] ?? '') === 'admin';
+        $userId  = (int) ($payload['sub'] ?? 0);
+
+        (new UserNotificationService())->markAllRead($isAdmin, $userId);
+        echo json_encode(['ok' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleNotificationDelete(array $vars = []): void
+    {
+        if (DB_NAME === '') {
+            echo json_encode(['ok' => true]);
+            return;
+        }
+
+        $payload = $this->requireAuth();
+        $isAdmin = ($payload['role'] ?? '') === 'admin';
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $id      = (int) ($vars['id'] ?? 0);
+
+        (new UserNotificationService())->delete($id, $isAdmin, $userId);
+        echo json_encode(['ok' => true]);
     }
 
     /** @param array<string, string> $vars */

@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, ServiceVariation, ProductVariation, BuildUpdate, AppNotification } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -737,3 +737,21 @@ export const sendContactMessageApi = (payload: ContactMessagePayload) =>
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+// ── Notifications API ─────────────────────────────────────────────────────────
+
+export const fetchNotificationsApi = (token: string) =>
+  apiFetch<{ notifications: AppNotification[]; unreadCount: number }>(
+    '/api/notifications',
+    {},
+    token
+  );
+
+export const markNotificationReadApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/notifications/${id}/read`, { method: 'PATCH' }, token);
+
+export const markAllNotificationsReadApi = (token: string) =>
+  apiFetch<{ ok: boolean }>('/api/notifications/read-all', { method: 'PATCH' }, token);
+
+export const deleteNotificationApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/notifications/${id}`, { method: 'DELETE' }, token);

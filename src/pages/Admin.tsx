@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from '../components/NotificationBell';
 import AnalyticsPanel       from './admin/AnalyticsPanel';
 import BookingsPanel        from './admin/BookingsPanel';
 import AdminBookingDetail   from './admin/AdminBookingDetail';
@@ -201,6 +202,8 @@ export default function AdminPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Back to Site</span>
           </a>
+          <div className="w-px h-5 bg-gray-700" />
+          <NotificationBell />
           <div className="w-px h-5 bg-gray-700" />
           <button onClick={() => logout()}
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">

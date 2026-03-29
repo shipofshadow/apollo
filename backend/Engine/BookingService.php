@@ -119,6 +119,18 @@ class BookingService
 
         (new NotificationService())->bookingCreated($booking);
 
+        // In-app notification for admin
+        if ($this->useDb) {
+            $vehicle = trim((string) ($booking['vehicleInfo'] ?? ''));
+            $svcName = (string) ($booking['serviceName'] ?? '');
+            (new UserNotificationService())->createForAdmin(
+                'new_booking',
+                'New Booking Received',
+                "{$booking['name']} booked {$svcName}" . ($vehicle !== '' ? " · {$vehicle}" : ''),
+                ['bookingId' => $booking['id']]
+            );
+        }
+
         return $booking;
     }
 
@@ -205,6 +217,22 @@ class BookingService
 
         (new NotificationService())->bookingStatusChanged($booking);
 
+        // In-app notification for the client who made the booking
+        if ($this->useDb) {
+            $uid = (int) ($booking['userId'] ?? 0);
+            if ($uid > 0) {
+                $label   = ucwords(str_replace('_', ' ', $status));
+                $svcName = (string) ($booking['serviceName'] ?? 'your service');
+                (new UserNotificationService())->createForUser(
+                    $uid,
+                    'status_changed',
+                    "Booking Status: {$label}",
+                    "Your booking for {$svcName} is now {$label}.",
+                    ['bookingId' => $booking['id'], 'status' => $status]
+                );
+            }
+        }
+
         return $booking;
     }
 
@@ -221,6 +249,21 @@ class BookingService
 
         if ($awaitingParts) {
             (new NotificationService())->bookingAwaitingParts($booking);
+
+            // In-app notification for the client
+            if ($this->useDb) {
+                $uid = (int) ($booking['userId'] ?? 0);
+                if ($uid > 0) {
+                    $svcName = (string) ($booking['serviceName'] ?? 'your service');
+                    (new UserNotificationService())->createForUser(
+                        $uid,
+                        'parts_update',
+                        'Job On Hold – Awaiting Parts',
+                        "Your {$svcName} job is on hold while we wait for parts to arrive.",
+                        ['bookingId' => $booking['id']]
+                    );
+                }
+            }
         }
 
         return $booking;
