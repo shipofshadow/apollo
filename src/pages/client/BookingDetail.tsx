@@ -535,44 +535,73 @@ export default function BookingDetail() {
         <ArrowLeft className="w-3.5 h-3.5" /> Back to Bookings
       </Link>
 
-      {/* Hero header */}
-      <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#171515] px-6 py-6 md:px-7 md:py-7">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-16 left-14 h-36 w-36 rounded-full bg-red-400/10 blur-2xl" />
+     {/* Hero Header - System Variant */}
+    <div className="relative border border-gray-800/80 rounded-xl bg-[#121212] overflow-hidden shadow-2xl">
+      
+      {/* Activity indicator line */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-orange via-brand-orange/50 to-transparent" />
 
-        <div className="relative flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-orange/90 mb-2">Booking Details</p>
-            <h1 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tight leading-tight">
+      <div className="p-6 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+          
+          {/* Primary Identity */}
+          <div className="space-y-3 flex-1">
+            <div className="flex items-center gap-4">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80">
+                // Dispatch Overview
+              </p>
+              <span className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded border ${STATUS_STYLES[booking.status]}`}>
+                {formatStatus(booking.status)}
+              </span>
+            </div>
+            
+            <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none">
               {booking.serviceName}
             </h1>
-            <div className="mt-3 flex flex-col gap-1">
+
+            {/* Added: Service Variations */}
+            {booking.selectedVariations && booking.selectedVariations.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {booking.selectedVariations.map((v) => (
+                  <span 
+                    key={`${v.serviceId}-${v.variationId}`} 
+                    className="inline-flex items-center px-2 py-1 bg-white/5 border border-white/10 rounded text-[11px] font-medium text-gray-300"
+                  >
+                    <span className="text-brand-orange/70 mr-1.5 font-mono">+</span>
+                    {v.variationName}
+                  </span>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex items-center gap-3 pt-2 text-xs font-mono">
               {booking.referenceNumber && (
-                <p className="text-brand-orange text-sm font-mono font-bold">Ref: {booking.referenceNumber}</p>
+                <span className="text-brand-orange bg-brand-orange/10 px-2 py-1 rounded border border-brand-orange/20 font-bold">
+                  REF:{booking.referenceNumber}
+                </span>
               )}
-              <p className="text-gray-600 text-xs font-mono">#{booking.id}</p>
+              <span className="text-gray-500">SYS_ID:{booking.id}</span>
             </div>
           </div>
-          <span className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest rounded-md border ${STATUS_STYLES[booking.status]}`}>
-            {formatStatus(booking.status)}
-          </span>
         </div>
 
-        <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-lg border border-gray-800/90 bg-black/20 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Date</p>
-            <p className="text-sm font-semibold text-white mt-1">{formatDisplayDate(booking.appointmentDate)}</p>
+        {/* Execution Telemetry */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-800/50 border border-gray-800/50 rounded-lg overflow-hidden">
+          <div className="bg-[#151515] p-4 transition-colors hover:bg-[#181818]">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Execution Date</p>
+            <p className="text-sm font-semibold text-gray-200">{formatDisplayDate(booking.appointmentDate)}</p>
           </div>
-          <div className="rounded-lg border border-gray-800/90 bg-black/20 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Time</p>
-            <p className="text-sm font-semibold text-white mt-1">{booking.appointmentTime}</p>
+          <div className="bg-[#151515] p-4 transition-colors hover:bg-[#181818]">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Local Time</p>
+            <p className="text-sm font-semibold text-gray-200">{booking.appointmentTime}</p>
           </div>
-          <div className="rounded-lg border border-gray-800/90 bg-black/20 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Vehicle</p>
-            <p className="text-sm font-semibold text-white mt-1 truncate">{booking.vehicleInfo}</p>
+          <div className="bg-[#151515] p-4 transition-colors hover:bg-[#181818]">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Target Asset</p>
+            <p className="text-sm font-semibold text-gray-200 truncate">{booking.vehicleInfo}</p>
           </div>
         </div>
       </div>
+    </div>
 
       {/* Status timeline */}
       {booking.status !== 'cancelled' && (
@@ -627,187 +656,169 @@ export default function BookingDetail() {
           </div>
         </div>
       )}
+<div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+  {/* --- CORE PAYLOAD: SERVICE & LOGISTICS --- */}
+  <div className="xl:col-span-2 flex flex-col gap-6">
+    <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6 md:p-8 relative overflow-hidden">
+      {/* Top accent line */}
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-orange via-brand-orange/50 to-transparent" />
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Details grid */}
-        <div className="bg-gradient-to-br from-brand-dark to-[#181818] border border-gray-800 rounded-xl p-6 xl:col-span-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-5">Service Info</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* Service */}
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-              <BadgeCheck className="w-4 h-4 text-brand-orange" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Service</p>
-              <p className="text-white text-sm font-semibold">{booking.serviceName}</p>
-            </div>
-          </div>
-
-          {/* Vehicle Details */}
-          {(booking.vehicleMake || booking.vehicleModel || booking.vehicleYear) && (
-            <div className="sm:col-span-2 space-y-3">
-              <p className="text-xs text-gray-400 font-mono">Vehicle Details:</p>
-              <div className="grid grid-cols-3 gap-3">
-                {booking.vehicleYear && (
-                  <div className="text-center p-2.5 rounded-sm bg-brand-darker/40 border border-gray-800">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600">Year</p>
-                    <p className="text-sm font-semibold text-white mt-1">{booking.vehicleYear}</p>
-                  </div>
-                )}
-                {booking.vehicleMake && (
-                  <div className="text-center p-2.5 rounded-sm bg-brand-darker/40 border border-gray-800">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600">Make</p>
-                    <p className="text-sm font-semibold text-white mt-1">{booking.vehicleMake}</p>
-                  </div>
-                )}
-                {booking.vehicleModel && (
-                  <div className="text-center p-2.5 rounded-sm bg-brand-darker/40 border border-gray-800">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600">Model</p>
-                    <p className="text-sm font-semibold text-white mt-1">{booking.vehicleModel}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Assigned mechanic */}
-          {booking.assignedTech && (
-            <div className="flex items-start gap-3 sm:col-span-2">
-              <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-                <Wrench className="w-4 h-4 text-brand-orange" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Assigned Mechanic</p>
-                <p className="text-white text-sm font-semibold">{booking.assignedTech.name}</p>
-                {booking.assignedTech.role && (
-                  <p className="text-gray-500 text-xs mt-0.5">{booking.assignedTech.role}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Service Variations */}
+      {/* Header Block */}
+      <div className="flex flex-col md:flex-row justify-between gap-6 mb-8">
+        <div>
+          <p className="text-[10px] font-mono text-brand-orange/80 uppercase tracking-widest mb-2">
+            // Primary Payload
+          </p>
+          <h2 className="text-3xl font-black text-white tracking-tight">{booking.serviceName}</h2>
+          
+          {/* Variations as sub-tags */}
           {booking.selectedVariations && booking.selectedVariations.length > 0 && (
-            <div className="sm:col-span-2 border-t border-gray-800 pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">Service Options</p>
-              <div className="space-y-2">
-                {booking.selectedVariations.map((v) => (
-                  <div key={`${v.serviceId}-${v.variationId}`} className="flex items-start gap-3 p-2.5 bg-brand-darker/40 rounded-sm border border-gray-800">
-                    <Package className="w-4 h-4 text-brand-orange shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-gray-400">{v.variationName}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {booking.selectedVariations.map((v) => (
+                <span 
+                  key={`${v.serviceId}-${v.variationId}`} 
+                  className="inline-flex items-center px-2 py-1 bg-white/5 border border-white/10 rounded text-xs font-medium text-gray-300"
+                >
+                  {v.variationName}
+                </span>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Notes */}
-        {booking.notes && (
-          <div className="mt-5 pt-5 border-t border-gray-800">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-                <FileText className="w-4 h-4 text-brand-orange" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Notes</p>
-                <p className="text-gray-300 text-sm leading-relaxed">{booking.notes}</p>
-              </div>
-            </div>
+        {booking.referenceNumber && (
+          <div className="text-right shrink-0">
+            <p className="text-[10px] uppercase text-gray-500 font-bold tracking-widest mb-1">Ref_ID</p>
+            <p className="text-sm font-mono text-brand-orange bg-brand-orange/10 px-3 py-1.5 rounded border border-brand-orange/20">
+              {booking.referenceNumber}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Specs Grid (1px gap trick for inner borders) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 rounded-lg overflow-hidden border border-gray-800/50">
+        
+        {/* Vehicle Details */}
+        {(booking.vehicleMake || booking.vehicleModel || booking.vehicleYear) && (
+          <div className="bg-[#151515] p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-500" /> Target Hardware
+            </p>
+            <dl className="space-y-2">
+              {[
+                { label: 'Year', val: booking.vehicleYear },
+                { label: 'Make', val: booking.vehicleMake },
+                { label: 'Model', val: booking.vehicleModel }
+              ].map(spec => spec.val && (
+                <div key={spec.label} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                  <dt className="text-xs text-gray-500 uppercase tracking-wider">{spec.label}</dt>
+                  <dd className="text-sm font-semibold text-white">{spec.val}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
         )}
 
-        {/* Booking Details Metadata */}
-        <div className="mt-5 pt-5 border-t border-gray-800">
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-                        {booking.referenceNumber && (
-                          <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Reference Number</p>
-                            <p className="text-brand-orange text-xs font-mono font-bold">{booking.referenceNumber}</p>
-                          </div>
-                        )}
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Booking ID</p>
-              <p className="text-gray-300 text-xs font-mono">{booking.id}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Created</p>
-              <p className="text-gray-300 text-xs">
-                {new Date(booking.createdAt).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
-              </p>
-            </div>
-          </div>
-        </div>
-
-          {/* Action buttons */}
-          {canModify && (
-            <div className="mt-6 pt-5 border-t border-gray-800">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">Actions</p>
-              <div className="flex flex-wrap gap-3">
-                {!rescheduling && (
-                  <button
-                    onClick={() => setRescheduling(true)}
-                    disabled={isConfirmed}
-                    className="flex items-center gap-2 border border-brand-orange/50 text-brand-orange hover:bg-brand-orange/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" /> Reschedule
-                  </button>
+        {/* Assigned Tech */}
+        {booking.assignedTech ? (
+          <div className="bg-[#151515] p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-orange" /> Assigned Operator
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded bg-brand-darker border border-gray-700 flex items-center justify-center shrink-0">
+                <Wrench className="w-4 h-4 text-gray-400" />
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-bold text-white truncate">{booking.assignedTech.name}</p>
+                {booking.assignedTech.role && (
+                  <p className="text-[10px] font-mono text-brand-orange/80 mt-0.5 truncate">{booking.assignedTech.role}</p>
                 )}
-                <button
-                  onClick={() => setCancelTarget(true)}
-                  disabled={isConfirmed}
-                  className="flex items-center gap-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Cancel Booking
-                </button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="bg-[#151515] p-5 flex items-center justify-center text-xs text-gray-600 font-mono uppercase tracking-widest">
+            Pending Operator...
+          </div>
+        )}
+      </div>
 
-        {/* Contact info */}
-        <div className="bg-gradient-to-br from-brand-dark to-[#181818] border border-gray-800 rounded-xl p-6">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-5">Contact Information</p>
-          <div className="grid grid-cols-1 gap-5">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-              <User className="w-4 h-4 text-gray-500" />
+      {/* Notes */}
+      {booking.notes && (
+        <div className="mt-6 bg-brand-orange/5 border-l-2 border-brand-orange p-4 rounded-r-lg">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange/70 mb-2">Contextual Notes</p>
+          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{booking.notes}</p>
+        </div>
+      )}
+    </div>
+
+    {/* Action Panel */}
+    {canModify && (
+      <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-4 flex flex-wrap gap-3">
+        {!rescheduling && (
+          <button
+            onClick={() => setRescheduling(true)}
+            disabled={isConfirmed}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-transparent border border-gray-700 hover:border-brand-orange hover:text-brand-orange text-gray-300 px-6 py-2.5 text-xs font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Edit3 className="w-3.5 h-3.5" /> Reschedule
+          </button>
+        )}
+        <button
+          onClick={() => setCancelTarget(true)}
+          disabled={isConfirmed}
+          className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-transparent border border-gray-700 hover:border-red-500 hover:text-red-500 hover:bg-red-500/10 text-gray-300 px-6 py-2.5 text-xs font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <XCircle className="w-3.5 h-3.5" /> Terminate
+        </button>
+      </div>
+    )}
+  </div>
+
+  {/* --- TELEMETRY & CONTACT (SIDEBAR) --- */}
+  <div className="xl:col-span-1 space-y-6">
+    
+    {/* Client Identity */}
+    <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6">Client Identity</p>
+      <ul className="space-y-5">
+        {[
+          { icon: User, label: 'Name', val: booking.name },
+          { icon: Mail, label: 'Email', val: booking.email },
+          { icon: Phone, label: 'Phone', val: booking.phone }
+        ].map((contact, i) => (
+          <li key={i} className="flex items-start gap-4">
+            <contact.icon className="w-4 h-4 text-gray-600 mt-0.5 shrink-0" />
+            <div className="overflow-hidden">
+              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">{contact.label}</p>
+              <p className="text-sm font-medium text-gray-200 truncate">{contact.val}</p>
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Name</p>
-              <p className="text-gray-300 text-sm">{booking.name}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-              <Mail className="w-4 h-4 text-gray-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Email</p>
-              <p className="text-gray-300 text-sm break-all">{booking.email}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 bg-brand-darker border border-gray-700 rounded-md flex items-center justify-center shrink-0 mt-0.5">
-              <Phone className="w-4 h-4 text-gray-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">Phone</p>
-              <p className="text-gray-300 text-sm">{booking.phone}</p>
-            </div>
-          </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    {/* System Meta */}
+    <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6 font-mono">
+      <p className="text-[10px] font-sans font-bold uppercase tracking-widest text-gray-500 mb-4">System Meta</p>
+      <div className="space-y-4 text-xs">
+        <div>
+          <span className="text-gray-600 block mb-1">UUID</span>
+          <p className="text-gray-400 break-all">{booking.id}</p>
+        </div>
+        <div>
+          <span className="text-gray-600 block mb-1">Timestamp</span>
+          <p className="text-gray-400">
+            {new Date(booking.createdAt).toISOString().replace('T', ' ').substring(0, 19)}Z
+          </p>
         </div>
       </div>
-      </div>
+    </div>
+
+  </div>
+</div>
 
       {/* Media attachments */}
       {hasMedia && (
