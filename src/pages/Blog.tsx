@@ -5,6 +5,7 @@ import { BookOpen, Calendar, Search } from 'lucide-react';
 import { fetchBlogPostsAsync } from '../store/contentSlice';
 import type { AppDispatch, RootState } from '../store';
 import { SkeletonBlogCard } from '../components/Skeleton';
+import PageSEO from '../components/PageSEO';
 
 export default function Blog() {
   const dispatch = useDispatch<AppDispatch>();
@@ -33,6 +34,10 @@ export default function Blog() {
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
+      <PageSEO
+        title="Blog & News"
+        description="Read the latest news, tips, and insights from 1625 Auto Lab on automotive retrofitting, upgrades, and customization."
+      />
       <div className="container mx-auto px-4 md:px-6">
         {/* Header */}
         <div className="mb-12 text-center">

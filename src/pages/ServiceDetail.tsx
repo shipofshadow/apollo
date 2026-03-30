@@ -7,6 +7,7 @@ import type { AppDispatch, RootState } from '../store';
 import VariationGallery from '../components/VariationGallery';
 import PublishedReviews from '../components/PublishedReviews';
 import { formatPrice } from '../utils/formatPrice';
+import PageSEO from '../components/PageSEO';
 
 export default function ServiceDetail() {
   const { slug }  = useParams<{ slug: string }>();
@@ -73,6 +74,11 @@ export default function ServiceDetail() {
 
   return (
     <div className="min-h-screen bg-brand-darker pb-20 relative overflow-hidden">
+      <PageSEO
+        title={service.title}
+        description={service.description ?? `Book ${service.title} at 1625 Auto Lab. Professional automotive retrofitting service.`}
+        image={service.imageUrl || undefined}
+      />
       <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 bg-brand-orange/10 blur-3xl" />
       <div className="pointer-events-none absolute top-[38rem] -left-24 w-72 h-72 bg-white/[0.04] blur-3xl" />
 

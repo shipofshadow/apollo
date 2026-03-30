@@ -8,10 +8,16 @@ import BeforeAfterShowcase from '../components/BeforeAfterShowcase';
 import FacebookFeed from '../components/FacebookFeed';
 import Testimonials from '../components/Testimonials';
 import HomeFaqSection from '../components/HomeFaqSection';
+import PageSEO from '../components/PageSEO';
 
 export default function Home() {
   return (
     <main className="bg-brand-dark">
+      <PageSEO
+        title="1625 Auto Lab | Automotive Retrofitting"
+        description="1625 Auto Lab — your trusted automotive retrofitting and customization workshop. Projector headlights, HID/LED conversions, suspension upgrades, and more."
+        appendSiteName={false}
+      />
       <Hero />
 
       <section className="relative border-y border-gray-800 bg-brand-darker/80">
