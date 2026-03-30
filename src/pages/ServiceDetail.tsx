@@ -221,7 +221,7 @@ export default function ServiceDetail() {
               <p className="text-gray-600 text-[0.7rem]">Free consultation · No hidden fees</p>
               {selectedVariation?.name && (
                 <p className="text-[0.65rem] text-gray-500 uppercase tracking-[0.12em] mt-2">
-                  Selected: {selectedVariation.name}
+                  {selectedVariation.name}
                 </p>
               )}
               {service.duration && (
