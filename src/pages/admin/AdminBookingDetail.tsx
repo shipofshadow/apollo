@@ -6,7 +6,7 @@ import {
   Package, PenLine, Phone, User, Wrench, X, XCircle,
   ChevronLeft, ChevronRight, AlertTriangle, RefreshCw,
   ClipboardList, BadgeCheck, Camera, Plus, StickyNote,
-  Shield, Award,
+  Shield, Award, Activity
 } from 'lucide-react';
 import {
   fetchAllBookingsAsync,
@@ -41,10 +41,10 @@ import { formatStatus } from '../../utils/formatStatus';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
+  pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
   confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
   completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
-  cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
+  cancelled:      'bg-[#1a1a1a]     text-gray-500    border-gray-800',
   awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
@@ -155,15 +155,15 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
     : false;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 bg-[#121212] border border-gray-800 p-5 rounded mt-4">
       {/* Date carousel */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">New Date</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3">Target Date</p>
         <div className="relative">
           <button
             type="button"
             onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-brand-darker border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white -translate-x-3 shadow-md"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-[#151515] border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange -translate-x-3 transition-colors"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
@@ -180,22 +180,22 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
                   key={i}
                   type="button"
                   onClick={() => handleDateSelect(date)}
-                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded-sm relative ${
+                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded relative ${
                     active
                       ? 'border-brand-orange bg-brand-orange/10'
-                      : 'border-gray-800 hover:border-gray-600 bg-brand-darker'
+                      : 'border-gray-800 hover:border-gray-600 bg-[#181818]'
                   }`}
                 >
-                  <div className="text-[10px] text-gray-500 uppercase mb-1">
+                  <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">
                     {date.toLocaleDateString('en-PH', { weekday: 'short' })}
                   </div>
-                  <div className="text-xl font-display font-bold text-white">{date.getDate()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase mt-1">
+                  <div className="text-xl font-bold text-white">{date.getDate()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase font-mono mt-1">
                     {date.toLocaleDateString('en-PH', { month: 'short' })}
                   </div>
                   {isCurrentBookingDate && (
                     <div className="absolute bottom-1 left-0 right-0 flex justify-center">
-                      <span className="w-1 h-1 rounded-full bg-brand-orange" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
                     </div>
                   )}
                 </button>
@@ -205,36 +205,36 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
           <button
             type="button"
             onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-brand-darker border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white translate-x-3 shadow-md"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-[#151515] border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange translate-x-3 transition-colors"
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
         {selectedDate && (
-          <p className="text-xs text-brand-orange mt-2">
-            Selected: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+          <p className="text-[10px] font-mono uppercase tracking-widest text-brand-orange mt-3">
+             Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         )}
       </div>
 
       {/* Time slots */}
       {selectedDate && (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">
-            New Time
+        <div className="pt-4 border-t border-gray-800/50">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3 flex items-center gap-2">
+            Target Time
             {slotsLoading && (
-              <span className="ml-2 text-gray-600 normal-case font-normal inline-flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Checking…
+              <span className="text-gray-500 font-mono flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Polling...
               </span>
             )}
           </p>
           {!slotsLoading && !shopDayIsOpen && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-sm">
-              The shop is closed on this date. Please choose a different day.
+            <p className="text-xs text-red-400 font-mono bg-red-500/10 border border-red-500/20 px-4 py-3 rounded">
+              [SYSTEM] Shop offline on selected date.
             </p>
           )}
           {!slotsLoading && shopDayIsOpen && openSlots.length === 0 && (
-            <p className="text-sm text-gray-500 py-2">No available slots for this date.</p>
+            <p className="text-xs text-gray-500 font-mono py-2">[SYSTEM] Zero capacity for selected date.</p>
           )}
           {!slotsLoading && shopDayIsOpen && openSlots.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -247,18 +247,18 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
                     key={slot}
                     type="button"
                     onClick={() => setSelectedTime(slot)}
-                    className={`flex flex-col items-center justify-center px-2 py-3 rounded-sm border font-bold transition-colors ${
+                    className={`flex flex-col items-center justify-center p-3 rounded border font-mono transition-all ${
                       isSelected
-                        ? 'bg-brand-orange border-brand-orange text-white'
-                        : 'bg-brand-darker border-gray-700 text-white hover:border-brand-orange hover:text-brand-orange'
+                        ? 'bg-brand-orange/20 border-brand-orange text-brand-orange shadow-[inset_0_0_10px_rgba(249,115,22,0.2)]'
+                        : 'bg-[#181818] border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white'
                     }`}
                   >
-                    <span className="text-sm leading-tight">{slot}</span>
+                    <span className="text-sm font-bold">{slot}</span>
                     {spotsLeft > 0 && (
-                      <span className={`text-[10px] font-semibold mt-1 ${
-                        isSelected ? 'text-orange-100' : almostFull ? 'text-yellow-400' : 'text-gray-500'
+                      <span className={`text-[9px] uppercase tracking-wider mt-1.5 ${
+                        isSelected ? 'text-brand-orange' : almostFull ? 'text-yellow-500' : 'text-gray-600'
                       }`}>
-                        {almostFull ? 'Last spot!' : `${spotsLeft} left`}
+                        {almostFull ? 'Critical' : `CAP: ${spotsLeft}`}
                       </span>
                     )}
                   </button>
@@ -270,37 +270,39 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-1 border-t border-gray-800">
+      <div className="flex items-center gap-3 pt-5 mt-5 border-t border-gray-800">
         <button
           onClick={() => setConfirmOpen(true)}
           disabled={saveBusy || !selectedDate || !selectedTime || unchanged}
-          className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm disabled:opacity-50"
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-brand-orange text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {saveBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-          Confirm Reschedule
+          Execute Reschedule
         </button>
         <button
           onClick={onCancel}
           disabled={saveBusy}
-          className="border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+          className="flex-1 sm:flex-none border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30"
         >
-          Cancel
+          Abort
         </button>
       </div>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Confirm Reschedule</h3>
-            <p className="mt-2 text-sm text-gray-300">Apply the selected date and time for this booking?</p>
-            <div className="mt-5 flex items-center justify-end gap-2">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
+            <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange mb-4 border-b border-gray-800 pb-2">
+              // Authorization Required
+            </h3>
+            <p className="text-sm text-gray-300 mb-6">Execute time modification for this dispatch sequence?</p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmOpen(false)}
                 disabled={saveBusy}
-                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                className="px-4 py-2 rounded border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
               >
-                Cancel
+                Abort
               </button>
               <button
                 type="button"
@@ -309,9 +311,9 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
                   setConfirmOpen(false);
                 }}
                 disabled={saveBusy}
-                className="px-3 py-2 rounded-sm bg-brand-orange text-xs font-bold uppercase tracking-widest text-white hover:bg-orange-600 disabled:opacity-50"
+                className="px-4 py-2 rounded bg-brand-orange text-xs font-bold uppercase tracking-widest text-white hover:bg-orange-600 disabled:opacity-30 transition-colors"
               >
-                {saveBusy ? 'Please wait...' : 'Confirm'}
+                {saveBusy ? 'Processing...' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -385,10 +387,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
 
-  // Seed the log with the booking's submission time on mount
   useEffect(() => {
     if (!token) return;
-    // Ensure we have fresh data
     dispatch(fetchAllBookingsAsync(token));
   }, [token, dispatch]);
 
@@ -408,7 +408,6 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       setSelectedTechUserId('');
     }
 
-    // Load customer loyalty stats
     if (token && booking.userId) {
       fetchCustomerStatsApi(token, booking.userId)
         .then(r => setCustomerStats(r.stats))
@@ -430,7 +429,6 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       .catch(() => setAssignableUsers([]));
   }, [token]);
 
-  // Load build updates whenever the booking changes
   useEffect(() => {
     if (!token || !bookingId) return;
     fetchBuildUpdatesApi(token, bookingId)
@@ -665,12 +663,12 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   if (!booking) {
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to Bookings
+        <button onClick={onBack} className="inline-flex items-center gap-2 text-gray-500 hover:text-white text-[10px] font-mono uppercase tracking-widest transition-colors">
+          <ArrowLeft className="w-3.5 h-3.5" /> Return
         </button>
-        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-5 py-4 rounded-sm">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          <p className="text-sm">Booking not found. It may have been deleted.</p>
+        <div className="flex items-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400 px-5 py-4 rounded font-mono text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <p>Payload dropped. Booking not found in current state.</p>
         </div>
       </div>
     );
@@ -686,471 +684,358 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const hasAfterPhotos = (booking.afterPhotos?.length ?? 0) > 0;
 
   return (
-    <div className="space-y-5 w-full max-w-7xl">
+    <div className="space-y-6 w-full max-w-[1400px]">
 
       {/* Lightbox */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
           onClick={() => setLightboxUrl(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white/70 hover:text-white"
+            className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors"
             onClick={() => setLightboxUrl(null)}
           >
-            <X className="w-7 h-7" />
+            <X className="w-8 h-8" />
           </button>
           <img
             src={lightboxUrl}
-            alt="Full size"
-            className="max-w-full max-h-[90vh] object-contain rounded-sm"
+            alt="Asset Inspection"
+            className="max-w-full max-h-[90vh] object-contain rounded border border-gray-800"
             referrerPolicy="no-referrer"
             onClick={e => e.stopPropagation()}
           />
         </div>
       )}
 
-      {/* Back + Header */}
-      <div className="flex items-center gap-3">
+      {/* Navigation & Header */}
+      <div className="flex flex-col gap-4">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors shrink-0"
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-orange text-[10px] font-mono uppercase tracking-widest transition-colors w-fit"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Back</span>
+          <ArrowLeft className="w-3.5 h-3.5" /> Return to Operations
         </button>
-        <div className="h-5 w-px bg-gray-800" />
-        <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
-          <div className="min-w-0">
-            <h2 className="text-lg font-display font-bold text-white uppercase tracking-tight truncate">
-              {booking.name}
-              <span className="hidden sm:inline text-gray-600 font-normal"> · </span>
-              <span className="hidden sm:inline text-gray-400 text-base">{booking.serviceName}</span>
-            </h2>
-            <div className="mt-1.5 space-y-0.5">
-              {booking.referenceNumber && (
-                <p className="text-brand-orange text-xs font-mono font-bold flex items-center gap-1.5">
-                  Ref: {booking.referenceNumber}
+
+        <div className="relative border border-gray-800/80 rounded-lg bg-[#121212] overflow-hidden shadow-2xl">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-orange via-brand-orange/50 to-transparent" />
+          
+          <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center gap-4">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80">
+                  Booking Details
                 </p>
-              )}
-              <p className="text-gray-600 text-xs font-mono flex items-center gap-1">
-                <Hash className="w-3 h-3" />{booking.id}
-              </p>
+                <span className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded border ${STATUS_STYLES[booking.status]}`}>
+                  {formatStatus(booking.status)}
+                </span>
+              </div>
+              
+              <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
+                {booking.name}
+              </h1>
+              
+              <div className="flex items-center gap-3 pt-2 text-xs font-mono">
+                {booking.referenceNumber && (
+                  <span className="text-brand-orange bg-brand-orange/10 px-2.5 py-1 rounded border border-brand-orange/20 font-bold">
+                    REF:{booking.referenceNumber}
+                  </span>
+                )}
+                <span className="text-gray-500 bg-[#181818] px-2.5 py-1 rounded border border-gray-800">
+                  Booking ID: {booking.id}
+                </span>
+              </div>
             </div>
           </div>
-          <span className={`ml-auto px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border shrink-0 ${STATUS_STYLES[booking.status]}`}>
-            {formatStatus(booking.status)}
-          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* ── Left column ── */}
-        <div className="lg:col-span-2 space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* ── LEFT COLUMN (Core Payload & Execution) ── */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
 
-          {/* Customer */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5" /> Customer
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1.5"><User className="w-3 h-3" /> Name</p>
-                <p className="text-white text-sm font-semibold">{booking.name}</p>
-              </div>
-              <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1.5"><Mail className="w-3 h-3" /> Email</p>
-                <a href={`mailto:${booking.email}`} className="text-gray-200 text-sm break-all hover:text-brand-orange transition-colors">{booking.email}</a>
-              </div>
-              <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1.5"><Phone className="w-3 h-3" /> Phone</p>
-                <a href={`tel:${booking.phone}`} className="text-gray-200 text-sm hover:text-brand-orange transition-colors">{booking.phone}</a>
-              </div>
-            </div>
-          </section>
-
-          {/* Vehicle */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <Car className="w-3.5 h-3.5" /> Vehicle
-            </p>
-            <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-              <p className="text-white text-sm font-semibold">{booking.vehicleInfo}</p>
-              {(booking.vehicleYear || booking.vehicleMake || booking.vehicleModel) && (
-                <p className="text-gray-500 text-xs mt-1">
-                  {[booking.vehicleYear, booking.vehicleMake, booking.vehicleModel].filter(Boolean).join(' · ')}
-                </p>
-              )}
-            </div>
-          </section>
-
-          {/* Service & Appointment */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <Wrench className="w-3.5 h-3.5" /> Service &amp; Appointment
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1.5"><Calendar className="w-3 h-3" /> Date</p>
-                <p className="text-gray-200 text-sm font-medium">{booking.appointmentDate}</p>
-              </div>
-              <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1.5"><Clock className="w-3 h-3" /> Time</p>
-                <p className="text-gray-200 text-sm font-medium">{booking.appointmentTime}</p>
-              </div>
-              <div className="sm:col-span-3 bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-[10px] text-gray-500 flex items-center gap-1 mb-1.5"><Wrench className="w-3 h-3" /> Service(s)</p>
-                <p className="text-gray-200 text-sm">{booking.serviceName}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5" /> Technician Assignment
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
-              <div>
-                <label className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 block">Assigned Mechanic</label>
-                <select
-                  value={selectedTechUserId}
-                  onChange={e => setSelectedTechUserId(e.target.value)}
-                  disabled={isFinalized}
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange text-sm"
-                >
-                  <option value="">Unassigned</option>
-                  {assignableUsers.map(member => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}{member.role ? ` (${member.role})` : ''}
-                    </option>
+          {/* Core Specs Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 border border-gray-800/80 rounded-lg overflow-hidden">
+            
+            {/* Payload (Service & Variations) */}
+            <div className="bg-[#121212] p-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                <Wrench className="w-3.5 h-3.5 text-gray-400" /> Service Details
+              </p>
+              <h3 className="text-lg font-bold text-gray-200 mb-2">{booking.serviceName}</h3>
+              {booking.selectedVariations && booking.selectedVariations.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {booking.selectedVariations.map(v => (
+                    <span key={`${v.serviceId}-${v.variationId}`} className="inline-flex items-center text-[10px] font-mono bg-white/5 border border-white/10 px-2 py-1 rounded text-gray-400">
+                      <span className="text-brand-orange/60 mr-1.5">+</span>{v.variationName}
+                    </span>
                   ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => requestConfirmation(
-                  {
-                    title: 'Save Assignment?',
-                    message: selectedTechUserId
-                      ? 'This will update the assigned technician for this booking.'
-                      : 'This will clear the current technician assignment.',
-                    confirmLabel: 'Save Assignment',
-                  },
-                  handleAssignTechnician,
-                )}
-                disabled={assignTechBusy || !token || isFinalized}
-                className="h-[42px] px-5 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50 inline-flex items-center gap-2 justify-center"
-              >
-                {assignTechBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
-                Save Assignment
-              </button>
-            </div>
-            {booking.assignedTech && (
-              <p className="text-xs text-gray-400 mt-3">
-                Current: <span className="text-white font-semibold">{booking.assignedTech.name}</span>
-                {booking.assignedTech.role ? <span className="text-gray-500"> · {booking.assignedTech.role}</span> : null}
-              </p>
-            )}
-            {isFinalized && (
-              <p className="text-xs text-gray-500 mt-3">Assignment is locked after completion or cancellation.</p>
-            )}
-          </section>
-
-          {/* Notes */}
-          {booking.notes && (
-            <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> Customer Notes
-              </p>
-              <div className="bg-brand-darker border border-gray-800 rounded-sm px-4 py-3">
-                <p className="text-gray-200 text-sm whitespace-pre-wrap">{booking.notes}</p>
-              </div>
-            </section>
-          )}
-
-          {/* Parts / Awaiting */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400 flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5" /> Parts / Awaiting
-              </p>
-              {canModify && !partsOpen && (
-                <button
-                  onClick={() => setPartsOpen(true)}
-                  className="text-xs font-bold uppercase tracking-widest text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
-                >
-                  <Edit3 className="w-3 h-3" /> {booking.partsNotes ? 'Edit' : 'Flag'}
-                </button>
+                </div>
               )}
             </div>
 
-            {!partsOpen && (
-              booking.partsNotes
-                ? <div className="bg-purple-500/5 border border-purple-500/30 rounded-sm px-4 py-3">
-                    <p className="text-purple-200 text-sm whitespace-pre-wrap">{booking.partsNotes}</p>
-                  </div>
-                : <p className="text-gray-600 text-sm italic">No parts notes recorded.</p>
-            )}
+            {/* Target Asset (Vehicle) */}
+            <div className="bg-[#121212] p-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                <Car className="w-3.5 h-3.5 text-gray-400" /> Vehicle
+              </p>
+              <h3 className="text-lg font-bold text-white mb-2">{booking.vehicleInfo}</h3>
+              {(booking.vehicleYear || booking.vehicleMake || booking.vehicleModel) && (
+                <div className="flex gap-2">
+                  {[
+                    { label: 'YR', val: booking.vehicleYear },
+                    { label: 'MK', val: booking.vehicleMake },
+                    { label: 'MD', val: booking.vehicleModel }
+                  ].map(spec => spec.val && (
+                    <div key={spec.label} className="bg-[#181818] border border-gray-800 px-2 py-1 rounded text-center min-w-[40px]">
+                      <p className="text-[8px] uppercase text-gray-600 font-bold mb-0.5">{spec.label}</p>
+                      <p className="text-xs font-mono text-gray-300">{spec.val}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            {partsOpen && (
-              <div className="space-y-3">
-                <textarea
-                  rows={4}
-                  value={partsNotes}
-                  onChange={e => setPartsNotes(e.target.value)}
-                  placeholder="e.g. Custom AES shrouds ordered from Japan — ETA 7–10 days"
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-purple-400 transition-colors resize-none rounded-sm text-sm"
-                />
-                <div className="flex gap-3">
+            {/* Client Identity */}
+            <div className="bg-[#121212] p-6 md:col-span-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                <User className="w-3.5 h-3.5 text-gray-400" /> Customer Information
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded bg-[#181818] border border-gray-800 flex items-center justify-center shrink-0">
+                    <Mail className="w-3.5 h-3.5 text-gray-500" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-widest font-bold">Email</p>
+                    <a href={`mailto:${booking.email}`} className="text-sm text-gray-300 hover:text-brand-orange transition-colors truncate block">{booking.email}</a>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded bg-[#181818] border border-gray-800 flex items-center justify-center shrink-0">
+                    <Phone className="w-3.5 h-3.5 text-gray-500" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-[9px] text-gray-600 uppercase tracking-widest font-bold">Phone</p>
+                    <a href={`tel:${booking.phone}`} className="text-sm font-mono text-gray-300 hover:text-brand-orange transition-colors truncate block">{booking.phone}</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dispatch Logic (Time & Operator) */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* Schedule */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" /> Appointment Schedule
+                  </p>
+                  {!rescheduling && (
+                    <button
+                      onClick={() => setRescheduling(true)}
+                      disabled={isFinalized}
+                      className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1 disabled:opacity-30"
+                    >
+                      <Edit3 className="w-3 h-3" /> Change Time
+                    </button>
+                  )}
+                </div>
+
+                {!rescheduling ? (
+                  <div className="space-y-3">
+                    <div className="bg-[#181818] border border-gray-800 rounded p-3 flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-mono">Date</span>
+                      <span className="text-sm font-bold text-gray-200">{booking.appointmentDate}</span>
+                    </div>
+                    <div className="bg-[#181818] border border-gray-800 rounded p-3 flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-mono">Time</span>
+                      <span className="text-sm font-bold text-gray-200">{booking.appointmentTime}</span>
+                    </div>
+                  </div>
+                ) : (
+                  token && (
+                    <AdminReschedulePanel
+                      booking={booking}
+                      token={token}
+                      onSuccess={async (_updated) => {
+                        await reloadActivity();
+                        setRescheduling(false);
+                      }}
+                      onCancel={() => setRescheduling(false)}
+                    />
+                  )
+                )}
+              </div>
+
+              {/* Operator */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                  <Wrench className="w-3.5 h-3.5 text-gray-400" /> Assigned Technician
+                </p>
+                
+                <div className="space-y-3">
+                  <select
+                    value={selectedTechUserId}
+                    onChange={e => setSelectedTechUserId(e.target.value)}
+                    disabled={isFinalized || assignTechBusy}
+                    className="w-full bg-[#181818] border border-gray-800 text-white px-3 py-3 rounded focus:outline-none focus:border-brand-orange transition-colors text-sm font-semibold"
+                  >
+                    <option value="">[ Not Assigned ]</option>
+                    {assignableUsers.map(member => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}{member.role ? ` — ${member.role}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  
                   <button
+                    type="button"
                     onClick={() => requestConfirmation(
                       {
-                        title: 'Save Parts Update?',
-                        message: 'This will save parts notes and notify the client.',
-                        confirmLabel: 'Save & Notify',
+                        title: 'Update Operator?',
+                        message: selectedTechUserId
+                          ? 'Locking in operator assignment for this payload.'
+                          : 'Clearing current operator assignment.',
+                        confirmLabel: 'Execute',
                       },
-                      handlePartsSave,
+                      handleAssignTechnician,
                     )}
-                    disabled={partsBusy || !partsNotes.trim()}
-                    className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
+                    disabled={assignTechBusy || !token || isFinalized}
+                    className="w-full py-2.5 bg-brand-darker border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {partsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
-                    Save &amp; Notify
-                  </button>
-                  <button
-                    onClick={() => { setPartsOpen(false); setPartsNotes(booking.partsNotes ?? ''); }}
-                    disabled={partsBusy}
-                    className="border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
-                  >
-                    Cancel
+                    {assignTechBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    Save Technician
                   </button>
                 </div>
               </div>
-            )}
-          </section>
+            </div>
+          </div>
 
-          {/* Admin Reschedule */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange flex items-center gap-1.5">
-                <Edit3 className="w-3.5 h-3.5" /> Reschedule Appointment
+          {/* Context Blocks (Notes & Parts) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 border border-gray-800/80 rounded-lg overflow-hidden">
+            
+            {/* Customer Notes */}
+            <div className="bg-[#121212] p-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-gray-400" /> Customer Notes
               </p>
-              {!rescheduling && (
-                <button
-                  onClick={() => setRescheduling(true)}
-                  disabled={isFinalized}
-                  className="text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3 h-3" /> Reschedule
-                </button>
+              {booking.notes ? (
+                <div className="bg-[#181818] border border-gray-800 rounded p-4">
+                  <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{booking.notes}</p>
+                </div>
+              ) : (
+                <p className="text-gray-600 text-xs font-mono bg-[#181818] border border-gray-800 border-dashed rounded p-4 text-center">No notes provided.</p>
               )}
             </div>
-            {!rescheduling ? (
-              <div className="flex items-center gap-6 flex-wrap">
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <Calendar className="w-4 h-4 text-gray-600" />
-                  <span>{booking.appointmentDate}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <Clock className="w-4 h-4 text-gray-600" />
-                  <span>{booking.appointmentTime}</span>
-                </div>
-                {isFinalized && (
-                  <p className="text-xs text-gray-500">Reschedule is locked after completion or cancellation.</p>
+
+            {/* Parts Notes */}
+            <div className="bg-[#121212] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5" /> Parts / Materials
+                </p>
+                {canModify && !partsOpen && (
+                  <button
+                    onClick={() => setPartsOpen(true)}
+                    className="text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3 h-3" /> {booking.partsNotes ? 'Edit' : 'Add'}
+                  </button>
                 )}
               </div>
-            ) : (
-              token && (
-                <AdminReschedulePanel
-                  booking={booking}
-                  token={token}
-                  onSuccess={async (_updated) => {
-                    await reloadActivity();
-                    setRescheduling(false);
-                  }}
-                  onCancel={() => setRescheduling(false)}
-                />
-              )
-            )}
-          </section>
 
-          {/* Reference Photos */}
+              {!partsOpen ? (
+                booking.partsNotes ? (
+                  <div className="bg-purple-500/5 border border-purple-500/20 rounded p-4">
+                    <p className="text-purple-200 text-sm whitespace-pre-wrap">{booking.partsNotes}</p>
+                  </div>
+                ) : (
+                  <p className="text-gray-600 text-xs font-mono bg-[#181818] border border-gray-800 border-dashed rounded p-4 text-center">No parts or materials pending.</p>
+                )
+              ) : (
+                <div className="space-y-3">
+                  <textarea
+                    rows={4}
+                    value={partsNotes}
+                    onChange={e => setPartsNotes(e.target.value)}
+                    placeholder="Enter missing parts or delivery info..."
+                    className="w-full bg-[#181818] border border-gray-800 text-white px-3 py-3 rounded focus:outline-none focus:border-purple-400 transition-colors resize-none text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => requestConfirmation(
+                        {
+                          title: 'Save Parts Update?',
+                          message: 'Save parts/materials notes and notify customer of delay.',
+                          confirmLabel: 'Save & Notify',
+                        },
+                        handlePartsSave,
+                      )}
+                      disabled={partsBusy || !partsNotes.trim()}
+                      className="flex-1 bg-purple-600/20 border border-purple-500/50 hover:bg-purple-600/40 text-purple-300 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
+                    >
+                      {partsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setPartsOpen(false); setPartsNotes(booking.partsNotes ?? ''); }}
+                      disabled={partsBusy}
+                      className="px-4 py-2.5 bg-transparent border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-[10px] font-bold uppercase tracking-widest transition-colors rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Reference Imagery */}
           {booking.mediaUrls && booking.mediaUrls.length > 0 && (
-            <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5" /> Reference Photos ({booking.mediaUrls.length})
+            <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                <ImageIcon className="w-3.5 h-3.5 text-gray-400" /> Reference Photos [{booking.mediaUrls.length}]
               </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                 {booking.mediaUrls.map((url, i) => (
                   <button
                     key={i}
                     onClick={() => setLightboxUrl(url)}
-                    className="aspect-square overflow-hidden rounded-sm border border-gray-700 hover:border-brand-orange transition-colors"
+                    className="aspect-square overflow-hidden rounded border border-gray-800 hover:border-brand-orange transition-colors relative group"
                   >
+                    <div className="absolute inset-0 bg-brand-orange/10 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" />
                     <img
                       src={url}
-                      alt={`Photo ${i + 1}`}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                      alt={`Ref ${i + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       referrerPolicy="no-referrer"
                     />
                   </button>
                 ))}
               </div>
-            </section>
+            </div>
           )}
 
-          {/* Build Updates */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5" /> Build Progress Updates
-              </p>
-              {!buildUpdateOpen && (
-                <button
-                  onClick={() => setBuildUpdateOpen(true)}
-                  disabled={isFinalized}
-                  className="text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" /> Add Update
-                </button>
-              )}
-            </div>
-
-            {/* Post new update form */}
-            {buildUpdateOpen && (
-              <div className="mb-5 space-y-3 border border-brand-orange/20 bg-brand-orange/5 rounded-sm p-4">
-                <textarea
-                  rows={3}
-                  value={buildUpdateNote}
-                  onChange={e => setBuildUpdateNote(e.target.value)}
-                  placeholder="e.g. Projectors mounted and aimed. Wiring harness completed."
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors resize-none rounded-sm text-sm"
-                />
-
-                {/* Photo upload */}
-                <div>
-                  <input
-                    ref={buildPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    disabled={isFinalized}
-                    onChange={handleBuildPhotoUpload}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => buildPhotoInputRef.current?.click()}
-                    disabled={photoUploading || isFinalized}
-                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
-                  >
-                    {photoUploading
-                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</>
-                      : <><Camera className="w-3.5 h-3.5" /> Add Photos</>
-                    }
-                  </button>
-                  {buildUpdatePhotos.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {buildUpdatePhotos.map((url, i) => (
-                        <div key={i} className="relative w-16 h-16">
-                          <img
-                            src={url}
-                            alt={`Upload ${i + 1}`}
-                            className="w-full h-full object-cover rounded-sm border border-gray-700"
-                            referrerPolicy="no-referrer"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setBuildUpdatePhotos(prev => prev.filter((_, j) => j !== i))}
-                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
-                          >
-                            <X className="w-2.5 h-2.5 text-white" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => requestConfirmation(
-                      {
-                        title: 'Post Build Update?',
-                        message: 'This update will be visible in the booking progress timeline.',
-                        confirmLabel: 'Post Update',
-                      },
-                      handleBuildUpdateSubmit,
-                    )}
-                    disabled={isFinalized || buildUpdateBusy || photoUploading || (!buildUpdateNote.trim() && buildUpdatePhotos.length === 0)}
-                    className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
-                  >
-                    {buildUpdateBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-                    Post Update
-                  </button>
-                  <button
-                    onClick={() => { setBuildUpdateOpen(false); setBuildUpdateNote(''); setBuildUpdatePhotos([]); }}
-                    disabled={buildUpdateBusy}
-                    className="border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 px-5 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Existing updates */}
-            {buildUpdates.length === 0 && !buildUpdateOpen ? (
-              <p className="text-gray-600 text-sm italic">No progress updates posted yet.</p>
-            ) : (
-              <ol className="space-y-4">
-                {buildUpdates.slice().reverse().map(upd => (
-                  <li key={upd.id} className="border border-gray-800 rounded-sm p-4 space-y-3">
-                    <p className="text-[10px] text-gray-500 font-mono">
-                      {new Date(upd.createdAt).toLocaleString()}
-                    </p>
-                    {upd.note && (
-                      <p className="text-gray-200 text-sm whitespace-pre-wrap">{upd.note}</p>
-                    )}
-                    {upd.photoUrls.length > 0 && (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {upd.photoUrls.map((url, j) => (
-                          <button
-                            key={j}
-                            onClick={() => setLightboxUrl(url)}
-                            className="aspect-square overflow-hidden rounded-sm border border-gray-700 hover:border-brand-orange transition-colors"
-                          >
-                            <img
-                              src={url}
-                              alt={`Progress photo ${j + 1}`}
-                              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                              referrerPolicy="no-referrer"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
-            {isFinalized && !buildUpdateOpen && (
-              <p className="text-xs text-gray-500 mt-4">Progress updates are locked after completion or cancellation.</p>
-            )}
-          </section>
-
-          {/* QA Before/After Photos */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5" /> QA Before / After Photos
+          {/* QA Imagery (Before/After) */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+              <Camera className="w-3.5 h-3.5 text-gray-400" /> Before & After Photos
             </p>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Before Photos (Check-in)</p>
-                  <span className="text-[10px] text-gray-600">{beforePhotos.length} file(s)</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 rounded overflow-hidden">
+              
+              {/* Before */}
+              <div className="bg-[#151515] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Before Service</p>
+                  <span className="text-[10px] text-gray-600 font-mono">COUNT:{beforePhotos.length}</span>
                 </div>
+                
                 <input
                   ref={beforePhotoInputRef}
                   type="file"
@@ -1159,51 +1044,56 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   className="hidden"
                   onChange={(e) => void handleQaPhotoUpload('before', e)}
                 />
-                <div className="flex gap-2 mb-3">
+                
+                <div className="flex gap-2 mb-4">
                   <button
                     type="button"
                     onClick={() => beforePhotoInputRef.current?.click()}
-                    disabled={qaUploadingStage !== null}
-                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                    disabled={qaUploadingStage !== null || booking.status === 'completed'}
+                    className="flex-1 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange py-2 text-[10px] font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30 flex items-center justify-center gap-2"
                   >
-                    {qaUploadingStage === 'before'
-                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
-                      : <><Camera className="w-3 h-3" /> Add Before</>}
+                    {qaUploadingStage === 'before' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                    Add Media
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleSaveQaPhotos('before')}
-                    disabled={qaSavingStage !== null || beforePhotos.length === 0}
-                    className="px-3 py-1.5 bg-brand-orange text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 disabled:opacity-50"
+                    disabled={qaSavingStage !== null || beforePhotos.length === 0 || booking.status === 'completed'}
+                    className="px-4 py-2 bg-brand-darker border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded disabled:opacity-30 transition-colors"
                   >
-                    {qaSavingStage === 'before' ? 'Saving…' : 'Save Before'}
+                    {qaSavingStage === 'before' ? 'Syncing...' : 'Sync'}
                   </button>
                 </div>
+
                 {beforePhotos.length > 0 ? (
                   <div className="grid grid-cols-4 gap-2">
                     {beforePhotos.map((url, i) => (
-                      <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
-                        <img src={url} alt={`Before ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div key={i} className="relative aspect-square rounded overflow-hidden border border-gray-700 group">
+                        <img src={url} alt="Before" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <button
                           type="button"
                           onClick={() => setBeforePhotos(prev => prev.filter((_, idx) => idx !== i))}
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 rounded border border-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <X className="w-2.5 h-2.5 text-white" />
+                          <X className="w-3 h-3 text-white" />
                         </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-600 italic">Required before confirming/check-in.</p>
+                  <div className="h-16 border border-dashed border-gray-800 rounded flex items-center justify-center">
+                    <p className="text-[9px] font-mono text-yellow-500 uppercase tracking-widest">Required for check-in</p>
+                  </div>
                 )}
               </div>
 
-              <div className="border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">After Photos (Completion)</p>
-                  <span className="text-[10px] text-gray-600">{afterPhotos.length} file(s)</span>
+              {/* After */}
+              <div className="bg-[#151515] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">After Service</p>
+                  <span className="text-[10px] text-gray-600 font-mono">COUNT:{afterPhotos.length}</span>
                 </div>
+                
                 <input
                   ref={afterPhotoInputRef}
                   type="file"
@@ -1212,204 +1102,281 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   className="hidden"
                   onChange={(e) => void handleQaPhotoUpload('after', e)}
                 />
-                <div className="flex gap-2 mb-3">
+                
+                <div className="flex gap-2 mb-4">
                   <button
                     type="button"
                     onClick={() => afterPhotoInputRef.current?.click()}
-                    disabled={qaUploadingStage !== null}
-                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                    disabled={qaUploadingStage !== null || booking.status === 'completed'}
+                    className="flex-1 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange py-2 text-[10px] font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30 flex items-center justify-center gap-2"
                   >
-                    {qaUploadingStage === 'after'
-                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
-                      : <><Camera className="w-3 h-3" /> Add After</>}
+                    {qaUploadingStage === 'after' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                    Add Media
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleSaveQaPhotos('after')}
-                    disabled={qaSavingStage !== null || afterPhotos.length === 0}
-                    className="px-3 py-1.5 bg-brand-orange text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 disabled:opacity-50"
+                    disabled={qaSavingStage !== null || afterPhotos.length === 0 || booking.status === 'completed'}
+                    className="px-4 py-2 bg-brand-darker border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded disabled:opacity-30 transition-colors"
                   >
-                    {qaSavingStage === 'after' ? 'Saving…' : 'Save After'}
+                    {qaSavingStage === 'after' ? 'Syncing...' : 'Sync'}
                   </button>
                 </div>
+
                 {afterPhotos.length > 0 ? (
                   <div className="grid grid-cols-4 gap-2">
                     {afterPhotos.map((url, i) => (
-                      <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
-                        <img src={url} alt={`After ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div key={i} className="relative aspect-square rounded overflow-hidden border border-gray-700 group">
+                        <img src={url} alt="After" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <button
                           type="button"
                           onClick={() => setAfterPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 rounded border border-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-16 border border-dashed border-gray-800 rounded flex items-center justify-center">
+                    <p className="text-[9px] font-mono text-yellow-500 uppercase tracking-widest">Required for completion</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Build Updates (Timeline) */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5" /> Progress Updates
+              </p>
+              {!buildUpdateOpen && (
+                <button
+                  onClick={() => setBuildUpdateOpen(true)}
+                  disabled={isFinalized}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1 bg-brand-orange/10 px-3 py-1.5 rounded disabled:opacity-30"
+                >
+                  <Plus className="w-3 h-3" /> Append Node
+                </button>
+              )}
+            </div>
+
+            {/* Post new update form */}
+            {buildUpdateOpen && (
+              <div className="mb-6 border border-brand-orange/30 bg-[#151515] rounded p-5 shadow-[inset_0_0_20px_rgba(249,115,22,0.05)]">
+                <textarea
+                  rows={3}
+                  value={buildUpdateNote}
+                  onChange={e => setBuildUpdateNote(e.target.value)}
+                  placeholder="Describe the update..."
+                  className="w-full bg-[#121212] border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors resize-none rounded text-sm font-mono mb-4"
+                />
+
+                <input
+                  ref={buildPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  disabled={isFinalized}
+                  onChange={handleBuildPhotoUpload}
+                />
+                
+                <div className="flex items-center gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => buildPhotoInputRef.current?.click()}
+                    disabled={photoUploading || isFinalized}
+                    className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30"
+                  >
+                    {photoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                    Attach Media
+                  </button>
+                  <span className="text-[9px] font-mono text-gray-500">{buildUpdatePhotos.length} Attached</span>
+                </div>
+
+                {buildUpdatePhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4 p-3 bg-[#121212] rounded border border-gray-800">
+                    {buildUpdatePhotos.map((url, i) => (
+                      <div key={i} className="relative w-14 h-14 group rounded overflow-hidden border border-gray-700">
+                        <img src={url} alt="Upload" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <button
+                          type="button"
+                          onClick={() => setBuildUpdatePhotos(prev => prev.filter((_, j) => j !== i))}
+                          className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="w-2.5 h-2.5 text-white" />
                         </button>
                       </div>
                     ))}
                   </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Add Progress Update?',
+                        message: 'This will add a new update to the customer timeline.',
+                        confirmLabel: 'Add Update',
+                      },
+                      handleBuildUpdateSubmit,
+                    )}
+                    disabled={isFinalized || buildUpdateBusy || photoUploading || (!buildUpdateNote.trim() && buildUpdatePhotos.length === 0)}
+                    className="flex-1 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
+                  >
+                    {buildUpdateBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                    Add Update
+                  </button>
+                  <button
+                    onClick={() => { setBuildUpdateOpen(false); setBuildUpdateNote(''); setBuildUpdatePhotos([]); }}
+                    disabled={buildUpdateBusy}
+                    className="px-5 py-2.5 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-[10px] font-bold uppercase tracking-widest transition-colors rounded"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Existing updates */}
+            <div className="relative">
+              {buildUpdates.length > 0 && (
+                <div className="absolute top-0 bottom-0 left-4 w-px bg-gray-800" />
+              )}
+              <div className="space-y-6 relative">
+                {buildUpdates.length === 0 && !buildUpdateOpen ? (
+                  <p className="text-gray-600 text-xs font-mono bg-[#181818] p-4 rounded border border-gray-800 border-dashed text-center">Timeline empty.</p>
                 ) : (
-                  <p className="text-xs text-gray-600 italic">Required before marking completed.</p>
+                  buildUpdates.slice().reverse().map((upd) => (
+                    <div key={upd.id} className="relative pl-10">
+                      <div className="absolute left-[13px] top-1.5 w-2 h-2 rounded-full bg-brand-orange ring-4 ring-[#121212]" />
+                      <div className="bg-[#151515] border border-gray-800 rounded p-4">
+                        <p className="text-[9px] text-gray-500 font-mono mb-2">
+                          SYS_TIME: {new Date(upd.createdAt).toISOString().replace('T', ' ').substring(0, 19)}Z
+                        </p>
+                        {upd.note && (
+                          <p className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">{upd.note}</p>
+                        )}
+                        {upd.photoUrls.length > 0 && (
+                          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-4 pt-4 border-t border-gray-800/50">
+                            {upd.photoUrls.map((url, j) => (
+                              <button
+                                key={j}
+                                onClick={() => setLightboxUrl(url)}
+                                className="aspect-square rounded overflow-hidden border border-gray-700 hover:border-brand-orange transition-colors"
+                              >
+                                <img src={url} alt="Progress" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
-          </section>
-
-          {/* Signature */}
-          {booking.signatureData && (
-            <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-                <PenLine className="w-3.5 h-3.5" /> Waiver Signature
-              </p>
-              <div className="bg-brand-darker border border-gray-800 rounded-sm p-4 flex items-center justify-center">
-                <img
-                  src={booking.signatureData}
-                  alt="Customer signature"
-                  className="max-w-full h-20 object-contain"
-                />
-              </div>
-            </section>
-          )}
+          </div>
+          
         </div>
 
-        {/* ── Right column ── */}
-        <div className="space-y-5">
+        {/* ── RIGHT COLUMN (Telemetry & Execution Controls) ── */}
+        <div className="space-y-6">
 
-          {/* Quick Actions */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <ClipboardList className="w-3.5 h-3.5" /> Quick Actions
+          {/* Quick Actions / Dispatch Controls */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6  top-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange/80 mb-6 pb-4 border-b border-gray-800 flex items-center gap-2">
+              <ClipboardList className="w-3.5 h-3.5 text-brand-orange" /> Actions
             </p>
-            <div className="space-y-2">
+            
+            <div className="space-y-3">
               {canConfirm && (
                 <button
                   onClick={() => setCheckInOpen(true)}
                   disabled={statusBusy !== null}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-green-500/30 text-green-400 hover:bg-green-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
                 >
-                  {statusBusy === 'confirmed' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  Confirm Booking
+                  <span>Check In</span>
+                  {statusBusy === 'confirmed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
                 </button>
               )}
               {canComplete && (
                 <button
                   onClick={() => setCompleteOpen(true)}
                   disabled={statusBusy !== null}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
                 >
-                  {statusBusy === 'completed' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
-                  Mark Completed
+                  <span>Mark as Completed</span>
+                  {statusBusy === 'completed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
                 </button>
               )}
               {canResume && (
                 <button
                   onClick={() => requestConfirmation(
                     {
-                      title: 'Resume Booking?',
-                      message: 'This will move the booking back to confirmed status.',
-                      confirmLabel: 'Resume Booking',
+                      title: 'Resume Operation?',
+                      message: 'Routing status back to confirmed state.',
+                      confirmLabel: 'Resume',
                     },
                     async () => handleStatus('confirmed'),
                   )}
                   disabled={statusBusy !== null}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-green-500/30 text-green-400 hover:bg-green-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
                 >
-                  {statusBusy === 'confirmed' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  Resume (Parts Arrived)
+                  <span>Resume (Parts Cleared)</span>
+                  {statusBusy === 'confirmed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
                 </button>
               )}
               {canCancel && (
                 <button
                   onClick={() => requestConfirmation(
                     {
-                      title: 'Cancel Booking?',
-                      message: 'This action sets the booking status to cancelled.',
-                      confirmLabel: 'Cancel Booking',
+                      title: 'Terminate Sequence?',
+                      message: 'Irreversible status change to cancelled.',
+                      confirmLabel: 'Terminate',
                       tone: 'danger',
                     },
                     async () => handleStatus('cancelled'),
                   )}
                   disabled={statusBusy !== null}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50"
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-red-500/30 text-red-400 hover:bg-red-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
                 >
-                  {statusBusy === 'cancelled' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                  Cancel Booking
+                  <span>Cancel Booking</span>
+                  {statusBusy === 'cancelled' ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
                 </button>
               )}
+              
               {!canModify && (
-                <p className="text-gray-600 text-xs italic">No actions available for a {formatStatus(booking.status).toLowerCase()} booking.</p>
+                <div className="bg-[#151515] border border-gray-800 rounded p-3 flex items-center justify-center">
+                  <p className="text-gray-600 text-[10px] font-mono uppercase tracking-widest">Actions Locked ({formatStatus(booking.status)})</p>
+                </div>
               )}
-              {canConfirm && !hasBeforePhotos && (
-                <p className="text-[11px] text-yellow-400">Before photos are required and can be uploaded in the check-in popup.</p>
-              )}
-              {canComplete && !hasAfterPhotos && (
-                <p className="text-[11px] text-yellow-400">After photos are required and can be uploaded in the completion popup.</p>
-              )}
+              
+              <div className="pt-2 space-y-1">
+                {canConfirm && !hasBeforePhotos && (
+                  <p className="text-[9px] font-mono text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20">! Ingest photos required prior to Auth.</p>
+                )}
+                {canComplete && !hasAfterPhotos && (
+                  <p className="text-[9px] font-mono text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20">! Egest photos required prior to Auth.</p>
+                )}
+              </div>
             </div>
-          </section>
-
-          {/* Booking Meta */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">Booking Info</p>
-            <div className="space-y-2.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500 text-xs">Submitted</span>
-                <span className="text-gray-300 text-xs">{new Date(booking.createdAt).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 text-xs">Status</span>
-                <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[booking.status]}`}>
-                  {formatStatus(booking.status)}
-                </span>
-              </div>
-              {booking.userId && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500 text-xs">User ID</span>
-                  <span className="text-gray-300 text-xs font-mono">#{booking.userId}</span>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Customer Loyalty Stats */}
-          {customerStats && (
-            <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-brand-orange" /> Customer History
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-brand-darker border border-gray-800 rounded-sm p-3 text-center">
-                  <p className="text-2xl font-display font-bold text-white">{customerStats.totalVisits}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-0.5">Total Visits</p>
-                </div>
-                <div className="bg-brand-darker border border-gray-800 rounded-sm p-3 text-center">
-                  <p className="text-2xl font-display font-bold text-blue-400">{customerStats.completedVisits}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mt-0.5">Completed</p>
-                </div>
-              </div>
-              {customerStats.memberSince && (
-                <p className="text-[10px] text-gray-600 mt-3">
-                  Member since {new Date(customerStats.memberSince).toLocaleDateString('en-PH', { year: 'numeric', month: 'long' })}
-                </p>
-              )}
-              {customerStats.totalVisits >= 5 && (
-                <div className="mt-3 flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 rounded-sm px-3 py-2">
-                  <Shield className="w-3.5 h-3.5 text-brand-orange shrink-0" />
-                  <span className="text-xs font-bold text-brand-orange">Loyal Customer</span>
-                </div>
-              )}
-            </section>
-          )}
+          </div>
 
           {/* Internal Notes */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-                <StickyNote className="w-3.5 h-3.5" /> Internal Notes
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <StickyNote className="w-3.5 h-3.5 text-gray-400" /> Internal Notes
               </p>
               {!notesEditing && (
                 <button
                   onClick={() => setNotesEditing(true)}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-brand-orange transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-brand-orange transition-colors"
                 >
                   <Edit3 className="w-3 h-3" /> {internalNotes ? 'Edit' : 'Add'}
                 </button>
@@ -1417,118 +1384,158 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             </div>
 
             {!notesEditing ? (
-              internalNotes ? (
-                <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{internalNotes}</p>
-              ) : (
-                <p className="text-gray-600 text-xs italic">No internal notes. Admin-only, never shown to client.</p>
-              )
+              <div className="bg-[#151515] border border-gray-800 rounded p-4">
+                {internalNotes ? (
+                  <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{internalNotes}</p>
+                ) : (
+                  <p className="text-gray-600 text-[10px] font-mono uppercase tracking-widest text-center">No notes yet.</p>
+                )}
+              </div>
             ) : (
               <div className="space-y-3">
                 <textarea
                   value={internalNotes}
                   onChange={e => setInternalNotes(e.target.value)}
                   rows={5}
-                  placeholder="Private notes visible only to admins…"
+                  placeholder="Enter notes (not visible to customer)..."
                   maxLength={5000}
-                  className="w-full bg-brand-darker border border-gray-700 text-white text-sm px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange resize-y placeholder-gray-600 transition-colors"
+                  className="w-full bg-[#181818] border border-gray-700 text-white text-sm px-3 py-3 rounded focus:outline-none focus:border-brand-orange resize-y transition-colors font-mono"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2">
                   <button
                     onClick={() => requestConfirmation(
                       {
-                        title: 'Save Internal Notes?',
-                        message: 'This will update admin-only notes for this booking.',
-                        confirmLabel: 'Save Notes',
+                        title: 'Save Notes?',
+                        message: 'These notes are for internal use only.',
+                        confirmLabel: 'Save',
                       },
                       handleSaveInternalNotes,
                     )}
                     disabled={notesBusy}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-brand-darker border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
                   >
                     {notesBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                     Save
                   </button>
                   <button
                     onClick={() => { setNotesEditing(false); setInternalNotes(booking.internalNotes ?? ''); }}
-                    className="text-xs text-gray-500 hover:text-white transition-colors"
+                    className="px-4 py-2 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-[10px] font-bold uppercase tracking-widest transition-colors rounded"
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             )}
-          </section>
+          </div>
+
+          {/* Customer History */}
+          {customerStats && (
+            <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+                <Award className="w-3.5 h-3.5 text-gray-400" /> Customer History
+              </p>
+              <div className="grid grid-cols-2 gap-px bg-gray-800/50 rounded overflow-hidden">
+                <div className="bg-[#151515] p-4 text-center">
+                  <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Total Visits</p>
+                  <p className="text-2xl font-black text-white">{customerStats.totalVisits}</p>
+                </div>
+                <div className="bg-[#151515] p-4 text-center">
+                  <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Completed Visits</p>
+                  <p className="text-2xl font-black text-blue-400">{customerStats.completedVisits}</p>
+                </div>
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest">
+                  Customer Since: {customerStats.memberSince ? new Date(customerStats.memberSince).toISOString().split('T')[0] : 'UNKNOWN'}
+                </p>
+              </div>
+              {customerStats.totalVisits >= 5 && (
+                <div className="mt-4 flex items-center justify-center gap-2 bg-brand-orange/10 border border-brand-orange/30 rounded py-2">
+                  <Shield className="w-3.5 h-3.5 text-brand-orange shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Loyal Customer</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Activity Log */}
-          <section className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-1.5">
-              <ClipboardList className="w-3.5 h-3.5" /> Activity Log
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6 flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-gray-400" /> Activity Log
             </p>
             {activityLogs.length === 0 ? (
-              <p className="text-gray-600 text-xs italic">No activity recorded for this booking.</p>
+              <p className="text-gray-600 text-[10px] font-mono text-center">Log empty.</p>
             ) : (
-              <ol className="relative border-l border-gray-800 space-y-4 ml-2">
+              <div className="space-y-4 font-mono">
                 {activityLogs.slice().reverse().map((entry) => (
-                  <li key={entry.id} className="ml-4">
-                    <span className="absolute -left-1.5 w-3 h-3 rounded-full bg-brand-orange/80 border-2 border-brand-darker" />
-                    <p className="text-xs font-bold text-white">{entry.action}</p>
-                    {entry.detail && (
-                      <p className="text-gray-500 text-[11px] mt-0.5 leading-snug">{entry.detail}</p>
-                    )}
-                    <p className="text-gray-700 text-[10px] mt-1">
-                      {new Date(entry.createdAt).toLocaleString()}
+                  <div key={entry.id} className="border-b border-gray-800/50 pb-3 last:border-0 last:pb-0">
+                    <p className="text-[9px] text-brand-orange mb-1">
+                      {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 19)}Z
                     </p>
-                  </li>
+                    <p className="text-[11px] text-gray-300 uppercase font-bold"> {entry.action}</p>
+                    {entry.detail && (
+                      <p className="text-[10px] text-gray-500 mt-1 pl-3 border-l border-gray-700">{entry.detail}</p>
+                    )}
+                  </div>
                 ))}
-              </ol>
+              </div>
             )}
-          </section>
+          </div>
+
         </div>
       </div>
 
+      {/* ── MODALS ── */}
+
+      {/* Action Confirmation Modal */}
       {confirmDialog && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-white">{confirmDialog.title}</h3>
-            <p className="mt-2 text-sm text-gray-300">{confirmDialog.message}</p>
-            <div className="mt-5 flex items-center justify-end gap-2">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
+            <h3 className={`text-[10px] font-mono font-bold uppercase tracking-widest mb-4 border-b border-gray-800 pb-2 ${confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-brand-orange'}`}>
+              // Auth required
+            </h3>
+            <p className="text-lg font-bold text-white mb-2">{confirmDialog.title}</p>
+            <p className="text-sm text-gray-400 mb-6">{confirmDialog.message}</p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={closeConfirmation}
                 disabled={confirmBusy}
-                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                className="px-4 py-2 rounded border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
               >
-                Cancel
+                Abort
               </button>
               <button
                 type="button"
                 onClick={() => void runConfirmedAction()}
                 disabled={confirmBusy}
-                className={[
-                  'px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50',
-                  confirmDialog.tone === 'danger' ? 'bg-red-700 hover:bg-red-600' : 'bg-brand-orange hover:bg-orange-600',
-                ].join(' ')}
+                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white disabled:opacity-30 transition-colors ${
+                  confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
+                }`}
               >
-                {confirmBusy ? 'Please wait...' : confirmDialog.confirmLabel}
+                {confirmBusy ? 'Executing...' : confirmDialog.confirmLabel}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Check-In Modal */}
       {checkInOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-2xl rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Confirm Check-In</h3>
-            <p className="mt-2 text-sm text-gray-300">
-              Upload at least one before photo, then confirm the booking.
-            </p>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
+            <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-green-500 mb-4 border-b border-gray-800 pb-2">
+              // Ingest Protocol
+            </h3>
+            <p className="text-lg font-bold text-white mb-1">Confirm Check-In</p>
+            <p className="text-sm text-gray-400 mb-6">Visual verification required to authorize.</p>
 
-            <div className="mt-4 border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Before Photos (Check-in)</p>
-                <span className="text-[10px] text-gray-600">{beforePhotos.length} file(s)</span>
+            <div className="bg-[#151515] border border-gray-800 rounded p-5 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Stage 1: Ingest Photos</p>
+                <span className="text-[10px] text-gray-600 font-mono">COUNT:{beforePhotos.length}</span>
               </div>
+              
               <input
                 ref={beforePhotoInputRef}
                 type="file"
@@ -1537,73 +1544,78 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 className="hidden"
                 onChange={(e) => void handleQaPhotoUpload('before', e)}
               />
+              
               <button
                 type="button"
                 onClick={() => beforePhotoInputRef.current?.click()}
                 disabled={qaUploadingStage !== null || checkInBusy}
-                className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                className="w-full py-3 mb-4 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30 flex items-center justify-center gap-2"
               >
-                {qaUploadingStage === 'before'
-                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
-                  : <><Camera className="w-3 h-3" /> Add Before Photos</>}
+                {qaUploadingStage === 'before' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                Add Media
               </button>
 
               {beforePhotos.length > 0 ? (
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                   {beforePhotos.map((url, i) => (
-                    <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
-                      <img src={url} alt={`Before ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <div key={i} className="relative aspect-square rounded overflow-hidden border border-gray-700 group">
+                      <img src={url} alt="Before" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       <button
                         type="button"
                         onClick={() => setBeforePhotos(prev => prev.filter((_, idx) => idx !== i))}
                         disabled={checkInBusy}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center disabled:opacity-50"
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 rounded border border-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-30"
                       >
-                        <X className="w-2.5 h-2.5 text-white" />
+                        <X className="w-3 h-3 text-white" />
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-yellow-400 italic mt-3">At least one before photo is required.</p>
+                <div className="h-16 border border-dashed border-gray-800 bg-[#181818] rounded flex items-center justify-center">
+                  <p className="text-[9px] font-mono text-yellow-500 uppercase tracking-widest">! Req for check-in</p>
+                </div>
               )}
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setCheckInOpen(false)}
                 disabled={checkInBusy}
-                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                className="px-4 py-2 rounded border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
               >
-                Cancel
+                Abort
               </button>
               <button
                 type="button"
                 onClick={() => void handleCheckInConfirm()}
                 disabled={checkInBusy || qaUploadingStage !== null || beforePhotos.length === 0}
-                className="px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white bg-brand-orange hover:bg-orange-600 disabled:opacity-50"
+                className="px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white bg-green-600 hover:bg-green-500 disabled:opacity-30 transition-colors"
               >
-                {checkInBusy ? 'Please wait...' : 'Upload & Confirm Booking'}
+                {checkInBusy ? 'Executing...' : 'Confirm Booking'}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Complete Modal */}
       {completeOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-2xl rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Complete Booking</h3>
-            <p className="mt-2 text-sm text-gray-300">
-              Upload at least one after photo, then mark this booking as completed.
-            </p>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
+            <h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-blue-500 mb-4 border-b border-gray-800 pb-2">
+              // Egest Protocol
+            </h3>
+            <p className="text-lg font-bold text-white mb-1">Complete Mission</p>
+            <p className="text-sm text-gray-400 mb-6">Final visual verification required to close.</p>
 
-            <div className="mt-4 border border-gray-800 rounded-sm p-3 bg-brand-darker/40">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">After Photos (Completion)</p>
-                <span className="text-[10px] text-gray-600">{afterPhotos.length} file(s)</span>
+            <div className="bg-[#151515] border border-gray-800 rounded p-5 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Stage 2: Egest Photos</p>
+                <span className="text-[10px] text-gray-600 font-mono">COUNT:{afterPhotos.length}</span>
               </div>
+              
               <input
                 ref={afterPhotoInputRef}
                 type="file"
@@ -1612,59 +1624,62 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 className="hidden"
                 onChange={(e) => void handleQaPhotoUpload('after', e)}
               />
+              
               <button
                 type="button"
                 onClick={() => afterPhotoInputRef.current?.click()}
                 disabled={qaUploadingStage !== null || completeBusy}
-                className="flex items-center gap-2 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-sm disabled:opacity-50"
+                className="w-full py-3 mb-4 border border-dashed border-gray-600 hover:border-brand-orange text-gray-400 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30 flex items-center justify-center gap-2"
               >
-                {qaUploadingStage === 'after'
-                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
-                  : <><Camera className="w-3 h-3" /> Add After Photos</>}
+                {qaUploadingStage === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                Add Media
               </button>
 
               {afterPhotos.length > 0 ? (
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                   {afterPhotos.map((url, i) => (
-                    <div key={i} className="relative aspect-square overflow-hidden rounded-sm border border-gray-700">
-                      <img src={url} alt={`After ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <div key={i} className="relative aspect-square rounded overflow-hidden border border-gray-700 group">
+                      <img src={url} alt="After" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       <button
                         type="button"
                         onClick={() => setAfterPhotos(prev => prev.filter((_, idx) => idx !== i))}
                         disabled={completeBusy}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center disabled:opacity-50"
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 rounded border border-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-30"
                       >
-                        <X className="w-2.5 h-2.5 text-white" />
+                        <X className="w-3 h-3 text-white" />
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-yellow-400 italic mt-3">At least one after photo is required.</p>
+                <div className="h-16 border border-dashed border-gray-800 bg-[#181818] rounded flex items-center justify-center">
+                  <p className="text-[9px] font-mono text-yellow-500 uppercase tracking-widest">! Req for completion</p>
+                </div>
               )}
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setCompleteOpen(false)}
                 disabled={completeBusy}
-                className="px-3 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                className="px-4 py-2 rounded border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
               >
-                Cancel
+                Abort
               </button>
               <button
                 type="button"
                 onClick={() => void handleCompleteConfirm()}
                 disabled={completeBusy || qaUploadingStage !== null || afterPhotos.length === 0}
-                className="px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white bg-brand-orange hover:bg-orange-600 disabled:opacity-50"
+                className="px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-30 transition-colors"
               >
-                {completeBusy ? 'Please wait...' : 'Upload & Mark Completed'}
+                {completeBusy ? 'Executing...' : 'Confirm Booking'}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

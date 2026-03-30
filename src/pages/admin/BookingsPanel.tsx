@@ -11,10 +11,10 @@ import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
+  pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
   confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
   completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
-  cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
+  cancelled:      'bg-[#1a1a1a]     text-gray-500    border-gray-800',
   awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
@@ -63,125 +63,168 @@ export default function BookingsPanel({ onView }: Props) {
   ];
 
   return (
-    <div>
-      <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide mb-6">Client Bookings</h2>
+    <div className="space-y-6">
+      
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div>
+          <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80 mb-2">
+            Bookings
+          </p>
+          <h2 className="text-3xl font-black text-white uppercase tracking-tight">Customer Bookings</h2>
+        </div>
 
-      {/* Search + filter row */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        {/* Search box */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+        {/* Search */}
+        <div className="relative w-full lg:w-80 shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name, phone, vehicle…"
-            className="w-full bg-brand-darker border border-gray-700 text-white text-sm pl-9 pr-8 py-2 rounded-sm focus:outline-none focus:border-brand-orange transition-colors placeholder-gray-600"
+            placeholder="Search by name, phone, vehicle..."
+            className="w-full bg-[#121212] border border-gray-800 text-white text-sm pl-9 pr-8 py-2.5 rounded focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange/50 transition-all placeholder-gray-600 font-mono"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-              aria-label="Clear search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
             >
-              <XIcon className="w-3.5 h-3.5" />
+              <XIcon className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {filters.map(({ key, label }) => (
-          <button key={key} onClick={() => setStatusFilter(key)}
-            className={`px-3 sm:px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm border transition-colors ${
-              statusFilter === key
-                ? 'bg-brand-orange border-brand-orange text-white'
-                : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
-            }`}>
-            {label}
-            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${statusFilter === key ? 'bg-white/20' : 'bg-gray-800'}`}>
-              {key === 'all' ? appointments.length : appointments.filter(b => b.status === key).length}
-            </span>
-          </button>
-        ))}
+      {/* Filter Matrix */}
+      <div className="flex flex-wrap gap-2">
+        {filters.map(({ key, label }) => {
+          const count = key === 'all' ? appointments.length : appointments.filter(b => b.status === key).length;
+          const isActive = statusFilter === key;
+          
+          return (
+            <button 
+              key={key} 
+              onClick={() => setStatusFilter(key)}
+              className={`flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors rounded ${
+                isActive
+                  ? 'bg-brand-orange/10 border-brand-orange/50 text-brand-orange'
+                  : 'bg-[#121212] border-gray-800 text-gray-500 hover:border-gray-600 hover:text-gray-300'
+              }`}
+            >
+              {label}
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono leading-none ${
+                isActive ? 'bg-brand-orange/20 text-brand-orange' : 'bg-gray-800 text-gray-400'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
+      {/* Loading State */}
       {status === 'loading' && (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
+        <div className="flex flex-col items-center justify-center py-20 border border-gray-800/50 rounded-lg bg-[#121212]/50">
+          <Loader2 className="w-6 h-6 text-brand-orange animate-spin mb-3" />
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-mono">Fetching Records...</p>
         </div>
       )}
 
+      {/* Empty State */}
       {filtered.length === 0 && status !== 'loading' && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
-          <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>
-            {term
-              ? `No bookings matching "${search}".`
-              : `No ${statusFilter !== 'all' ? statusFilter : ''} bookings found.`}
+        <div className="flex flex-col items-center justify-center py-20 border border-gray-800 border-dashed rounded-lg bg-[#121212]">
+          <p className="text-gray-500 font-mono text-sm">
+            {term ? `> No records matching query: "${search}"` : `> No records found for status: ${statusFilter}`}
           </p>
           {term && (
-            <button onClick={() => setSearch('')} className="mt-3 text-xs text-brand-orange hover:text-orange-400 font-bold uppercase tracking-widest">
-              Clear search
+            <button onClick={() => setSearch('')} className="mt-4 px-4 py-2 border border-gray-700 hover:border-brand-orange hover:text-brand-orange text-xs text-gray-400 font-bold uppercase tracking-widest transition-colors rounded">
+              Clear Query
             </button>
           )}
         </div>
       )}
 
-      {/* Desktop table */}
+      {/* Results Rendering */}
       {filtered.length > 0 && (
-        <>
-          {/* ── Desktop (md+): table ── */}
-          <div className="hidden md:block bg-brand-dark border border-gray-800 rounded-sm overflow-x-auto">
-            <table className="w-full text-left min-w-[600px]">
+        <div className="bg-[#121212] border border-gray-800 rounded-lg overflow-hidden shadow-xl">
+          
+          {/* ── DESKTOP: DATA TABLE ── */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left min-w-[800px]">
               <thead>
-                <tr className="border-b border-gray-800 bg-brand-darker/50">
-                  {['Client', 'Service', 'Date & Time', 'Status', 'Actions'].map(h => (
-                    <th key={h} className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500">{h}</th>
+                <tr className="bg-[#151515] border-b border-gray-800">
+                  {['Customer', 'Service / Vehicle', 'Appointment', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 whitespace-nowrap">
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-800/50">
                 {filtered.map(b => (
                   <tr
                     key={b.id}
-                    className="border-b border-gray-800 hover:bg-brand-darker/40 transition-colors cursor-pointer"
+                    className="hover:bg-white/[0.02] transition-colors cursor-pointer group"
                     onClick={() => onView(b.id)}
                   >
+                    {/* Client */}
                     <td className="px-5 py-4">
-                      <p className="text-white font-semibold">{b.name}</p>
-                      <p className="text-gray-500 text-xs">{b.phone}</p>
+                      <p className="text-white font-bold text-sm">{b.name}</p>
+                      <p className="text-gray-500 text-xs font-mono mt-0.5">{b.phone}</p>
                     </td>
-                    <td className="px-5 py-4 text-gray-300 text-sm">
-                      <p>{b.serviceName}</p>
-                      <p className="text-gray-600 text-xs mt-0.5">{b.vehicleInfo}</p>
-                    </td>
-                    <td className="px-5 py-4 text-gray-300 text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-gray-500" /> {b.appointmentDate}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <Clock className="w-3.5 h-3.5 text-gray-500" /> {b.appointmentTime}
-                      </div>
-                    </td>
+
+                    {/* Service & Variations */}
                     <td className="px-5 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-sm border ${STATUS_STYLES[b.status]}`}>
+                      <p className="text-gray-200 font-semibold text-sm">{b.serviceName}</p>
+                      
+                      {b.selectedVariations && b.selectedVariations?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {b.selectedVariations.map(v => (
+                            <span key={`${v.serviceId}-${v.variationId}`} className="inline-flex items-center text-[9px] font-mono bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-gray-400">
+                              <span className="text-brand-orange/60 mr-1">+</span>{v.variationName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <p className="text-gray-600 text-[10px] uppercase tracking-widest font-mono mt-2 flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-gray-600" /> {b.vehicleInfo}
+                      </p>
+                    </td>
+
+                    {/* DateTime */}
+                    <td className="px-5 py-4 text-gray-400 text-xs font-mono">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className="w-3.5 h-3.5 text-gray-600" /> {b.appointmentDate}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-gray-600" /> {b.appointmentTime}
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded border ${STATUS_STYLES[b.status]}`}>
                         {formatStatus(b.status)}
                       </span>
                     </td>
+
+                    {/* Actions */}
                     <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         <button onClick={() => onView(b.id)}
-                          title="View full booking details"
-                          className="flex items-center gap-1 px-3 py-1.5 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange hover:bg-brand-orange/20 text-xs font-bold uppercase rounded-sm transition-colors">
-                          <Eye className="w-3 h-3" /> View
+                          title="View Details"
+                          className="flex items-center justify-center w-8 h-8 bg-[#181818] border border-gray-700 hover:border-brand-orange hover:text-brand-orange text-gray-400 rounded transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
                         </button>
+                        
                         {b.status !== 'cancelled' && b.status !== 'completed' && (
                           <button onClick={() => handleCancel(b.id)}
-                            title="Cancel this booking"
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
-                            <XCircle className="w-3 h-3" /> Cancel
+                            title="Cancel Booking"
+                            className="flex items-center justify-center w-8 h-8 bg-[#181818] border border-gray-700 hover:border-red-500 hover:text-red-500 hover:bg-red-500/10 text-gray-400 rounded transition-colors"
+                          >
+                            <XCircle className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -192,45 +235,63 @@ export default function BookingsPanel({ onView }: Props) {
             </table>
           </div>
 
-          {/* ── Mobile (< md): cards ── */}
-          <div className="md:hidden space-y-3">
+          {/* ── MOBILE: CARD GRID ── */}
+          <div className="md:hidden divide-y divide-gray-800/50">
             {filtered.map(b => (
               <div
                 key={b.id}
-                className="bg-brand-dark border border-gray-800 rounded-sm p-4 cursor-pointer hover:border-gray-600 transition-colors"
+                className="p-5 hover:bg-white/[0.02] transition-colors cursor-pointer"
                 onClick={() => onView(b.id)}
               >
-                <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
-                    <p className="text-white font-semibold text-sm">{b.name}</p>
-                    <p className="text-gray-500 text-xs mt-0.5">{b.phone}</p>
+                    <p className="text-white font-bold text-sm leading-tight">{b.name}</p>
+                    <p className="text-gray-500 text-[11px] font-mono mt-1">{b.phone}</p>
                   </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-sm border shrink-0 ${STATUS_STYLES[b.status]}`}>
+                  <span className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded border shrink-0 ${STATUS_STYLES[b.status]}`}>
                     {formatStatus(b.status)}
                   </span>
                 </div>
-                <p className="text-gray-400 text-xs mb-1">{b.serviceName}</p>
-                <p className="text-gray-600 text-xs mb-3">{b.vehicleInfo}</p>
-                <div className="flex items-center gap-3 text-gray-400 text-xs mb-3">
-                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-gray-600" /> {b.appointmentDate}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-gray-600" /> {b.appointmentTime}</span>
+                
+                <div className="mb-4 bg-[#151515] border border-gray-800/80 p-3 rounded">
+                  <p className="text-gray-200 text-sm font-semibold">{b.serviceName}</p>
+                  
+                  {b.selectedVariations && b.selectedVariations?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {b.selectedVariations.map(v => (
+                        <span key={`${v.serviceId}-${v.variationId}`} className="inline-flex items-center text-[9px] font-mono bg-black/20 border border-white/5 px-1.5 py-0.5 rounded text-gray-400">
+                          <span className="text-brand-orange/60 mr-1">+</span>{v.variationName}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-gray-500 text-[10px] uppercase tracking-widest font-mono mt-3 border-t border-gray-800/80 pt-2">
+                    {b.vehicleInfo}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-800" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => onView(b.id)}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange hover:bg-brand-orange/20 text-xs font-bold uppercase rounded-sm transition-colors">
-                    <Eye className="w-3 h-3" /> View
-                  </button>
+
+                <div className="flex items-center justify-between text-gray-400 text-xs font-mono">
+                  <div className="flex gap-4">
+                    <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-gray-600" /> {b.appointmentDate}</span>
+                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-gray-600" /> {b.appointmentTime}</span>
+                  </div>
+                  
                   {b.status !== 'cancelled' && b.status !== 'completed' && (
-                    <button onClick={() => handleCancel(b.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
-                      <XCircle className="w-3 h-3" /> Cancel
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleCancel(b.id); }}
+                      title="Cancel Booking"
+                      className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                    >
+                      <XCircle className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
             ))}
           </div>
-        </>
+
+        </div>
       )}
     </div>
   );
