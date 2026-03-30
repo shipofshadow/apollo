@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MoveHorizontal, ChevronRight, Loader2 } from 'lucide-react';
 import { fetchBeforeAfterItemsApi } from '../services/api';
 import type { BeforeAfterItem } from '../types';
