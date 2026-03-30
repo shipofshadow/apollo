@@ -259,18 +259,35 @@ class NotificationService
     }
 
     /** @param array<string, mixed> $b */
-    private function buildAdminNotificationBody(array $b): string
-    {
-        $lines = '';
-        foreach ($b as $key => $val) {
-            if (in_array($key, ['signatureData', 'mediaUrls'], true)) {
-                continue;
-            }
-            $k = htmlspecialchars((string) $key);
-            $v = htmlspecialchars(is_array($val) ? implode(', ', $val) : (string) $val);
-            $lines .= "<tr><td><strong>$k</strong></td><td>$v</td></tr>";
+   private function buildAdminNotificationBody(array $b): string
+{
+    $lines = '';
+    foreach ($b as $key => $val) {
+        // Skip large or irrelevant media arrays
+        if (in_array($key, ['signatureData', 'mediaUrls', 'beforePhotos', 'afterPhotos'], true)) {
+            continue;
         }
-        return $this->wrapHtml("<h2>New Booking Received</h2><table>$lines</table>");
+
+        $k = htmlspecialchars((string) $key);
+
+        if (is_array($val)) {
+            if ($key === 'selectedVariations') {
+                // Pluck just the names out of the multidimensional array
+                $names = array_column($val, 'variationName');
+                $v = htmlspecialchars(implode(', ', $names));
+            } else {
+                // Prevent crashes if another nested array slips through
+                $isComplex = count(array_filter($val, 'is_array')) > 0;
+                $v = htmlspecialchars($isComplex ? json_encode($val) : implode(', ', $val));
+            }
+        } else {
+            $v = htmlspecialchars((string) $val);
+        }
+
+        $lines .= "<tr><td style='padding: 8px; border-bottom: 1px solid #ddd;'><strong>$k</strong></td><td style='padding: 8px; border-bottom: 1px solid #ddd;'>$v</td></tr>";
+    }
+    
+    return $this->wrapHtml("<h2>New Booking Received</h2><table style='border-collapse: collapse; text-align: left;'>$lines</table>");
     }
 
     /** @param array<string, mixed> $b */

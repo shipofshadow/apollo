@@ -877,9 +877,16 @@ export default function BookingPage() {
               <p className="text-sm text-gray-600 mb-8">We'll send a confirmation to your email. If you need to change anything, just give us a call.</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 {user ? (
-                  <button onClick={() => navigate('/client/bookings')}
+                  <button
+                    onClick={() => {
+                      if (appointments.length > 0) {
+                        navigate(`/client/bookings/${appointments[0].id}`);
+                      } else {
+                        navigate('/client/bookings');
+                      }
+                    }}
                     className="bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
-                    View My Bookings
+                    View Booking Details
                   </button>
                 ) : (
                   <Link to={`/register?redirect=/client/bookings&name=${encodeURIComponent(form.name)}&email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phone)}`}

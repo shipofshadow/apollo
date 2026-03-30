@@ -192,13 +192,13 @@ export default function Header() {
         </div>
 
         {/* Mobile Language Toggle */}
-        <div className="lg:hidden flex items-center gap-2">
+        {/* <div className="lg:hidden flex items-center gap-2">
           <select value={lang} onChange={handleLangChange} className="bg-brand-dark border border-gray-700 text-white px-2 py-1 rounded-sm text-xs uppercase">
             {Object.entries(LANG_LABELS).map(([code, label]) => (
               <option key={code} value={code}>{label}</option>
             ))}
           </select>
-        </div>
+        </div> */}
 
         {/* Mobile Toggle Button */}
         <div className="lg:hidden flex items-center gap-4 z-50">
