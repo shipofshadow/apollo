@@ -2,24 +2,45 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import BeforeAfterShowcase from '../components/BeforeAfterShowcase';
 import { fetchBuildShowcaseApi } from '../services/api';
+import type { PortfolioItem } from '../types';
+
+interface BuildShowcaseItem extends PortfolioItem {
+  parts?: string[];
+}
 
 export default function BuildShowcase() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
 
-  const [build, setBuild] = useState<any>(null);
+  const [build, setBuild] = useState<BuildShowcaseItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<'idle' | 'success' | 'error'>('idle');
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug) {
+      setError('Not found');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     fetchBuildShowcaseApi(slug)
-      .then(data => setBuild(data))
+      .then(data => setBuild(data as BuildShowcaseItem))
       .catch(() => setError('Not found'))
       .finally(() => setLoading(false));
   }, [slug]);
 
+  async function handleShare() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareState('success');
+    } catch {
+      setShareState('error');
+    } finally {
+      window.setTimeout(() => setShareState('idle'), 1800);
+    }
+  }
 
   if (loading) return <div className="text-center py-20 text-gray-400">Loading…</div>;
   if (error || !build) return <div className="text-center py-20 text-red-400">Build not found.</div>;
@@ -54,9 +75,9 @@ export default function BuildShowcase() {
         )}
         <button
           className="bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors"
-          onClick={() => navigator.clipboard.writeText(window.location.href)}
+          onClick={handleShare}
         >
-          Share this build
+          {shareState === 'success' ? 'Link copied' : shareState === 'error' ? 'Copy failed' : 'Share this build'}
         </button>
       </div>
     </div>
