@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { t } from '../utils/i18n';
 import { useDispatch, useSelector } from 'react-redux';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import type { RootState, AppDispatch } from '../store';
@@ -162,14 +163,14 @@ export default function IntakeForm() {
           {/* Left Side: Contact Info */}
           <div className="bg-brand-gray p-6 md:p-10 lg:p-16 border-l-4 border-brand-orange">
             <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-4">
-              Get In Touch
+              {t('Get In Touch')}
             </span>
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-white uppercase mb-8">
-              Contact <span className="text-brand-orange">The Lab</span>
+              {t('Contact')} <span className="text-brand-orange">{t('The Lab')}</span>
             </h2>
             
             <p className="text-gray-400 mb-12 leading-relaxed">
-              Ready to upgrade your ride? Fill out the intake form to schedule a consultation. We specialize in custom builds and require appointments for all major retrofits.
+              {t('Ready to upgrade your ride? Fill out the intake form to schedule a consultation. We specialize in custom builds and require appointments for all major retrofits.')}
             </p>
 
             <div className="space-y-8">
@@ -178,7 +179,7 @@ export default function IntakeForm() {
                   <MapPin className="w-6 h-6 text-brand-orange" />
                 </div>
                 <div>
-                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">Location</h4>
+                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">{t('Location')}</h4>
                   <p className="text-gray-400">NKKS Arcade, Krystal Homes, Brgy. Alasas<br />Pampanga, San Fernando, Philippines, 2000</p>
                 </div>
               </div>
@@ -188,7 +189,7 @@ export default function IntakeForm() {
                   <Phone className="w-6 h-6 text-brand-orange" />
                 </div>
                 <div>
-                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">Phone</h4>
+                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">{t('Phone')}</h4>
                   <p className="text-gray-400">0939 330 8263</p>
                 </div>
               </div>
@@ -198,7 +199,7 @@ export default function IntakeForm() {
                   <Mail className="w-6 h-6 text-brand-orange" />
                 </div>
                 <div>
-                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">Email</h4>
+                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">{t('Email')}</h4>
                   <p className="text-gray-400">1625autolab@gmail.com</p>
                 </div>
               </div>
@@ -208,7 +209,7 @@ export default function IntakeForm() {
                   <Clock className="w-6 h-6 text-brand-orange" />
                 </div>
                 <div>
-                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">Hours</h4>
+                  <h4 className="text-white font-display uppercase tracking-wider text-xl mb-2">{t('Hours')}</h4>
                   <p className="text-gray-400">Mon-Fri: 9:00 AM - 6:00 PM<br />Sat: By Appointment Only</p>
                 </div>
               </div>
@@ -220,21 +221,21 @@ export default function IntakeForm() {
             {status === 'success' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-dark/95 backdrop-blur-sm p-8 text-center z-10">
                 <CheckCircle className="w-20 h-20 text-green-500 mb-6" />
-                <h3 className="text-3xl font-display font-bold text-white uppercase mb-4">Request Received</h3>
+                <h3 className="text-3xl font-display font-bold text-white uppercase mb-4">{t('Request Received')}</h3>
                 <p className="text-gray-400 mb-8 max-w-md">
-                  We've received your build request. A technician will contact you within 24 hours to discuss details and scheduling.
+                  {t("We've received your build request. A technician will contact you within 24 hours to discuss details and scheduling.")}
                 </p>
                 <button
                   onClick={handleReset}
                   className="bg-brand-orange text-white font-display uppercase tracking-wider px-8 py-4 rounded-sm hover:bg-orange-600 transition-colors"
                 >
-                  Submit Another Request
+                  {t('Submit Another Request')}
                 </button>
               </div>
             ) : (
               <>
                 <h3 className="text-2xl font-display font-bold text-white uppercase mb-8 border-b border-gray-800 pb-4">
-                  Intake Form
+                  {t('Intake Form')}
                 </h3>
                 
                 {status === 'error' && (
@@ -247,7 +248,7 @@ export default function IntakeForm() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Full Name *</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Full Name')} *</label>
                       <input
                         type="text"
                         name="name"
@@ -255,11 +256,11 @@ export default function IntakeForm() {
                         value={formData.name}
                         onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                        placeholder="John Doe"
+                        placeholder={t('John Doe')}
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Phone Number *</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Phone Number')} *</label>
                       <input
                         type="tel"
                         name="phone"
@@ -267,13 +268,13 @@ export default function IntakeForm() {
                         value={formData.phone}
                         onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                        placeholder="(555) 123-4567"
+                        placeholder={t('(555) 123-4567')}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Email Address *</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Email Address')} *</label>
                     <input
                       type="email"
                       name="email"
@@ -281,33 +282,33 @@ export default function IntakeForm() {
                       value={formData.email}
                       onChange={handleChange}
                       className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors"
-                      placeholder="john@example.com"
+                        placeholder={t('john@example.com')}
                     />
                   </div>
 
                   {/* Vehicle cascading dropdowns */}
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                      Vehicle *
-                      {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading…</span>}
+                      {t('Vehicle')} *
+                      {makesLoading && <span className="ml-2 text-gray-600 normal-case font-normal">{t('Loading…')}</span>}
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <select required value={vehicleYear} onChange={e => setVehicleYear(e.target.value)}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
-                        <option value="">Year…</option>
+                        <option value="">{t('Year…')}</option>
                         {VEHICLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                       <select required value={vehicleMake}
                         onChange={e => { setVehicleMake(e.target.value); setVehicleModel(''); }}
                         disabled={makesLoading}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-60">
-                        <option value="">{makesLoading ? 'Loading…' : 'Make…'}</option>
+                        <option value="">{makesLoading ? t('Loading…') : t('Make…')}</option>
                         {makesList.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                       <select required value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
                         disabled={!vehicleMake || modelsLoading}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-40">
-                        <option value="">{modelsLoading ? 'Loading…' : 'Model…'}</option>
+                        <option value="">{modelsLoading ? t('Loading…') : t('Model…')}</option>
                         {modelsList.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
@@ -315,7 +316,7 @@ export default function IntakeForm() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Service Required *</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Service Required')} *</label>
                       <select
                         name="serviceRequired"
                         required
@@ -323,24 +324,24 @@ export default function IntakeForm() {
                         onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none"
                       >
-                        <option value="" disabled>Select a service</option>
-                        <option value="headlights">Headlight Retrofit</option>
-                        <option value="headunit">Android Headunit</option>
-                        <option value="security">Security System</option>
-                        <option value="aesthetics">Aesthetic Upgrades</option>
-                        <option value="other">Other / Multiple</option>
+                        <option value="" disabled>{t('Select a service')}</option>
+                        <option value="headlights">{t('Headlight Retrofit')}</option>
+                        <option value="headunit">{t('Android Headunit')}</option>
+                        <option value="security">{t('Security System')}</option>
+                        <option value="aesthetics">{t('Aesthetic Upgrades')}</option>
+                        <option value="other">{t('Other / Multiple')}</option>
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Location Preference</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Location Preference')}</label>
                       <select
                         name="locationPreference"
                         value={formData.locationPreference}
                         onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none"
                       >
-                        <option value="in-shop">In-Shop (San Fernando)</option>
-                        <option value="mail-in">Mail-In Service</option>
+                        <option value="in-shop">{t('In-Shop (San Fernando)')}</option>
+                        <option value="mail-in">{t('Mail-In Service')}</option>
                       </select>
                     </div>
                   </div>
@@ -348,10 +349,10 @@ export default function IntakeForm() {
                   {/* Preferred date & time */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Preferred Date *</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Preferred Date')} *</label>
                       <select name="preferredDate" required value={formData.preferredDate} onChange={handleChange}
                         className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none">
-                        <option value="">Select a date…</option>
+                        <option value="">{t('Select a date…')}</option>
                         {availableDates.map(d => {
                           const dt = new Date(d + 'T00:00:00');
                           return (
@@ -364,18 +365,18 @@ export default function IntakeForm() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                        Preferred Time *
-                        {slotsLoading && <span className="ml-2 text-gray-600 normal-case font-normal">Loading…</span>}
+                        {t('Preferred Time')} *
+                        {slotsLoading && <span className="ml-2 text-gray-600 normal-case font-normal">{t('Loading…')}</span>}
                       </label>
                       {formData.preferredDate && !shopDayIsOpen ? (
                         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-sm">
-                          Shop is closed on this date.
+                          {t('Shop is closed on this date.')}
                         </p>
                       ) : (
                         <select name="preferredTime" required value={formData.preferredTime} onChange={handleChange}
                           disabled={!formData.preferredDate || slotsLoading}
                           className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors appearance-none disabled:opacity-50">
-                          <option value="">{slotsLoading ? 'Loading…' : 'Select a time…'}</option>
+                          <option value="">{slotsLoading ? t('Loading…') : t('Select a time…')}</option>
                           {(availableSlots.length ? availableSlots : []).map(t => (
                             <option key={t} value={t}>{t}</option>
                           ))}
@@ -385,14 +386,14 @@ export default function IntakeForm() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Specific Requests / Details</label>
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">{t('Specific Requests / Details')}</label>
                     <textarea
                       name="specificRequests"
                       rows={4}
                       value={formData.specificRequests}
                       onChange={handleChange}
                       className="w-full bg-brand-gray/50 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors resize-none"
-                      placeholder="Describe your vision or specific parts you want used..."
+                      placeholder={t('Describe your vision or specific parts you want used...')}
                     ></textarea>
                   </div>
 
@@ -404,10 +405,10 @@ export default function IntakeForm() {
                     {status === 'loading' ? (
                       <>
                         <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        Processing...
+                        {t('Processing...')}
                       </>
                     ) : (
-                      'Submit Request'
+                      t('Submit Request')
                     )}
                   </button>
                 </form>
