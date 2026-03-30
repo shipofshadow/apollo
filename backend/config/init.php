@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Manila');
+
 // ---------------------------------------------------------------------------
 // 1. Composer autoloader – covers vendor packages AND our Engine/ classes
 // ---------------------------------------------------------------------------

@@ -84,13 +84,13 @@ class NotificationService
         $customerName  = (string) ($booking['name']  ?? 'Customer');
 
         if ($customerEmail !== '') {
-            $subject = 'Booking Confirmed – 1625 Auto Lab';
+            $subject = 'Booking Confirmed | 1625 Auto Lab';
             $body    = $this->buildConfirmationBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
 
         if (MAIL_ADMIN !== '') {
-            $subject = "New Booking: {$booking['serviceName']} – {$booking['name']}";
+            $subject = "New Booking: {$booking['serviceName']} | {$booking['name']}";
             $body    = $this->buildAdminNotificationBody($booking);
             $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
         }
@@ -114,7 +114,7 @@ class NotificationService
             // Continue to admin notification even if customer email is missing.
         } else {
             $status  = ucfirst((string) ($booking['status'] ?? ''));
-            $subject = "Your Booking is $status – 1625 Auto Lab";
+            $subject = "Your Booking is $status | 1625 Auto Lab";
             $body    = $this->buildStatusUpdateBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -123,7 +123,7 @@ class NotificationService
             $status  = ucfirst((string) ($booking['status'] ?? ''));
             $service = (string) ($booking['serviceName'] ?? 'Service');
             $name    = (string) ($booking['name'] ?? 'Customer');
-            $subject = "Booking Status Updated: {$service} – {$name} ({$status})";
+            $subject = "Booking Status Updated: {$service} | {$name} ({$status})";
             $body    = $this->buildAdminStatusChangedBody($booking);
             $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
         }
@@ -146,7 +146,7 @@ class NotificationService
         if ($customerEmail === '') {
             // Continue to admin notification even if customer email is missing.
         } else {
-            $subject = 'Job Update: Awaiting Parts – 1625 Auto Lab';
+            $subject = 'Job Update: Awaiting Parts | 1625 Auto Lab';
             $body    = $this->buildAwaitingPartsBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -154,7 +154,7 @@ class NotificationService
         if (MAIL_ADMIN !== '') {
             $service = (string) ($booking['serviceName'] ?? 'Service');
             $name    = (string) ($booking['name'] ?? 'Customer');
-            $subject = "Booking Awaiting Parts: {$service} – {$name}";
+            $subject = "Booking Awaiting Parts: {$service} | {$name}";
             $body    = $this->buildAdminAwaitingPartsBody($booking);
             $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
         }
@@ -178,7 +178,7 @@ class NotificationService
         if ($customerEmail === '') {
             // Continue to admin notification even if customer email is missing.
         } else {
-            $subject = 'Build Update on Your Vehicle – 1625 Auto Lab';
+            $subject = 'Build Update on Your Vehicle | 1625 Auto Lab';
             $body    = $this->buildProgressUpdateBody($booking, $update);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -186,7 +186,7 @@ class NotificationService
         if (MAIL_ADMIN !== '') {
             $service = (string) ($booking['serviceName'] ?? 'Service');
             $name    = (string) ($booking['name'] ?? 'Customer');
-            $subject = "Build Progress Update Posted: {$service} – {$name}";
+            $subject = "Build Progress Update Posted: {$service} | {$name}";
             $body    = $this->buildAdminBuildUpdateBody($booking, $update);
             $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
         }
@@ -224,7 +224,7 @@ class NotificationService
             <p style='color:#888'>1625 Auto Lab</p>
         ");
 
-        $this->send($email, 'Customer', 'Reset Your Password – 1625 Auto Lab', $body);
+        $this->send($email, 'Customer', 'Reset Your Password | 1625 Auto Lab', $body);
     }
 
     // -------------------------------------------------------------------------
@@ -240,21 +240,38 @@ class NotificationService
         $time        = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
         $vehicle     = htmlspecialchars((string) ($b['vehicleInfo']     ?? ''));
         $id          = htmlspecialchars((string) ($b['id']              ?? ''));
-    $refNum      = htmlspecialchars((string) ($b['referenceNumber']  ?? ''));
+        $refNum      = htmlspecialchars((string) ($b['referenceNumber']  ?? ''));
+
+
+        // Add all details of selected variations if present
+        $variationsHtml = '';
+            if (!empty($b['selectedVariations']) && is_array($b['selectedVariations'])) {
+                $variationRows = [];
+                foreach ($b['selectedVariations'] as $variation) {
+                    if (isset($variation['variationName'])) {
+                        $variation_name = $this->normalizeFancyText($variation['variationName']);
+                        $variationRows[] = '<li>' . htmlspecialchars($variation_name) . '</li>';
+                    }
+                }
+                if (count($variationRows) > 0) {
+                    $variationsHtml = '<tr><td valign="top"><strong>Options:</strong></td><td><ul style="margin:0 0 0 16px;padding:0">' . implode('', $variationRows) . '</ul></td></tr>';
+                }
+            }
 
         return $this->wrapHtml("
             <h2>Hi $name,</h2>
             <p>Your appointment has been received and is <strong>pending confirmation</strong>.</p>
             <table>
                 <tr><td><strong>Service:</strong></td><td>$service</td></tr>
+                $variationsHtml
                 <tr><td><strong>Date:</strong></td><td>$date</td></tr>
                 <tr><td><strong>Time:</strong></td><td>$time</td></tr>
                 <tr><td><strong>Vehicle:</strong></td><td>$vehicle</td></tr>
-                                <tr><td><strong>Reference:</strong></td><td>$refNum</td></tr>
+                <tr><td><strong>Reference:</strong></td><td>$refNum</td></tr>
                 <tr><td><strong>Booking ID:</strong></td><td>#$id</td></tr>
             </table>
             <p>We will contact you to confirm the appointment or if we need additional information.</p>
-            <p style='color:#888'>1625 Auto Lab · NKKS Arcade, Brgy. Alasas, San Fernando, Pampanga</p>
+            <p style='color:#888'>1625 Auto Lab | NKKS Arcade, Brgy. Alasas, San Fernando, Pampanga</p>
         ");
     }
 
@@ -281,7 +298,7 @@ class NotificationService
                 $v = htmlspecialchars($isComplex ? json_encode($val) : implode(', ', $val));
             }
         } else {
-            $v = htmlspecialchars((string) $val);
+            $v = htmlspecialchars(json_encode($val, JSON_UNESCAPED_UNICODE));
         }
 
         $lines .= "<tr><td style='padding: 8px; border-bottom: 1px solid #ddd;'><strong>$k</strong></td><td style='padding: 8px; border-bottom: 1px solid #ddd;'>$v</td></tr>";
@@ -412,6 +429,21 @@ class NotificationService
         $note      = nl2br(htmlspecialchars((string) ($u['note'] ?? '')));
         $date      = htmlspecialchars((string) ($u['createdAt'] ?? ''));
 
+        // Add all details of selected variations if present
+        $variationsHtml = '';
+        if (!empty($b['selectedVariations']) && is_array($b['selectedVariations'])) {
+            $variationRows = [];
+            foreach ($b['selectedVariations'] as $variation) {
+                if (isset($variation['variationName'])) {
+                    $variation_name = $this->normalizeFancyText($variation['variationName']);
+                    $variationRows[] = '<li>' . htmlspecialchars($variation_name) . '</li>';
+                }
+            }
+            if (count($variationRows) > 0) {
+                $variationsHtml = '<tr><td valign="top"><strong>Options:</strong></td><td><ul style="margin:0 0 0 16px;padding:0">' . implode('', $variationRows) . '</ul></td></tr>';
+            }
+        }
+
         $photosHtml = '';
         $photoUrls  = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
         foreach ($photoUrls as $url) {
@@ -429,6 +461,7 @@ class NotificationService
             <table>
                 <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
                 <tr><td><strong>Service:</strong></td><td>$service</td></tr>
+                $variationsHtml
                 <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
                 <tr><td><strong>Posted At:</strong></td><td>$date</td></tr>
             </table>
@@ -470,11 +503,11 @@ class NotificationService
             return [
                 'sent'      => false,
                 'recipient' => $to,
-                'reason'    => 'No recipient – set MAIL_ADMIN in .env or supply a recipient',
+                'reason'    => 'No recipient | set MAIL_ADMIN in .env or supply a recipient',
             ];
         }
 
-        $subject = 'Test Email – 1625 Auto Lab';
+        $subject = 'Test Email | 1625 Auto Lab';
         $body    = '<h2 style="font-family:sans-serif;color:#f97316">Test Email</h2>'
                  . '<p style="font-family:sans-serif">This is a test notification from your 1625 Auto Lab booking system. '
                  . 'If you received this, your email configuration is working correctly.</p>'
@@ -581,5 +614,31 @@ class NotificationService
             ? substr($local, 0, 2) . str_repeat('*', max(1, strlen($local) - 2))
             : str_repeat('*', strlen($local));
         return $masked . ($domain !== '' ? '@' . $domain : '');
+    }
+
+    /**
+     * Converts "fancy" Unicode (bold/italic/serif) back to standard plain text.
+     * Useful for email clients that choke on mathematical alphanumeric symbols.
+     */
+    private function normalizeFancyText(string $text): string
+    {
+        // Map for Bold Sans-Serif (which your output seems to use)
+        // You can expand this map if you use other styles (italics, etc.)
+        $search  = [
+            '/[\x{1D5D4}-\x{1D5ED}]/u', // A-Z (Bold Sans)
+            '/[\x{1D5EE}-\x{1D607}]/u', // a-z (Bold Sans)
+            '/[\x{1D7EC}-\x{1D7F5}]/u', // 0-9 (Bold Sans)
+        ];
+
+        return preg_replace_callback($search, function ($match) {
+            $char = $match[0];
+            $code = mb_ord($char, 'UTF-8');
+
+            if ($code >= 0x1D5D4 && $code <= 0x1D5ED) return chr($code - 0x1D5D4 + 65);  // A-Z
+            if ($code >= 0x1D5EE && $code <= 0x1D607) return chr($code - 0x1D5EE + 97);  // a-z
+            if ($code >= 0x1D7EC && $code <= 0x1D7F5) return chr($code - 0x1D7EC + 48);  // 0-9
+            
+            return $char;
+        }, $text);
     }
 }
