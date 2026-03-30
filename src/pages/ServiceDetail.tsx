@@ -10,32 +10,39 @@ import { formatPrice } from '../utils/formatPrice';
 import PageSEO from '../components/PageSEO';
 
 export default function ServiceDetail() {
-  const { slug }  = useParams<{ slug: string }>();
-  const dispatch  = useDispatch<AppDispatch>();
+  const { slug } = useParams<{ slug: string }>();
+  const dispatch = useDispatch<AppDispatch>();
   const { token } = useSelector((s: RootState) => s.auth);
+  
+  // State Hooks
   const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
+  // Redux Selectors
   const allServices = useSelector((s: RootState) => s.services.items);
   const service = allServices.find(sv => sv.slug === slug);
   const loadStatus = useSelector((s: RootState) => s.services.status);
 
-  // Get up to 3 other services for the suggestions block
-  const suggestedServices = allServices
-    .filter(sv => sv.id !== service?.id)
-    .slice(0, 3);
+  // 1. Move Callbacks above early returns
+  const handleVariationChange = useCallback((variation: { id: number }) => {
+    setSelectedVariationId(variation.id);
+    setSelectedColor(null);
+  }, []);
 
-  // Scroll to top when slug changes (critical for clicking suggested services)
+  // 2. All Effect Hooks must be at the top level
+  // Scroll to top when slug changes
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [slug]);
 
+  // Fetch service if not in store
   useEffect(() => {
     if (slug && !service) {
       dispatch(fetchServiceBySlugAsync({ slug, token }));
     }
   }, [slug, service, token, dispatch]);
 
+  // Sync variations when service loads
   useEffect(() => {
     if (!service?.variations?.length) {
       setSelectedVariationId(null);
@@ -52,6 +59,7 @@ export default function ServiceDetail() {
     setSelectedColor(null);
   }, [service]);
 
+  // 3. Early Returns (Loading and Error states)
   if (loadStatus === 'loading' && !service) {
     return (
       <div className="pt-32 pb-24 min-h-screen bg-brand-darker flex items-center justify-center">
@@ -71,15 +79,15 @@ export default function ServiceDetail() {
     );
   }
 
+  // 4. Derived Variables (Calculated only after we know service exists)
+  const suggestedServices = allServices
+    .filter(sv => sv.id !== service.id)
+    .slice(0, 3);
+
   const hasVariations = service.variations && service.variations.length > 0;
   const selectedVariation = hasVariations
     ? service.variations.find(v => v.id === selectedVariationId) ?? service.variations[0]
     : null;
-
-  const handleVariationChange = useCallback((variation: { id: number }) => {
-    setSelectedVariationId(variation.id);
-    setSelectedColor(null);
-  }, []);
 
   return (
     <div className="min-h-screen bg-brand-darker pb-20 relative overflow-hidden">
@@ -88,12 +96,13 @@ export default function ServiceDetail() {
         description={service.description ?? `Book ${service.title} at 1625 Auto Lab. Professional automotive retrofitting service.`}
         image={service.imageUrl || undefined}
       />
+      
+      {/* Decorative Blobs */}
       <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 bg-brand-orange/10 blur-3xl" />
       <div className="pointer-events-none absolute top-[38rem] -left-24 w-72 h-72 bg-white/[0.04] blur-3xl" />
 
       {/* ── Hero Strip ──────────────────────────────────────────────────────── */}
       <div className="relative h-[460px] md:h-[540px] overflow-hidden">
-        {/* Hero image with slow-zoom entrance */}
         {service.imageUrl ? (
           <img
             src={service.imageUrl}
@@ -105,10 +114,8 @@ export default function ServiceDetail() {
           <div className="absolute inset-0 bg-brand-dark" />
         )}
 
-        {/* Gradient: darken top (for nav), transparent mid, solid bottom */}
         <div className="absolute inset-0 bg-gradient-to-b from-brand-darker/60 via-brand-darker/10 to-brand-darker pointer-events-none" />
 
-        {/* Back link — top-left, padded to clear the fixed nav */}
         <div className="absolute top-0 left-0 right-0 pt-24 md:pt-[6.5rem]">
           <div className="container mx-auto px-4 md:px-8">
             <Link
@@ -120,10 +127,8 @@ export default function ServiceDetail() {
           </div>
         </div>
 
-        {/* Title + meta — bottom of hero */}
         <div className="absolute bottom-0 left-0 right-0">
           <div className="container mx-auto px-4 md:px-8 pb-10">
-            {/* Eyebrow */}
             <div className="flex items-center gap-3 mb-3 animate-fadeInUp">
               <span className="block w-5 h-px bg-brand-orange" />
               <span className="text-brand-orange font-bold uppercase tracking-[0.18em] text-[0.65rem]">
@@ -131,12 +136,10 @@ export default function ServiceDetail() {
               </span>
             </div>
 
-            {/* Title */}
             <h1 className="text-5xl md:text-7xl font-display font-black text-white uppercase tracking-tight leading-none mb-4 animate-fadeInUp animate-delay-100">
               {service.title}
             </h1>
 
-            {/* Price + duration badges */}
             <div className="flex items-center gap-5 flex-wrap animate-fadeInUp animate-delay-200">
               {service.startingPrice && (
                 <>
@@ -161,50 +164,48 @@ export default function ServiceDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
 
           {/* ── Left 2/3 — variation gallery ──────────────────────────────── */}
-         <div className="lg:col-span-2 space-y-6">
-          {hasVariations && (
-            <div>
-              <div className="flex items-center gap-4 mb-4">
-                <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">
-                  // Available Packages
-                </h2>
-                <div className="flex-1 h-px bg-gray-800" />
+          <div className="lg:col-span-2 space-y-6">
+            {hasVariations ? (
+              <div>
+                <div className="flex items-center gap-4 mb-4">
+                  <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">
+                    // Available Packages
+                  </h2>
+                  <div className="flex-1 h-px bg-gray-800" />
+                </div>
+                <div className="bg-[#121212] border border-gray-800 rounded p-5">
+                  <VariationGallery
+                    variations={service.variations}
+                    selectedColor={selectedColor}
+                    onSelectColor={setSelectedColor}
+                    onVariationChange={handleVariationChange}
+                  />
+                </div>
               </div>
-              <div className="bg-[#121212] border border-gray-800 rounded p-5">
-                <VariationGallery
-                  variations={service.variations}
-                  selectedColor={selectedColor}
-                  onSelectColor={setSelectedColor}
-                  onVariationChange={handleVariationChange}
-                />
+            ) : service.imageUrl && (
+              <div>
+                <div className="flex items-center gap-4 mb-4">
+                  <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">
+                    // Payload Schematic
+                  </h2>
+                  <div className="flex-1 h-px bg-gray-800" />
+                </div>
+                <div className="aspect-video rounded overflow-hidden border border-gray-800 bg-[#121212]">
+                  <img
+                    src={service.imageUrl}
+                    alt={service.title}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
               </div>
-            </div>
-          )}
-
-          {!hasVariations && service.imageUrl && (
-            <div>
-              <div className="flex items-center gap-4 mb-4">
-                <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">
-                  // Payload Schematic
-                </h2>
-                <div className="flex-1 h-px bg-gray-800" />
-              </div>
-              <div className="aspect-video rounded overflow-hidden border border-gray-800 bg-[#121212]">
-                <img
-                  src={service.imageUrl}
-                  alt={service.title}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
           {/* ── Right 1/3 — sticky sidebar ────────────────────────────────── */}
           <div className="lg:sticky lg:top-24 lg:self-start flex flex-col gap-4">
-
-            {/* CTA card — gradient with orange border glow */}
+            
+            {/* CTA card */}
             <div className="bg-gradient-to-br from-[#1a0d00] via-brand-darker to-[#0f1215] border border-brand-orange/25 rounded-sm p-6 text-center animate-fadeInUp shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
               {(selectedVariation?.price ?? service.startingPrice) && (
                 <>
@@ -242,15 +243,15 @@ export default function ServiceDetail() {
               )}
             </div>
 
-            {/* Description — left orange border */}
+            {/* Description */}
             <div className="border border-white/[0.08] bg-black/20 rounded-sm p-4 animate-fadeInUp animate-delay-100">
               <p className="text-gray-400 text-sm leading-[1.85] border-l-2 border-brand-orange pl-4">
                 {service.fullDescription || service.description}
               </p>
             </div>
 
-            {/* Features — row list with icon boxes */}
-            {service.features.length > 0 && (
+            {/* Features */}
+            {service.features && service.features.length > 0 && (
               <div className="border border-white/[0.08] bg-black/20 rounded-sm overflow-hidden animate-fadeInUp animate-delay-200">
                 {service.features.map((feature, idx) => (
                   <div
@@ -265,12 +266,11 @@ export default function ServiceDetail() {
                 ))}
               </div>
             )}
-
           </div>
         </div>
       </div>
 
-       {/* ── Published Reviews ───────────────────────────────────────────────── */}
+      {/* ── Published Reviews ───────────────────────────────────────────────── */}
       <PublishedReviews serviceId={service.id} />
 
       {/* ── Suggested Services ──────────────────────────────────────────────── */}
@@ -320,7 +320,6 @@ export default function ServiceDetail() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
