@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  ArrowLeft, Calendar, Car, CheckCircle2, Clock, Edit3,
-  FileText, Hash, Image as ImageIcon, Loader2, Mail,
-  Package, PenLine, Phone, User, Wrench, X, XCircle,
+  ArrowLeft, Car, CheckCircle2, Clock, Edit3,
+  FileText, Image as ImageIcon, Loader2, Mail,
+  Package, Phone, User, Wrench, X, XCircle,
   ChevronLeft, ChevronRight, AlertTriangle, RefreshCw,
   ClipboardList, BadgeCheck, Camera, Plus, StickyNote,
   Shield, Award, Activity
