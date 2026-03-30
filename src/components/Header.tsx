@@ -4,9 +4,6 @@ import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut } from 'l
 
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
-import { LANG_LABELS, setLang, currentLang } from '../utils/i18n';
-import type { SupportedLang } from '../utils/i18n';
-
 
 const LOGO_URL = 'https://cdn.1625autolab.com/1625autolab/logos/logo.png';
 
@@ -21,13 +18,7 @@ export default function Header() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Language state and handler must be inside the component
-  const [lang, setLangState] = useState<SupportedLang>(currentLang);
-  const handleLangChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLang = e.target.value as SupportedLang;
-    setLang(newLang);
-    setLangState(newLang);
-  };
+
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -190,15 +181,6 @@ export default function Header() {
             </div>
           )}
         </div>
-
-        {/* Mobile Language Toggle */}
-        {/* <div className="lg:hidden flex items-center gap-2">
-          <select value={lang} onChange={handleLangChange} className="bg-brand-dark border border-gray-700 text-white px-2 py-1 rounded-sm text-xs uppercase">
-            {Object.entries(LANG_LABELS).map(([code, label]) => (
-              <option key={code} value={code}>{label}</option>
-            ))}
-          </select>
-        </div> */}
 
         {/* Mobile Toggle Button */}
         <div className="lg:hidden flex items-center gap-4 z-50">
