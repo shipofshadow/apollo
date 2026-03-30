@@ -197,13 +197,13 @@ export default function ServiceDetail() {
 
             {/* CTA card — gradient with orange border glow */}
             <div className="bg-gradient-to-br from-[#1a0d00] via-brand-darker to-[#0f1215] border border-brand-orange/25 rounded-sm p-6 text-center animate-fadeInUp shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
-              {service.startingPrice && (
+              {(selectedVariation?.price ?? service.startingPrice) && (
                 <>
                   <div className="text-4xl font-display font-black text-brand-orange leading-none">
-                    {formatPrice(service.startingPrice)}
+                    {formatPrice(selectedVariation?.price ?? service.startingPrice)}
                   </div>
                   <div className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-[0.12em] mt-1 mb-5">
-                    Starting Price
+                    {selectedVariation ? 'Selected Package Price' : 'Starting Price'}
                   </div>
                 </>
               )}
