@@ -4,6 +4,7 @@ import { Users, Shield, Zap, X, Mail, Phone, Facebook, Instagram, Loader2, MapPi
 import { fetchTeamMembersAsync, fetchSiteSettingsAsync } from '../store/siteSettingsSlice';
 import type { AppDispatch, RootState } from '../store';
 import type { TeamMember } from '../types';
+import PageSEO from '../components/PageSEO';
 
 export default function AboutPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -31,6 +32,10 @@ export default function AboutPage() {
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker relative">
+      <PageSEO
+        title="About Us"
+        description="Learn about 1625 Auto Lab, your trusted automotive retrofitting and customization workshop. Meet our team and discover our story."
+      />
       <div className="container mx-auto px-4 md:px-6">
 
         {/* Company Section */}

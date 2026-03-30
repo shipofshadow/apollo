@@ -4,6 +4,7 @@ import { Calendar, Loader2, AlertCircle, ImageIcon, ChevronDown } from 'lucide-r
 import { fetchAllFacebookPosts } from '../services/api';
 import type { FacebookPost } from '../types';
 import { getPostImages, getPostTitle, getPostUrl, isPortfolioPost } from '../utils/facebookPostHelpers';
+import PageSEO from '../components/PageSEO';
 
 const PAGE_SIZE = 6;
 
@@ -38,6 +39,10 @@ export default function Portfolio() {
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
+      <PageSEO
+        title="Portfolio & Recent Builds"
+        description="See our latest automotive retrofit and customization builds. Browse real projects from 1625 Auto Lab featuring projector headlights, custom lighting, and more."
+      />
       <div className="container mx-auto px-4 md:px-6">
         {/* Page header */}
         <div className="mb-16 text-center max-w-3xl mx-auto">

@@ -5,6 +5,7 @@ import { MapPin, Phone, Mail, Clock, ExternalLink, Calendar, Send, CheckCircle, 
 import { fetchSiteSettingsAsync } from '../store/siteSettingsSlice';
 import type { AppDispatch, RootState } from '../store';
 import { sendContactMessageApi } from '../services/api';
+import PageSEO from '../components/PageSEO';
 
 // Define the shape so TypeScript stops panicking
 type InfoItem = {
@@ -103,6 +104,10 @@ export default function ContactPage() {
 
   return (
     <div className="bg-brand-dark min-h-screen">
+      <PageSEO
+        title="Contact Us"
+        description="Get in touch with 1625 Auto Lab. Contact us for inquiries about automotive retrofitting, custom builds, or to schedule a consultation."
+      />
       {/* Hero */}
       <section className="pt-32 pb-16 bg-brand-darker relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-brand-orange/5 via-transparent to-transparent pointer-events-none" />
