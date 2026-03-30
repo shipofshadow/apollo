@@ -173,7 +173,7 @@ export const fetchServiceByIdApi = (id: number, token?: string | null) =>
   apiFetch<{ service: Service }>(`/api/services/${id}`, {}, token);
 
 export const fetchServiceBySlugApi = (slug: string, token?: string | null) =>
-  apiFetch<{ service: Service }>(`/api/services/${slug}`, {}, token);
+  apiFetch<{ service: Service }>(`/api/services/${encodeURIComponent(slug)}`, {}, token);
 
 export const createServiceApi = (
   token: string,
