@@ -81,36 +81,31 @@ export default function VariationGallery({
   return (
     <div className="space-y-5">
       {/* ── Variation selector tabs ─────────────────────────────────────── */}
-      <div className="relative rounded-sm border border-white/[0.08] bg-gradient-to-b from-white/[0.04] to-transparent p-2 overflow-x-auto">
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-brand-darker to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-brand-darker to-transparent" />
-        <div className="flex gap-2 min-w-max">
-        {variations.map((v, idx) => (
-          <button
-            key={v.id}
-            onClick={() => selectVariation(idx)}
-            /* min-h-[3.5rem] keeps all tabs the same height whether or not a price sub-label is shown */
-            className={`flex flex-col items-start min-h-[3.7rem] px-4 py-2.5 border rounded-sm cursor-pointer transition-all text-left whitespace-nowrap ${
-              idx === activeIdx
-                ? 'border-brand-orange bg-brand-orange/15 shadow-[0_8px_24px_rgba(243,111,33,0.28)]'
-                : 'border-white/[0.07] bg-black/25 hover:border-white/20 hover:bg-white/[0.03]'
-            }`}
-          >
-            <span className={`text-xs font-bold uppercase tracking-[0.08em] leading-tight ${
-              idx === activeIdx ? 'text-brand-orange' : 'text-white'
-            }`}>
-              {v.name}
-            </span>
-            {v.price && (
-              <span className="text-[0.7rem] font-semibold text-gray-500 mt-0.5">
-                From {formatPrice(v.price)}
+     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {variations.map((v, idx) => {
+          const isActive = idx === activeIdx;
+          return (
+            <button
+              key={v.id}
+              onClick={() => selectVariation(idx)}
+              className={`flex flex-col items-start min-w-[140px] p-3 border rounded transition-colors text-left shrink-0 ${
+                isActive
+                  ? 'border-brand-orange bg-[#181818]'
+                  : 'border-gray-800 bg-[#121212] hover:border-gray-600'
+              }`}
+            >
+              <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
+                isActive ? 'text-brand-orange' : 'text-gray-500'
+              }`}>
+                {v.name}
               </span>
-            )}
-          </button>
-        ))}
-        </div>
+              <span className="text-gray-200 font-mono text-xs">
+                {v.price ? formatPrice(v.price) : 'CONTACT'}
+              </span>
+            </button>
+          );
+        })}
       </div>
-
       {/* ── Selected variation card – animates in on tab switch ─────────── */}
       {active && (
         <div

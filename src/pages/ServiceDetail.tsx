@@ -152,28 +152,35 @@ export default function ServiceDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
 
           {/* ── Left 2/3 — variation gallery ──────────────────────────────── */}
-          <div className="lg:col-span-2">
-            {hasVariations && (
-              <>
-                {/* Section label with horizontal rule */}
-                <div className="flex items-center gap-4 mb-5">
-                  <h2 className="text-xl font-display font-black text-white uppercase tracking-tight whitespace-nowrap">
-                    Available Packages
-                  </h2>
-                  <div className="flex-1 h-px bg-white/[0.07]" />
-                </div>
-                <div className="rounded-sm border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent p-4 md:p-5">
-                  <VariationGallery
-                    variations={service.variations}
-                    selectedColor={selectedColor}
-                    onSelectColor={setSelectedColor}
-                    onVariationChange={handleVariationChange}
-                  />
-                </div>
-              </>
-            )}
-            {!hasVariations && service.imageUrl && (
-              <div className="aspect-video rounded-sm overflow-hidden border border-white/[0.07] bg-brand-dark">
+         <div className="lg:col-span-2 space-y-6">
+          {hasVariations && (
+            <div>
+              <div className="flex items-center gap-4 mb-4">
+                <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">
+                  // Available Packages
+                </h2>
+                <div className="flex-1 h-px bg-gray-800" />
+              </div>
+              <div className="bg-[#121212] border border-gray-800 rounded p-5">
+                <VariationGallery
+                  variations={service.variations}
+                  selectedColor={selectedColor}
+                  onSelectColor={setSelectedColor}
+                  onVariationChange={handleVariationChange}
+                />
+              </div>
+            </div>
+          )}
+
+          {!hasVariations && service.imageUrl && (
+            <div>
+              <div className="flex items-center gap-4 mb-4">
+                <h2 className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">
+                  // Payload Schematic
+                </h2>
+                <div className="flex-1 h-px bg-gray-800" />
+              </div>
+              <div className="aspect-video rounded overflow-hidden border border-gray-800 bg-[#121212]">
                 <img
                   src={service.imageUrl}
                   alt={service.title}
@@ -181,8 +188,9 @@ export default function ServiceDetail() {
                   referrerPolicy="no-referrer"
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
           {/* ── Right 1/3 — sticky sidebar ────────────────────────────────── */}
           <div className="lg:sticky lg:top-24 lg:self-start flex flex-col gap-4">
