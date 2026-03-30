@@ -1102,3 +1102,8 @@ export const uploadMyVehicleImageApi = async (token: string, file: File): Promis
 
 export const deleteMyVehicleApi = (token: string, id: number) =>
   apiFetch<{ ok: boolean }>(`/api/client/vehicles/${id}`, { method: 'DELETE' }, token);
+
+// ── Build Showcase API ─────────────────────────────────────────────────────
+
+export const fetchBuildShowcaseApi = (slug: string) =>
+  apiFetch<PortfolioItem>(`/api/portfolio/slug/${encodeURIComponent(slug)}`);

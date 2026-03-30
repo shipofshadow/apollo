@@ -37,8 +37,12 @@ import BookingDetail from './pages/client/BookingDetail';
 import MyGarage from './pages/client/MyGarage';
 import Profile from './pages/client/Profile';
 
+
 // Admin
 import Admin from './pages/Admin';
+
+// Build Showcase (public build mini-site)
+import BuildShowcase from './pages/BuildShowcase';
 
 /** Wraps public-facing routes with the site Header and Footer. */
 function PublicLayout() {
@@ -68,6 +72,7 @@ function AppInner() {
         <Route path="/products"     element={<Navigate to="/services" replace />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/portfolio"    element={<Portfolio />} />
+        <Route path="/builds/:slug" element={<BuildShowcase />} />
         <Route path="/blog"         element={<Blog />} />
         <Route path="/faq"          element={<FaqPage />} />
         <Route path="/contact"      element={<ContactPage />} />

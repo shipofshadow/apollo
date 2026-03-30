@@ -168,6 +168,7 @@ class Router
             // ── Portfolio (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/portfolio',                          'handlePortfolioList');
             $r->addRoute('GET',    '/api/portfolio/{id:\d+}',                 'handlePortfolioGet');
+            $r->addRoute('GET',    '/api/portfolio/slug/{slug}',               'handlePortfolioGetBySlug');
             $r->addRoute('POST',   '/api/portfolio',                          'handlePortfolioCreate');
             $r->addRoute('PUT',    '/api/portfolio/{id:\d+}',                 'handlePortfolioUpdate');
             $r->addRoute('DELETE', '/api/portfolio/{id:\d+}',                 'handlePortfolioDelete');
@@ -2577,6 +2578,22 @@ class Router
         ]);
 
         echo json_encode(['message' => 'Your message has been sent successfully.']);
+    }
+
+        /**
+     * Public: Get a portfolio/build item by slug
+     */
+    private function handlePortfolioGetBySlug(array $vars): void
+    {
+        $slug = $vars['slug'] ?? '';
+        $service = new PortfolioService();
+        try {
+            $item = $service->getBySlug($slug);
+            echo json_encode($item);
+        } catch (\Throwable $e) {
+            http_response_code($e->getCode() ?: 404);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
     }
 }
 

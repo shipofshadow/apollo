@@ -14,6 +14,34 @@ declare(strict_types=1);
  * Requires migration 017_create_portfolio.sql to have been run.
  */
 class PortfolioService
+
+    /**
+     * Get a portfolio/build item by slug (public, active only)
+     *
+     * @param string $slug
+     * @return array<string, mixed>
+     */
+    public function getBySlug(string $slug): array
+    {
+        if ($this->useDb) {
+            $stmt = Database::getInstance()->prepare(
+                'SELECT * FROM portfolio WHERE slug = :slug AND is_active = 1 LIMIT 1'
+            );
+            $stmt->execute([':slug' => $slug]);
+            $row = $stmt->fetch();
+            if (!$row) {
+                throw new RuntimeException('Portfolio item not found.', 404);
+            }
+            return $this->mapRow($row);
+        } else {
+            foreach ($this->fileRead() as $p) {
+                if (($p['slug'] ?? '') === $slug && ($p['isActive'] ?? true)) {
+                    return $p;
+                }
+            }
+            throw new RuntimeException('Portfolio item not found.', 404);
+        }
+    }
 {
     private bool   $useDb;
     private static string $storageFile = __DIR__ . '/../storage/portfolio.json';
