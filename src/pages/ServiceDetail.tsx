@@ -16,10 +16,19 @@ export default function ServiceDetail() {
   const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
-  const service = useSelector((s: RootState) =>
-    s.services.items.find(sv => sv.slug === slug)
-  );
+  const allServices = useSelector((s: RootState) => s.services.items);
+  const service = allServices.find(sv => sv.slug === slug);
   const loadStatus = useSelector((s: RootState) => s.services.status);
+
+  // Get up to 3 other services for the suggestions block
+  const suggestedServices = allServices
+    .filter(sv => sv.id !== service?.id)
+    .slice(0, 3);
+
+  // Scroll to top when slug changes (critical for clicking suggested services)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [slug]);
 
   useEffect(() => {
     if (slug && !service) {
@@ -261,10 +270,57 @@ export default function ServiceDetail() {
         </div>
       </div>
 
-      {/* ── Published Reviews ───────────────────────────────────────────────── */}
+       {/* ── Published Reviews ───────────────────────────────────────────────── */}
       <PublishedReviews serviceId={service.id} />
+
+      {/* ── Suggested Services ──────────────────────────────────────────────── */}
+      {suggestedServices.length > 0 && (
+        <div className="container mx-auto px-4 md:px-8 pt-20 pb-8 relative z-10">
+          <div className="flex items-center gap-4 mb-8">
+            <h2 className="text-xl md:text-2xl font-display font-bold text-white uppercase tracking-tight">
+              Explore Other Services
+            </h2>
+            <div className="flex-1 h-px bg-gray-800" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {suggestedServices.map(suggested => (
+              <Link
+                key={suggested.id}
+                to={`/services/${suggested.slug}`}
+                className="group block bg-[#121212] border border-gray-800 rounded-sm overflow-hidden hover:border-brand-orange transition-colors"
+              >
+                <div className="aspect-video relative overflow-hidden bg-brand-dark">
+                  {suggested.imageUrl ? (
+                    <img
+                      src={suggested.imageUrl}
+                      alt={suggested.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-700">No Image</div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#121212] to-transparent opacity-80" />
+                  {suggested.startingPrice && (
+                    <div className="absolute bottom-3 left-3 bg-brand-orange text-white font-bold px-2 py-1 text-xs rounded-sm">
+                      From {formatPrice(suggested.startingPrice)}
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <h3 className="text-white font-bold uppercase tracking-wide group-hover:text-brand-orange transition-colors">
+                    {suggested.title}
+                  </h3>
+                  {suggested.duration && (
+                    <p className="text-gray-500 text-xs mt-1 uppercase tracking-widest">{suggested.duration}</p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );
 }
-
