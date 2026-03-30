@@ -18,6 +18,7 @@ import {
 import { BACKEND_URL } from '../config';
 import type { ClientVehicle, ShopDayHours } from '../types';
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
+import CustomCalendar from '../components/CustomCalendar';
 import PageSEO from '../components/PageSEO';
 import SignaturePad from '../components/SignaturePad';
 import { formatPrice } from '../utils/formatPrice';
@@ -558,15 +559,15 @@ export default function BookingPage() {
               <p className="text-sm text-gray-400 mb-6">Scroll left/right to see more dates, then pick a time that works for you.</p>
               <div className="mb-8">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Available Dates</p>
-                <div className="flex overflow-x-auto pb-3 gap-3 snap-x">
-                  {availableDates.map((date, i) => (
-                    <button key={i} onClick={() => handleDateSelect(date)}
-                      className={`snap-start shrink-0 w-24 p-4 border text-center transition-all rounded-sm ${selectedDate?.toDateString() === date.toDateString() ? 'border-brand-orange bg-brand-orange/10' : 'border-gray-800 hover:border-gray-600'}`}>
-                      <div className="text-xs text-gray-400 uppercase mb-1">{date.toLocaleDateString('en-PH', { weekday: 'short' })}</div>
-                      <div className="text-2xl font-display font-bold text-white">{date.getDate()}</div>
-                      <div className="text-xs text-gray-500 uppercase mt-1">{date.toLocaleDateString('en-PH', { month: 'short' })}</div>
-                    </button>
-                  ))}
+                <div className="max-w-md mx-auto">
+                  <CustomCalendar
+                    value={selectedDate}
+                    onChange={handleDateSelect}
+                    availableDates={availableDates}
+                    closedDatesSet={closedDatesSet}
+                    slotCounts={slotCounts}
+                    slotCapacity={slotCapacity}
+                  />
                 </div>
               </div>
               {selectedDate && (

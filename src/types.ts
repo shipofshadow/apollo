@@ -197,6 +197,8 @@ export interface Booking {
   beforePhotos?: string[];
   afterPhotos?: string[];
   createdAt: string;
+  /** Optional: Slug for public build showcase page */
+  buildSlug?: string;
 }
 
 export interface AssignedTechnician {

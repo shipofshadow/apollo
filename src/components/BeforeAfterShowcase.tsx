@@ -3,7 +3,7 @@ import { MoveHorizontal } from 'lucide-react';
 import { fetchBeforeAfterItemsApi } from '../services/api';
 import type { BeforeAfterItem } from '../types';
 
-type ComparisonCase = {
+export type ComparisonCase = {
   id: number | string;
   title: string;
   beforeUrl: string;
@@ -25,13 +25,19 @@ function buildComparisonCases(items: BeforeAfterItem[]): ComparisonCase[] {
     .slice(0, 8);
 }
 
-export default function BeforeAfterShowcase() {
-  const [loading, setLoading] = useState(true);
-  const [cases, setCases] = useState<ComparisonCase[]>([]);
+
+interface BeforeAfterShowcaseProps {
+  cases?: ComparisonCase[];
+}
+
+export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterShowcaseProps) {
+  const [loading, setLoading] = useState(!propCases);
+  const [cases, setCases] = useState<ComparisonCase[]>(propCases || []);
   const [activeIndex, setActiveIndex] = useState(0);
   const [splitPercent, setSplitPercent] = useState(52);
 
   useEffect(() => {
+    if (propCases) return;
     let cancelled = false;
     fetchBeforeAfterItemsApi()
       .then(({ items }) => {
@@ -44,11 +50,8 @@ export default function BeforeAfterShowcase() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, [propCases]);
 
   const active = useMemo(() => {
     if (cases.length === 0) return null;

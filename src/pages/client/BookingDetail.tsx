@@ -975,6 +975,22 @@ export default function BookingDetail() {
         </div>
       )}
 
+
+      {/* Build Showcase link – only for completed bookings with a build slug */}
+      {booking.status === 'completed' && booking.buildSlug && (
+        <div className="mb-8">
+          <a
+            href={`/builds/${booking.buildSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors mb-2"
+          >
+            View Build Showcase
+          </a>
+          <p className="text-xs text-gray-400 mt-1">Share or view your before/after build page.</p>
+        </div>
+      )}
+
       {/* Review widget – only for completed bookings */}
       {booking.status === 'completed' && token && (
         <div>
