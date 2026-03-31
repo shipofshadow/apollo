@@ -115,6 +115,7 @@ class BookingService
             'status'             => 'pending',
             'awaitingParts'      => false,
             'partsNotes'         => null,
+            'source'             => trim($data['source'] ?? 'website'),
             'createdAt'          => date('c'),
         ];
 

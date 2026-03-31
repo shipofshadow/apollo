@@ -97,6 +97,7 @@ class Router
 
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
+            $r->addRoute('POST',  '/api/booking/external',          'handleBookingExternalCreate');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
@@ -776,23 +777,18 @@ class Router
     // Booking handlers
     // -------------------------------------------------------------------------
 
-    /** @param array<string, string> $vars */
-    private function handleBookingCreate(array $vars = []): void
-    {
-        // Optional auth – link booking to user if a valid token is present
-        $userId = null;
-        $token  = Auth::tokenFromHeader();
-        if ($token !== null) {
-            try {
-                $payload = Auth::decodeToken($token);
-                $userId  = (int) ($payload['sub'] ?? 0) ?: null;
-            } catch (RuntimeException) {
-                // invalid token → treat as anonymous booking
-            }
-        }
 
-        $data    = $this->jsonBody();
-        $booking = (new BookingService())->create($data, $userId);
+    /**
+     * Handle external booking creation (chatbot, integrations, etc).
+     * Accepts a JSON payload and sets source to 'chatbot'.
+     * No authentication required.
+     * @param array<string, string> $vars
+     */
+    private function handleBookingExternalCreate(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $data['source'] = 'chatbot';
+        $booking = (new BookingService())->create($data, null);
         http_response_code(201);
         echo json_encode(['booking' => $booking]);
     }
