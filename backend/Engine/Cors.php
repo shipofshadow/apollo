@@ -18,7 +18,7 @@ class Cors
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         if (in_array($origin, CORS_ORIGINS, true)) {
-            header("Access-Control-Allow-Origin: {$origin}");
+            header("Access-Control-Allow-Origin: *");
             header('Vary: Origin');
         }
 
