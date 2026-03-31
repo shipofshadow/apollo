@@ -69,9 +69,11 @@ class Router
             $r->addRoute('GET',  '/health',             'handleHealth');
             $r->addRoute('GET',  '/api/posts',          'handlePosts');
 
+            $r->addRoute('GET',  '/api/manychat/menu', 'getManyChatMenu');
+            $r->addRoute('POST',  '/api/manychat/variants', 'getManyChatDrillDown');
+
             // ── Services (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/services',                   'handleServiceList');
-            $r->addRoute('GET',    '/api/services/dynamic',           'handleServiceListDynamic');
             $r->addRoute('GET',    '/api/services/{id:\d+}',          'handleServiceGet');
             $r->addRoute('GET',    '/api/services/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}', 'handleServiceGetBySlug');
             $r->addRoute('POST',   '/api/services',                   'handleServiceCreate');
@@ -1730,62 +1732,76 @@ class Router
         echo json_encode(['services' => $services]);
     }
 
-    private function handleServiceListDynamic(array $vars = []): void
+    /**
+     * Tier 1: Fetches parent services and formats them as a ManyChat Gallery.
+     */
+    private function getManyChatMenu(): array
     {
-        // Service managers see inactive entries; public sees active only.
-        $includeInactive = false;
-        $token = Auth::tokenFromHeader();
-        if ($token !== null) {
-            try {
-                $payload = Auth::decodeToken($token);
-                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'services:manage');
-            } catch (RuntimeException) { /* treat as public */ }
-        }
+        $serviceService = new ServiceCrudService();
+        $services = $serviceService->getAllServices(); // Fetches Headlights, Headunits, etc.
 
-        $services = (new ServiceCrudService())->getAll($includeInactive);
-
-        // ManyChat strictly enforces a maximum of 10 cards per gallery.
-        $limitedServices = array_slice($services, 0, 10);
-        $elements = [];
-
-        foreach ($limitedServices as $service) {
-            // Note: Change object operator (->) to array notation (['']) if getAll() returns associative arrays.
-            $elements[] = [
-                "title" => $service->title,
-                "subtitle" => "Price: " . $service->startingPrice . "\n⏳ " . $service->duration,
-                "image_url" => $service->imageUrl,
-                "buttons" => [
+        $elements = array_map(function ($service) {
+            return [
+                'title' => $service['name'],
+                'image_url' => $service['image_url'] ?? '',
+                'subtitle' => strip_tags($service['description'] ?? ''),
+                'buttons' => [
                     [
-                        "type" => "payload",
-                        "caption" => "View Details",
-                        "payload" => "VIEW_SERVICE_" . $service->id
-                    ],
-                    [
-                        "type" => "url",
-                        "caption" => "Book Now",
-                        "url" => "https://1625autolab.com/book/" . $service->slug,
-                        "webview_size" => "tall"
+                        'type' => 'node',
+                        'caption' => 'View Options',
+                        'target' => 'Drill Down Trigger', // Name of your ManyChat Flow/Node
+                        'payload' => json_encode(['service_id' => $service['id']])
                     ]
                 ]
             ];
-        }
+        }, $services);
 
-        $response = [
-            "version" => "v2",
-            "content" => [
-                "messages" => [
-                    [
-                        "type" => "cards",
-                        "elements" => $elements,
-                        "image_aspect_ratio" => "horizontal" // Use "square" if your images get cropped weirdly
-                    ]
-                ]
+        return [
+            'version' => 'v2',
+            'content' => [
+                'type' => 'gallery',
+                'elements' => array_slice($elements, 0, 10) // ManyChat gallery limit
             ]
         ];
+    }
 
-        // Force JSON header; ManyChat webhooks can be picky without it.
-        header('Content-Type: application/json');
-        echo json_encode($response);
+    /**
+     * Tier 2: Fetches variations for a specific service ID passed in the request.
+     */
+    private function getManyChatDrillDown(int $serviceId): array
+    {
+        $serviceService = new ServiceCrudService();
+        $variations = $serviceService->getServiceVariations($serviceId); // Fetches specific models/packages
+
+        if (empty($variations)) {
+            return [
+                'version' => 'v2',
+                'content' => ['messages' => [['type' => 'text', 'text' => 'No variations available for this selection.']]]
+            ];
+        }
+
+        $elements = array_map(function ($variant) {
+            return [
+                'title' => $variant['name'],
+                'subtitle' => "Price: " . ($variant['price'] ?? 'Contact us'),
+                'image_url' => $variant['image_url'] ?? '',
+                'buttons' => [
+                    [
+                        'type' => 'buy_button', // Or external link to your booking page
+                        'caption' => 'Book Now',
+                        'url' => "https://byteress.xyz/book/" . $variant['id']
+                    ]
+                ]
+            ];
+        }, $variations);
+
+        return [
+            'version' => 'v2',
+            'content' => [
+                'type' => 'gallery',
+                'elements' => array_slice($elements, 0, 10)
+            ]
+        ];
     }
 
     /** @param array<string, string> $vars */
