@@ -71,6 +71,7 @@ class Router
 
             // ── Services (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/services',                   'handleServiceList');
+            $r->addRoute('GET',    '/api/services/dynamic',           'handleServiceListDynamic');
             $r->addRoute('GET',    '/api/services/{id:\d+}',          'handleServiceGet');
             $r->addRoute('GET',    '/api/services/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}', 'handleServiceGetBySlug');
             $r->addRoute('POST',   '/api/services',                   'handleServiceCreate');
@@ -1727,6 +1728,64 @@ class Router
 
         $services = (new ServiceCrudService())->getAll($includeInactive);
         echo json_encode(['services' => $services]);
+    }
+
+    private function handleServiceListDynamic(array $vars = []): void
+    {
+        // Service managers see inactive entries; public sees active only.
+        $includeInactive = false;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $includeInactive = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'services:manage');
+            } catch (RuntimeException) { /* treat as public */ }
+        }
+
+        $services = (new ServiceCrudService())->getAll($includeInactive);
+
+        // ManyChat strictly enforces a maximum of 10 cards per gallery.
+        $limitedServices = array_slice($services, 0, 10);
+        $elements = [];
+
+        foreach ($limitedServices as $service) {
+            // Note: Change object operator (->) to array notation (['']) if getAll() returns associative arrays.
+            $elements[] = [
+                "title" => $service->title,
+                "subtitle" => "Price: " . $service->startingPrice . "\n⏳ " . $service->duration,
+                "image_url" => $service->imageUrl,
+                "buttons" => [
+                    [
+                        "type" => "payload",
+                        "caption" => "View Details",
+                        "payload" => "VIEW_SERVICE_" . $service->id
+                    ],
+                    [
+                        "type" => "url",
+                        "caption" => "Book Now",
+                        "url" => "https://1625autolab.com/book/" . $service->slug,
+                        "webview_size" => "tall"
+                    ]
+                ]
+            ];
+        }
+
+        $response = [
+            "version" => "v2",
+            "content" => [
+                "messages" => [
+                    [
+                        "type" => "cards",
+                        "elements" => $elements,
+                        "image_aspect_ratio" => "horizontal" // Use "square" if your images get cropped weirdly
+                    ]
+                ]
+            ]
+        ];
+
+        // Force JSON header; ManyChat webhooks can be picky without it.
+        header('Content-Type: application/json');
+        echo json_encode($response);
     }
 
     /** @param array<string, string> $vars */
