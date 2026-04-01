@@ -817,66 +817,115 @@ class Router
      */
     private function handleBookingExternalCreate(array $vars = []): void
     {
-        $data = $this->jsonBody();
+        try {
+            $data = $this->jsonBody();
 
-        // Accept common integration aliases (snake_case and alternate key names).
-        $aliases = [
-            'service_id'       => 'serviceId',
-            'service_ids'      => 'serviceIds',
-            'service_name'     => 'serviceName',
-            'vehicle_info'     => 'vehicleInfo',
-            'vehicle_make'     => 'vehicleMake',
-            'vehicle_model'    => 'vehicleModel',
-            'vehicle_year'     => 'vehicleYear',
-            'appointment_date' => 'appointmentDate',
-            'appointment_time' => 'appointmentTime',
-            'signature_data'   => 'signatureData',
-        ];
-        foreach ($aliases as $from => $to) {
-            if (!isset($data[$to]) && isset($data[$from])) {
-                $data[$to] = $data[$from];
+            // Accept common integration aliases (snake_case and alternate key names).
+            $aliases = [
+                'service_id'       => 'serviceId',
+                'service_ids'      => 'serviceIds',
+                'service_name'     => 'serviceName',
+                'vehicle_info'     => 'vehicleInfo',
+                'vehicle_make'     => 'vehicleMake',
+                'vehicle_model'    => 'vehicleModel',
+                'vehicle_year'     => 'vehicleYear',
+                'appointment_date' => 'appointmentDate',
+                'appointment_time' => 'appointmentTime',
+                'signature_data'   => 'signatureData',
+            ];
+            foreach ($aliases as $from => $to) {
+                if (!isset($data[$to]) && isset($data[$from])) {
+                    $data[$to] = $data[$from];
+                }
             }
-        }
 
-        // Preserve note/message style fields as booking notes.
-        if (!isset($data['notes'])) {
-            foreach (['note', 'message', 'customer_note', 'customer_notes'] as $key) {
-                if (isset($data[$key]) && trim((string) $data[$key]) !== '') {
-                    $data['notes'] = (string) $data[$key];
+            // Preserve note/message style fields as booking notes.
+            if (!isset($data['notes'])) {
+                foreach (['note', 'message', 'customer_note', 'customer_notes'] as $key) {
+                    if (isset($data[$key]) && trim((string) $data[$key]) !== '') {
+                        $data['notes'] = (string) $data[$key];
+                        break;
+                    }
+                }
+            }
+
+            // Normalize media aliases to mediaUrls expected by BookingService.
+            if (!isset($data['mediaUrls'])) {
+                foreach (['images', 'imageUrls', 'image_urls', 'photoUrls', 'photo_urls'] as $key) {
+                    if (!isset($data[$key])) {
+                        continue;
+                    }
+                    if (is_array($data[$key])) {
+                        $data['mediaUrls'] = $data[$key];
+                    } elseif (is_string($data[$key]) && trim($data[$key]) !== '') {
+                        $data['mediaUrls'] = [trim($data[$key])];
+                    }
                     break;
                 }
             }
-        }
 
-        // Normalize media aliases to mediaUrls expected by BookingService.
-        if (!isset($data['mediaUrls'])) {
-            foreach (['images', 'imageUrls', 'image_urls', 'photoUrls', 'photo_urls'] as $key) {
-                if (!isset($data[$key])) {
-                    continue;
-                }
-                if (is_array($data[$key])) {
-                    $data['mediaUrls'] = $data[$key];
-                } elseif (is_string($data[$key]) && trim($data[$key]) !== '') {
-                    $data['mediaUrls'] = [trim($data[$key])];
-                }
-                break;
+            if (isset($data['mediaUrls']) && is_array($data['mediaUrls'])) {
+                $data['mediaUrls'] = array_values(array_filter(
+                    array_map(static fn ($v) => is_string($v) ? trim($v) : '', $data['mediaUrls']),
+                    static fn (string $v): bool => $v !== ''
+                ));
             }
-        }
 
-        if (isset($data['mediaUrls']) && is_array($data['mediaUrls'])) {
-            $data['mediaUrls'] = array_values(array_filter(
-                array_map(static fn ($v) => is_string($v) ? trim($v) : '', $data['mediaUrls']),
-                static fn (string $v): bool => $v !== ''
-            ));
-        }
+            if (trim((string) ($data['source'] ?? '')) === '') {
+                $data['source'] = 'chatbot';
+            }
 
-        if (trim((string) ($data['source'] ?? '')) === '') {
-            $data['source'] = 'chatbot';
-        }
+            // Return structured field validation errors before service call.
+            $fieldErrors = [];
+            if (trim((string) ($data['name'] ?? '')) === '') {
+                $fieldErrors['name'] = 'Name is required.';
+            }
+            if (trim((string) ($data['phone'] ?? '')) === '') {
+                $fieldErrors['phone'] = 'Phone is required.';
+            }
+            if (trim((string) ($data['appointmentDate'] ?? '')) === '') {
+                $fieldErrors['appointmentDate'] = 'Appointment date is required.';
+            }
 
-        $booking = (new BookingService())->create($data, null);
-        http_response_code(201);
-        echo json_encode(['booking' => $booking]);
+            $hasServiceId = isset($data['serviceId']) && trim((string) $data['serviceId']) !== '';
+            $hasServiceIds = isset($data['serviceIds']) && is_array($data['serviceIds']) && count($data['serviceIds']) > 0;
+            $hasServiceName = isset($data['serviceName']) && trim((string) $data['serviceName']) !== '';
+            if (!$hasServiceId && !$hasServiceIds && !$hasServiceName) {
+                $fieldErrors['service'] = 'Provide serviceId, serviceIds, or serviceName.';
+            }
+
+            if ($fieldErrors !== []) {
+                http_response_code(422);
+                echo json_encode([
+                    'error' => 'validation_error',
+                    'message' => 'External booking validation failed.',
+                    'fields' => $fieldErrors,
+                ]);
+                return;
+            }
+
+            $booking = (new BookingService())->create($data, null);
+            http_response_code(201);
+            echo json_encode(['booking' => $booking]);
+        } catch (RuntimeException $e) {
+            $status = (int) $e->getCode();
+            if ($status < 400 || $status > 599) {
+                $status = 400;
+            }
+
+            http_response_code($status);
+            echo json_encode([
+                'error' => $status >= 500 ? 'internal_error' : 'request_error',
+                'message' => $status >= 500 ? 'Unable to create external booking.' : $e->getMessage(),
+                'detail' => $status >= 500 ? null : $e->getMessage(),
+            ]);
+        } catch (\Throwable) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'internal_error',
+                'message' => 'Unable to create external booking.',
+            ]);
+        }
     }
 
     /** @param array<string, string> $vars */
