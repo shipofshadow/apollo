@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  Calendar, Clock, Loader2, XCircle, Eye, Search, X as XIcon,
+  Calendar, Clock, Loader2, XCircle, Eye, Search, X as XIcon, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
@@ -9,6 +9,7 @@ import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
+import { deleteBookingApi } from '../../services/api';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
@@ -29,6 +30,8 @@ export default function BookingsPanel({ onView }: Props) {
   const { appointments, status } = useSelector((s: RootState) => s.booking);
   const [statusFilter, setStatusFilter] = useState<'all' | Booking['status']>('all');
   const [search, setSearch] = useState('');
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));
@@ -38,6 +41,26 @@ export default function BookingsPanel({ onView }: Props) {
     if (!token) return;
     dispatch(updateBookingStatusAsync({ token, id, status: 'cancelled' }));
     showToast('Booking cancelled.', 'success');
+  };
+
+  const requestDelete = (id: string, customerName: string) => {
+    if (!token || deleteBusyId) return;
+    setDeleteTarget({ id, name: customerName });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!token || deleteBusyId) return;
+    setDeleteBusyId(id);
+    try {
+      await deleteBookingApi(token, id);
+      await dispatch(fetchAllBookingsAsync(token));
+      showToast('Booking deleted.', 'success');
+      setDeleteTarget(null);
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to delete booking.', 'error');
+    } finally {
+      setDeleteBusyId(null);
+    }
   };
 
   const term = search.trim().toLowerCase();
@@ -227,6 +250,15 @@ export default function BookingsPanel({ onView }: Props) {
                             <XCircle className="w-4 h-4" />
                           </button>
                         )}
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); requestDelete(b.id, b.name); }}
+                          title="Delete Booking"
+                          disabled={deleteBusyId === b.id}
+                          className="flex items-center justify-center w-8 h-8 bg-[#181818] border border-gray-700 hover:border-red-500 hover:text-red-500 hover:bg-red-500/10 text-gray-400 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {deleteBusyId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -277,20 +309,71 @@ export default function BookingsPanel({ onView }: Props) {
                     <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-gray-600" /> {b.appointmentTime}</span>
                   </div>
                   
-                  {b.status !== 'cancelled' && b.status !== 'completed' && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleCancel(b.id); }}
-                      title="Cancel Booking"
-                      className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                  <div className="flex items-center gap-2">
+                    {b.status !== 'cancelled' && b.status !== 'completed' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleCancel(b.id); }}
+                        title="Cancel Booking"
+                        className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); requestDelete(b.id, b.name); }}
+                      title="Delete Booking"
+                      disabled={deleteBusyId === b.id}
+                      className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      <XCircle className="w-4 h-4" />
+                      {deleteBusyId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm p-4 flex items-center justify-center">
+          <div className="w-full max-w-md bg-[#101010] border border-red-500/30 rounded-lg shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-red-500/20 bg-red-500/10 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-red-300" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-red-300">Delete Booking</p>
+                <h3 className="text-sm font-semibold text-white">This action cannot be undone.</h3>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gray-300">
+                Permanently delete booking for <span className="font-semibold text-white">{deleteTarget.name}</span>?
+              </p>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-800 bg-[#0c0c0c] flex items-center justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteBusyId !== null}
+                className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 rounded transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleDelete(deleteTarget.id)}
+                disabled={deleteBusyId !== null}
+                className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-red-500/50 text-red-200 hover:bg-red-500/15 rounded transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {deleteBusyId === deleteTarget.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                <span>{deleteBusyId === deleteTarget.id ? 'Deleting...' : 'Confirm Delete'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

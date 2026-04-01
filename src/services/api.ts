@@ -333,6 +333,11 @@ export const cancelMyBookingApi = (token: string, id: string) =>
     method: 'PATCH',
   }, token);
 
+export const deleteBookingApi = (token: string, id: string) =>
+  apiFetch<{ deleted: boolean }>(`/api/bookings/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }, token);
+
 export const fetchBookingByIdApi = (token: string, id: string) =>
   apiFetch<{ booking: Booking }>(`/api/bookings/${encodeURIComponent(id)}`, {}, token);
 

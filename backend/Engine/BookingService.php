@@ -582,6 +582,22 @@ class BookingService
     }
 
     /**
+     * Permanently delete a booking (admin-only).
+     */
+    public function delete(string $id): void
+    {
+        $existing = $this->useDb
+            ? $this->dbFindById($id)
+            : $this->fileFindById($id);
+
+        if ($existing === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
+    }
+
+    /**
      * Admin-only reschedule: no ownership check, bypasses client restrictions.
      * Date must be in YYYY-MM-DD format; time must be non-empty.
      *
@@ -1010,6 +1026,43 @@ class BookingService
             throw new RuntimeException('Booking not found.', 404);
         }
         return $this->mapDbRow($data);
+    }
+
+    private function dbDelete(string $id): void
+    {
+        $db = Database::getInstance();
+        $startedTransaction = false;
+
+        if (!$db->inTransaction()) {
+            $db->beginTransaction();
+            $startedTransaction = true;
+        }
+
+        try {
+            // booking_reviews has no FK in older schemas, so delete manually when present.
+            try {
+                $db->prepare('DELETE FROM booking_reviews WHERE booking_id = :id')
+                    ->execute([':id' => $id]);
+            } catch (\Throwable) {
+                // Ignore when table does not exist yet.
+            }
+
+            $stmt = $db->prepare('DELETE FROM bookings WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+
+            if ($stmt->rowCount() === 0) {
+                throw new RuntimeException('Booking not found.', 404);
+            }
+
+            if ($startedTransaction && $db->inTransaction()) {
+                $db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($startedTransaction && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
@@ -1476,6 +1529,27 @@ class BookingService
 
         $this->fileWrite($all);
         return $found;
+    }
+
+    private function fileDelete(string $id): void
+    {
+        $all = array_reverse($this->fileGetAll());
+        $next = [];
+        $deleted = false;
+
+        foreach ($all as $booking) {
+            if (($booking['id'] ?? '') === $id) {
+                $deleted = true;
+                continue;
+            }
+            $next[] = $booking;
+        }
+
+        if (!$deleted) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $this->fileWrite($next);
     }
 
     /** @param array<int, array<string, mixed>> $bookings */

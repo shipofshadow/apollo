@@ -5,7 +5,7 @@ import {
   FileText, Image as ImageIcon, Loader2, Mail,
   Package, Phone, User, Wrench, X, XCircle,
   ChevronLeft, ChevronRight, AlertTriangle, RefreshCw,
-  ClipboardList, BadgeCheck, Camera, Plus, StickyNote,
+  ClipboardList, BadgeCheck, Camera, Plus, StickyNote, Trash2,
   Shield, Award, Activity
 } from 'lucide-react';
 import {
@@ -24,6 +24,7 @@ import {
   uploadBuildUpdateMediaApi,
   updateInternalNotesApi,
   updateBookingQaPhotosApi,
+  deleteBookingApi,
   fetchCustomerStatsApi,
   fetchTeamMembersApi,
   fetchAdminUsersApi,
@@ -351,6 +352,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [partsNotes,    setPartsNotes]    = useState('');
   const [partsBusy,     setPartsBusy]     = useState(false);
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
+  const [deleteBusy,    setDeleteBusy]    = useState(false);
   const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
   const [teamMembers,   setTeamMembers]   = useState<TeamMember[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AdminManagedUser[]>([]);
@@ -499,6 +501,21 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       showToast((e as Error).message ?? 'Failed to update status.', 'error');
     } finally {
       setStatusBusy(null);
+    }
+  };
+
+  const handleDeleteBooking = async () => {
+    if (!token || !booking) return;
+    setDeleteBusy(true);
+    try {
+      await deleteBookingApi(token, booking.id);
+      await dispatch(fetchAllBookingsAsync(token)).unwrap();
+      showToast('Booking deleted.', 'success');
+      onBack();
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to delete booking.', 'error');
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -1349,6 +1366,22 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   {statusBusy === 'cancelled' ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
                 </button>
               )}
+              <button
+                onClick={() => requestConfirmation(
+                  {
+                    title: 'Delete Booking Record?',
+                    message: 'This permanently deletes the booking and cannot be undone.',
+                    confirmLabel: 'Delete Booking',
+                    tone: 'danger',
+                  },
+                  handleDeleteBooking,
+                )}
+                disabled={statusBusy !== null || deleteBusy}
+                className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-red-500/40 text-red-300 hover:bg-red-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
+              >
+                <span>{deleteBusy ? 'Deleting...' : 'Delete Booking'}</span>
+                {deleteBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
+              </button>
               
               {!canModify && (
                 <div className="bg-[#151515] border border-gray-800 rounded p-3 flex items-center justify-center">

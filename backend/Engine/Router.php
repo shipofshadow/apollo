@@ -107,6 +107,7 @@ class Router
             $r->addRoute('POST',  '/api/bookings/media',            'handleBookingMediaUpload');
             $r->addRoute('GET',   '/api/bookings/{id}',             'handleBookingGet');
             $r->addRoute('PATCH', '/api/bookings/{id}',             'handleBookingUpdate');
+            $r->addRoute('DELETE','/api/bookings/{id}',             'handleBookingDelete');
             $r->addRoute('PATCH', '/api/bookings/{id}/assign-tech', 'handleBookingAssignTech');
             $r->addRoute('PATCH', '/api/bookings/{id}/cancel',      'handleBookingCancel');
             $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',        'handleBookingReschedule');
@@ -1037,6 +1038,16 @@ class Router
 
         $booking = (new BookingService())->updateStatus($id, $status);
         echo json_encode(['booking' => $booking]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingDelete(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $id = $vars['id'] ?? '';
+
+        (new BookingService())->delete($id);
+        echo json_encode(['deleted' => true]);
     }
 
     /** @param array<string, string> $vars */
