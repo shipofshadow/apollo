@@ -1,0 +1,23 @@
+<p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:2px;color:#64748b;text-transform:uppercase">Website Inquiry</p>
+<h2 style="margin:0 0 24px;font-size:24px;font-weight:900;color:#f1f5f9">New Contact Message</h2>
+
+<div style="background:#162032;border:1px solid #334155;border-radius:8px;overflow:hidden;margin-bottom:20px">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+      <td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:100px">From</td>
+      <td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9;font-weight:600">
+        {{ name }} &lt;<a href="mailto:{{ email }}" style="color:#f97316;text-decoration:none">{{ email }}</a>&gt;
+      </td>
+    </tr>
+    {{ phone_row_html }}
+    <tr>
+      <td style="padding:10px 16px;color:#64748b;font-size:13px">Subject</td>
+      <td style="padding:10px 16px;color:#f1f5f9;font-weight:600">{{ subject }}</td>
+    </tr>
+  </table>
+</div>
+
+<div style="background:#162032;border-left:3px solid #f97316;padding:16px 20px;border-radius:0 6px 6px 0">
+  <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1px;color:#f97316;text-transform:uppercase">Message</p>
+  <p style="margin:0;font-size:14px;color:#cbd5e1;white-space:pre-wrap">{{ message }}</p>
+</div>

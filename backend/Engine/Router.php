@@ -780,6 +780,34 @@ class Router
     // Booking handlers
     // -------------------------------------------------------------------------
 
+    /** @param array<string, string> $vars */
+    private function handleBookingCreate(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+
+        // Allow both guest and authenticated booking submission.
+        $userId = null;
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            if ($userId <= 0) {
+                $userId = null;
+            }
+        } catch (RuntimeException $e) {
+            if ((int) $e->getCode() !== 401) {
+                throw $e;
+            }
+        }
+
+        if (trim((string) ($data['source'] ?? '')) === '') {
+            $data['source'] = 'website';
+        }
+
+        $booking = (new BookingService())->create($data, $userId);
+        http_response_code(201);
+        echo json_encode(['booking' => $booking]);
+    }
+
 
     /**
      * Handle external booking creation (chatbot, integrations, etc).
@@ -790,7 +818,62 @@ class Router
     private function handleBookingExternalCreate(array $vars = []): void
     {
         $data = $this->jsonBody();
-        $data['source'] = 'chatbot';
+
+        // Accept common integration aliases (snake_case and alternate key names).
+        $aliases = [
+            'service_id'       => 'serviceId',
+            'service_ids'      => 'serviceIds',
+            'service_name'     => 'serviceName',
+            'vehicle_info'     => 'vehicleInfo',
+            'vehicle_make'     => 'vehicleMake',
+            'vehicle_model'    => 'vehicleModel',
+            'vehicle_year'     => 'vehicleYear',
+            'appointment_date' => 'appointmentDate',
+            'appointment_time' => 'appointmentTime',
+            'signature_data'   => 'signatureData',
+        ];
+        foreach ($aliases as $from => $to) {
+            if (!isset($data[$to]) && isset($data[$from])) {
+                $data[$to] = $data[$from];
+            }
+        }
+
+        // Preserve note/message style fields as booking notes.
+        if (!isset($data['notes'])) {
+            foreach (['note', 'message', 'customer_note', 'customer_notes'] as $key) {
+                if (isset($data[$key]) && trim((string) $data[$key]) !== '') {
+                    $data['notes'] = (string) $data[$key];
+                    break;
+                }
+            }
+        }
+
+        // Normalize media aliases to mediaUrls expected by BookingService.
+        if (!isset($data['mediaUrls'])) {
+            foreach (['images', 'imageUrls', 'image_urls', 'photoUrls', 'photo_urls'] as $key) {
+                if (!isset($data[$key])) {
+                    continue;
+                }
+                if (is_array($data[$key])) {
+                    $data['mediaUrls'] = $data[$key];
+                } elseif (is_string($data[$key]) && trim($data[$key]) !== '') {
+                    $data['mediaUrls'] = [trim($data[$key])];
+                }
+                break;
+            }
+        }
+
+        if (isset($data['mediaUrls']) && is_array($data['mediaUrls'])) {
+            $data['mediaUrls'] = array_values(array_filter(
+                array_map(static fn ($v) => is_string($v) ? trim($v) : '', $data['mediaUrls']),
+                static fn (string $v): bool => $v !== ''
+            ));
+        }
+
+        if (trim((string) ($data['source'] ?? '')) === '') {
+            $data['source'] = 'chatbot';
+        }
+
         $booking = (new BookingService())->create($data, null);
         http_response_code(201);
         echo json_encode(['booking' => $booking]);

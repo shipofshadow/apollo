@@ -991,7 +991,7 @@ export default function BookingDetail() {
       {booking.status === 'completed' && booking.buildSlug && (
         <div className="mb-8">
           <a
-            href={`/builds/${booking.buildSlug}`}
+            href={`/builds/${encodeURIComponent(booking.buildSlug)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block bg-brand-orange text-white px-6 py-3 font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors mb-2"

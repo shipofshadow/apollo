@@ -38,19 +38,19 @@ class NotificationService
         $subject = htmlspecialchars($rawSubject);
         $msgText = nl2br(htmlspecialchars($data['message'] ?? ''));
 
-        $phoneRow = $phone !== '' ? "<tr><td><strong>Phone:</strong></td><td>$phone</td></tr>" : '';
+        $phoneRowHtml = $phone !== ''
+            ? '<tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Phone</td>'
+              . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">'
+              . '<a href="tel:' . $phone . '" style="color:#f97316;text-decoration:none">' . $phone . '</a></td></tr>'
+            : '';
 
-        $body = $this->wrapHtml("
-            <h2>New Contact Form Message</h2>
-            <table>
-                <tr><td><strong>From:</strong></td><td>$name &lt;$email&gt;</td></tr>
-                $phoneRow
-                <tr><td><strong>Subject:</strong></td><td>$subject</td></tr>
-            </table>
-            <h3>Message</h3>
-            <p style='white-space:pre-wrap'>$msgText</p>
-            <p style='color:#888;font-size:12px'>Sent via the contact form on the 1625 Auto Lab website.</p>
-        ");
+        $body = $this->render('contact-message', [
+            'name'          => $name,
+            'email'         => $email,
+            'phone_row_html' => $phoneRowHtml,
+            'subject'       => $subject,
+            'message'       => $msgText,
+        ]);
 
         $emailSubject = "Contact Form: $rawSubject";
 
@@ -205,24 +205,9 @@ class NotificationService
         }
 
         $safeUrl = htmlspecialchars($resetUrl);
-        $body    = $this->wrapHtml("
-            <h2>Reset Your Password</h2>
-            <p>We received a request to reset the password for your 1625 Auto Lab account.</p>
-            <p>Click the button below to choose a new password. This link will expire in <strong>1 hour</strong>.</p>
-            <p style='text-align:center;margin:32px 0'>
-                <a href='$safeUrl'
-                   style='background:#f97316;color:#fff;padding:14px 28px;text-decoration:none;
-                          font-weight:bold;border-radius:4px;display:inline-block'>
-                    Reset Password
-                </a>
-            </p>
-            <p>If you did not request a password reset, you can safely ignore this email.
-               Your password will not be changed.</p>
-            <p>Or copy this link into your browser:<br>
-               <a href='$safeUrl' style='color:#f97316;word-break:break-all'>$safeUrl</a>
-            </p>
-            <p style='color:#888'>1625 Auto Lab</p>
-        ");
+        $body = $this->render('password-reset', [
+            'reset_url' => $safeUrl,
+        ]);
 
         $this->send($email, 'Customer', 'Reset Your Password | 1625 Auto Lab', $body);
     }
@@ -234,109 +219,165 @@ class NotificationService
     /** @param array<string, mixed> $b */
     private function buildConfirmationBody(array $b): string
     {
-        $name        = htmlspecialchars((string) ($b['name']            ?? ''));
-        $service     = htmlspecialchars((string) ($b['serviceName']     ?? ''));
-        $date        = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
-        $time        = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
-        $vehicle     = htmlspecialchars((string) ($b['vehicleInfo']     ?? ''));
-        $id          = htmlspecialchars((string) ($b['id']              ?? ''));
-        $refNum      = htmlspecialchars((string) ($b['referenceNumber']  ?? ''));
+        $name    = htmlspecialchars((string) ($b['name']            ?? ''));
+        $service = htmlspecialchars((string) ($b['serviceName']     ?? ''));
+        $date    = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
+        $time    = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
+        $vehicle = htmlspecialchars((string) ($b['vehicleInfo']     ?? ''));
+        $refNum  = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
+        $notes   = htmlspecialchars((string) ($b['notes']           ?? ''));
 
-
-        // Add all details of selected variations if present
         $variationsHtml = '';
-            if (!empty($b['selectedVariations']) && is_array($b['selectedVariations'])) {
-                $variationRows = [];
-                foreach ($b['selectedVariations'] as $variation) {
-                    if (isset($variation['variationName'])) {
-                        $variation_name = $this->normalizeFancyText($variation['variationName']);
-                        $variationRows[] = '<li>' . htmlspecialchars($variation_name) . '</li>';
-                    }
-                }
-                if (count($variationRows) > 0) {
-                    $variationsHtml = '<tr><td valign="top"><strong>Options:</strong></td><td><ul style="margin:0 0 0 16px;padding:0">' . implode('', $variationRows) . '</ul></td></tr>';
+        if (!empty($b['selectedVariations']) && is_array($b['selectedVariations'])) {
+            $rows = [];
+            foreach ($b['selectedVariations'] as $variation) {
+                if (isset($variation['variationName'])) {
+                    $rows[] = '<li style="margin:3px 0;color:#cbd5e1">' . htmlspecialchars($this->normalizeFancyText($variation['variationName'])) . '</li>';
                 }
             }
+            if ($rows) {
+                $variationsHtml = '<tr>'
+                    . '<td style="padding:10px 0;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:120px;vertical-align:top">Options</td>'
+                    . '<td style="padding:10px 0;border-bottom:1px solid #334155">'
+                    . '<ul style="margin:0;padding:0 0 0 16px">' . implode('', $rows) . '</ul></td></tr>';
+            }
+        }
 
-        return $this->wrapHtml("
-            <h2>Hi $name,</h2>
-            <p>Your appointment has been received and is <strong>pending confirmation</strong>.</p>
-            <table>
-                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
-                $variationsHtml
-                <tr><td><strong>Date:</strong></td><td>$date</td></tr>
-                <tr><td><strong>Time:</strong></td><td>$time</td></tr>
-                <tr><td><strong>Vehicle:</strong></td><td>$vehicle</td></tr>
-                <tr><td><strong>Reference:</strong></td><td>$refNum</td></tr>
-                <tr><td><strong>Booking ID:</strong></td><td>#$id</td></tr>
-            </table>
-            <p>We will contact you to confirm the appointment or if we need additional information.</p>
-            <p style='color:#888'>1625 Auto Lab | NKKS Arcade, Brgy. Alasas, San Fernando, Pampanga</p>
-        ");
+        $notesHtml = $notes !== ''
+            ? '<div style="background:#162032;border-left:3px solid #f97316;padding:12px 16px;margin:20px 0;border-radius:0 4px 4px 0">'
+              . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#f97316;text-transform:uppercase">Your Notes</p>'
+              . '<p style="margin:0;color:#cbd5e1;font-size:14px">' . $notes . '</p></div>'
+            : '';
+
+        return $this->render('booking-confirmation', [
+            'name'            => $name,
+            'service'         => $service,
+            'variations_html' => $variationsHtml,
+            'date'            => $date,
+            'time'            => $time,
+            'vehicle'         => $vehicle,
+            'ref_num'         => $refNum,
+            'notes_html'      => $notesHtml,
+        ]);
     }
 
     /** @param array<string, mixed> $b */
-   private function buildAdminNotificationBody(array $b): string
-{
-    $lines = '';
-    foreach ($b as $key => $val) {
-        // Skip large or irrelevant media arrays
-        if (in_array($key, ['signatureData', 'mediaUrls', 'beforePhotos', 'afterPhotos'], true)) {
-            continue;
-        }
+    private function buildAdminNotificationBody(array $b): string
+    {
+        $name    = htmlspecialchars((string) ($b['name']            ?? '—'));
+        $email   = htmlspecialchars((string) ($b['email']           ?? '—'));
+        $phone   = htmlspecialchars((string) ($b['phone']           ?? ''));
+        $service = htmlspecialchars((string) ($b['serviceName']     ?? '—'));
+        $date    = htmlspecialchars((string) ($b['appointmentDate'] ?? '—'));
+        $time    = htmlspecialchars((string) ($b['appointmentTime'] ?? '—'));
+        $vehicle = htmlspecialchars((string) ($b['vehicleInfo']     ?? '—'));
+        $refNum  = htmlspecialchars((string) ($b['referenceNumber'] ?? '—'));
+        $source  = htmlspecialchars(ucfirst((string) ($b['source']  ?? 'website')));
+        $notes   = nl2br(htmlspecialchars((string) ($b['notes']     ?? '')));
 
-        $k = htmlspecialchars((string) $key);
-
-        if (is_array($val)) {
-            if ($key === 'selectedVariations') {
-                // Pluck just the names out of the multidimensional array
-                $names = array_column($val, 'variationName');
-                $v = htmlspecialchars(implode(', ', $names));
-            } else {
-                // Prevent crashes if another nested array slips through
-                $isComplex = count(array_filter($val, 'is_array')) > 0;
-                $v = htmlspecialchars($isComplex ? json_encode($val) : implode(', ', $val));
+        $variationsHtml = '';
+        if (!empty($b['selectedVariations']) && is_array($b['selectedVariations'])) {
+            $names = array_column($b['selectedVariations'], 'variationName');
+            $safe  = [];
+            foreach ($names as $n) {
+                $safe[] = htmlspecialchars($this->normalizeFancyText((string) $n));
             }
-        } else {
-            $v = htmlspecialchars(json_encode($val, JSON_UNESCAPED_UNICODE));
+            if ($safe) {
+                $variationsHtml = '<tr>'
+                    . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:120px">Options</td>'
+                    . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . implode(', ', $safe) . '</td></tr>';
+            }
         }
 
-        $lines .= "<tr><td style='padding: 8px; border-bottom: 1px solid #ddd;'><strong>$k</strong></td><td style='padding: 8px; border-bottom: 1px solid #ddd;'>$v</td></tr>";
-    }
-    
-    return $this->wrapHtml("<h2>New Booking Received</h2><table style='border-collapse: collapse; text-align: left;'>$lines</table>");
+        $phoneHtml = $phone !== ''
+            ? ' &nbsp;&middot;&nbsp; <a href="tel:' . $phone . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>'
+            : '';
+
+        $notesHtml = $notes !== ''
+            ? '<div style="background:#162032;border-left:3px solid #f59e0b;padding:12px 16px;margin:20px 0;border-radius:0 4px 4px 0">'
+              . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#f59e0b;text-transform:uppercase">Customer Notes</p>'
+              . '<p style="margin:0;color:#fde68a;font-size:14px">' . $notes . '</p></div>'
+            : '';
+
+        return $this->render('admin-new-booking', [
+            'name'            => $name,
+            'ref_num'         => $refNum,
+            'service'         => $service,
+            'variations_html' => $variationsHtml,
+            'date'            => $date,
+            'time'            => $time,
+            'vehicle'         => $vehicle,
+            'email'           => $email,
+            'phone_html'      => $phoneHtml,
+            'source'          => $source,
+            'notes_html'      => $notesHtml,
+        ]);
     }
 
     /** @param array<string, mixed> $b */
     private function buildStatusUpdateBody(array $b): string
     {
-        $name    = htmlspecialchars((string) ($b['name']    ?? ''));
-        $status  = htmlspecialchars(ucfirst((string) ($b['status'] ?? '')));
-        $service = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $name    = htmlspecialchars((string) ($b['name']            ?? ''));
+        $status  = (string) ($b['status'] ?? '');
+        $service = htmlspecialchars((string) ($b['serviceName']     ?? ''));
+        $date    = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
+        $time    = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
+        $vehicle = htmlspecialchars((string) ($b['vehicleInfo']     ?? ''));
+        $refNum  = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
+        $badge   = $this->statusBadge($status);
 
-        return $this->wrapHtml("
-            <h2>Hi $name,</h2>
-            <p>Your booking for <strong>$service</strong> is now <strong>$status</strong>.</p>
-            <p>If you have any questions, please call us at <strong>0939 330 8263</strong>
-               or email <a href='mailto:1625autolab@gmail.com'>1625autolab@gmail.com</a>.</p>
-            <p style='color:#888'>1625 Auto Lab</p>
-        ");
+        $messages = [
+            'confirmed'      => 'Your appointment is <strong style="color:#4ade80">confirmed</strong>. We look forward to seeing you and your vehicle!',
+            'in_progress'    => 'Our technicians have <strong style="color:#60a5fa">started working on your vehicle</strong>. We\'ll keep you posted on progress.',
+            'completed'      => 'Your vehicle is <strong style="color:#34d399">ready for pickup</strong>! Thank you for trusting 1625 Auto Lab with your build.',
+            'cancelled'      => 'Your booking has been <strong style="color:#f87171">cancelled</strong>. If this was a mistake or you\'d like to rebook, feel free to contact us.',
+            'awaiting_parts' => 'Your job is currently <strong style="color:#fb923c">on hold</strong> while we wait for parts. We\'ll notify you as soon as work resumes.',
+        ];
+        $key     = strtolower(str_replace(' ', '_', $status));
+        $message = $messages[$key] ?? 'Your booking status has been updated. Contact us for details.';
+
+                $dateRowHtml = $date
+                        ? '<tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:120px">Date</td>'
+                            . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $date . ($time ? ' &middot; ' . $time : '') . '</td></tr>'
+                        : '';
+                $vehicleRowHtml = $vehicle
+                        ? '<tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Vehicle</td>'
+                            . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $vehicle . '</td></tr>'
+                        : '';
+                $refRowHtml = $refNum
+                        ? '<tr><td style="padding:10px 16px;color:#64748b;font-size:13px">Reference #</td>'
+                            . '<td style="padding:10px 16px;color:#f97316;font-weight:700">' . $refNum . '</td></tr>'
+                        : '';
+
+                return $this->render('booking-status', [
+                        'name'            => $name,
+                        'status_badge'    => $badge,
+                        'status_message'  => $message,
+                        'service'         => $service,
+                        'date_row_html'   => $dateRowHtml,
+                        'vehicle_row_html' => $vehicleRowHtml,
+                        'ref_row_html'    => $refRowHtml,
+                ]);
     }
 
     /** @param array<string, mixed> $b */
     private function buildAwaitingPartsBody(array $b): string
     {
-        $name   = htmlspecialchars((string) ($b['name']       ?? ''));
-        $notes  = htmlspecialchars((string) ($b['partsNotes'] ?? 'No additional details provided.'));
+        $name    = htmlspecialchars((string) ($b['name']        ?? ''));
+        $service = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $notes   = nl2br(htmlspecialchars((string) ($b['partsNotes'] ?? 'No additional details provided.')));
+        $refNum  = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
 
-        return $this->wrapHtml("
-            <h2>Hi $name,</h2>
-            <p>Your job is temporarily <strong>on hold while we wait for parts</strong> to arrive.</p>
-            <p><strong>Details:</strong> $notes</p>
-            <p>We will notify you as soon as the parts arrive and work resumes.
-               In the meantime, feel free to reach us at <strong>0939 330 8263</strong>.</p>
-            <p style='color:#888'>1625 Auto Lab</p>
-        ");
+        $refParaHtml = $refNum !== ''
+            ? '<p style="margin:8px 0 0;font-size:12px;color:#475569">Reference: <strong style="color:#64748b">' . $refNum . '</strong></p>'
+            : '';
+
+        return $this->render('booking-awaiting-parts', [
+            'name'         => $name,
+            'service'      => $service,
+            'parts_notes'  => $notes,
+            'ref_para_html' => $refParaHtml,
+        ]);
     }
 
     /**
@@ -349,71 +390,101 @@ class NotificationService
         $service = htmlspecialchars((string) ($b['serviceName'] ?? ''));
         $note    = nl2br(htmlspecialchars((string) ($u['note']  ?? '')));
         $date    = htmlspecialchars((string) ($u['createdAt']   ?? ''));
+        $refNum  = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
 
+        $photoUrls = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
         $photosHtml = '';
-        $photoUrls  = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
-        foreach ($photoUrls as $url) {
-            $safeUrl     = htmlspecialchars((string) $url);
-            $photosHtml .= "<img src='$safeUrl' alt='Build photo' style='max-width:100%;margin:8px 0;display:block;border-radius:4px'>";
+        if ($photoUrls) {
+            $photosHtml = '<p style="margin:20px 0 8px;font-size:11px;font-weight:700;letter-spacing:2px;color:#64748b;text-transform:uppercase">Build Photos</p>'
+                . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>';
+            $col = 0;
+            foreach ($photoUrls as $url) {
+                $safeUrl = htmlspecialchars((string) $url);
+                if ($col > 0 && $col % 2 === 0) {
+                    $photosHtml .= '</tr><tr>';
+                }
+                $photosHtml .= '<td style="padding:4px;width:50%">'
+                    . '<a href="' . $safeUrl . '">'
+                    . '<img src="' . $safeUrl . '" alt="Build photo" style="width:100%;max-width:240px;border-radius:6px;display:block;border:1px solid #334155">'
+                    . '</a></td>';
+                $col++;
+            }
+            $photosHtml .= '</tr></table>';
         }
 
-        $noteSection = $note !== '' ? "<p><strong>Update:</strong> $note</p>" : '';
+        $noteHtml = $note !== ''
+            ? '<div style="background:#162032;border-left:3px solid #3b82f6;padding:14px 18px;margin-bottom:20px;border-radius:0 6px 6px 0">'
+              . '<p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:1px;color:#60a5fa;text-transform:uppercase">Technician Note</p>'
+              . '<p style="margin:0;font-size:14px;color:#bfdbfe;white-space:pre-wrap">' . $note . '</p></div>'
+            : '';
 
-        return $this->wrapHtml("
-            <h2>Hi $name,</h2>
-            <p>There is a new progress update on your <strong>$service</strong> job!</p>
-            $noteSection
-            $photosHtml
-            <p style='color:#888;font-size:12px'>Posted on $date</p>
-            <p>If you have any questions, call us at <strong>0939 330 8263</strong>
-               or email <a href='mailto:1625autolab@gmail.com'>1625autolab@gmail.com</a>.</p>
-            <p style='color:#888'>1625 Auto Lab</p>
-        ");
+        $refHtml = $refNum !== ''
+            ? '<p style="margin:4px 0 0;font-size:12px;color:#475569">Reference: <strong style="color:#64748b">' . $refNum . '</strong></p>'
+            : '';
+
+        return $this->render('build-update', [
+            'name'       => $name,
+            'service'    => $service,
+            'note_html'  => $noteHtml,
+            'photos_html' => $photosHtml,
+            'posted_at'  => $date,
+            'ref_html'   => $refHtml,
+        ]);
     }
 
     /** @param array<string, mixed> $b */
     private function buildAdminStatusChangedBody(array $b): string
     {
-        $name        = htmlspecialchars((string) ($b['name'] ?? ''));
-        $email       = htmlspecialchars((string) ($b['email'] ?? ''));
-        $service     = htmlspecialchars((string) ($b['serviceName'] ?? ''));
-        $status      = htmlspecialchars(ucfirst((string) ($b['status'] ?? '')));
-        $date        = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
-        $time        = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
-        $bookingId   = htmlspecialchars((string) ($b['id'] ?? ''));
+        $name      = htmlspecialchars((string) ($b['name']            ?? ''));
+        $email     = htmlspecialchars((string) ($b['email']           ?? ''));
+        $phone     = htmlspecialchars((string) ($b['phone']           ?? ''));
+        $service   = htmlspecialchars((string) ($b['serviceName']     ?? ''));
+        $status    = (string) ($b['status'] ?? '');
+        $date      = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
+        $time      = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
+        $bookingId = htmlspecialchars((string) ($b['id']              ?? ''));
+        $refNum    = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
+        $badge     = $this->statusBadge($status);
+        $phoneHtml = $phone !== ''
+            ? ' &nbsp;&middot;&nbsp; <a href="tel:' . $phone . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>'
+            : '';
 
-        return $this->wrapHtml("
-            <h2>Booking Status Updated</h2>
-            <table>
-                <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
-                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
-                <tr><td><strong>Status:</strong></td><td>$status</td></tr>
-                <tr><td><strong>Date:</strong></td><td>$date</td></tr>
-                <tr><td><strong>Time:</strong></td><td>$time</td></tr>
-                <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
-            </table>
-        ");
+        return $this->render('admin-status-changed', [
+            'status_badge' => $badge,
+            'name'         => $name,
+            'email'        => $email,
+            'phone_html'   => $phoneHtml,
+            'service'      => $service,
+            'date'         => $date,
+            'time'         => $time,
+            'ref_num'      => $refNum,
+            'booking_id'   => $bookingId,
+        ]);
     }
 
     /** @param array<string, mixed> $b */
     private function buildAdminAwaitingPartsBody(array $b): string
     {
-        $name        = htmlspecialchars((string) ($b['name'] ?? ''));
-        $email       = htmlspecialchars((string) ($b['email'] ?? ''));
-        $service     = htmlspecialchars((string) ($b['serviceName'] ?? ''));
-        $notes       = nl2br(htmlspecialchars((string) ($b['partsNotes'] ?? 'No additional details provided.')));
-        $bookingId   = htmlspecialchars((string) ($b['id'] ?? ''));
+        $name      = htmlspecialchars((string) ($b['name']        ?? ''));
+        $email     = htmlspecialchars((string) ($b['email']       ?? ''));
+        $phone     = htmlspecialchars((string) ($b['phone']       ?? ''));
+        $service   = htmlspecialchars((string) ($b['serviceName'] ?? ''));
+        $notes     = nl2br(htmlspecialchars((string) ($b['partsNotes'] ?? 'No additional details provided.')));
+        $bookingId = htmlspecialchars((string) ($b['id']          ?? ''));
+        $refNum    = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
+        $phoneHtml = $phone !== ''
+            ? ' &nbsp;&middot;&nbsp; <a href="tel:' . $phone . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>'
+            : '';
 
-        return $this->wrapHtml("
-            <h2>Booking Awaiting Parts</h2>
-            <table>
-                <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
-                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
-                <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
-            </table>
-            <h3>Parts Notes</h3>
-            <p style='white-space:pre-wrap'>$notes</p>
-        ");
+        return $this->render('admin-awaiting-parts', [
+            'name'        => $name,
+            'email'       => $email,
+            'phone_html'  => $phoneHtml,
+            'service'     => $service,
+            'ref_num'     => $refNum,
+            'booking_id'  => $bookingId,
+            'parts_notes' => $notes,
+        ]);
     }
 
     /**
@@ -422,59 +493,113 @@ class NotificationService
      */
     private function buildAdminBuildUpdateBody(array $b, array $u): string
     {
-        $name      = htmlspecialchars((string) ($b['name'] ?? ''));
-        $email     = htmlspecialchars((string) ($b['email'] ?? ''));
+        $name      = htmlspecialchars((string) ($b['name']        ?? ''));
+        $email     = htmlspecialchars((string) ($b['email']       ?? ''));
+        $phone     = htmlspecialchars((string) ($b['phone']       ?? ''));
         $service   = htmlspecialchars((string) ($b['serviceName'] ?? ''));
-        $bookingId = htmlspecialchars((string) ($b['id'] ?? ''));
-        $note      = nl2br(htmlspecialchars((string) ($u['note'] ?? '')));
-        $date      = htmlspecialchars((string) ($u['createdAt'] ?? ''));
+        $bookingId = htmlspecialchars((string) ($b['id']          ?? ''));
+        $refNum    = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
+        $note      = nl2br(htmlspecialchars((string) ($u['note']  ?? '')));
+        $date      = htmlspecialchars((string) ($u['createdAt']   ?? ''));
+        $phoneHtml = $phone !== ''
+            ? ' &nbsp;&middot;&nbsp; <a href="tel:' . $phone . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>'
+            : '';
 
-        // Add all details of selected variations if present
         $variationsHtml = '';
         if (!empty($b['selectedVariations']) && is_array($b['selectedVariations'])) {
-            $variationRows = [];
+            $rows = [];
             foreach ($b['selectedVariations'] as $variation) {
                 if (isset($variation['variationName'])) {
-                    $variation_name = $this->normalizeFancyText($variation['variationName']);
-                    $variationRows[] = '<li>' . htmlspecialchars($variation_name) . '</li>';
+                    $rows[] = htmlspecialchars($this->normalizeFancyText($variation['variationName']));
                 }
             }
-            if (count($variationRows) > 0) {
-                $variationsHtml = '<tr><td valign="top"><strong>Options:</strong></td><td><ul style="margin:0 0 0 16px;padding:0">' . implode('', $variationRows) . '</ul></td></tr>';
+            if ($rows) {
+                $variationsHtml = '<tr>'
+                    . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:120px">Options</td>'
+                    . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . implode(', ', $rows) . '</td></tr>';
             }
         }
 
+        $photoUrls = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
         $photosHtml = '';
-        $photoUrls  = is_array($u['photoUrls'] ?? null) ? $u['photoUrls'] : [];
-        foreach ($photoUrls as $url) {
-            $safeUrl = htmlspecialchars((string) $url);
-            $photosHtml .= "<li><a href='$safeUrl' style='color:#f97316'>$safeUrl</a></li>";
-        }
-        if ($photosHtml !== '') {
-            $photosHtml = "<h3>Photos</h3><ul>$photosHtml</ul>";
+        if ($photoUrls) {
+            $items = '';
+            foreach ($photoUrls as $url) {
+                $safeUrl = htmlspecialchars((string) $url);
+                $items .= '<li style="margin:4px 0"><a href="' . $safeUrl . '" style="color:#f97316;text-decoration:none;font-size:13px;word-break:break-all">' . $safeUrl . '</a></li>';
+            }
+            $photosHtml = '<div style="background:#162032;border:1px solid #334155;border-radius:6px;padding:14px 18px;margin-top:16px">'
+                . '<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1px;color:#64748b;text-transform:uppercase">Attached Photos</p>'
+                . '<ul style="margin:0;padding:0 0 0 16px">' . $items . '</ul></div>';
         }
 
-        $noteSection = $note !== '' ? "<h3>Update Note</h3><p style='white-space:pre-wrap'>$note</p>" : '';
+        $noteHtml = $note !== ''
+            ? '<div style="background:#162032;border-left:3px solid #3b82f6;padding:14px 18px;margin-bottom:16px;border-radius:0 6px 6px 0">'
+              . '<p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:1px;color:#60a5fa;text-transform:uppercase">Update Note</p>'
+              . '<p style="margin:0;font-size:14px;color:#bfdbfe;white-space:pre-wrap">' . $note . '</p></div>'
+            : '';
 
-        return $this->wrapHtml("
-            <h2>Build Progress Update Posted</h2>
-            <table>
-                <tr><td><strong>Customer:</strong></td><td>$name &lt;$email&gt;</td></tr>
-                <tr><td><strong>Service:</strong></td><td>$service</td></tr>
-                $variationsHtml
-                <tr><td><strong>Booking ID:</strong></td><td>#$bookingId</td></tr>
-                <tr><td><strong>Posted At:</strong></td><td>$date</td></tr>
-            </table>
-            $noteSection
-            $photosHtml
-        ");
+        return $this->render('admin-build-update', [
+            'name'            => $name,
+            'email'           => $email,
+            'phone_html'      => $phoneHtml,
+            'service'         => $service,
+            'variations_html' => $variationsHtml,
+            'ref_num'         => $refNum,
+            'booking_id'      => $bookingId,
+            'posted_at'       => $date,
+            'note_html'       => $noteHtml,
+            'photos_html'     => $photosHtml,
+        ]);
     }
 
-    private function wrapHtml(string $body): string
+    /** Generates a coloured status badge span for HTML emails. */
+    private function statusBadge(string $status): string
     {
-        return "<!DOCTYPE html><html><body style='font-family:sans-serif;max-width:600px;margin:auto;padding:24px'>
-            $body
-        </body></html>";
+        $map = [
+            'confirmed'      => ['#052e16', '#4ade80', '#166534'],
+            'in_progress'    => ['#172554', '#60a5fa', '#1e40af'],
+            'completed'      => ['#052e16', '#34d399', '#065f46'],
+            'cancelled'      => ['#450a0a', '#f87171', '#7f1d1d'],
+            'awaiting_parts' => ['#431407', '#fb923c', '#7c2d12'],
+            'pending'        => ['#451a03', '#fbbf24', '#78350f'],
+        ];
+        $key   = strtolower(str_replace(' ', '_', $status));
+        $c     = $map[$key] ?? ['#1e293b', '#94a3b8', '#334155'];
+        $label = htmlspecialchars(ucwords(str_replace('_', ' ', $status)));
+        return '<span style="background:' . $c[0] . ';color:' . $c[1] . ';border:1px solid ' . $c[2]
+            . ';font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;'
+            . 'letter-spacing:1px;text-transform:uppercase;font-family:Arial,sans-serif">'
+            . $label . '</span>';
+    }
+
+    /**
+     * Render an email template, injecting variables for {{ key }} placeholders.
+     * The content template is wrapped in backend/templates/email/layout.html.
+     *
+     * @param string               $template Template filename without .html (e.g. 'booking-confirmation')
+     * @param array<string, string> $vars     Map of placeholder name → value (values must already be HTML-safe)
+     */
+    private function render(string $template, array $vars): string
+    {
+        static $layout = null;
+        $dir = __DIR__ . '/../templates/email/';
+
+        if ($layout === null) {
+            $layout = (string) file_get_contents($dir . 'layout.html');
+        }
+
+        $tplFile = $dir . $template . '.html';
+        $content = file_exists($tplFile) ? (string) file_get_contents($tplFile) : '';
+
+        foreach ($vars as $key => $value) {
+            $content = str_replace('{{ ' . $key . ' }}', $value, $content);
+        }
+
+        // Remove any unfilled placeholders so they don't leak into the email
+        $content = (string) preg_replace('/\{\{\s*\w[\w_]*\s*\}\}/', '', $content);
+
+        return str_replace('{{ body }}', $content, $layout);
     }
 
     // -------------------------------------------------------------------------
@@ -508,10 +633,9 @@ class NotificationService
         }
 
         $subject = 'Test Email | 1625 Auto Lab';
-        $body    = '<h2 style="font-family:sans-serif;color:#f97316">Test Email</h2>'
-                 . '<p style="font-family:sans-serif">This is a test notification from your 1625 Auto Lab booking system. '
-                 . 'If you received this, your email configuration is working correctly.</p>'
-                 . '<p style="font-family:sans-serif;color:#9ca3af;font-size:12px">Sent at: ' . date('Y-m-d H:i:s') . '</p>';
+        $body = $this->render('test-email', [
+            'sent_at' => date('Y-m-d H:i:s'),
+        ]);
 
         $this->send($to, 'Admin', $subject, $body);
 

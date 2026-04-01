@@ -36,6 +36,12 @@ class BookingService
 
     private static string $storageFile = __DIR__ . '/../storage/bookings.json';
 
+    /** @var array<int, array<string, mixed>>|null */
+    private ?array $activePortfolioCache = null;
+
+    /** @var bool|null Cached bookings.build_slug column existence check. */
+    private ?bool $hasBuildSlugColumnCache = null;
+
     private const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'awaiting_parts'];
 
     /** @var int|null Cached slot capacity to avoid repeated DB/file reads within one request. */
@@ -734,16 +740,7 @@ class BookingService
     private function dbInsert(array $booking): void
     {
         $db = Database::getInstance();
-        $db->prepare(
-            'INSERT INTO bookings
-             (id, reference_number, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
-              vehicle_year, service_id, service_ids, selected_variations, appointment_date, appointment_time,
-              notes, signature_data, media_urls, before_media_urls, after_media_urls, status, source)
-             VALUES
-             (:id, :reference_number, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
-              :vehicle_year, :service_id, :service_ids, :selected_variations, :appointment_date, :appointment_time,
-              :notes, :signature_data, :media_urls, :before_media_urls, :after_media_urls, :status, :source)'
-        )->execute([
+        $params = [
             ':id'                  => $booking['id'],
             ':reference_number'    => $booking['referenceNumber'],
             ':user_id'             => $booking['userId'],
@@ -766,7 +763,33 @@ class BookingService
             ':after_media_urls'    => json_encode($booking['afterPhotos'] ?? []),
             ':status'              => $booking['status'],
             ':source'              => $booking['source'] ?? 'website',
-        ]);
+        ];
+
+        if ($this->hasBuildSlugColumn()) {
+            $params[':build_slug'] = $this->resolveBuildSlugForBooking($booking);
+            $db->prepare(
+                'INSERT INTO bookings
+                 (id, reference_number, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
+                  vehicle_year, service_id, service_ids, selected_variations, appointment_date, appointment_time,
+                  notes, signature_data, media_urls, before_media_urls, after_media_urls, status, source, build_slug)
+                 VALUES
+                 (:id, :reference_number, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
+                  :vehicle_year, :service_id, :service_ids, :selected_variations, :appointment_date, :appointment_time,
+                  :notes, :signature_data, :media_urls, :before_media_urls, :after_media_urls, :status, :source, :build_slug)'
+            )->execute($params);
+            return;
+        }
+
+        $db->prepare(
+            'INSERT INTO bookings
+             (id, reference_number, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
+              vehicle_year, service_id, service_ids, selected_variations, appointment_date, appointment_time,
+              notes, signature_data, media_urls, before_media_urls, after_media_urls, status, source)
+             VALUES
+             (:id, :reference_number, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
+              :vehicle_year, :service_id, :service_ids, :selected_variations, :appointment_date, :appointment_time,
+              :notes, :signature_data, :media_urls, :before_media_urls, :after_media_urls, :status, :source)'
+        )->execute($params);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -830,6 +853,18 @@ class BookingService
         if (!$data) {
             throw new RuntimeException('Booking not found.', 404);
         }
+
+        if ($this->hasBuildSlugColumn()) {
+            $resolvedSlug = $this->resolveBuildSlugForBooking($data);
+            $currentSlug  = trim((string) ($data['build_slug'] ?? ''));
+
+            if ($resolvedSlug !== null && $resolvedSlug !== '' && $resolvedSlug !== $currentSlug) {
+                $db->prepare('UPDATE bookings SET build_slug = :slug WHERE id = :id')
+                    ->execute([':slug' => $resolvedSlug, ':id' => $id]);
+                $data['build_slug'] = $resolvedSlug;
+            }
+        }
+
         return $this->mapDbRow($data);
     }
 
@@ -1041,6 +1076,7 @@ class BookingService
             'partsNotes'         => $row['parts_notes']     ?? null,
             'internalNotes'      => $row['internal_notes']  ?? null,
             'createdAt'          => $row['created_at'],
+            'buildSlug'          => $this->resolveBuildSlugForBooking($row),
         ];
     }
 
@@ -1223,7 +1259,149 @@ class BookingService
             return [];
         }
         $data = json_decode((string) file_get_contents(self::$storageFile), true);
-        return is_array($data) ? array_reverse($data) : [];
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $bookings = array_reverse($data);
+        foreach ($bookings as &$booking) {
+            if (!is_array($booking)) {
+                continue;
+            }
+            $booking['buildSlug'] = $this->resolveBuildSlugForBooking($booking);
+        }
+        unset($booking);
+
+        return $bookings;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function getActivePortfolioItems(): array
+    {
+        if ($this->activePortfolioCache !== null) {
+            return $this->activePortfolioCache;
+        }
+
+        try {
+            $items = (new PortfolioService())->getAll(false);
+            $this->activePortfolioCache = is_array($items) ? $items : [];
+        } catch (\Throwable) {
+            $this->activePortfolioCache = [];
+        }
+
+        return $this->activePortfolioCache;
+    }
+
+    private function hasBuildSlugColumn(): bool
+    {
+        if ($this->hasBuildSlugColumnCache !== null) {
+            return $this->hasBuildSlugColumnCache;
+        }
+
+        try {
+            $stmt = Database::getInstance()->query('SELECT build_slug FROM bookings LIMIT 0');
+            $this->hasBuildSlugColumnCache = $stmt !== false;
+        } catch (\Throwable) {
+            $this->hasBuildSlugColumnCache = false;
+        }
+
+        return $this->hasBuildSlugColumnCache;
+    }
+
+    private function makeSlug(string $value): string
+    {
+        $slug = strtolower(trim($value));
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+        return trim($slug, '-');
+    }
+
+    /** @param array<string, mixed> $item */
+    private function portfolioItemSlug(array $item): string
+    {
+        $explicit = trim((string) ($item['slug'] ?? ''));
+        if ($explicit !== '') {
+            return $this->makeSlug($explicit);
+        }
+
+        return $this->makeSlug((string) ($item['title'] ?? ''));
+    }
+
+    /**
+     * Resolve a completed booking to a public portfolio/build slug.
+     *
+     * @param array<string, mixed> $booking
+     */
+    private function resolveBuildSlugForBooking(array $booking): ?string
+    {
+        $status = strtolower((string) ($booking['status'] ?? ''));
+        if ($status !== 'completed') {
+            return null;
+        }
+
+        $explicit = trim((string) ($booking['buildSlug'] ?? ($booking['build_slug'] ?? '')));
+        if ($explicit !== '') {
+            $slug = $this->makeSlug($explicit);
+            return $slug !== '' ? $slug : null;
+        }
+
+        $items = $this->getActivePortfolioItems();
+
+        $referenceNumber = trim((string) ($booking['referenceNumber'] ?? ($booking['reference_number'] ?? '')));
+        if ($referenceNumber !== '' && !empty($items)) {
+            $needle = strtolower($referenceNumber);
+            foreach ($items as $item) {
+                $haystack = strtolower(
+                    trim((string) ($item['title'] ?? '')) . ' ' . trim((string) ($item['description'] ?? ''))
+                );
+                if ($haystack !== '' && str_contains($haystack, $needle)) {
+                    $slug = $this->portfolioItemSlug($item);
+                    if ($slug !== '') {
+                        return $slug;
+                    }
+                }
+            }
+        }
+
+        $serviceName = trim((string) ($booking['serviceName'] ?? ($booking['service_name'] ?? '')));
+        if ($serviceName !== '' && !empty($items)) {
+            $serviceSlug = $this->makeSlug($serviceName);
+            if ($serviceSlug !== '') {
+                foreach ($items as $item) {
+                    $slug = $this->portfolioItemSlug($item);
+                    if ($slug === $serviceSlug) {
+                        return $slug;
+                    }
+                }
+            }
+
+            foreach ($items as $item) {
+                $title = trim((string) ($item['title'] ?? ''));
+                if ($title !== '' && stripos($title, $serviceName) !== false) {
+                    $slug = $this->portfolioItemSlug($item);
+                    if ($slug !== '') {
+                        return $slug;
+                    }
+                }
+            }
+        }
+
+        $referenceNumber = trim((string) ($booking['referenceNumber'] ?? ($booking['reference_number'] ?? '')));
+        if ($referenceNumber !== '') {
+            $fallback = $this->makeSlug($referenceNumber);
+            if ($fallback !== '') {
+                return $fallback;
+            }
+        }
+
+        $id = trim((string) ($booking['id'] ?? ''));
+        if ($id !== '') {
+            $fallback = $this->makeSlug($id);
+            if ($fallback !== '') {
+                return 'booking-' . $fallback;
+            }
+        }
+
+        return null;
     }
 
     /** @return array<string, mixed> */
