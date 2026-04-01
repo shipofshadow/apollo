@@ -1734,74 +1734,90 @@ class Router
 
     /**
      * Tier 1: Fetches parent services and formats them as a ManyChat Gallery.
+     *
+     * @param array<string, string> $vars
      */
-    private function getManyChatMenu(): array
+    private function getManyChatMenu(array $vars = []): void
     {
         $serviceService = new ServiceCrudService();
-        $services = $serviceService->getAllServices(); // Fetches Headlights, Headunits, etc.
+        $services = $serviceService->getAll();
 
         $elements = array_map(function ($service) {
             return [
-                'title' => $service['name'],
-                'image_url' => $service['image_url'] ?? '',
+                'title' => $service['title'],
+                'image_url' => $service['imageUrl'] ?? '',
                 'subtitle' => strip_tags($service['description'] ?? ''),
                 'buttons' => [
                     [
                         'type' => 'node',
                         'caption' => 'View Options',
-                        'target' => 'Drill Down Trigger', // Name of your ManyChat Flow/Node
+                        'target' => 'Drill Down Trigger',
                         'payload' => json_encode(['service_id' => $service['id']])
                     ]
                 ]
             ];
         }, $services);
 
-        return [
+        echo json_encode([
             'version' => 'v2',
             'content' => [
                 'type' => 'gallery',
                 'elements' => array_slice($elements, 0, 10) // ManyChat gallery limit
             ]
-        ];
+        ]);
     }
 
     /**
-     * Tier 2: Fetches variations for a specific service ID passed in the request.
+     * Tier 2: Fetches variations for a specific service ID passed in the request body.
+     *
+     * @param array<string, string> $vars
      */
-    private function getManyChatDrillDown(int $serviceId): array
+    private function getManyChatDrillDown(array $vars = []): void
     {
-        $serviceService = new ServiceCrudService();
-        $variations = $serviceService->getServiceVariations($serviceId); // Fetches specific models/packages
+        $body = $this->jsonBody();
+        $serviceId = (int) ($body['service_id'] ?? 0);
 
-        if (empty($variations)) {
-            return [
-                'version' => 'v2',
-                'content' => ['messages' => [['type' => 'text', 'text' => 'No variations available for this selection.']]]
-            ];
+        if ($serviceId <= 0) {
+            throw new RuntimeException('Missing or invalid service_id.', 400);
         }
 
-        $elements = array_map(function ($variant) {
+        $serviceService = new ServiceCrudService();
+        $service = $serviceService->getById($serviceId, false);
+        $variations = $service['variations'] ?? [];
+
+        if (empty($variations)) {
+            echo json_encode([
+                'version' => 'v2',
+                'content' => ['messages' => [['type' => 'text', 'text' => 'No variations available for this selection.']]]
+            ]);
+            return;
+        }
+
+        $bookingUrl = rtrim(APP_URL, '/') . '/booking';
+
+        $elements = array_map(function ($variant) use ($bookingUrl) {
+            $images = $variant['images'] ?? [];
             return [
                 'title' => $variant['name'],
-                'subtitle' => "Price: " . ($variant['price'] ?? 'Contact us'),
-                'image_url' => $variant['image_url'] ?? '',
+                'subtitle' => 'Price: ' . ($variant['price'] ?? 'Contact us'),
+                'image_url' => $images[0] ?? '',
                 'buttons' => [
                     [
-                        'type' => 'buy_button', // Or external link to your booking page
+                        'type' => 'url',
                         'caption' => 'Book Now',
-                        'url' => "https://byteress.xyz/book/" . $variant['id']
+                        'url' => $bookingUrl
                     ]
                 ]
             ];
         }, $variations);
 
-        return [
+        echo json_encode([
             'version' => 'v2',
             'content' => [
                 'type' => 'gallery',
                 'elements' => array_slice($elements, 0, 10)
             ]
-        ];
+        ]);
     }
 
     /** @param array<string, string> $vars */
