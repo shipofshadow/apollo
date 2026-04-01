@@ -95,7 +95,7 @@ class BookingService
             'referenceNumber'    => $this->generateReferenceNumber(),
             'userId'             => $userId,
             'name'               => trim($data['name']),
-            'email'              => strtolower(trim($data['email'])),
+            'email'              => ($data['email'] ?? '') !== '' ? strtolower(trim($data['email'])) : null,
             'phone'              => trim($data['phone']),
             'vehicleInfo'        => trim($data['vehicleInfo']),
             'vehicleMake'        => trim($data['vehicleMake']  ?? ''),
@@ -738,11 +738,11 @@ class BookingService
             'INSERT INTO bookings
              (id, reference_number, user_id, name, email, phone, vehicle_info, vehicle_make, vehicle_model,
               vehicle_year, service_id, service_ids, selected_variations, appointment_date, appointment_time,
-              notes, signature_data, media_urls, before_media_urls, after_media_urls, status)
+              notes, signature_data, media_urls, before_media_urls, after_media_urls, status, source)
              VALUES
              (:id, :reference_number, :user_id, :name, :email, :phone, :vehicle_info, :vehicle_make, :vehicle_model,
               :vehicle_year, :service_id, :service_ids, :selected_variations, :appointment_date, :appointment_time,
-              :notes, :signature_data, :media_urls, :before_media_urls, :after_media_urls, :status)'
+              :notes, :signature_data, :media_urls, :before_media_urls, :after_media_urls, :status, :source)'
         )->execute([
             ':id'                  => $booking['id'],
             ':reference_number'    => $booking['referenceNumber'],
@@ -765,6 +765,7 @@ class BookingService
             ':before_media_urls'   => json_encode($booking['beforePhotos'] ?? []),
             ':after_media_urls'    => json_encode($booking['afterPhotos'] ?? []),
             ':status'              => $booking['status'],
+            ':source'              => $booking['source'] ?? 'website',
         ]);
     }
 
@@ -1035,6 +1036,7 @@ class BookingService
             'beforePhotos'       => $beforePhotos,
             'afterPhotos'        => $afterPhotos,
             'status'             => $row['status'],
+            'source'             => $row['source'] ?? 'website',
             'awaitingParts'      => (bool) ($row['awaiting_parts'] ?? false),
             'partsNotes'         => $row['parts_notes']     ?? null,
             'internalNotes'      => $row['internal_notes']  ?? null,
@@ -1412,7 +1414,7 @@ class BookingService
     private function validatePayload(array $data): void
     {
         $required = [
-            'name', 'email', 'phone', 'vehicleInfo',
+            'name', 'phone', 'vehicleInfo',
             'appointmentDate', 'appointmentTime',
         ];
         foreach ($required as $field) {
@@ -1420,7 +1422,8 @@ class BookingService
                 throw new RuntimeException("Field '$field' is required.", 422);
             }
         }
-        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+        $email = trim((string) ($data['email'] ?? ''));
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('A valid email address is required.', 422);
         }
         // Accepts new multi-service format (serviceIds[]) or legacy single serviceId

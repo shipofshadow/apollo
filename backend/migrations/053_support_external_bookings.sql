@@ -5,4 +5,7 @@
 ALTER TABLE bookings
     ADD COLUMN IF NOT EXISTS source VARCHAR(50) NOT NULL DEFAULT 'website' AFTER status;
 
+ALTER TABLE bookings
+    MODIFY COLUMN email VARCHAR(255) DEFAULT NULL;
+
     
