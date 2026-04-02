@@ -3,17 +3,19 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2,
-  UploadCloud, X, Calendar as CalendarIcon, Car
+  UploadCloud, X, Calendar as CalendarIcon, Car, Bell
 } from 'lucide-react';
 import { submitBookingAsync, resetBookingState } from '../store/bookingSlice';
 import { fetchServicesAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import {
   fetchAvailabilityApi, uploadBookingMediaApi,
   fetchVehicleMakesApi, fetchVehicleModelsApi,
   fetchShopHoursApi, fetchMyVehiclesApi,
   fetchShopClosedDatesApi,
+  joinWaitlistApi,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
 import type { ClientVehicle, ShopDayHours } from '../types';
@@ -102,6 +104,7 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token } = useAuth();
+  const { showToast } = useToast();
   const { status: bookStatus, error: bookError, appointments } = useSelector((s: RootState) => s.booking);
   const services = useSelector((s: RootState) => s.services.items.filter(sv => sv.isActive));
 
@@ -126,6 +129,8 @@ export default function BookingPage() {
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
   const [slotCapacity, setSlotCapacity] = useState(3);
+  const [waitlistJoining, setWaitlistJoining] = useState(false);
+  const [waitlistJoined, setWaitlistJoined] = useState<string | null>(null); // "date|time" key
   const [shopDayIsOpen, setShopDayIsOpen] = useState(true);
   const [closureReason, setClosureReason] = useState<string | null>(null);
   const [shopCloseTime, setShopCloseTime] = useState('18:00');
@@ -590,11 +595,51 @@ export default function BookingPage() {
                                   Shop closes at {shopCloseTime}. Slots that won't accommodate your {totalMaxHours}h service duration are hidden.
                                 </p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                  {visibleSlots.length === 0 && (
+                                  {visibleSlots.length === 0 && !isTodaySelected && (
+                                    <div className="col-span-full py-6 text-center bg-brand-orange/5 border border-brand-orange/10 rounded-sm space-y-3 px-4">
+                                      <p className="text-sm text-brand-orange/80">
+                                        No available slots for this date.
+                                      </p>
+                                      {(() => {
+                                        const slotKey = `${selectedDate ? selectedDate.toISOString().slice(0,10) : ''}|all`;
+                                        if (waitlistJoined === slotKey) {
+                                          return <p className="text-xs text-green-400 font-semibold">✓ You're on the waitlist! We'll notify you if a slot opens.</p>;
+                                        }
+                                        return (
+                                          <button
+                                            disabled={waitlistJoining}
+                                            onClick={async () => {
+                                              const dateStr = selectedDate ? selectedDate.toISOString().slice(0,10) : '';
+                                              setWaitlistJoining(true);
+                                              try {
+                                                await joinWaitlistApi({
+                                                  slotDate: dateStr,
+                                                  slotTime: 'any',
+                                                  name: form.name || user?.name || '',
+                                                  email: form.email || user?.email || '',
+                                                  phone: form.phone || user?.phone || '',
+                                                  serviceIds: selectedServices.map(s => s.id).join(','),
+                                                }, token);
+                                                setWaitlistJoined(slotKey);
+                                                showToast("You've joined the waitlist!", 'success');
+                                              } catch (e) {
+                                                showToast((e as Error).message ?? 'Could not join waitlist.', 'error');
+                                              } finally {
+                                                setWaitlistJoining(false);
+                                              }
+                                            }}
+                                            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
+                                          >
+                                            <Bell className="w-3.5 h-3.5" />
+                                            {waitlistJoining ? 'Joining…' : 'Join Waitlist'}
+                                          </button>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
+                                  {visibleSlots.length === 0 && isTodaySelected && (
                                     <p className="col-span-full text-sm text-brand-orange/80 py-6 text-center bg-brand-orange/5 border border-brand-orange/10 rounded-sm">
-                                      {isTodaySelected
-                                        ? 'No available slots left for today.'
-                                        : 'No available slots for this date.'}
+                                      No available slots left for today.
                                     </p>
                                   )}
                                   {visibleSlots.map(time => {

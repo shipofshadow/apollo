@@ -761,6 +761,48 @@ export default function BookingDetail() {
           <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{booking.notes}</p>
         </div>
       )}
+
+      {/* Calibration Certificate */}
+      {booking.calibrationData && booking.status === 'completed' && (
+        <div className="mt-6 bg-[#111] border border-brand-orange/20 rounded-lg p-5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange/70 mb-4 flex items-center gap-2">
+            <BadgeCheck className="w-3.5 h-3.5 text-brand-orange" /> Calibration Certificate
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+            {booking.calibrationData.beamAngle && (
+              <div>
+                <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Beam Angle</p>
+                <p className="text-sm font-bold text-white">{booking.calibrationData.beamAngle}</p>
+              </div>
+            )}
+            {booking.calibrationData.luxOutput && (
+              <div>
+                <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Lux Output</p>
+                <p className="text-sm font-bold text-white">{booking.calibrationData.luxOutput}</p>
+              </div>
+            )}
+            {booking.assignedTech && (
+              <div>
+                <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Technician</p>
+                <p className="text-sm font-bold text-white">{booking.assignedTech.name}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Date</p>
+              <p className="text-sm font-bold text-white">{booking.appointmentDate}</p>
+            </div>
+          </div>
+          {booking.calibrationData.notes && (
+            <p className="text-xs text-gray-400 leading-relaxed border-t border-white/5 pt-3">{booking.calibrationData.notes}</p>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded hover:bg-brand-orange/20 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+          </button>
+        </div>
+      )}
     </div>
 
     {/* Action Panel */}

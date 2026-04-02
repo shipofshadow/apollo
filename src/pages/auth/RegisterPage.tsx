@@ -36,6 +36,7 @@ export default function RegisterPage() {
   });
   const [showPw,   setShowPw]   = useState(false);
   const [localErr, setLocalErr] = useState('');
+  const [consentGiven, setConsentGiven] = useState(false);
   const hasShownToast = useRef(false);
 
   useEffect(() => {
@@ -64,12 +65,17 @@ export default function RegisterPage() {
       setLocalErr('Password must be at least 8 characters.');
       return;
     }
+    if (!consentGiven) {
+      setLocalErr('Please accept the privacy policy to continue.');
+      return;
+    }
     register({
       name: form.name,
       email: form.email,
       phone: form.phone,
       password: form.password,
-    }).catch(() => {});
+      consentGiven: true,
+    } as Parameters<typeof register>[0]).catch(() => {});
   };
 
   const displayError = localErr || error;
@@ -171,6 +177,20 @@ export default function RegisterPage() {
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
                 placeholder="Repeat your password"
               />
+            </div>
+
+            {/* Privacy Consent */}
+            <div className="flex items-start gap-3 p-3 bg-brand-darker border border-gray-700 rounded-sm">
+              <input
+                type="checkbox"
+                id="consent"
+                checked={consentGiven}
+                onChange={e => setConsentGiven(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-brand-orange cursor-pointer shrink-0"
+              />
+              <label htmlFor="consent" className="text-xs text-gray-400 cursor-pointer leading-relaxed">
+                I agree to the collection and processing of my personal data (bookings, vehicle info, contact details) by 1625 Auto Lab for service delivery purposes. You may export or delete your data anytime from your profile.
+              </label>
             </div>
 
             <button
