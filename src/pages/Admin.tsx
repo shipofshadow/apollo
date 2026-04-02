@@ -4,12 +4,11 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare,
+  Camera, MessageSquare, GitBranch,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
-import AdminChatbotPanel    from './admin/chatbot/AdminChatbotPanel';
 import AnalyticsPanel       from './admin/AnalyticsPanel';
 import BookingsPanel        from './admin/BookingsPanel';
 import AdminBookingDetail   from './admin/AdminBookingDetail';
@@ -26,13 +25,16 @@ import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
 import UserAccessPanel      from './admin/UserAccessPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
+import ConversationsPage    from './chatbot/ConversationsPage';
+import FlowEditorPage       from './chatbot/FlowEditorPage';
 
 const TAB_PATHS: Record<string, string> = {
   analytics: '/admin/dashboard',
   appointments: '/admin/bookings',
   calendar: '/admin/calendar',
   reviews: '/admin/reviews',
-  chatbot: '/admin/chatbot',
+  'chatbot-conversations': '/chatbot/conversations',
+  'chatbot-flow': '/chatbot/flow-editor',
   services: '/admin/services',
   products: '/admin/products',
   'shop-hours': '/admin/shop-hours',
@@ -131,6 +133,7 @@ export default function AdminPage() {
   
   // Track which dropdown groups are open
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    chatbot: true,
     shop: true,
     content: true,
     settings: false,
@@ -199,7 +202,7 @@ export default function AdminPage() {
   const isAdmin = role === 'admin';
 
   const canAccessTab = (key: string) => {
-    if (key === 'chatbot') {
+    if (['chatbot', 'chatbot-conversations', 'chatbot-flow'].includes(key)) {
       return hasPermission('chatbot:manage');
     }
 
@@ -223,7 +226,13 @@ export default function AdminPage() {
     { key: 'appointments', label: 'Bookings',   icon: Calendar },
     { key: 'calendar',     label: 'Calendar',   icon: CalendarDays },
     { key: 'reviews',      label: 'Reviews',    icon: Star },
-    { key: 'chatbot',      label: 'Chatbot',    icon: MessageSquare, routePath: '/admin/chatbot' },
+    {
+      isGroup: true, key: 'chatbot', label: 'Chatbot', icon: MessageSquare,
+      children: [
+        { key: 'chatbot-conversations', label: 'Conversations', icon: MessageSquare },
+        { key: 'chatbot-flow',          label: 'Flow Editor',  icon: GitBranch },
+      ]
+    },
     {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
@@ -273,7 +282,8 @@ export default function AdminPage() {
       case 'content':       return <ContentPanel />;
       case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); navigate(TAB_PATHS.appointments); }} />;
       case 'reviews':       return <ReviewsPanel />;
-      case 'chatbot':       return <AdminChatbotPanel />;
+      case 'chatbot-conversations': return <ConversationsPage />;
+      case 'chatbot-flow':  return <FlowEditorPage />;
       case 'appointments':
         if (activeBookingId) {
           return (
@@ -294,6 +304,8 @@ export default function AdminPage() {
       default: return null;
     }
   };
+
+  const isChatbotTab = activeTab === 'chatbot-conversations' || activeTab === 'chatbot-flow';
 
   return (
     <div className="min-h-screen bg-brand-darker flex flex-col">
@@ -349,7 +361,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="flex relative">
+      <div className="relative flex flex-1 min-h-0 overflow-hidden">
         {/* Mobile overlay */}
         {mobileOpen && (
           <div
@@ -426,11 +438,13 @@ export default function AdminPage() {
                       <div className={`mt-0.5 space-y-0.5 ${collapsed ? '' : 'pl-3 border-l border-gray-800/50 ml-3'}`}>
                         {visibleChildren.map(child => {
                           const ChildIcon = child.icon;
-                          const isActive = activeTab === child.key;
+                          const isActive = 'externalPath' in child
+                            ? location.pathname.startsWith((child as { externalPath: string }).externalPath)
+                            : activeTab === child.key;
                           return (
                             <button
                               key={child.key}
-                              onClick={() => handleTabChange(child.key)}
+                              onClick={() => 'externalPath' in child ? navigate((child as { externalPath: string }).externalPath) : handleTabChange(child.key)}
                               title={collapsed ? child.label : undefined}
                               className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm relative ${
                                 isActive
@@ -501,7 +515,7 @@ export default function AdminPage() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 min-w-0">
+        <main className={`flex-1 min-w-0 min-h-0 ${isChatbotTab ? 'p-0 overflow-hidden' : 'p-4 md:p-6 lg:p-8'}`}>
           {renderContent()}
         </main>
       </div>

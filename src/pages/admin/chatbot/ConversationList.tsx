@@ -45,7 +45,7 @@ export default function ConversationList({ conversations, selectedId, onSelect }
   }
 
   return (
-    <div className="space-y-1.5 p-1.5">
+    <div className="space-y-1.5 p-2">
       {conversations.map((conv) => {
         const isSelected = conv.session_id === selectedId
         const statusKey = conv.status as keyof typeof STATUS_COLORS
@@ -69,10 +69,10 @@ export default function ConversationList({ conversations, selectedId, onSelect }
           <div
             key={conv.session_id}
             onClick={() => onSelect(conv.session_id)}
-            className={`cursor-pointer rounded-md border px-3 py-2.5 transition ${
+            className={`cursor-pointer rounded-md border px-3 py-2.5 transition-all duration-200 ${
               isSelected
                 ? 'border-brand-orange/70 bg-brand-orange/10 shadow-[0_8px_20px_rgba(245,130,32,0.18)]'
-                : 'border-gray-800 bg-brand-dark/70 hover:border-gray-700 hover:bg-brand-darker/70'
+                : 'border-gray-800 bg-gray-900/70 hover:border-gray-700 hover:bg-gray-800/70'
             }`}
           >
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -80,14 +80,14 @@ export default function ConversationList({ conversations, selectedId, onSelect }
                 <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-[11px] font-bold ${
                   isSelected
                     ? 'border-brand-orange/60 bg-brand-orange/20 text-brand-orange'
-                    : 'border-gray-700 bg-brand-dark text-gray-300'
+                    : 'border-gray-700 bg-gray-900 text-gray-300'
                 }`}>
                   {initial}
                 </div>
                 {needsAttention && (
                   <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-brand-orange" />
                 )}
-                <div className="min-w-0">
+                <div className="min-w-0 block overflow-hidden">
                   <div className="truncate text-[13px] font-semibold text-gray-100">{title}</div>
                   <div className="truncate font-mono text-[10px] text-gray-500">{subtitle}</div>
                 </div>

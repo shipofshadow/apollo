@@ -55,6 +55,8 @@ type AppointmentAction = {
   created_at: string
 }
 
+const POLL_INTERVAL_MS = 3000
+
 function getAgentName(msg: ConversationMessage): string | null {
   if (msg.metadata?.agent_name) return msg.metadata.agent_name
   if (!msg.metadata_json) return null
@@ -107,7 +109,8 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
       const data = await chatbotApi.getConversation(sessionId)
       setConversation(data)
       if (isInitial) setErrorMessage(null)
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch conversation', error)
       if (isInitial) setErrorMessage('Failed to load conversation.')
     } finally {
       if (isInitial) setLoading(false)
@@ -120,11 +123,45 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     try {
       const data = await chatbotApi.getAppointmentActions(sessionId, 10)
       setAppointmentActions(Array.isArray(data) ? data : [])
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch appointment actions', error)
       setAppointmentActions([])
     } finally {
       setActionsLoading(false)
     }
+  }, [sessionId])
+
+  const syncPresenceAndProfile = useCallback(async () => {
+    if (!sessionId) return
+
+    const [presenceResult, profileResult] = await Promise.allSettled([
+      chatbotApi.getPresence(sessionId),
+      chatbotApi.getCustomerProfile(sessionId),
+    ])
+
+    if (presenceResult.status === 'fulfilled' && presenceResult.value) {
+      setPresence(presenceResult.value)
+    } else if (presenceResult.status === 'rejected') {
+      console.error('Failed to fetch chat presence', presenceResult.reason)
+    }
+
+    if (profileResult.status === 'fulfilled' && profileResult.value) {
+      const profileData = profileResult.value
+      setProfileForm({
+        name: String(profileData.name || ''),
+        email: String(profileData.email || ''),
+        phone: String(profileData.phone || ''),
+        vehicle_make: String(profileData.vehicle_make || ''),
+        vehicle_model: String(profileData.vehicle_model || ''),
+        vehicle_year: String(profileData.vehicle_year || ''),
+      })
+    } else if (profileResult.status === 'rejected') {
+      console.error('Failed to fetch customer profile', profileResult.reason)
+    }
+
+    chatbotApi.markRead(sessionId, 'agent').catch((error) => {
+      console.error('Failed to mark messages as read', error)
+    })
   }, [sessionId])
 
   useEffect(() => {
@@ -133,53 +170,30 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     setErrorMessage(null)
     setPresence(null)
     if (!sessionId) return
-    fetchConversation(true)
-    fetchAppointmentActions()
-    const interval = setInterval(() => fetchConversation(false), 3000)
+
+    void fetchConversation(true)
+    void fetchAppointmentActions()
+    void syncPresenceAndProfile()
+
+    const interval = setInterval(() => {
+      if (document.hidden) return
+      void Promise.all([
+        fetchConversation(false),
+        syncPresenceAndProfile(),
+      ])
+    }, POLL_INTERVAL_MS)
+
     return () => clearInterval(interval)
-  }, [sessionId, fetchConversation, fetchAppointmentActions])
+  }, [sessionId, fetchConversation, fetchAppointmentActions, syncPresenceAndProfile])
 
   const effectiveAgentName = user?.role === 'admin' ? user.name : null
 
   useEffect(() => {
-    if (!sessionId) return
-
-    let cancelled = false
-
-    const syncProfileAndPresence = async () => {
-      try {
-        const [presenceData, profileData] = await Promise.all([
-          chatbotApi.getPresence(sessionId).catch(() => null),
-          chatbotApi.getCustomerProfile(sessionId).catch(() => null),
-        ])
-        if (cancelled) return
-
-        if (presenceData) {
-          setPresence(presenceData)
-        }
-        if (profileData) {
-          setProfileForm({
-            name: String(profileData.name || ''),
-            email: String(profileData.email || ''),
-            phone: String(profileData.phone || ''),
-            vehicle_make: String(profileData.vehicle_make || ''),
-            vehicle_model: String(profileData.vehicle_model || ''),
-            vehicle_year: String(profileData.vehicle_year || ''),
-          })
-        }
-
-        chatbotApi.markRead(sessionId, 'agent').catch(() => undefined)
-      } catch {
-      }
-    }
-
-    syncProfileAndPresence()
-    const interval = setInterval(syncProfileAndPresence, 2500)
-
     return () => {
-      cancelled = true
-      clearInterval(interval)
-      chatbotApi.setPresence(sessionId, 'agent', false).catch(() => undefined)
+      if (!sessionId) return
+      chatbotApi.setPresence(sessionId, 'agent', false).catch((error) => {
+        console.error('Failed to clear agent presence', error)
+      })
     }
   }, [sessionId])
 
@@ -188,7 +202,9 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
 
     const isTypingNow = inputValue.trim().length > 0
     const timer = setTimeout(() => {
-      chatbotApi.setPresence(sessionId, 'agent', isTypingNow).catch(() => undefined)
+      chatbotApi.setPresence(sessionId, 'agent', isTypingNow).catch((error) => {
+        console.error('Failed to update typing presence', error)
+      })
     }, 250)
 
     return () => clearTimeout(timer)
@@ -237,8 +253,12 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     try {
       await chatbotApi.adminReply(sessionId, text, null, effectiveAgentName)
       setInputValue('')
-      chatbotApi.setPresence(sessionId, 'agent', false).catch(() => undefined)
-      chatbotApi.markRead(sessionId, 'agent').catch(() => undefined)
+      chatbotApi.setPresence(sessionId, 'agent', false).catch((error) => {
+        console.error('Failed to clear typing presence', error)
+      })
+      chatbotApi.markRead(sessionId, 'agent').catch((error) => {
+        console.error('Failed to mark reply as read', error)
+      })
       setErrorMessage(null)
       fetchConversation(false)
     } catch (e) {
@@ -351,7 +371,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const canReplyAsAgent = canSend && !!effectiveAgentName
 
   return (
-    <div className="flex h-full flex-col bg-gradient-to-b from-brand-dark to-brand-darker">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-brand-dark to-brand-darker">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-800 bg-brand-darker/95 px-4 py-3 backdrop-blur-sm">
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-xs font-semibold text-gray-100 sm:text-sm">
@@ -537,8 +557,8 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         </div>
       )}
 
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.03),transparent_35%),linear-gradient(to_bottom,rgba(255,255,255,0.02),transparent)] px-4 py-4">
-        {messages.length === 0 && (
+      <div ref={messagesContainerRef} className="h-0 flex-1 min-h-0 overflow-y-auto overscroll-y-contain bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.03),transparent_35%),linear-gradient(to_bottom,rgba(255,255,255,0.02),transparent)] px-4 py-4">
+          {messages.length === 0 && (
           <div className="mt-10 text-center text-sm text-gray-500">
             No messages in this conversation.
           </div>
@@ -580,7 +600,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 border-t border-gray-800 bg-brand-darker/95 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-end">
+      <div className="z-10 flex shrink-0 flex-col gap-2 border-t border-gray-800 bg-brand-darker/95 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-end">
         <div className="w-full rounded-sm border border-gray-700 bg-brand-dark px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-300 sm:w-52">
           {canSend ? `Replying as ${effectiveAgentName || 'Admin'}` : 'Take over first'}
         </div>

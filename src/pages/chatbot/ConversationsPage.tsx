@@ -67,7 +67,9 @@ export default function ConversationsPage() {
           customerNameCacheRef.current[sid] = name
           setConversations((prev) => prev.map((c) => c.session_id === sid ? { ...c, customer_name: name } : c))
         })
-        .catch(() => undefined)
+        .catch((error) => {
+          console.error('Failed to hydrate customer profile for session', sid, error)
+        })
         .finally(() => pendingNameLoadsRef.current.delete(sid))
     })
   }, [])
@@ -97,8 +99,8 @@ export default function ConversationsPage() {
       const withCache = mergeCachedNames(list)
       setConversations(withCache)
       hydrateMissingCustomerNames(withCache)
-    } catch {
-      // network errors are silently ignored; poll will retry
+    } catch (error) {
+      console.error('Failed to fetch conversations', error)
     } finally {
       setLoading(false)
     }
@@ -116,7 +118,9 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => undefined)
+      Notification.requestPermission().catch((error) => {
+        console.error('Failed to request notification permission', error)
+      })
     }
   }, [])
 
@@ -152,39 +156,33 @@ export default function ConversationsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-brand-darker flex flex-col">
-      {/* Page Header */}
-      <div className="border-b border-gray-800 bg-brand-dark px-4 md:px-6 py-4 flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <MessageSquare className="w-5 h-5 text-brand-orange shrink-0" />
-          <div>
-            <h1 className="text-white font-display font-bold uppercase tracking-tight text-lg leading-none">
-              Conversations
-            </h1>
-            <p className="text-gray-500 text-xs mt-0.5">
-              {conversations.length} total · {humanCount} need attention
-            </p>
-          </div>
+    <div className="h-screen w-full overflow-hidden bg-gray-900 text-gray-200 flex flex-col">
+      <div className="border-b border-gray-800 bg-gray-900/90 px-4 py-2.5 flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+          <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+          <div className="ml-2 hidden sm:block text-xs text-gray-500">{conversations.length} conversations</div>
         </div>
         <button
           onClick={() => void fetchConversations()}
-          className="flex items-center gap-2 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-sm transition-colors"
+          className="flex items-center gap-2 text-xs text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-sm transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 min-h-0 overflow-hidden">
         {/* Sidebar — conversation list */}
         <aside
           className={`
             ${showSidebar ? 'translate-x-0' : '-translate-x-full'}
             md:translate-x-0
-            fixed md:relative inset-y-0 left-0 z-30
-            w-72 md:w-72 lg:w-80
-            bg-brand-dark border-r border-gray-800
+            fixed md:relative inset-y-0 left-0 z-40 md:z-10
+            flex-none w-[88vw] max-w-xs md:max-w-none md:w-80
+            bg-gray-900 border-r border-gray-800
             flex flex-col
-            transition-transform duration-200
+            overflow-hidden transition-transform duration-300 ease-in-out
           `}
         >
           {/* Mobile close */}
@@ -193,6 +191,17 @@ export default function ConversationsPage() {
             <button onClick={() => setShowSidebar(false)} className="text-gray-400 hover:text-white">
               <X className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* Sidebar header */}
+          <div className="hidden md:flex items-center justify-between px-4 py-3 border-b border-gray-800">
+            <div className="w-10 h-10 rounded-full bg-gray-800 border border-gray-700 grid place-items-center text-brand-orange shrink-0">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div className="ml-3 min-w-0">
+              <p className="text-sm font-semibold text-gray-100 truncate">Messenger</p>
+              <p className="text-[11px] text-gray-500 truncate">{humanCount} waiting for human</p>
+            </div>
           </div>
 
           {/* Search */}
@@ -204,7 +213,7 @@ export default function ConversationsPage() {
                 placeholder="Search conversations…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-brand-darker border border-gray-700 text-white text-xs pl-8 pr-3 py-2 rounded-sm focus:outline-none focus:border-brand-orange transition-colors placeholder-gray-600"
+                className="w-full bg-gray-900 border border-gray-700 text-white text-xs pl-8 pr-3 py-2 rounded-sm focus:outline-none focus:border-brand-orange transition-colors placeholder-gray-600"
               />
             </div>
           </div>
@@ -244,7 +253,7 @@ export default function ConversationsPage() {
           </div>
 
           {/* Status legend */}
-          <div className="px-4 py-3 border-t border-gray-800 flex items-center gap-4 text-[11px] text-gray-500">
+          <div className="px-4 py-3 border-t border-gray-800 hidden md:flex items-center gap-4 text-[11px] text-gray-500">
             <span className="flex items-center gap-1.5"><Bot className="w-3 h-3 text-blue-400" /> Bot</span>
             <span className="flex items-center gap-1.5"><User className="w-3 h-3 text-brand-orange" /> Human</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-600 inline-block" /> Closed</span>
@@ -254,15 +263,15 @@ export default function ConversationsPage() {
         {/* Mobile overlay */}
         {showSidebar && (
           <div
-            className="md:hidden fixed inset-0 z-20 bg-black/60"
+            className="md:hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowSidebar(false)}
           />
         )}
 
         {/* Main area — chat view */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-gray-900 border-l border-gray-800">
           {/* Mobile toolbar */}
-          <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-brand-dark">
+          <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900">
             <button
               onClick={() => setShowSidebar(true)}
               className="flex items-center gap-2 text-xs text-gray-400 hover:text-white bg-gray-800 px-3 py-1.5 rounded-sm transition-colors"
@@ -276,14 +285,16 @@ export default function ConversationsPage() {
           </div>
 
           {selectedSessionId ? (
-            <ChatView
-              sessionId={selectedSessionId}
-              onDeleteConversation={async (sid) => {
-                await chatbotApi.deleteConversation(sid)
-                setConversations((prev) => prev.filter((c) => c.session_id !== sid))
-                setSelectedSessionId(null)
-              }}
-            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ChatView
+                sessionId={selectedSessionId}
+                onDeleteConversation={async (sid) => {
+                  await chatbotApi.deleteConversation(sid)
+                  setConversations((prev) => prev.filter((c) => c.session_id !== sid))
+                  setSelectedSessionId(null)
+                }}
+              />
+            </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-4">
               <div className="w-16 h-16 rounded-full bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center">

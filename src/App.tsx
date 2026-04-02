@@ -42,10 +42,6 @@ import Profile from './pages/client/Profile';
 // Admin
 import Admin from './pages/Admin';
 
-// Chatbot standalone pages
-import ConversationsPage from './pages/chatbot/ConversationsPage';
-import FlowEditorPage from './pages/chatbot/FlowEditorPage';
-
 // Build Showcase (public build mini-site)
 import BuildShowcase from './pages/BuildShowcase';
 
@@ -115,7 +111,7 @@ function AppInner() {
         path="/chatbot/conversations"
         element={
           <ProtectedRoute denyClientRole>
-            <ConversationsPage />
+            <Admin />
           </ProtectedRoute>
         }
       />
@@ -123,7 +119,7 @@ function AppInner() {
         path="/chatbot/flow-editor"
         element={
           <ProtectedRoute denyClientRole>
-            <FlowEditorPage />
+            <Admin />
           </ProtectedRoute>
         }
       />

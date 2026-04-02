@@ -406,10 +406,23 @@ export default function FlowEditorPage() {
   const [showNewFlowModal, setShowNewFlowModal] = useState(false)
   const [newFlowName, setNewFlowName] = useState('')
   const [newFlowDesc, setNewFlowDesc] = useState('')
+  const [isMobile, setIsMobile] = useState(false)
 
   const nodeIdCounter = useRef(100)
 
   const savedFlowRef = useRef({ nodes: DEFAULT_NODES, edges: DEFAULT_EDGES })
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const apply = () => {
+      const mobile = media.matches
+      setIsMobile(mobile)
+      if (mobile) setShowPalette(false)
+    }
+    apply()
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [])
 
   // ── Fetch flows ──────────────────────────────────────────────────────────
   const fetchFlows = useCallback(async () => {
@@ -436,7 +449,12 @@ export default function FlowEditorPage() {
 
     try {
       const parsed = JSON.parse(flow.flow_json ?? '{}') as { nodes?: Node<FlowNodeData>[]; edges?: Edge[] }
-      const loadedNodes = parsed.nodes ?? DEFAULT_NODES
+      const loadedNodes = (parsed.nodes ?? DEFAULT_NODES).map((n, i) => ({
+        ...n,
+        position: (n.position && typeof n.position.x === 'number' && typeof n.position.y === 'number')
+          ? n.position
+          : { x: 250, y: 50 + i * 120 },
+      }))
       const loadedEdges = parsed.edges ?? DEFAULT_EDGES
       setNodes(loadedNodes)
       setEdges(loadedEdges)
@@ -578,7 +596,7 @@ export default function FlowEditorPage() {
   }, [newFlowDesc, newFlowName, setEdges, setNodes])
 
   return (
-    <div className="h-screen flex flex-col bg-[#0d0d1a] text-white overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col bg-[#0d0d1a] text-white overflow-hidden">
       {/* ── Top Toolbar ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-800 bg-[#111120] shrink-0 flex-wrap">
         {/* Flow selector */}
@@ -779,7 +797,7 @@ export default function FlowEditorPage() {
 
         {/* ── Right Properties Panel ───────────────────────────────── */}
         {selectedNode && (
-          <aside className="w-60 md:w-64 shrink-0 bg-[#111120] border-l border-gray-800 flex flex-col overflow-hidden">
+          <aside className="absolute md:static right-0 top-0 bottom-0 z-20 w-[88vw] max-w-[20rem] md:w-64 shrink-0 bg-[#111120] border-l border-gray-800 flex flex-col overflow-hidden shadow-2xl md:shadow-none">
             <PropertiesPanel
               node={selectedNode}
               onUpdate={handleUpdateNodeData}
@@ -866,7 +884,7 @@ export default function FlowEditorPage() {
       )}
 
       {/* ── Help hint when empty ─────────────────────────────────────── */}
-      {nodes.length <= 1 && edges.length === 0 && !selectedFlowId && (
+      {nodes.length <= 1 && edges.length === 0 && !selectedFlowId && !isMobile && (
         <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 z-20 bg-[#111120] border border-gray-700 rounded-lg px-5 py-3 text-center max-w-sm shadow-xl">
           <p className="text-white font-bold text-sm mb-1">Build your first flow</p>
           <p className="text-gray-400 text-xs">Click node types on the left to add them, then drag handles to connect. Save when done.</p>
