@@ -145,8 +145,13 @@ export default function CardCarousel({ cards, onButtonClick }: CardCarouselProps
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
           onClick={() => setSpecsModalIndex(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setSpecsModalIndex(null) }}
+          role="presentation"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="specs-modal-title"
             className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -154,7 +159,7 @@ export default function CardCarousel({ cards, onButtonClick }: CardCarouselProps
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-orange-600">Specifications</p>
                 {modalCard.title && (
-                  <h3 className="mt-0.5 text-sm font-semibold text-slate-900">{modalCard.title}</h3>
+                  <h3 id="specs-modal-title" className="mt-0.5 text-sm font-semibold text-slate-900">{modalCard.title}</h3>
                 )}
               </div>
               <button
