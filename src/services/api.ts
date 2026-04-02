@@ -227,7 +227,7 @@ export const deleteServiceApi = (token: string, id: number) =>
 
 export const createServiceVariationApi = (
   token: string,
-  serviceId: number,
+  serviceId: number | string,
   data: Partial<Omit<ServiceVariation, 'id' | 'serviceId'>>
 ) =>
   apiFetch<{ variation: ServiceVariation }>(`/api/services/${serviceId}/variations`, {
@@ -237,7 +237,7 @@ export const createServiceVariationApi = (
 
 export const updateServiceVariationApi = (
   token: string,
-  serviceId: number,
+  serviceId: number | string,
   varId: number,
   data: Partial<Omit<ServiceVariation, 'id' | 'serviceId'>>
 ) =>
@@ -246,7 +246,7 @@ export const updateServiceVariationApi = (
     body: JSON.stringify(data),
   }, token);
 
-export const deleteServiceVariationApi = (token: string, serviceId: number, varId: number) =>
+export const deleteServiceVariationApi = (token: string, serviceId: number | string, varId: number) =>
   apiFetch<{ message: string }>(`/api/services/${serviceId}/variations/${varId}`, {
     method: 'DELETE',
   }, token);
