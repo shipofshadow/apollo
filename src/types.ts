@@ -194,6 +194,12 @@ export interface Booking {
   awaitingParts?: boolean;
   partsNotes?: string;
   internalNotes?: string;
+  calibrationData?: {
+    beamAngle?: string;
+    luxOutput?: string;
+    notes?: string;
+    [key: string]: string | undefined;
+  } | null;
   signatureData?: string;
   mediaUrls?: string[];
   beforePhotos?: string[];
@@ -423,10 +429,28 @@ export interface BeforeAfterItem {
   id: number;
   title: string;
   description: string;
+  vehicleMake: string;
+  vehicleModel: string;
   beforeImageUrl: string;
   afterImageUrl: string;
   isActive: boolean;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WaitlistEntry {
+  id: number;
+  slotDate: string;
+  slotTime: string;
+  userId: number | null;
+  name: string;
+  email: string;
+  phone: string;
+  serviceIds: string;
+  notes: string | null;
+  status: 'waiting' | 'notified' | 'booked' | 'expired';
+  notifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

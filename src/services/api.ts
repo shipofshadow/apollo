@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -912,8 +912,16 @@ export const deleteOfferApi = (token: string, id: number) =>
 
 // ── Before/After API ─────────────────────────────────────────────────────────
 
-export const fetchBeforeAfterItemsApi = (token?: string | null) =>
-  apiFetch<{ items: BeforeAfterItem[] }>('/api/before-after', {}, token);
+export const fetchBeforeAfterItemsApi = (
+  filters?: { make?: string; model?: string },
+  token?: string | null
+) => {
+  const params = new URLSearchParams();
+  if (filters?.make)  params.set('make',  filters.make);
+  if (filters?.model) params.set('model', filters.model);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch<{ items: BeforeAfterItem[] }>(`/api/before-after${qs}`, {}, token);
+};
 
 export const fetchBeforeAfterItemApi = (id: number, token?: string | null) =>
   apiFetch<{ item: BeforeAfterItem }>(`/api/before-after/${id}`, {}, token);
@@ -1136,3 +1144,73 @@ export const deleteMyVehicleApi = (token: string, id: number) =>
 
 export const fetchBuildShowcaseApi = (slug: string) =>
   apiFetch<PortfolioItem>(`/api/portfolio/slug/${encodeURIComponent(slug)}`);
+
+
+// ── Calibration Certificate ───────────────────────────────────────────────────
+
+export const updateCalibrationDataApi = (
+  token: string,
+  bookingId: string,
+  data: { beamAngle?: string; luxOutput?: string; notes?: string; [key: string]: string | undefined }
+) =>
+  apiFetch<{ booking: Booking }>(`/api/bookings/${bookingId}/calibration`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
+
+// ── GDPR / Data Privacy ───────────────────────────────────────────────────────
+
+export const exportMyDataApi = async (token: string): Promise<void> => {
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/auth/data-export`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    notifyApiOffline();
+    throw new Error('API is offline.');
+  }
+  if (!response.ok) {
+    const d = await response.json().catch(() => ({}));
+    throw new Error((d as { detail?: string }).detail ?? `Export failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `my-data-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+export const deleteMyAccountApi = (token: string, password: string) =>
+  apiFetch<{ message: string }>('/api/auth/account', {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  }, token);
+
+// ── Waitlist ──────────────────────────────────────────────────────────────────
+
+export interface JoinWaitlistPayload {
+  slotDate: string;
+  slotTime: string;
+  name: string;
+  email: string;
+  phone?: string;
+  serviceIds?: string;
+  notes?: string;
+}
+
+export const joinWaitlistApi = (data: JoinWaitlistPayload, token?: string | null) =>
+  apiFetch<{ entry: WaitlistEntry }>('/api/waitlist', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const fetchWaitlistApi = (token: string, status?: string) => {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiFetch<{ entries: WaitlistEntry[] }>(`/api/waitlist${qs}`, {}, token);
+};
+
+export const removeWaitlistEntryApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/waitlist/${id}`, { method: 'DELETE' }, token);

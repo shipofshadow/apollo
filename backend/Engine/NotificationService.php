@@ -212,6 +212,46 @@ class NotificationService
         $this->send($email, 'Customer', 'Reset Your Password | 1625 Auto Lab', $body);
     }
 
+    /**
+     * Notify a waitlisted customer that their requested slot has opened up.
+     */
+    public function sendWaitlistSlotAvailable(
+        string $name,
+        string $email,
+        string $date,
+        string $time
+    ): void {
+        if (MAIL_FROM === '' || $email === '') {
+            return;
+        }
+
+        $safeName = htmlspecialchars($name);
+        $safeDate = htmlspecialchars($date);
+        $safeTime = htmlspecialchars($time);
+        $bookingUrl = htmlspecialchars((defined('APP_URL') ? APP_URL : '') . '/booking');
+
+        $body = "
+        <div style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>
+          <h2 style='color:#f36f21'>Slot Available! 🔥</h2>
+          <p>Hi {$safeName},</p>
+          <p>Great news! A slot you've been waiting for has just opened up:</p>
+          <div style='background:#f5f5f5;padding:16px;border-radius:8px;margin:20px 0'>
+            <strong>Date:</strong> {$safeDate}<br/>
+            <strong>Time:</strong> {$safeTime}
+          </div>
+          <p>Book now before it's taken!</p>
+          <p>
+            <a href='{$bookingUrl}'
+               style='background:#f36f21;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold'>
+              Book Now
+            </a>
+          </p>
+          <p style='color:#888;font-size:12px;margin-top:32px'>– 1625 Auto Lab</p>
+        </div>";
+
+        $this->send($email, $name, "Slot Available: {$date} at {$time} | 1625 Auto Lab", $body);
+    }
+
     // -------------------------------------------------------------------------
     // Email body builders
     // -------------------------------------------------------------------------

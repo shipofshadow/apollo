@@ -275,6 +275,19 @@ class BookingService
             (new SmsService())->bookingStatusChanged($booking);
         }
 
+        // When a booking is cancelled, check if anyone is waiting for the freed slot
+        if ($status === 'cancelled') {
+            $slotDate = (string) ($booking['appointmentDate'] ?? '');
+            $slotTime = (string) ($booking['appointmentTime'] ?? '');
+            if ($slotDate !== '' && $slotTime !== '') {
+                try {
+                    (new WaitlistService())->handleBookingCancelled($slotDate, $slotTime);
+                } catch (\Throwable) {
+                    // fail silently – don't block the cancellation
+                }
+            }
+        }
+
         // In-app notification for the client who made the booking
         if ($this->useDb) {
             $uid = (int) ($booking['userId'] ?? 0);
@@ -548,6 +561,32 @@ class BookingService
         }
 
         return $this->updateStatus($id, 'cancelled');
+    }
+
+    /**
+     * Save calibration data for a completed lighting installation.
+     *
+     * @param array<string, mixed> $data  Keys: beamAngle, luxOutput, notes, etc.
+     * @return array<string, mixed>  Updated booking
+     */
+    public function updateCalibrationData(string $id, array $data): array
+    {
+        if (!$this->useDb) {
+            throw new RuntimeException('Calibration data requires a database connection.', 503);
+        }
+
+        $booking = $this->dbFindById($id);
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        $json = json_encode($data, JSON_UNESCAPED_UNICODE);
+        $stmt = Database::getInstance()->prepare(
+            'UPDATE bookings SET calibration_data = :data WHERE id = :id'
+        );
+        $stmt->execute([':data' => $json, ':id' => $id]);
+
+        return $this->dbFindById($id) ?? $booking;
     }
 
     /**
@@ -1131,6 +1170,9 @@ class BookingService
             'awaitingParts'      => (bool) ($row['awaiting_parts'] ?? false),
             'partsNotes'         => $row['parts_notes']     ?? null,
             'internalNotes'      => $row['internal_notes']  ?? null,
+            'calibrationData'    => isset($row['calibration_data']) && $row['calibration_data'] !== null
+                                      ? json_decode((string) $row['calibration_data'], true)
+                                      : null,
             'createdAt'          => $row['created_at'],
             'buildSlug'          => $this->resolveBuildSlugForBooking($row),
         ];

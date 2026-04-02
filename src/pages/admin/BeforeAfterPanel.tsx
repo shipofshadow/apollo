@@ -13,6 +13,8 @@ import { useAuth } from '../../context/AuthContext';
 type BeforeAfterForm = {
   title: string;
   description: string;
+  vehicleMake: string;
+  vehicleModel: string;
   beforeImageUrl: string;
   afterImageUrl: string;
   sortOrder: number;
@@ -22,6 +24,8 @@ type BeforeAfterForm = {
 const EMPTY_FORM: BeforeAfterForm = {
   title: '',
   description: '',
+  vehicleMake: '',
+  vehicleModel: '',
   beforeImageUrl: '',
   afterImageUrl: '',
   sortOrder: 0,
@@ -32,6 +36,8 @@ function itemToForm(item: BeforeAfterItem): BeforeAfterForm {
   return {
     title: item.title,
     description: item.description,
+    vehicleMake: item.vehicleMake ?? '',
+    vehicleModel: item.vehicleModel ?? '',
     beforeImageUrl: item.beforeImageUrl,
     afterImageUrl: item.afterImageUrl,
     sortOrder: item.sortOrder,
@@ -55,7 +61,7 @@ export default function BeforeAfterPanel() {
   const loadItems = async () => {
     setLoading(true);
     try {
-      const { items: data } = await fetchBeforeAfterItemsApi(token);
+      const { items: data } = await fetchBeforeAfterItemsApi(undefined, token);
       setItems(data);
     } finally {
       setLoading(false);
@@ -114,6 +120,8 @@ export default function BeforeAfterPanel() {
     const payload = {
       title: form.title,
       description: form.description,
+      vehicleMake: form.vehicleMake,
+      vehicleModel: form.vehicleModel,
       beforeImageUrl: form.beforeImageUrl,
       afterImageUrl: form.afterImageUrl,
       sortOrder: form.sortOrder,
@@ -195,6 +203,27 @@ export default function BeforeAfterPanel() {
               className={`${inputCls} resize-none`}
               placeholder="Describe the transformation shown in this pair."
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Vehicle Make</label>
+              <input
+                value={form.vehicleMake}
+                onChange={e => setForm(prev => ({ ...prev, vehicleMake: e.target.value }))}
+                className={inputCls}
+                placeholder="e.g. Toyota"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Vehicle Model</label>
+              <input
+                value={form.vehicleModel}
+                onChange={e => setForm(prev => ({ ...prev, vehicleModel: e.target.value }))}
+                className={inputCls}
+                placeholder="e.g. Fortuner"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

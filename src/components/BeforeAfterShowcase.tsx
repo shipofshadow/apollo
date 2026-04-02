@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MoveHorizontal, ChevronRight, Loader2 } from 'lucide-react';
+import { MoveHorizontal, ChevronRight, Loader2, Search, X } from 'lucide-react';
 import { fetchBeforeAfterItemsApi } from '../services/api';
 import type { BeforeAfterItem } from '../types';
 
@@ -9,6 +9,8 @@ export type ComparisonCase = {
   beforeUrl: string;
   afterUrl: string;
   description?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
 };
 
 function buildComparisonCases(items: BeforeAfterItem[]): ComparisonCase[] {
@@ -21,8 +23,9 @@ function buildComparisonCases(items: BeforeAfterItem[]): ComparisonCase[] {
       description: item.description,
       beforeUrl: item.beforeImageUrl,
       afterUrl: item.afterImageUrl,
-    }))
-    .slice(0, 8);
+      vehicleMake: item.vehicleMake,
+      vehicleModel: item.vehicleModel,
+    }));
 }
 
 interface BeforeAfterShowcaseProps {
@@ -31,25 +34,44 @@ interface BeforeAfterShowcaseProps {
 
 export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterShowcaseProps) {
   const [loading, setLoading] = useState(!propCases);
-  const [cases, setCases] = useState<ComparisonCase[]>(propCases || []);
+  const [allCases, setAllCases] = useState<ComparisonCase[]>(propCases || []);
   const [activeIndex, setActiveIndex] = useState(0);
   const [splitPercent, setSplitPercent] = useState(50);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (propCases) return;
     let cancelled = false;
     fetchBeforeAfterItemsApi()
       .then(({ items }) => {
-        if (!cancelled) setCases(buildComparisonCases(items));
+        if (!cancelled) setAllCases(buildComparisonCases(items));
       })
       .catch(() => {
-        if (!cancelled) setCases([]);
+        if (!cancelled) setAllCases([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
   }, [propCases]);
+
+  // Filter cases by search query (matches make or model)
+  const cases = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return allCases;
+    return allCases.filter(c => {
+      const make  = (c.vehicleMake  ?? '').toLowerCase();
+      const model = (c.vehicleModel ?? '').toLowerCase();
+      const title = (c.title        ?? '').toLowerCase();
+      return make.includes(q) || model.includes(q) || title.includes(q);
+    });
+  }, [allCases, searchQuery]);
+
+  // Reset active index whenever the filtered list changes
+  useEffect(() => {
+    setActiveIndex(0);
+    setSplitPercent(50);
+  }, [searchQuery]);
 
   const active = useMemo(() => cases[activeIndex] || null, [cases, activeIndex]);
 
@@ -64,7 +86,7 @@ export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterSho
     </div>
   );
 
-  if (!active) return null;
+  if (allCases.length === 0) return null;
 
   return (
     <section className="relative py-24 bg-[#0a0a0a] overflow-hidden border-y border-white/5">
@@ -98,7 +120,40 @@ export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterSho
           </div>
         </div>
 
+        {/* Vehicle Search Filter */}
+        <div className="mb-8 flex items-center gap-3 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search by vehicle (e.g. Honda Civic, Fortuner…)"
+              className="w-full bg-white/[0.04] border border-white/10 rounded-sm pl-9 pr-8 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-orange/50"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              {cases.length} result{cases.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-stretch">
+          {!active ? (
+            <div className="xl:col-span-12 py-16 text-center text-gray-500">
+              <Search className="w-8 h-8 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No builds found for "{searchQuery}". Try a different vehicle.</p>
+            </div>
+          ) : (<>
           {/* Main Slider Area */}
           <div className="xl:col-span-8 flex flex-col">
             <div className="relative aspect-[16/10] xl:aspect-video rounded-sm border border-white/10 bg-black overflow-hidden shadow-2xl group">
@@ -164,7 +219,14 @@ export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterSho
 
             {/* Case Info Footer */}
             <div className="mt-6 p-6 bg-white/[0.02] border border-white/5 rounded-sm">
-              <h3 className="text-white text-xl font-bold uppercase tracking-wide">{active.title}</h3>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <h3 className="text-white text-xl font-bold uppercase tracking-wide">{active.title}</h3>
+                {(active.vehicleMake || active.vehicleModel) && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange/80 bg-brand-orange/10 border border-brand-orange/20 px-2 py-1 rounded-sm shrink-0">
+                    {[active.vehicleMake, active.vehicleModel].filter(Boolean).join(' ')}
+                  </span>
+                )}
+              </div>
               {active.description && (
                 <p className="text-gray-500 text-sm mt-2 leading-relaxed">{active.description}</p>
               )}
@@ -199,7 +261,9 @@ export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterSho
                         {item.title}
                       </p>
                       <p className={`text-[10px] mt-1 ${isSelected ? 'text-white/70' : 'text-gray-500'}`}>
-                        Case Study 0{idx + 1}
+                        {item.vehicleMake && item.vehicleModel
+                          ? `${item.vehicleMake} ${item.vehicleModel}`
+                          : `Case Study 0${idx + 1}`}
                       </p>
                     </div>
                     <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-white translate-x-1' : 'text-gray-700'}`} />
@@ -208,6 +272,7 @@ export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterSho
               })}
             </div>
           </div>
+        </>)}
         </div>
       </div>
 
