@@ -21,12 +21,13 @@ export type ChatbotAdminSettings = {
   sound_enabled: boolean
   send_on_enter: boolean
   polling_interval: number
+  admin_kb_text: string
   updated_at?: string | null
 }
 
 export type ChatbotAdminSettingsUpdate = Partial<Pick<
   ChatbotAdminSettings,
-  'agent_color' | 'sound_enabled' | 'send_on_enter' | 'polling_interval'
+  'agent_color' | 'sound_enabled' | 'send_on_enter' | 'polling_interval' | 'admin_kb_text'
 >>
 
 type RetryConfig = InternalAxiosRequestConfig & {

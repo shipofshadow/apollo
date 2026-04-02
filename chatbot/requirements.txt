@@ -9,3 +9,5 @@ python-multipart==0.0.22
 pydantic[email]
 python-dotenv==1.0.1
 PyJWT==2.9.0
+openai>=1.40.0
+google-genai>=0.7.0

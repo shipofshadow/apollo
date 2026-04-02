@@ -75,6 +75,7 @@ export default function ProductsPanel() {
   const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
   const [variations,   setVariations]   = useState<ProductVariation[]>([]);
+  const editingProduct = editId !== null ? products.find((p) => p.id === editId) : null;
 
   useEffect(() => {
     if (token) dispatch(fetchProductsAsync(token));
@@ -264,7 +265,7 @@ export default function ProductsPanel() {
             </label>
             <VariationsManager
               variations={variations}
-              parentId={editId}
+              parentId={editingProduct?.uuid ?? editId}
               parentType="product"
               token={token}
               onSaved={v => setVariations(v as ProductVariation[])}

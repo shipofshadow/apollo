@@ -22,7 +22,9 @@ export default function ProductDetail() {
     }
   }, [dispatch, status]);
 
-  const product = products.find(p => p.id === Number(id));
+  const product = products.find((p) =>
+    String(p.uuid ?? '') === String(id ?? '') || String(p.id) === String(id ?? '')
+  );
 
   useEffect(() => {
     if (!product?.variations?.length) {

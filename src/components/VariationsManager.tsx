@@ -66,7 +66,7 @@ function variationToForm(v: Variation): VariationForm {
 
 interface Props {
   variations: Variation[];
-  parentId: number;
+  parentId: number | string;
   parentType: 'service' | 'product';
   token: string;
   onSaved: (updated: Variation[]) => void;

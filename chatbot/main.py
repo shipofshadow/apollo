@@ -27,7 +27,7 @@ from auth import require_admin
 from database import Base, SessionLocal, engine
 from engine.flow_validation import validate_flow_json_text
 from engine.http_client import close_http_client, init_http_client
-from routers import admin, chat, flows, handoff, users, manychat, customer_ops
+from routers import admin, ai, chat, flows, handoff, users, manychat, customer_ops
 
 
 DEFAULT_FLOW_PATH = os.path.join(os.path.dirname(__file__), "example_flow.json")
@@ -56,6 +56,10 @@ OPENAPI_TAGS = [
     {
         "name": "manychat",
         "description": "ManyChat-compatible service and variant gallery endpoints.",
+    },
+    {
+        "name": "ai",
+        "description": "LLM-backed intent evaluation endpoint with strict JSON contract.",
     },
     {
         "name": "customer-ops",
@@ -370,6 +374,7 @@ app.include_router(users.router, dependencies=[Depends(require_admin)])
 app.include_router(handoff.router, dependencies=[Depends(require_admin)])
 app.include_router(admin.router, dependencies=[Depends(require_admin)])
 app.include_router(manychat.router)
+app.include_router(ai.router)
 app.include_router(customer_ops.router, dependencies=[Depends(require_admin)])
 
 

@@ -192,6 +192,16 @@ class ChatbotAdminSettings(MySQLMixin, Base):
     updated_at = Column(DateTime, default=_now, onupdate=_now, nullable=False)
 
 
+class ChatbotAISettings(MySQLMixin, Base):
+    __tablename__ = "chatbot_ai_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, unique=True, index=True, nullable=False)
+    admin_kb_text = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, default=_now, nullable=False)
+    updated_at = Column(DateTime, default=_now, onupdate=_now, nullable=False)
+
+
 class Booking(MySQLMixin, Base):
     __tablename__ = "bookings"
 

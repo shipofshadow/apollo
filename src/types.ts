@@ -237,6 +237,7 @@ export interface ProductVariation {
 
 export interface Product {
   id: number;
+  uuid?: string;
   name: string;
   description: string;
   price: number;

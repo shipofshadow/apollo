@@ -10,9 +10,12 @@ export type CardButton = {
 
 export type CardData = {
   title?: string
+  subtitle?: string
   description?: string
   image_url?: string
+  service_id?: string | number
   variant_id?: string | number
+  specs_summary?: string
   buttons?: CardButton[]
 }
 

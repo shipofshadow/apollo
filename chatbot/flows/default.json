@@ -38,7 +38,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "https://api.1625autolab.com/api/manychat/menu",
+        "url": "http://localhost:8000/api/manychat/menu",
         "response_variable": "services",
         "render_cards": true
       },
@@ -72,7 +72,7 @@
       "input_type": "none",
       "http_request": {
         "method": "POST",
-        "url": "https://api.1625autolab.com/api/manychat/variants",
+        "url": "http://localhost:8000/api/manychat/variants",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -101,6 +101,14 @@
           "variationName",
           "variant_name",
           "title"
+        ],
+        "variation_details": [
+          "subtitle",
+          "variation_details"
+        ],
+        "variation_specs": [
+          "specs_summary",
+          "variation_specs"
         ]
       },
       "validation": {
@@ -111,7 +119,7 @@
     },
     {
       "id": "node_book_prompt",
-      "message": "Book na ba natin 'tong variant na 'to ngayon?",
+      "message": "Book na ba natin 'tong {variation_name} ngayon?\n{variation_details}",
       "input_type": "quick_reply",
       "options": [
         {
@@ -214,7 +222,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "https://api.1625autolab.com/api/bookings/availability?date={appointment_date}",
+        "url": "http://localhost:8000/api/bookings/availability?date={appointment_date}",
         "response_variable": "available_slots",
         "response_field": "availableSlots",
         "next_if_empty": "node_no_slots",
@@ -325,7 +333,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "https://api.1625autolab.com/api/manychat/menu",
+        "url": "http://localhost:8000/api/manychat/menu",
         "response_variable": "services",
         "render_cards": true
       },
@@ -359,7 +367,7 @@
       "input_type": "none",
       "http_request": {
         "method": "POST",
-        "url": "https://api.1625autolab.com/api/manychat/variants",
+        "url": "http://localhost:8000/api/manychat/variants",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -412,7 +420,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "https://api.1625autolab.com/api/bookings/availability?date={appointment_date}",
+        "url": "http://localhost:8000/api/bookings/availability?date={appointment_date}",
         "response_variable": "available_slots",
         "response_field": "availableSlots",
         "next_if_empty": "node_no_slots",
@@ -487,7 +495,7 @@
       "input_type": "none",
       "http_request": {
         "method": "POST",
-        "url": "https://api.1625autolab.com/api/booking/external",
+        "url": "http://localhost:8000/api/booking/external",
         "headers": {
           "Content-Type": "application/json"
         },

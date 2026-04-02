@@ -16,6 +16,10 @@ declare(strict_types=1);
 class ProductService
 {
     private bool   $useDb;
+    /** @var array<string, bool>|null */
+    private ?array $productColumns = null;
+    /** @var array<string, bool>|null */
+    private ?array $variationColumns = null;
     private static string $storageFile = __DIR__ . '/../storage/products.json';
 
     public function __construct()
@@ -49,6 +53,52 @@ class ProductService
         return $this->useDb
             ? $this->dbGetById($id, $requireActive)
             : $this->fileGetById($id, $requireActive);
+    }
+
+    /**
+     * Single product by identifier (UUID preferred, numeric ID fallback).
+     *
+     * @return array<string, mixed>
+     */
+    public function getByIdentifier(string $identifier, bool $requireActive = true): array
+    {
+        $trimmed = trim($identifier);
+        if ($trimmed === '') {
+            throw new RuntimeException('Product not found.', 404);
+        }
+
+        if ($this->isUuid($trimmed)) {
+            return $this->useDb
+                ? $this->dbGetByUuid($trimmed, $requireActive)
+                : $this->fileGetByUuid($trimmed, $requireActive);
+        }
+
+        if (ctype_digit($trimmed)) {
+            return $this->getById((int) $trimmed, $requireActive);
+        }
+
+        throw new RuntimeException('Product not found.', 404);
+    }
+
+    /** Resolve product numeric ID from UUID or numeric identifier. */
+    public function resolveId(string $identifier): int
+    {
+        $trimmed = trim($identifier);
+        if ($trimmed === '') {
+            throw new RuntimeException('Product not found.', 404);
+        }
+
+        if (ctype_digit($trimmed)) {
+            return (int) $trimmed;
+        }
+
+        if ($this->isUuid($trimmed)) {
+            return $this->useDb
+                ? $this->dbResolveIdByUuid($trimmed)
+                : $this->fileResolveIdByUuid($trimmed);
+        }
+
+        throw new RuntimeException('Product not found.', 404);
     }
 
     /**
@@ -120,6 +170,42 @@ class ProductService
         return $this->mapRow($row, $this->dbFetchVariations($id));
     }
 
+    /** @return array<string, mixed> */
+    private function dbGetByUuid(string $uuid, bool $requireActive): array
+    {
+        if (!$this->hasProductColumn('uuid')) {
+            throw new RuntimeException('Product not found.', 404);
+        }
+
+        $cond = $requireActive ? 'AND is_active = 1' : '';
+        $stmt = Database::getInstance()->prepare(
+            "SELECT * FROM products WHERE uuid = :uuid $cond LIMIT 1"
+        );
+        $stmt->execute([':uuid' => $uuid]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('Product not found.', 404);
+        }
+        return $this->mapRow($row, $this->dbFetchVariations((int) $row['id']));
+    }
+
+    private function dbResolveIdByUuid(string $uuid): int
+    {
+        if (!$this->hasProductColumn('uuid')) {
+            throw new RuntimeException('Product not found.', 404);
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT id FROM products WHERE uuid = :uuid LIMIT 1'
+        );
+        $stmt->execute([':uuid' => $uuid]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('Product not found.', 404);
+        }
+        return (int) $row['id'];
+    }
+
     // -------------------------------------------------------------------------
     // DB – write
     // -------------------------------------------------------------------------
@@ -128,13 +214,33 @@ class ProductService
     private function dbCreate(array $data): array
     {
         $db   = Database::getInstance();
-        $stmt = $db->prepare(
-            'INSERT INTO products
-             (name, description, price, category, image_url, features, sort_order, is_active)
-             VALUES
-             (:name, :description, :price, :category, :image_url, :features, :sort_order, :is_active)'
-        );
-        $stmt->execute($this->bindParams($data));
+        $params = $this->bindParams($data);
+        if ($this->hasProductColumn('uuid')) {
+            $stmt = $db->prepare(
+                'INSERT INTO products
+                 (uuid, name, description, price, category, image_url, features, sort_order, is_active)
+                 VALUES
+                 (:uuid, :name, :description, :price, :category, :image_url, :features, :sort_order, :is_active)'
+            );
+            $stmt->execute($params);
+        } else {
+            $stmt = $db->prepare(
+                'INSERT INTO products
+                 (name, description, price, category, image_url, features, sort_order, is_active)
+                 VALUES
+                 (:name, :description, :price, :category, :image_url, :features, :sort_order, :is_active)'
+            );
+            $stmt->execute([
+                ':name'        => $params[':name'],
+                ':description' => $params[':description'],
+                ':price'       => $params[':price'],
+                ':category'    => $params[':category'],
+                ':image_url'   => $params[':image_url'],
+                ':features'    => $params[':features'],
+                ':sort_order'  => $params[':sort_order'],
+                ':is_active'   => $params[':is_active'],
+            ]);
+        }
         return $this->dbGetById((int) $db->lastInsertId(), false);
     }
 
@@ -223,6 +329,30 @@ class ProductService
                     throw new RuntimeException('Product not found.', 404);
                 }
                 return $p;
+            }
+        }
+        throw new RuntimeException('Product not found.', 404);
+    }
+
+    /** @return array<string, mixed> */
+    private function fileGetByUuid(string $uuid, bool $requireActive): array
+    {
+        foreach ($this->fileRead() as $p) {
+            if ((string) ($p['uuid'] ?? '') === $uuid) {
+                if ($requireActive && !($p['isActive'] ?? true)) {
+                    throw new RuntimeException('Product not found.', 404);
+                }
+                return $p;
+            }
+        }
+        throw new RuntimeException('Product not found.', 404);
+    }
+
+    private function fileResolveIdByUuid(string $uuid): int
+    {
+        foreach ($this->fileRead() as $p) {
+            if ((string) ($p['uuid'] ?? '') === $uuid) {
+                return (int) ($p['id'] ?? 0);
             }
         }
         throw new RuntimeException('Product not found.', 404);
@@ -332,6 +462,9 @@ class ProductService
 
         return [
             'id'          => (int)  $row['id'],
+            'uuid'        => trim((string) ($row['uuid'] ?? '')) !== ''
+                ? (string) $row['uuid']
+                : (string) $row['id'],
             'name'        =>        $row['name'],
             'description' =>        $row['description'],
             'price'       => (float) $row['price'],
@@ -355,6 +488,7 @@ class ProductService
         }
 
         return [
+            ':uuid'        => $data['uuid']        ?? $this->uuid(),
             ':name'        => $data['name']        ?? '',
             ':description' => $data['description'] ?? '',
             ':price'       => (float) ($data['price'] ?? 0),
@@ -376,6 +510,7 @@ class ProductService
 
         return [
             'id'          => $id,
+            'uuid'        => $data['uuid'] ?? $this->uuid(),
             'name'        => $data['name']        ?? '',
             'description' => $data['description'] ?? '',
             'price'       => (float) ($data['price'] ?? 0),
@@ -388,6 +523,50 @@ class ProductService
             'createdAt'   => $data['createdAt'] ?? date('c'),
             'updatedAt'   => date('c'),
         ];
+    }
+
+    private function hasProductColumn(string $column): bool
+    {
+        $map = $this->getProductColumnMap();
+        return !empty($map[$column]);
+    }
+
+    /** @return array<string, bool> */
+    private function getProductColumnMap(): array
+    {
+        if ($this->productColumns !== null) {
+            return $this->productColumns;
+        }
+
+        $this->productColumns = [];
+        $stmt = Database::getInstance()->query('SHOW COLUMNS FROM products');
+        foreach ($stmt->fetchAll() as $row) {
+            $field = (string) ($row['Field'] ?? '');
+            if ($field !== '') {
+                $this->productColumns[$field] = true;
+            }
+        }
+        return $this->productColumns;
+    }
+
+    private function isUuid(string $value): bool
+    {
+        return (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            $value
+        );
+    }
+
+    private function uuid(): string
+    {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -468,11 +647,30 @@ class ProductService
     {
         $this->dbGetById($productId, false); // throws 404 if product missing
         $db   = Database::getInstance();
-        $stmt = $db->prepare(
-              'INSERT INTO product_variations (product_id, name, description, price, images, specs, colors, color_images, sort_order)
-               VALUES (:product_id, :name, :description, :price, :images, :specs, :colors, :color_images, :sort_order)'
-        );
-        $stmt->execute($this->bindVariationParams($productId, $data));
+        $params = $this->bindVariationParams($productId, $data);
+
+        if ($this->hasVariationColumns(['colors', 'color_images'])) {
+            $stmt = $db->prepare(
+                  'INSERT INTO product_variations (product_id, name, description, price, images, specs, colors, color_images, sort_order)
+                   VALUES (:product_id, :name, :description, :price, :images, :specs, :colors, :color_images, :sort_order)'
+            );
+            $stmt->execute($params);
+        } else {
+            $stmt = $db->prepare(
+                  'INSERT INTO product_variations (product_id, name, description, price, images, specs, sort_order)
+                   VALUES (:product_id, :name, :description, :price, :images, :specs, :sort_order)'
+            );
+            $stmt->execute([
+                ':product_id'  => $params[':product_id'],
+                ':name'        => $params[':name'],
+                ':description' => $params[':description'],
+                ':price'       => $params[':price'],
+                ':images'      => $params[':images'],
+                ':specs'       => $params[':specs'],
+                ':sort_order'  => $params[':sort_order'],
+            ]);
+        }
+
         $varId = (int) $db->lastInsertId();
         return $this->dbFetchVariationById($varId);
     }
@@ -498,21 +696,44 @@ class ProductService
             'sortOrder'   => $current['sortOrder'],
         ], $data);
 
-        $stmt = Database::getInstance()->prepare(
-            'UPDATE product_variations SET
+        $withColorColumns = $this->hasVariationColumns(['colors', 'color_images']);
+        $sql = $withColorColumns
+            ? 'UPDATE product_variations SET
                name        = :name,
                description = :description,
                price       = :price,
                images      = :images,
                specs       = :specs,
-                             colors      = :colors,
-                             color_images = :color_images,
+               colors      = :colors,
+               color_images = :color_images,
                sort_order  = :sort_order
              WHERE id = :id AND product_id = :product_id'
-        );
+            : 'UPDATE product_variations SET
+               name        = :name,
+               description = :description,
+               price       = :price,
+               images      = :images,
+               specs       = :specs,
+               sort_order  = :sort_order
+             WHERE id = :id AND product_id = :product_id';
+
+        $stmt = Database::getInstance()->prepare($sql);
         $params                = $this->bindVariationParams($productId, $merged);
         $params[':id']         = $varId;
-        $stmt->execute($params);
+        if ($withColorColumns) {
+            $stmt->execute($params);
+        } else {
+            $stmt->execute([
+                ':id'          => $params[':id'],
+                ':product_id'  => $params[':product_id'],
+                ':name'        => $params[':name'],
+                ':description' => $params[':description'],
+                ':price'       => $params[':price'],
+                ':images'      => $params[':images'],
+                ':specs'       => $params[':specs'],
+                ':sort_order'  => $params[':sort_order'],
+            ]);
+        }
 
         $newVariation = [
             'images'      => json_decode((string) ($params[':images'] ?? '[]'), true) ?: [],
@@ -524,6 +745,36 @@ class ProductService
         );
 
         return $this->dbFetchVariationById($varId);
+    }
+
+    /** @param string[] $columns */
+    private function hasVariationColumns(array $columns): bool
+    {
+        $map = $this->getVariationColumnMap();
+        foreach ($columns as $column) {
+            if (empty($map[$column])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** @return array<string, bool> */
+    private function getVariationColumnMap(): array
+    {
+        if ($this->variationColumns !== null) {
+            return $this->variationColumns;
+        }
+
+        $this->variationColumns = [];
+        $stmt = Database::getInstance()->query('SHOW COLUMNS FROM product_variations');
+        foreach ($stmt->fetchAll() as $row) {
+            $field = (string) ($row['Field'] ?? '');
+            if ($field !== '') {
+                $this->variationColumns[$field] = true;
+            }
+        }
+        return $this->variationColumns;
     }
 
     /**

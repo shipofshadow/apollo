@@ -415,6 +415,16 @@ export default function WebsiteChatWidget() {
               {messages.map((message, index) => {
                 const hasLaterUserReply = messages.slice(index + 1).some((item) => item.sender === 'user')
                 const isQuickReplyActive = message.message_type === 'quick_reply' && !hasLaterUserReply
+                const previousMessage = index > 0 ? messages[index - 1] : null
+                const previousTime = previousMessage ? new Date(previousMessage.timestamp).getTime() : 0
+                const currentTime = new Date(message.timestamp).getTime()
+                const isSameBurst =
+                  previousMessage != null &&
+                  previousMessage.sender === message.sender &&
+                  Number.isFinite(previousTime) &&
+                  Number.isFinite(currentTime) &&
+                  Math.abs(currentTime - previousTime) < 60000
+                const showTimestamp = !isSameBurst
                 return (
                   <MessageBubble
                     key={message.id}
@@ -422,6 +432,7 @@ export default function WebsiteChatWidget() {
                     isQuickReplyActive={isQuickReplyActive}
                     onQuickReply={handleQuickReply}
                     quickRepliesDisabled={quickRepliesDisabled}
+                    showTimestamp={showTimestamp}
                   />
                 )
               })}

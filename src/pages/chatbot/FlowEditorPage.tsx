@@ -657,6 +657,9 @@ export default function FlowEditorPage() {
   const [showNewFlowModal, setShowNewFlowModal] = useState(false)
   const [newFlowName, setNewFlowName]           = useState('')
   const [newFlowDesc, setNewFlowDesc]           = useState('')
+  const [showJsonModal, setShowJsonModal]       = useState(false)
+  const [flowJsonDraft, setFlowJsonDraft]       = useState('')
+  const [flowJsonError, setFlowJsonError]       = useState('')
 
   const selectedNode = flowDef.nodes.find((n) => n.id === selectedNodeId) ?? null
   const allNodeIds   = flowDef.nodes.map((n) => n.id)
@@ -836,6 +839,70 @@ export default function FlowEditorPage() {
     setNewFlowDesc('')
   }, [newFlowDesc, newFlowName])
 
+  const openJsonModal = useCallback(() => {
+    setFlowJsonDraft(JSON.stringify(flowDef, null, 2))
+    setFlowJsonError('')
+    setShowJsonModal(true)
+  }, [flowDef])
+
+  const applyJsonDraft = useCallback(() => {
+    setFlowJsonError('')
+    try {
+      const parsed = JSON.parse(flowJsonDraft) as Partial<FlowDef>
+      if (!parsed || typeof parsed !== 'object') {
+        setFlowJsonError('JSON must be an object.')
+        return
+      }
+      if (!Array.isArray(parsed.nodes)) {
+        setFlowJsonError('JSON must include a nodes array.')
+        return
+      }
+
+      const nodes: FlowNode[] = parsed.nodes.map((node, idx) => {
+        if (!node || typeof node !== 'object') {
+          throw new Error(`Node #${idx + 1} must be an object.`)
+        }
+        const n = node as Partial<FlowNode>
+        if (!n.id || typeof n.id !== 'string') {
+          throw new Error(`Node #${idx + 1} is missing a valid string id.`)
+        }
+        if (!n.input_type || !['text', 'quick_reply', 'none'].includes(n.input_type)) {
+          throw new Error(`Node \"${n.id}\" has invalid input_type.`)
+        }
+        return {
+          id: n.id,
+          message: typeof n.message === 'string' ? n.message : '',
+          input_type: n.input_type,
+          variable: typeof n.variable === 'string' ? n.variable : undefined,
+          validation: n.validation ?? null,
+          options: Array.isArray(n.options) ? n.options : [],
+          next: n.next ?? null,
+          http_request: n.http_request ?? null,
+          normalize_skip: Boolean(n.normalize_skip),
+          payload_assign: n.payload_assign ?? null,
+        }
+      })
+
+      const nextDef: FlowDef = {
+        id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : flowDef.id,
+        name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : flowName,
+        trigger_keywords: Array.isArray(parsed.trigger_keywords)
+          ? parsed.trigger_keywords.map((k) => String(k).trim()).filter(Boolean)
+          : [],
+        nodes,
+      }
+
+      setFlowDef(nextDef)
+      if (nextDef.name) setFlowName(nextDef.name)
+      setSelectedNodeId(null)
+      setShowJsonModal(false)
+      setSaveMsg('Flow JSON applied.')
+      setTimeout(() => setSaveMsg(''), 2500)
+    } catch (e) {
+      setFlowJsonError((e as Error).message || 'Invalid JSON.')
+    }
+  }, [flowDef.id, flowJsonDraft, flowName])
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="h-full min-h-0 flex flex-col bg-[#0d0d1a] text-white overflow-hidden">
@@ -903,6 +970,15 @@ export default function FlowEditorPage() {
                        text-xs font-bold px-3 py-1.5 rounded transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> New
+          </button>
+
+          <button
+            onClick={openJsonModal}
+            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white
+                       text-xs font-bold px-3 py-1.5 rounded transition-colors"
+            title="Edit full flow JSON"
+          >
+            {'{}'} JSON
           </button>
 
           {selectedFlowId && (
@@ -1162,6 +1238,61 @@ export default function FlowEditorPage() {
                            text-white text-sm font-bold px-5 py-2 rounded transition-colors"
               >
                 Create Flow
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JSON Editor modal */}
+      {showJsonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4
+                        bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#111120] border border-gray-700 rounded-lg shadow-2xl
+                          w-full max-w-4xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-lg">Edit Flow JSON</h2>
+              <button
+                onClick={() => setShowJsonModal(false)}
+                className="text-gray-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 mb-3">
+              Paste or edit the full flow JSON, then click Apply to load it into the editor.
+            </p>
+
+            <textarea
+              rows={18}
+              className="w-full bg-[#0d0d1a] border border-gray-700 focus:border-brand-orange
+                         text-white text-xs font-mono px-3 py-2 rounded focus:outline-none
+                         transition-colors leading-relaxed"
+              spellCheck={false}
+              value={flowJsonDraft}
+              onChange={(e) => setFlowJsonDraft(e.target.value)}
+            />
+
+            {flowJsonError && (
+              <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {flowJsonError}
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-3 mt-5">
+              <button
+                onClick={() => setShowJsonModal(false)}
+                className="text-sm text-gray-400 hover:text-white px-4 py-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyJsonDraft}
+                className="bg-brand-orange hover:bg-orange-500 text-white text-sm font-bold
+                           px-5 py-2 rounded transition-colors"
+              >
+                Apply JSON
               </button>
             </div>
           </div>

@@ -29,6 +29,7 @@ def _default_settings() -> schemas.AdminSettingsOut:
         sound_enabled=False,
         send_on_enter=True,
         polling_interval=3000,
+        admin_kb_text="",
         updated_at=None,
     )
 
@@ -232,15 +233,24 @@ def get_admin_settings(
 ):
     user_id = _admin_user_id(payload)
     settings = db.query(models.ChatbotAdminSettings).filter_by(user_id=user_id).first()
+    ai_settings = db.query(models.ChatbotAISettings).filter_by(user_id=user_id).first()
     if not settings:
-        return _default_settings()
+        defaults = _default_settings()
+        if ai_settings and ai_settings.admin_kb_text:
+            defaults.admin_kb_text = ai_settings.admin_kb_text
+            defaults.updated_at = ai_settings.updated_at
+        return defaults
 
     return schemas.AdminSettingsOut(
         agent_color=settings.agent_color,
         sound_enabled=settings.sound_enabled,
         send_on_enter=settings.send_on_enter,
         polling_interval=settings.polling_interval,
-        updated_at=settings.updated_at,
+        admin_kb_text=ai_settings.admin_kb_text if ai_settings else "",
+        updated_at=max(
+            [t for t in [settings.updated_at, ai_settings.updated_at if ai_settings else None] if t is not None],
+            default=settings.updated_at,
+        ),
     )
 
 
@@ -252,6 +262,7 @@ def upsert_admin_settings(
 ):
     user_id = _admin_user_id(payload)
     settings = db.query(models.ChatbotAdminSettings).filter_by(user_id=user_id).first()
+    ai_settings = db.query(models.ChatbotAISettings).filter_by(user_id=user_id).first()
     if not settings:
         defaults = _default_settings()
         settings = models.ChatbotAdminSettings(
@@ -262,6 +273,11 @@ def upsert_admin_settings(
             polling_interval=defaults.polling_interval,
         )
         db.add(settings)
+        db.flush()
+
+    if not ai_settings:
+        ai_settings = models.ChatbotAISettings(user_id=user_id, admin_kb_text="")
+        db.add(ai_settings)
         db.flush()
 
     if body.agent_color is not None:
@@ -278,16 +294,26 @@ def upsert_admin_settings(
     if body.polling_interval is not None:
         settings.polling_interval = int(body.polling_interval)
 
+    if body.admin_kb_text is not None:
+        ai_settings.admin_kb_text = body.admin_kb_text.strip()
+
+    ai_settings.updated_at = now_utc8()
+
     settings.updated_at = now_utc8()
     db.commit()
     db.refresh(settings)
+    db.refresh(ai_settings)
 
     return schemas.AdminSettingsOut(
         agent_color=settings.agent_color,
         sound_enabled=settings.sound_enabled,
         send_on_enter=settings.send_on_enter,
         polling_interval=settings.polling_interval,
-        updated_at=settings.updated_at,
+        admin_kb_text=ai_settings.admin_kb_text,
+        updated_at=max(
+            [t for t in [settings.updated_at, ai_settings.updated_at] if t is not None],
+            default=settings.updated_at,
+        ),
     )
 
 

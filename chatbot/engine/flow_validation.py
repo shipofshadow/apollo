@@ -9,6 +9,22 @@ def _node_edges(node: Dict[str, Any]) -> List[str]:
     if isinstance(nxt, str) and nxt.strip() and nxt != "handoff":
         edges.append(nxt.strip())
 
+    http_request = node.get("http_request")
+    if isinstance(http_request, dict):
+        for key in ("next_if_empty", "next_if_not_empty"):
+            target = http_request.get(key)
+            if isinstance(target, str) and target.strip() and target != "handoff":
+                edges.append(target.strip())
+
+    routing_rules = node.get("routing_rules")
+    if isinstance(routing_rules, list):
+        for rule in routing_rules:
+            if not isinstance(rule, dict):
+                continue
+            target = rule.get("next")
+            if isinstance(target, str) and target.strip() and target != "handoff":
+                edges.append(target.strip())
+
     options = node.get("options")
     if isinstance(options, list):
         for opt in options:

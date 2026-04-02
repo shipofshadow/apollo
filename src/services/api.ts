@@ -538,7 +538,7 @@ export const deleteBlogPostApi = (token: string, id: number) =>
 export const fetchProductsApi = (token?: string | null) =>
   apiFetch<{ products: Product[] }>('/api/products', {}, token);
 
-export const fetchProductByIdApi = (id: number, token?: string | null) =>
+export const fetchProductByIdApi = (id: number | string, token?: string | null) =>
   apiFetch<{ product: Product }>(`/api/products/${id}`, {}, token);
 
 export const createProductApi = (
@@ -552,7 +552,7 @@ export const createProductApi = (
 
 export const updateProductApi = (
   token: string,
-  id: number,
+  id: number | string,
   data: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>
 ) =>
   apiFetch<{ product: Product }>(`/api/products/${id}`, {
@@ -560,7 +560,7 @@ export const updateProductApi = (
     body: JSON.stringify(data),
   }, token);
 
-export const deleteProductApi = (token: string, id: number) =>
+export const deleteProductApi = (token: string, id: number | string) =>
   apiFetch<{ message: string }>(`/api/products/${id}`, {
     method: 'DELETE',
   }, token);
@@ -569,7 +569,7 @@ export const deleteProductApi = (token: string, id: number) =>
 
 export const createProductVariationApi = (
   token: string,
-  productId: number,
+  productId: number | string,
   data: Partial<Omit<ProductVariation, 'id' | 'productId'>>
 ) =>
   apiFetch<{ variation: ProductVariation }>(`/api/products/${productId}/variations`, {
@@ -579,7 +579,7 @@ export const createProductVariationApi = (
 
 export const updateProductVariationApi = (
   token: string,
-  productId: number,
+  productId: number | string,
   varId: number,
   data: Partial<Omit<ProductVariation, 'id' | 'productId'>>
 ) =>
@@ -588,7 +588,7 @@ export const updateProductVariationApi = (
     body: JSON.stringify(data),
   }, token);
 
-export const deleteProductVariationApi = (token: string, productId: number, varId: number) =>
+export const deleteProductVariationApi = (token: string, productId: number | string, varId: number) =>
   apiFetch<{ message: string }>(`/api/products/${productId}/variations/${varId}`, {
     method: 'DELETE',
   }, token);

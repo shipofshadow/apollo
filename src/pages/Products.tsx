@@ -27,7 +27,11 @@ export default function Products() {
 
   const filteredProducts = activeProducts.filter(product => {
     const matchesCategory = activeCategory === 'All' || product.category === activeCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const lowerSearch = searchQuery.toLowerCase();
+    const matchesSearch =
+      product.name.toLowerCase().includes(lowerSearch) ||
+      product.description.toLowerCase().includes(lowerSearch) ||
+      product.features.some((feature) => feature.toLowerCase().includes(lowerSearch));
     return matchesCategory && matchesSearch;
   });
 
@@ -92,7 +96,7 @@ export default function Products() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
             <Link 
-              to={`/products/${product.id}`}
+              to={`/products/${product.uuid ?? product.id}`}
               key={product.id} 
               className="bg-gradient-to-b from-brand-dark to-[#11171c] border border-gray-800 rounded-sm overflow-hidden group hover:border-brand-orange/50 transition-all duration-300 flex flex-col hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(0,0,0,0.35)]"
             >
@@ -110,6 +114,26 @@ export default function Products() {
               </div>
               <div className="p-6 flex flex-col flex-grow">
                 <h3 className="text-white font-bold uppercase tracking-wider mb-2 text-lg line-clamp-2 group-hover:text-brand-orange transition-colors">{product.name}</h3>
+                <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 mb-3">
+                  {product.description || 'High-quality component, tested and tuned by The Lab.'}
+                </p>
+                {product.features.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {product.features.slice(0, 3).map((feature) => (
+                      <span
+                        key={feature}
+                        className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-sm border border-gray-700 text-gray-300 bg-black/20"
+                      >
+                        {feature}
+                      </span>
+                    ))}
+                    {product.features.length > 3 && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-sm border border-gray-700 text-gray-500 bg-black/20">
+                        +{product.features.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-gray-500 text-xs uppercase tracking-[0.12em] mb-3">Tap to view details</p>
                 <p className="text-brand-orange font-display text-2xl font-bold mt-auto">
                   {formatPrice(product.price)}

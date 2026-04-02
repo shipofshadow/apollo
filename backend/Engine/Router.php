@@ -166,15 +166,15 @@ class Router
 
             // ── Products (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/products',          'handleProductList');
-            $r->addRoute('GET',    '/api/products/{id:\d+}', 'handleProductGet');
+            $r->addRoute('GET',    '/api/products/{id:[A-Za-z0-9-]+}', 'handleProductGet');
             $r->addRoute('POST',   '/api/products',          'handleProductCreate');
-            $r->addRoute('PUT',    '/api/products/{id:\d+}', 'handleProductUpdate');
-            $r->addRoute('DELETE', '/api/products/{id:\d+}', 'handleProductDelete');
+            $r->addRoute('PUT',    '/api/products/{id:[A-Za-z0-9-]+}', 'handleProductUpdate');
+            $r->addRoute('DELETE', '/api/products/{id:[A-Za-z0-9-]+}', 'handleProductDelete');
             // Product variations (admin write, public read via parent product)
-            $r->addRoute('GET',    '/api/products/{id:\d+}/variations',              'handleProductVariationList');
-            $r->addRoute('POST',   '/api/products/{id:\d+}/variations',              'handleProductVariationCreate');
-            $r->addRoute('PUT',    '/api/products/{id:\d+}/variations/{vid:\d+}',    'handleProductVariationUpdate');
-            $r->addRoute('DELETE', '/api/products/{id:\d+}/variations/{vid:\d+}',    'handleProductVariationDelete');
+            $r->addRoute('GET',    '/api/products/{id:[A-Za-z0-9-]+}/variations',              'handleProductVariationList');
+            $r->addRoute('POST',   '/api/products/{id:[A-Za-z0-9-]+}/variations',              'handleProductVariationCreate');
+            $r->addRoute('PUT',    '/api/products/{id:[A-Za-z0-9-]+}/variations/{vid:\d+}',    'handleProductVariationUpdate');
+            $r->addRoute('DELETE', '/api/products/{id:[A-Za-z0-9-]+}/variations/{vid:\d+}',    'handleProductVariationDelete');
 
             // ── Portfolio (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/portfolio',                          'handlePortfolioList');
@@ -2018,13 +2018,60 @@ class Router
             return;
         }
 
-        $bookingUrl = rtrim(APP_URL, '/') . '/booking';
+        $bookingBaseUrl = rtrim(APP_URL, '/') . '/booking';
 
-        $elements = array_map(function ($variant) use ($bookingUrl) {
+        $elements = array_map(function ($variant) use ($bookingBaseUrl, $serviceId) {
             $images = $variant['images'] ?? [];
+            $description = trim((string) ($variant['description'] ?? ''));
+            $specs = is_array($variant['specs'] ?? null) ? $variant['specs'] : [];
+
+            $specChunks = [];
+            foreach ($specs as $spec) {
+                if (!is_array($spec)) {
+                    continue;
+                }
+                $label = trim((string) ($spec['label'] ?? ''));
+                $value = trim((string) ($spec['value'] ?? ''));
+                if ($label === '' || $value === '') {
+                    continue;
+                }
+                $specChunks[] = $label . ': ' . $value;
+                if (count($specChunks) >= 2) {
+                    break;
+                }
+            }
+
+            $parts = [];
+            $price = trim((string) ($variant['price'] ?? ''));
+            if ($price !== '') {
+                $parts[] = 'Price: ' . $price;
+            }
+            if ($description !== '') {
+                $parts[] = $description;
+            }
+            if (!empty($specChunks)) {
+                $parts[] = 'Specs: ' . implode(', ', $specChunks);
+            }
+
+            $subtitle = implode(' | ', $parts);
+            if ($subtitle === '') {
+                $subtitle = 'Contact us for variant details.';
+            }
+
+            if (strlen($subtitle) > 230) {
+                $subtitle = substr($subtitle, 0, 227) . '...';
+            }
+
+            $bookingUrl = $bookingBaseUrl
+                . '?serviceId=' . urlencode((string) $serviceId)
+                . '&variationId=' . urlencode((string) ($variant['id'] ?? ''));
+
             return [
                 'title' => $variant['name'],
-                'subtitle' => 'Price: ' . ($variant['price'] ?? 'Contact us'),
+                'subtitle' => $subtitle,
+                'service_id' => $serviceId,
+                'variant_id' => $variant['id'] ?? null,
+                'specs_summary' => implode(', ', $specChunks),
                 'image_url' => $images[0] ?? '',
                 'buttons' => [
                     [
@@ -2292,7 +2339,7 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductGet(array $vars = []): void
     {
-        $id           = (int) ($vars['id'] ?? 0);
+        $id            = (string) ($vars['id'] ?? '');
         $requireActive = true;
         $token = Auth::tokenFromHeader();
         if ($token !== null) {
@@ -2302,7 +2349,7 @@ class Router
             } catch (RuntimeException) { /* stay public */ }
         }
 
-        $product = (new ProductService())->getById($id, $requireActive);
+        $product = (new ProductService())->getByIdentifier($id, $requireActive);
         echo json_encode(['product' => $product]);
     }
 
@@ -2320,9 +2367,10 @@ class Router
     private function handleProductUpdate(array $vars = []): void
     {
         $this->requirePermission('products:manage');
-        $id      = (int) ($vars['id'] ?? 0);
+        $id      = (string) ($vars['id'] ?? '');
         $data    = $this->jsonBody();
-        $product = (new ProductService())->update($id, $data);
+        $svc     = new ProductService();
+        $product = $svc->update($svc->resolveId($id), $data);
         echo json_encode(['product' => $product]);
     }
 
@@ -2330,8 +2378,9 @@ class Router
     private function handleProductDelete(array $vars = []): void
     {
         $this->requirePermission('products:manage');
-        $id = (int) ($vars['id'] ?? 0);
-        (new ProductService())->delete($id);
+        $id = (string) ($vars['id'] ?? '');
+        $svc = new ProductService();
+        $svc->delete($svc->resolveId($id));
         echo json_encode(['message' => 'Product deleted.']);
     }
 
@@ -2342,8 +2391,8 @@ class Router
     /** @param array<string, string> $vars */
     private function handleProductVariationList(array $vars = []): void
     {
-        $id      = (int) ($vars['id'] ?? 0);
-        $product = (new ProductService())->getById($id, false);
+        $id      = (string) ($vars['id'] ?? '');
+        $product = (new ProductService())->getByIdentifier($id, false);
         echo json_encode(['variations' => $product['variations'] ?? []]);
     }
 
@@ -2351,9 +2400,10 @@ class Router
     private function handleProductVariationCreate(array $vars = []): void
     {
         $this->requirePermission('products:manage');
-        $id        = (int) ($vars['id'] ?? 0);
+        $id        = (string) ($vars['id'] ?? '');
         $data      = $this->jsonBody();
-        $variation = (new ProductService())->createVariation($id, $data);
+        $svc       = new ProductService();
+        $variation = $svc->createVariation($svc->resolveId($id), $data);
         http_response_code(201);
         echo json_encode(['variation' => $variation]);
     }
@@ -2362,10 +2412,11 @@ class Router
     private function handleProductVariationUpdate(array $vars = []): void
     {
         $this->requirePermission('products:manage');
-        $id        = (int) ($vars['id']  ?? 0);
+        $id        = (string) ($vars['id']  ?? '');
         $vid       = (int) ($vars['vid'] ?? 0);
         $data      = $this->jsonBody();
-        $variation = (new ProductService())->updateVariation($id, $vid, $data);
+        $svc       = new ProductService();
+        $variation = $svc->updateVariation($svc->resolveId($id), $vid, $data);
         echo json_encode(['variation' => $variation]);
     }
 
@@ -2373,9 +2424,10 @@ class Router
     private function handleProductVariationDelete(array $vars = []): void
     {
         $this->requirePermission('products:manage');
-        $id  = (int) ($vars['id']  ?? 0);
+        $id  = (string) ($vars['id']  ?? '');
         $vid = (int) ($vars['vid'] ?? 0);
-        (new ProductService())->deleteVariation($id, $vid);
+        $svc = new ProductService();
+        $svc->deleteVariation($svc->resolveId($id), $vid);
         echo json_encode(['message' => 'Variation deleted.']);
     }
 

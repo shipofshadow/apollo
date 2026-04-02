@@ -9,6 +9,7 @@ export type SettingsState = {
   soundEnabled: boolean
   sendOnEnter: boolean
   pollingInterval: number
+  adminKbText: string
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   soundEnabled: false,
   sendOnEnter: true,
   pollingInterval: 3000,
+  adminKbText: '',
 }
 
 function toValidPollingInterval(value: unknown): number {
@@ -36,6 +38,7 @@ function sanitizeSettings(input: Partial<SettingsState> | null | undefined): Set
       ? input.sendOnEnter
       : DEFAULT_SETTINGS.sendOnEnter,
     pollingInterval: toValidPollingInterval(input?.pollingInterval),
+    adminKbText: typeof input?.adminKbText === 'string' ? input.adminKbText : DEFAULT_SETTINGS.adminKbText,
   }
 }
 
@@ -55,6 +58,7 @@ function toApiPayload(settings: SettingsState): ChatbotAdminSettingsUpdate {
     sound_enabled: settings.soundEnabled,
     send_on_enter: settings.sendOnEnter,
     polling_interval: settings.pollingInterval,
+    admin_kb_text: settings.adminKbText,
   }
 }
 
@@ -63,12 +67,14 @@ function fromApiPayload(payload: Partial<{
   sound_enabled: boolean
   send_on_enter: boolean
   polling_interval: number
+  admin_kb_text: string
 }>): SettingsState {
   return sanitizeSettings({
     agentColor: payload.agent_color,
     soundEnabled: payload.sound_enabled,
     sendOnEnter: payload.send_on_enter,
     pollingInterval: payload.polling_interval,
+    adminKbText: payload.admin_kb_text,
   })
 }
 

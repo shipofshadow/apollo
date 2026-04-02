@@ -214,6 +214,121 @@ def _try_parse_payload_input(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _deep_get(source: Any, path: str) -> Any:
+    """Resolve dotted-path values from dictionaries/lists, e.g. a.b.c."""
+    if not path:
+        return None
+
+    parts = [p.strip() for p in str(path).split(".") if p.strip()]
+    current = source
+    for part in parts:
+        if isinstance(current, dict):
+            if part not in current:
+                return None
+            current = current[part]
+            continue
+        if isinstance(current, list):
+            if not part.isdigit():
+                return None
+            idx = int(part)
+            if idx < 0 or idx >= len(current):
+                return None
+            current = current[idx]
+            continue
+        return None
+    return current
+
+
+def _resolve_payload_value(
+    variables: Dict[str, Any],
+    payload_data: Optional[Dict[str, Any]],
+    key: Any,
+) -> Any:
+    raw_key = str(key).strip()
+    if not raw_key:
+        return None
+
+    # Prefer explicit payload object values when present.
+    if isinstance(payload_data, dict):
+        if raw_key in payload_data and payload_data[raw_key] not in (None, ""):
+            return payload_data[raw_key]
+        nested_payload_value = _deep_get(payload_data, raw_key)
+        if nested_payload_value not in (None, ""):
+            return nested_payload_value
+
+    # Fallback to values already stored in flow variables.
+    if raw_key in variables and variables[raw_key] not in (None, ""):
+        return variables[raw_key]
+    nested_var_value = _deep_get(variables, raw_key)
+    if nested_var_value not in (None, ""):
+        return nested_var_value
+
+    return None
+
+
+def _apply_payload_assign(
+    variables: Dict[str, Any],
+    payload_assign: Any,
+    payload_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    if not isinstance(payload_assign, dict):
+        return variables
+
+    merged = {**variables}
+    for target_var, payload_keys in payload_assign.items():
+        keys = payload_keys if isinstance(payload_keys, list) else [payload_keys]
+        chosen = None
+        for key in keys:
+            chosen = _resolve_payload_value(merged, payload_data, key)
+            if chosen is not None:
+                break
+        if chosen is not None:
+            merged[target_var] = str(chosen)
+
+    return merged
+
+
+def _matches_routing_condition(condition: str, variables: Dict[str, Any]) -> bool:
+    """Evaluate very small condition language: '<left> == <right>' or '!='."""
+    if not isinstance(condition, str) or not condition.strip():
+        return False
+
+    rendered = _interpolate(condition, variables).strip()
+    operator = None
+    if "==" in rendered:
+        operator = "=="
+    elif "!=" in rendered:
+        operator = "!="
+    else:
+        return False
+
+    left, right = rendered.split(operator, 1)
+    left = left.strip().strip("\"'")
+    right = right.strip().strip("\"'")
+    if operator == "==":
+        return left == right
+    return left != right
+
+
+def _resolve_routing_next(node: Dict[str, Any], variables: Dict[str, Any]) -> Optional[str]:
+    rules = node.get("routing_rules")
+    if isinstance(rules, list):
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            condition = rule.get("condition")
+            target = rule.get("next")
+            if not isinstance(target, str) or not target.strip():
+                continue
+            if _matches_routing_condition(str(condition or ""), variables):
+                return target.strip()
+
+    fallback = node.get("next")
+    if isinstance(fallback, str) and fallback.strip():
+        return fallback.strip()
+    return None
+
+
 def _normalize_optional_input(text: str) -> str:
     """Treat common skip markers as empty string for optional free-text nodes."""
     raw = (text or "").strip()
@@ -282,6 +397,27 @@ def _sync_selection_labels(variables: Dict[str, Any]) -> Dict[str, Any]:
         inferred = _pick_title(updated.get("variants"), variant_id, ("variant_id",))
         if inferred:
             updated["variation_name"] = inferred
+
+    if variant_id not in (None, ""):
+        updated.setdefault("variation_details", "")
+        updated.setdefault("variation_specs", "")
+        cards = _extract_cards(updated.get("variants"))
+        target = str(variant_id).strip().lower()
+        for card in cards:
+            card_variant = card.get("variant_id")
+            if card_variant is None:
+                continue
+            if str(card_variant).strip().lower() != target:
+                continue
+
+            subtitle = str(card.get("subtitle", "")).strip()
+            if subtitle:
+                updated["variation_details"] = subtitle
+
+            specs_summary = str(card.get("specs_summary", "")).strip()
+            if specs_summary:
+                updated["variation_specs"] = specs_summary
+            break
 
     return updated
 
@@ -603,19 +739,11 @@ async def process_message(
 
         payload_data = _try_parse_payload_input(user_input)
         if payload_data:
-            payload_assign = active_node.get("payload_assign", {})
-            if isinstance(payload_assign, dict):
-                merged = {**variables}
-                for target_var, payload_keys in payload_assign.items():
-                    keys = payload_keys if isinstance(payload_keys, list) else [payload_keys]
-                    value = None
-                    for k in keys:
-                        if k in payload_data and payload_data[k] not in (None, ""):
-                            value = payload_data[k]
-                            break
-                    if value is not None:
-                        merged[target_var] = str(value)
-                variables = merged
+            variables = _apply_payload_assign(
+                variables,
+                active_node.get("payload_assign", {}),
+                payload_data,
+            )
 
             # Use the mapped value for validation when this node expects a variable.
             var_name = active_node.get("variable")
@@ -737,6 +865,7 @@ async def _deliver_node(
         # --- Handle HTTP request if present ---
         http_cfg = node.get("http_request")
         http_rendered_message = False
+        latest_http_render_data: Any = None
         if http_cfg:
             resp_data, err = await _do_http_request(http_cfg, variables)
             resp_var = http_cfg.get("response_variable")
@@ -756,6 +885,7 @@ async def _deliver_node(
                     if response_field and isinstance(resp_data, dict)
                     else resp_data
                 )
+                latest_http_render_data = render_data
 
                 if resp_var:
                     variables = {**variables, resp_var: render_data}
@@ -809,6 +939,10 @@ async def _deliver_node(
                         if qr_text:
                             http_rendered_message = True
 
+        if node.get("payload_assign"):
+            payload_source = latest_http_render_data if isinstance(latest_http_render_data, dict) else None
+            variables = _apply_payload_assign(variables, node.get("payload_assign"), payload_source)
+
         # --- Render the node message ---
         message_text = _interpolate(node.get("message", ""), variables)
         input_type = node.get("input_type", "text")
@@ -838,7 +972,7 @@ async def _deliver_node(
                 response_messages.append(
                     {"content": message_text, "message_type": "text", "metadata": None}
                 )
-            node_id = node.get("next")
+            node_id = _resolve_routing_next(node, variables)
             if node_id == "handoff":
                 return response_messages, None, variables, True
             continue

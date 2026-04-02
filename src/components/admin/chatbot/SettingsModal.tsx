@@ -122,6 +122,26 @@ export default function SettingsModal({ open, settings, isSaving = false, onClos
               ))}
             </select>
           </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-brand-orange" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">Chatbot AI Knowledge Base</h3>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs text-gray-400">Chatbot-only KB text (facts, pricing, policies, limitations)</label>
+              <textarea
+                value={draft.adminKbText}
+                onChange={(e) => setDraft((prev) => ({ ...prev, adminKbText: e.target.value }))}
+                rows={6}
+                className="w-full resize-y border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-100 outline-none focus:border-brand-orange"
+                placeholder="Operating hours: 9AM-6PM. PMS starts at P2,500. We do NOT do body paint."
+              />
+              <p className="text-[11px] text-gray-500">
+                This is used by the chatbot AI intent endpoint. Keep it factual and short; the bot answers from this KB and hands off when unsure.
+              </p>
+            </div>
+          </section>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-gray-800 px-5 py-4">

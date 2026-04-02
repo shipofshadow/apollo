@@ -13,6 +13,7 @@ type MessageBubbleProps = {
   isQuickReplyActive?: boolean
   onQuickReply: (value: string | QuickReplyPayload) => void
   quickRepliesDisabled: boolean
+  showTimestamp?: boolean
 }
 
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/g
@@ -48,7 +49,8 @@ function formatTime(timestamp?: string) {
   const then = new Date(timestamp)
   const diffSeconds = Math.floor((now.getTime() - then.getTime()) / 1000)
 
-  if (diffSeconds < 60) return 'just now'
+  if (diffSeconds < 5) return 'just now'
+  if (diffSeconds < 60) return `${diffSeconds}s ago`
   const diffMinutes = Math.floor(diffSeconds / 60)
   if (diffMinutes < 60) return `${diffMinutes}m ago`
   const diffHours = Math.floor(diffMinutes / 60)
@@ -56,7 +58,7 @@ function formatTime(timestamp?: string) {
   return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-export default function MessageBubble({ message, isQuickReplyActive = false, onQuickReply, quickRepliesDisabled }: MessageBubbleProps) {
+export default function MessageBubble({ message, isQuickReplyActive = false, onQuickReply, quickRepliesDisabled, showTimestamp = true }: MessageBubbleProps) {
   const isUser = message.sender === 'user'
   const isHuman = message.sender === 'human'
   const isCardMessage = message.message_type === 'card' && message.metadata?.cards
@@ -116,15 +118,34 @@ export default function MessageBubble({ message, isQuickReplyActive = false, onQ
       try {
         const url = new URL(button.url)
         const variantFromUrl = url.searchParams.get('variant_id') || url.searchParams.get('variantId') || url.searchParams.get('id')
+        const serviceFromUrl = url.searchParams.get('service_id') || url.searchParams.get('serviceId')
         if (variantFromUrl) {
-          sendValue(variantFromUrl, card.title || button.caption || button.label || button.text)
+          sendValue(
+            JSON.stringify({
+              variant_id: variantFromUrl,
+              service_id: serviceFromUrl ?? card.service_id,
+              title: card.title,
+              subtitle: card.subtitle,
+              specs_summary: (card as CardData & { specs_summary?: string }).specs_summary,
+            }),
+            card.title || button.caption || button.label || button.text,
+          )
           return
         }
       } catch {
       }
 
       if (card.variant_id !== undefined && card.variant_id !== null) {
-        sendValue(card.variant_id, card.title || button.caption || button.label || button.text)
+        sendValue(
+          JSON.stringify({
+            variant_id: card.variant_id,
+            service_id: card.service_id,
+            title: card.title,
+            subtitle: card.subtitle,
+            specs_summary: (card as CardData & { specs_summary?: string }).specs_summary,
+          }),
+          card.title || button.caption || button.label || button.text,
+        )
         return
       }
 
@@ -193,7 +214,9 @@ export default function MessageBubble({ message, isQuickReplyActive = false, onQ
         <QuickReplies options={message.metadata.options} onSelect={onQuickReply} disabled={quickRepliesDisabled} />
       )}
 
-      <span className={`mt-1 text-[11px] text-slate-400 ${isUser ? 'mr-1' : 'ml-1'}`}>{formatTime(message.timestamp)}</span>
+      {showTimestamp && (
+        <span className={`mt-1 text-[11px] text-slate-400 ${isUser ? 'mr-1' : 'ml-1'}`}>{formatTime(message.timestamp)}</span>
+      )}
     </div>
   )
 }

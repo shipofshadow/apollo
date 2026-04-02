@@ -138,6 +138,16 @@ class ChatStateOut(BaseModel):
     updated_at: datetime
 
 
+class AIEvaluateRequest(BaseModel):
+    user_message: str = Field(min_length=1, max_length=2000)
+    kb_context: Optional[str] = Field(default="", max_length=20000)
+
+
+class AIEvaluateResponse(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    suggested_action: Literal["trigger_booking", "handoff", "none"]
+
+
 # ---------------------------------------------------------------------------
 # Admin schemas
 # ---------------------------------------------------------------------------
@@ -295,6 +305,7 @@ class AdminSettingsUpdate(BaseModel):
     sound_enabled: Optional[bool] = None
     send_on_enter: Optional[bool] = None
     polling_interval: Optional[int] = Field(default=None, ge=1000, le=60000)
+    admin_kb_text: Optional[str] = Field(default=None, max_length=20000)
 
 
 class AdminSettingsOut(BaseModel):
@@ -302,4 +313,5 @@ class AdminSettingsOut(BaseModel):
     sound_enabled: bool
     send_on_enter: bool
     polling_interval: int
+    admin_kb_text: str = ""
     updated_at: Optional[datetime] = None
