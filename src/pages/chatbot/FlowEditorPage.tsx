@@ -1,430 +1,666 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  type Connection,
-  type Edge,
-  type Node,
-  type NodeTypes,
-  MarkerType,
-  Panel,
-  BackgroundVariant,
-  Handle,
-  Position,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import {
-  Plus, Save, Trash2, Play, ChevronDown, ChevronUp, Zap, MessageSquare,
-  GitBranch, PhoneCall, CheckCircle, X, Loader2, AlertCircle,
-  List, Settings, ArrowLeft, RefreshCw,
+  Plus, Save, Trash2, Play, ChevronDown, ChevronUp, MessageSquare,
+  CheckCircle, X, Loader2, AlertCircle, List, RefreshCw,
+  Globe, ArrowRight, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { chatbotApi, toApiErrorMessage } from '../../services/chatbotApi'
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-type FlowNodeData = {
+type ValidationConfig = {
+  type: 'required' | 'email' | 'regex' | 'number' | 'date' | 'year_range' | 'in_list_variable'
+  error_message?: string
+  pattern?: string
+  min?: number
+  max?: number
+  list_variable?: string
+}
+
+type QuickReplyOption = {
   label: string
-  [key: string]: unknown
+  value: string
+  next: string
+}
+
+type FlowNode = {
+  id: string
+  message: string
+  input_type: 'text' | 'quick_reply' | 'none'
+  variable?: string
+  validation?: ValidationConfig | null
+  options?: QuickReplyOption[]
+  next?: string | null
+  http_request?: Record<string, unknown> | null
+  normalize_skip?: boolean
+  payload_assign?: Record<string, unknown> | null
+}
+
+type FlowDef = {
+  id: string
+  name: string
+  trigger_keywords: string[]
+  nodes: FlowNode[]
 }
 
 type FlowRecord = {
-  id: string
+  id: string | number
   name?: string
   description?: string | null
   is_active?: boolean
   flow_json?: string
 }
 
-// ─── Node Data Types ────────────────────────────────────────────────────────
+// ── Shared style constants ────────────────────────────────────────────────────
 
-type TriggerNodeData = FlowNodeData & {
-  triggerType: 'greeting' | 'keyword' | 'any'
-  keywords?: string
+const INPUT_CLS =
+  'w-full bg-[#0a0a15] border border-gray-700 text-white text-xs px-3 py-2 rounded ' +
+  'focus:outline-none focus:border-brand-orange transition-colors placeholder-gray-600'
+const SELECT_CLS = INPUT_CLS + ' appearance-none'
+const LABEL_CLS = 'block text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-1'
+
+const NODE_TYPE_CFG = {
+  none:        { color: '#3b82f6', label: 'Message' },
+  text:        { color: '#f59e0b', label: 'Text Input' },
+  quick_reply: { color: '#8b5cf6', label: 'Quick Reply' },
+} as const
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function makeUniqueId(nodes: FlowNode[]): string {
+  const ids = new Set(nodes.map((n) => n.id))
+  let i = nodes.length + 1
+  while (ids.has(`node_${i}`)) i++
+  return `node_${i}`
 }
 
-type MessageNodeData = FlowNodeData & {
-  message: string
-  delay?: number
+function makeFlowTemplate(name: string): FlowDef {
+  const slug =
+    name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || 'new_flow'
+  return {
+    id: slug,
+    name,
+    trigger_keywords: [],
+    nodes: [
+      {
+        id: 'node_1',
+        message: 'Hello! How can I help you today?',
+        input_type: 'quick_reply',
+        options: [
+          { label: 'Get Help',      value: 'help',  next: 'node_help' },
+          { label: 'Talk to Human', value: 'human', next: 'handoff'   },
+        ],
+        next: null,
+      },
+      {
+        id: 'node_help',
+        message: "Great! I'll connect you with a team member shortly.",
+        input_type: 'none',
+        next: 'handoff',
+      },
+    ],
+  }
 }
 
-type ConditionNodeData = FlowNodeData & {
-  conditionVar: string
-  operator: 'equals' | 'contains' | 'exists' | 'not_exists'
-  value: string
-}
+// ── NodeCard ──────────────────────────────────────────────────────────────────
 
-type QuickReplyNodeData = FlowNodeData & {
-  message: string
-  replies: string
-}
+function NodeCard({
+  node, index, selected,
+  onSelect, onDelete, onMoveUp, onMoveDown,
+  isFirst, isLast,
+}: {
+  node: FlowNode
+  index: number
+  selected: boolean
+  onSelect: () => void
+  onDelete: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  isFirst: boolean
+  isLast: boolean
+}) {
+  const cfg = NODE_TYPE_CFG[node.input_type] ?? NODE_TYPE_CFG.none
 
-type ActionNodeData = FlowNodeData & {
-  actionType: 'handoff' | 'tag' | 'set_variable' | 'end_flow'
-  actionValue?: string
-}
-
-// ─── Custom Node Components ─────────────────────────────────────────────────
-
-function nodeWrapper(color: string, icon: React.ReactNode, title: string, children: React.ReactNode, selected: boolean) {
   return (
     <div
-      className="bg-[#1a1a2e] border rounded-lg shadow-xl min-w-[200px] max-w-[240px] transition-all"
-      style={{
-        borderColor: selected ? color : '#374151',
-        boxShadow: selected ? `0 0 20px ${color}40` : undefined,
-      }}
+      onClick={onSelect}
+      className={`group relative bg-[#1a1a2e] border rounded-lg cursor-pointer transition-all ${
+        selected
+          ? 'border-brand-orange shadow-lg shadow-brand-orange/10'
+          : 'border-gray-700 hover:border-gray-600'
+      }`}
     >
+      {/* Card header */}
       <div
         className="flex items-center gap-2 px-3 py-2 rounded-t-lg"
-        style={{ backgroundColor: `${color}22`, borderBottom: `1px solid ${color}44` }}
+        style={{ backgroundColor: `${cfg.color}12`, borderBottom: `1px solid ${cfg.color}30` }}
       >
-        <span style={{ color }}>{icon}</span>
-        <span className="text-xs font-bold uppercase tracking-widest text-white">{title}</span>
+        <span className="text-[10px] font-bold text-gray-600 w-4 text-center shrink-0">
+          {index + 1}
+        </span>
+        <span className="flex-1 font-mono text-[11px] font-semibold text-white truncate">
+          {node.id}
+        </span>
+        <span
+          className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border shrink-0"
+          style={{ color: cfg.color, borderColor: `${cfg.color}50` }}
+        >
+          {cfg.label}
+        </span>
+        {node.http_request && (
+          <Globe className="w-3 h-3 text-teal-400 shrink-0" title="Has HTTP request" />
+        )}
+        {/* Controls visible on hover */}
+        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveUp() }}
+            disabled={isFirst}
+            className="text-gray-600 hover:text-white disabled:opacity-20 p-0.5 transition-colors"
+            title="Move up"
+          >
+            <ArrowUp className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveDown() }}
+            disabled={isLast}
+            className="text-gray-600 hover:text-white disabled:opacity-20 p-0.5 transition-colors"
+            title="Move down"
+          >
+            <ArrowDown className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className="text-gray-600 hover:text-red-400 p-0.5 ml-0.5 transition-colors"
+            title="Delete node"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
-      <div className="px-3 py-2.5 text-xs text-gray-300 space-y-1">{children}</div>
+
+      {/* Card body */}
+      <div className="px-3 py-2.5 space-y-2">
+        <p className="text-xs text-gray-300 leading-snug line-clamp-2 whitespace-pre-wrap">
+          {node.message || <span className="text-gray-600 italic">No message set</span>}
+        </p>
+        {node.variable && (
+          <p className="text-[10px] text-gray-500">
+            Saves to: <span className="font-mono text-amber-400">{node.variable}</span>
+          </p>
+        )}
+        {node.options && node.options.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {node.options.map((opt, i) => (
+              <span
+                key={i}
+                className="flex items-center gap-1 bg-purple-900/25 border border-purple-700/30
+                           text-purple-200 text-[10px] px-1.5 py-0.5 rounded-full"
+              >
+                {opt.label || '(empty)'}
+                <ArrowRight className="w-2.5 h-2.5 text-purple-400 shrink-0" />
+                <span className="font-mono text-purple-300">{opt.next || '?'}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        {node.next && (
+          <p className="flex items-center gap-1 text-[10px]">
+            <ArrowRight className="w-3 h-3 text-brand-orange shrink-0" />
+            <span className="font-mono text-brand-orange/80">{node.next}</span>
+          </p>
+        )}
+      </div>
     </div>
   )
 }
 
-function TriggerNode({ data, selected }: { data: TriggerNodeData; selected: boolean }) {
-  return (
-    <>
-      {nodeWrapper('#22c55e', <Zap className="w-3.5 h-3.5" />, 'Trigger', (
-        <>
-          <div className="text-gray-400">Type: <span className="text-white capitalize">{data.triggerType || 'greeting'}</span></div>
-          {data.keywords && <div className="text-gray-400 truncate">Keywords: <span className="text-white">{data.keywords}</span></div>}
-        </>
-      ), selected)}
-      <Handle type="source" position={Position.Bottom} style={{ background: '#22c55e', border: '2px solid #16a34a' }} />
-    </>
-  )
-}
+// ── NodeEditPanel ─────────────────────────────────────────────────────────────
 
-function MessageNode({ data, selected }: { data: MessageNodeData; selected: boolean }) {
-  return (
-    <>
-      <Handle type="target" position={Position.Top} style={{ background: '#3b82f6', border: '2px solid #2563eb' }} />
-      {nodeWrapper('#3b82f6', <MessageSquare className="w-3.5 h-3.5" />, 'Send Message', (
-        <>
-          <div className="text-gray-100 text-[11px] leading-snug line-clamp-3 whitespace-pre-wrap break-words">
-            {data.message || <span className="text-gray-500 italic">No message set</span>}
-          </div>
-          {data.delay ? <div className="text-gray-500 text-[10px]">Delay: {data.delay}s</div> : null}
-        </>
-      ), selected)}
-      <Handle type="source" position={Position.Bottom} style={{ background: '#3b82f6', border: '2px solid #2563eb' }} />
-    </>
-  )
-}
-
-function ConditionNode({ data, selected }: { data: ConditionNodeData; selected: boolean }) {
-  return (
-    <>
-      <Handle type="target" position={Position.Top} style={{ background: '#f59e0b', border: '2px solid #d97706' }} />
-      {nodeWrapper('#f59e0b', <GitBranch className="w-3.5 h-3.5" />, 'Condition', (
-        <>
-          <div className="text-gray-400">If <span className="text-white font-mono">{data.conditionVar || '…'}</span></div>
-          <div className="text-gray-400"><span className="text-amber-300">{data.operator || 'equals'}</span> <span className="text-white">"{data.value || '…'}"</span></div>
-        </>
-      ), selected)}
-      <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '30%', background: '#22c55e', border: '2px solid #16a34a' }} />
-      <Handle type="source" position={Position.Bottom} id="no" style={{ left: '70%', background: '#ef4444', border: '2px solid #dc2626' }} />
-      <div style={{ position: 'absolute', bottom: -18, left: '14%', fontSize: 9, color: '#22c55e', fontWeight: 700 }}>YES</div>
-      <div style={{ position: 'absolute', bottom: -18, left: '58%', fontSize: 9, color: '#ef4444', fontWeight: 700 }}>NO</div>
-    </>
-  )
-}
-
-function QuickReplyNode({ data, selected }: { data: QuickReplyNodeData; selected: boolean }) {
-  const replies = (data.replies || '').split(',').map((r) => r.trim()).filter(Boolean)
-  return (
-    <>
-      <Handle type="target" position={Position.Top} style={{ background: '#8b5cf6', border: '2px solid #7c3aed' }} />
-      {nodeWrapper('#8b5cf6', <List className="w-3.5 h-3.5" />, 'Quick Replies', (
-        <>
-          <div className="text-gray-100 text-[11px] leading-snug mb-1.5">
-            {data.message || <span className="text-gray-500 italic">No message set</span>}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {replies.length > 0 ? replies.map((r, i) => (
-              <span key={i} className="bg-purple-900/50 border border-purple-700 text-purple-200 text-[10px] px-1.5 py-0.5 rounded-full">{r}</span>
-            )) : <span className="text-gray-500 italic text-[10px]">No replies set</span>}
-          </div>
-        </>
-      ), selected)}
-      <Handle type="source" position={Position.Bottom} style={{ background: '#8b5cf6', border: '2px solid #7c3aed' }} />
-    </>
-  )
-}
-
-function ActionNode({ data, selected }: { data: ActionNodeData; selected: boolean }) {
-  const ACTION_LABELS: Record<string, string> = {
-    handoff: '🤝 Handoff to Human',
-    tag: '🏷️ Tag Customer',
-    set_variable: '📝 Set Variable',
-    end_flow: '🔚 End Flow',
-  }
-  return (
-    <>
-      <Handle type="target" position={Position.Top} style={{ background: '#ec4899', border: '2px solid #db2777' }} />
-      {nodeWrapper('#ec4899', <Settings className="w-3.5 h-3.5" />, 'Action', (
-        <>
-          <div className="text-white text-[11px] font-medium">{ACTION_LABELS[data.actionType] || data.actionType}</div>
-          {data.actionValue && <div className="text-gray-400 text-[10px] truncate">Value: <span className="text-white">{data.actionValue}</span></div>}
-        </>
-      ), selected)}
-      {data.actionType !== 'end_flow' && (
-        <Handle type="source" position={Position.Bottom} style={{ background: '#ec4899', border: '2px solid #db2777' }} />
-      )}
-    </>
-  )
-}
-
-function PhoneNode({ data, selected }: { data: FlowNodeData; selected: boolean }) {
-  return (
-    <>
-      <Handle type="target" position={Position.Top} style={{ background: '#14b8a6', border: '2px solid #0d9488' }} />
-      {nodeWrapper('#14b8a6', <PhoneCall className="w-3.5 h-3.5" />, 'Call to Action', (
-        <>
-          <div className="text-gray-100 text-[11px]">{data.label || 'CTA'}</div>
-        </>
-      ), selected)}
-      <Handle type="source" position={Position.Bottom} style={{ background: '#14b8a6', border: '2px solid #0d9488' }} />
-    </>
-  )
-}
-
-const nodeTypes: NodeTypes = {
-  trigger: TriggerNode as unknown as NodeTypes[string],
-  message: MessageNode as unknown as NodeTypes[string],
-  condition: ConditionNode as unknown as NodeTypes[string],
-  quickReply: QuickReplyNode as unknown as NodeTypes[string],
-  action: ActionNode as unknown as NodeTypes[string],
-  cta: PhoneNode as unknown as NodeTypes[string],
-}
-
-// ─── Node Palette ────────────────────────────────────────────────────────────
-
-const NODE_PALETTE = [
-  { type: 'trigger',    label: 'Trigger',       icon: <Zap className="w-3.5 h-3.5" />,          color: '#22c55e', desc: 'Start of flow' },
-  { type: 'message',   label: 'Message',        icon: <MessageSquare className="w-3.5 h-3.5" />, color: '#3b82f6', desc: 'Send a message' },
-  { type: 'condition', label: 'Condition',      icon: <GitBranch className="w-3.5 h-3.5" />,     color: '#f59e0b', desc: 'If/else branch' },
-  { type: 'quickReply',label: 'Quick Replies',  icon: <List className="w-3.5 h-3.5" />,          color: '#8b5cf6', desc: 'Buttons for user' },
-  { type: 'action',    label: 'Action',         icon: <Settings className="w-3.5 h-3.5" />,      color: '#ec4899', desc: 'Perform an action' },
-  { type: 'cta',       label: 'Call to Action', icon: <PhoneCall className="w-3.5 h-3.5" />,     color: '#14b8a6', desc: 'CTA button' },
-]
-
-function defaultNodeData(type: string): FlowNodeData {
-  switch (type) {
-    case 'trigger':    return { label: 'New Trigger', triggerType: 'greeting', keywords: '' } as TriggerNodeData
-    case 'message':    return { label: 'Send Message', message: '', delay: 0 } as MessageNodeData
-    case 'condition':  return { label: 'Check Condition', conditionVar: '', operator: 'equals', value: '' } as ConditionNodeData
-    case 'quickReply': return { label: 'Quick Replies', message: '', replies: '' } as QuickReplyNodeData
-    case 'action':     return { label: 'Action', actionType: 'handoff', actionValue: '' } as ActionNodeData
-    case 'cta':        return { label: 'Book Now' }
-    default:           return { label: 'Node' }
-  }
-}
-
-// ─── Properties Panel ────────────────────────────────────────────────────────
-
-function PropertiesPanel({
+function NodeEditPanel({
   node,
+  allNodeIds,
   onUpdate,
-  onDelete,
+  onClose,
 }: {
-  node: Node<FlowNodeData>
-  onUpdate: (id: string, data: FlowNodeData) => void
-  onDelete: (id: string) => void
+  node: FlowNode
+  allNodeIds: string[]
+  onUpdate: (updated: FlowNode) => void
+  onClose: () => void
 }) {
-  const d = node.data
+  const [local, setLocal]           = useState<FlowNode>(node)
+  const [idDraft, setIdDraft]       = useState(node.id)
+  const [httpRaw, setHttpRaw]       = useState(
+    node.http_request ? JSON.stringify(node.http_request, null, 2) : ''
+  )
+  const [httpErr, setHttpErr]         = useState('')
+  const [payloadRaw, setPayloadRaw] = useState(
+    node.payload_assign ? JSON.stringify(node.payload_assign, null, 2) : ''
+  )
+  const [payloadErr, setPayloadErr]   = useState('')
+  const [showHttp, setShowHttp]       = useState(!!node.http_request)
+  const [showPayload, setShowPayload] = useState(!!node.payload_assign)
 
-  function field(label: string, el: React.ReactNode) {
-    return (
-      <div>
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-1">{label}</label>
-        {el}
-      </div>
-    )
+  // Keep a live ref to onUpdate so the effect never uses a stale closure
+  const onUpdateRef = useRef(onUpdate)
+  useEffect(() => { onUpdateRef.current = onUpdate })
+
+  // Propagate every local change to the parent (skip the initial mount)
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return }
+    onUpdateRef.current(local)
+  }, [local])
+
+  function set<K extends keyof FlowNode>(key: K, value: FlowNode[K]) {
+    setLocal((prev) => ({ ...prev, [key]: value }))
   }
 
-  const inputCls = 'w-full bg-[#0d0d1a] border border-gray-700 text-white text-xs px-3 py-2 rounded focus:outline-none focus:border-brand-orange transition-colors'
-  const selectCls = `${inputCls} appearance-none`
-
-  function set(key: string, value: unknown) {
-    onUpdate(node.id, { ...d, [key]: value })
+  function setInputType(type: FlowNode['input_type']) {
+    setLocal((prev) => ({
+      ...prev,
+      input_type: type,
+      ...(type !== 'text'        ? { variable: undefined, validation: null, normalize_skip: undefined } : {}),
+      ...(type !== 'quick_reply' ? { options: [] }                                                       : {}),
+    }))
   }
+
+  function setValidationType(vtype: string) {
+    if (!vtype) { set('validation', null); return }
+    setLocal((prev) => ({
+      ...prev,
+      validation: {
+        type: vtype as ValidationConfig['type'],
+        error_message: prev.validation?.error_message,
+      },
+    }))
+  }
+
+  function setValidationField<K extends keyof ValidationConfig>(key: K, value: ValidationConfig[K]) {
+    setLocal((prev) => ({
+      ...prev,
+      validation: { ...(prev.validation as ValidationConfig), [key]: value },
+    }))
+  }
+
+  function addOption() {
+    setLocal((prev) => ({
+      ...prev,
+      options: [...(prev.options ?? []), { label: '', value: '', next: '' }],
+    }))
+  }
+
+  function updateOption(i: number, key: keyof QuickReplyOption, value: string) {
+    setLocal((prev) => {
+      const opts = [...(prev.options ?? [])]
+      opts[i] = { ...opts[i], [key]: value }
+      if (key === 'label' && !opts[i].value) {
+        opts[i].value = value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+      }
+      return { ...prev, options: opts }
+    })
+  }
+
+  function removeOption(i: number) {
+    setLocal((prev) => ({
+      ...prev,
+      options: (prev.options ?? []).filter((_, idx) => idx !== i),
+    }))
+  }
+
+  function handleHttpChange(raw: string) {
+    setHttpRaw(raw)
+    if (!raw.trim()) { setHttpErr(''); set('http_request', null); return }
+    try   { set('http_request', JSON.parse(raw) as Record<string, unknown>); setHttpErr('') }
+    catch (e) { setHttpErr((e as Error).message) }
+  }
+
+  function handlePayloadChange(raw: string) {
+    setPayloadRaw(raw)
+    if (!raw.trim()) { setPayloadErr(''); set('payload_assign', null); return }
+    try   { set('payload_assign', JSON.parse(raw) as Record<string, unknown>); setPayloadErr('') }
+    catch (e) { setPayloadErr((e as Error).message) }
+  }
+
+  const v          = local.validation
+  const datalistId = `nl-${local.id}`
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-widest text-brand-orange">Properties</span>
-        <button onClick={() => onDelete(node.id)} className="text-red-400 hover:text-red-300 transition-colors" title="Delete node">
-          <Trash2 className="w-4 h-4" />
+      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between shrink-0">
+        <span className="text-xs font-bold uppercase tracking-widest text-brand-orange">
+          Edit Node
+        </span>
+        <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <X className="w-4 h-4" />
         </button>
       </div>
 
+      <datalist id={datalistId}>
+        {allNodeIds.map((id) => <option key={id} value={id} />)}
+        <option value="handoff" />
+      </datalist>
+
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {field('Label', (
-          <input className={inputCls} value={String(d.label || '')} onChange={(e) => set('label', e.target.value)} />
-        ))}
 
-        {node.type === 'trigger' && (() => {
-          const td = d as TriggerNodeData
-          return (
-            <>
-              {field('Trigger Type', (
-                <select className={selectCls} value={td.triggerType || 'greeting'} onChange={(e) => set('triggerType', e.target.value)}>
-                  <option value="greeting">Greeting / First message</option>
-                  <option value="keyword">Keyword match</option>
-                  <option value="any">Any message</option>
-                </select>
-              ))}
-              {td.triggerType === 'keyword' && field('Keywords (comma separated)', (
-                <input className={inputCls} placeholder="hello, hi, hey" value={td.keywords || ''} onChange={(e) => set('keywords', e.target.value)} />
-              ))}
-            </>
-          )
-        })()}
+        {/* Node ID */}
+        <div>
+          <label className={LABEL_CLS}>Node ID</label>
+          <input
+            className={INPUT_CLS + ' font-mono'}
+            value={idDraft}
+            onChange={(e) => setIdDraft(e.target.value)}
+            onBlur={() => {
+              const t = idDraft.trim()
+              if (t && t !== local.id) set('id', t)
+              else setIdDraft(local.id)
+            }}
+            placeholder="e.g. node_welcome"
+          />
+          <p className="text-[10px] text-gray-600 mt-1">
+            Other nodes reference this ID. Rename with care.
+          </p>
+        </div>
 
-        {node.type === 'message' && (() => {
-          const md = d as MessageNodeData
-          return (
-            <>
-              {field('Message Text', (
-                <textarea rows={4} className={inputCls} placeholder="Type your message…" value={md.message || ''} onChange={(e) => set('message', e.target.value)} />
-              ))}
-              {field('Delay (seconds)', (
-                <input type="number" min={0} max={10} className={inputCls} value={md.delay ?? 0} onChange={(e) => set('delay', Number(e.target.value))} />
-              ))}
-            </>
-          )
-        })()}
+        {/* Message */}
+        <div>
+          <label className={LABEL_CLS}>Message</label>
+          <textarea
+            rows={3}
+            className={INPUT_CLS}
+            value={local.message}
+            onChange={(e) => set('message', e.target.value)}
+            placeholder="Type the message to send to the user..."
+          />
+        </div>
 
-        {node.type === 'condition' && (() => {
-          const cd = d as ConditionNodeData
-          return (
-            <>
-              {field('Variable Name', (
-                <input className={inputCls} placeholder="e.g. user_intent" value={cd.conditionVar || ''} onChange={(e) => set('conditionVar', e.target.value)} />
-              ))}
-              {field('Operator', (
-                <select className={selectCls} value={cd.operator || 'equals'} onChange={(e) => set('operator', e.target.value)}>
-                  <option value="equals">equals</option>
-                  <option value="contains">contains</option>
-                  <option value="exists">exists</option>
-                  <option value="not_exists">does not exist</option>
-                </select>
-              ))}
-              {(cd.operator === 'equals' || cd.operator === 'contains') && field('Value', (
-                <input className={inputCls} placeholder="e.g. booking" value={cd.value || ''} onChange={(e) => set('value', e.target.value)} />
-              ))}
-              <div className="bg-amber-900/20 border border-amber-700/30 rounded p-2 text-[10px] text-amber-300">
-                <strong>YES</strong> path → left handle · <strong>NO</strong> path → right handle
-              </div>
-            </>
-          )
-        })()}
+        {/* Input Type */}
+        <div>
+          <label className={LABEL_CLS}>Input Type</label>
+          <select
+            className={SELECT_CLS}
+            value={local.input_type}
+            onChange={(e) => setInputType(e.target.value as FlowNode['input_type'])}
+          >
+            <option value="none">None – send message only</option>
+            <option value="text">Text – collect user input</option>
+            <option value="quick_reply">Quick Reply – show buttons</option>
+          </select>
+        </div>
 
-        {node.type === 'quickReply' && (() => {
-          const qd = d as QuickReplyNodeData
-          return (
-            <>
-              {field('Message', (
-                <textarea rows={3} className={inputCls} placeholder="What would you like to do?" value={qd.message || ''} onChange={(e) => set('message', e.target.value)} />
-              ))}
-              {field('Quick Replies (comma separated)', (
-                <input className={inputCls} placeholder="Book a service, Get a quote, Talk to us" value={qd.replies || ''} onChange={(e) => set('replies', e.target.value)} />
-              ))}
-            </>
-          )
-        })()}
+        {/* Text input fields */}
+        {local.input_type === 'text' && (
+          <>
+            <div>
+              <label className={LABEL_CLS}>Store Response In (variable)</label>
+              <input
+                className={INPUT_CLS + ' font-mono'}
+                value={local.variable ?? ''}
+                onChange={(e) => set('variable', e.target.value || undefined)}
+                placeholder="e.g. user_name"
+              />
+            </div>
 
-        {node.type === 'action' && (() => {
-          const ad = d as ActionNodeData
-          return (
-            <>
-              {field('Action Type', (
-                <select className={selectCls} value={ad.actionType || 'handoff'} onChange={(e) => set('actionType', e.target.value)}>
-                  <option value="handoff">Handoff to Human Agent</option>
-                  <option value="tag">Tag Customer</option>
-                  <option value="set_variable">Set Variable</option>
-                  <option value="end_flow">End Flow</option>
-                </select>
-              ))}
-              {(ad.actionType === 'tag' || ad.actionType === 'set_variable') && field('Value', (
-                <input className={inputCls} placeholder={ad.actionType === 'tag' ? 'Tag name' : 'variable=value'} value={ad.actionValue || ''} onChange={(e) => set('actionValue', e.target.value)} />
-              ))}
-            </>
-          )
-        })()}
+            <div>
+              <label className={LABEL_CLS}>Validation</label>
+              <select
+                className={SELECT_CLS + ' mb-2'}
+                value={v?.type ?? ''}
+                onChange={(e) => setValidationType(e.target.value)}
+              >
+                <option value="">None</option>
+                <option value="required">Required</option>
+                <option value="email">Email</option>
+                <option value="number">Number</option>
+                <option value="date">Date</option>
+                <option value="regex">Regex Pattern</option>
+                <option value="year_range">Year Range</option>
+                <option value="in_list_variable">In List Variable</option>
+              </select>
 
-        {node.type === 'cta' && field('Button Label', (
-          <input className={inputCls} value={String(d.label || '')} onChange={(e) => set('label', e.target.value)} />
-        ))}
+              {v && (
+                <div className="space-y-2 pl-2 border-l-2 border-gray-700">
+                  {v.type === 'regex' && (
+                    <input
+                      className={INPUT_CLS + ' font-mono'}
+                      placeholder="Pattern e.g. ^\d+$"
+                      value={v.pattern ?? ''}
+                      onChange={(e) => setValidationField('pattern', e.target.value)}
+                    />
+                  )}
+                  {v.type === 'year_range' && (
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        className={INPUT_CLS}
+                        placeholder="Min year"
+                        value={v.min ?? ''}
+                        onChange={(e) => setValidationField('min', Number(e.target.value))}
+                      />
+                      <input
+                        type="number"
+                        className={INPUT_CLS}
+                        placeholder="Max year"
+                        value={v.max ?? ''}
+                        onChange={(e) => setValidationField('max', Number(e.target.value))}
+                      />
+                    </div>
+                  )}
+                  {v.type === 'in_list_variable' && (
+                    <input
+                      className={INPUT_CLS + ' font-mono'}
+                      placeholder="List variable name"
+                      value={v.list_variable ?? ''}
+                      onChange={(e) => setValidationField('list_variable', e.target.value)}
+                    />
+                  )}
+                  <input
+                    className={INPUT_CLS}
+                    placeholder="Error message (optional)"
+                    value={v.error_message ?? ''}
+                    onChange={(e) =>
+                      setValidationField('error_message', e.target.value || undefined)
+                    }
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => set('normalize_skip', !local.normalize_skip)}
+                className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${
+                  local.normalize_skip ? 'bg-brand-orange' : 'bg-gray-700'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${
+                    local.normalize_skip ? 'left-[1.125rem]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+              <span className="text-xs text-gray-400">Accept "skip" as no input</span>
+            </div>
+          </>
+        )}
+
+        {/* Quick-reply options */}
+        {local.input_type === 'quick_reply' && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={LABEL_CLS + ' mb-0'}>Options</label>
+              <button
+                onClick={addOption}
+                className="flex items-center gap-1 text-[11px] text-brand-orange
+                           hover:text-orange-400 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+            </div>
+            <div className="space-y-2">
+              {(local.options ?? []).length === 0 && (
+                <p className="text-[11px] text-gray-600 italic">No options yet – click Add.</p>
+              )}
+              {(local.options ?? []).map((opt, i) => (
+                <div
+                  key={i}
+                  className="bg-[#0d0d1a] border border-gray-700 rounded p-2 space-y-1.5"
+                >
+                  <div className="flex items-center gap-1">
+                    <input
+                      className={INPUT_CLS + ' flex-1'}
+                      placeholder="Label (shown to user)"
+                      value={opt.label}
+                      onChange={(e) => updateOption(i, 'label', e.target.value)}
+                    />
+                    <button
+                      onClick={() => removeOption(i)}
+                      className="text-gray-600 hover:text-red-400 p-1 transition-colors shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <input
+                    className={INPUT_CLS + ' font-mono'}
+                    placeholder="Value (internal key)"
+                    value={opt.value}
+                    onChange={(e) => updateOption(i, 'value', e.target.value)}
+                  />
+                  <input
+                    list={datalistId}
+                    className={INPUT_CLS + ' font-mono'}
+                    placeholder="Next node ID or handoff"
+                    value={opt.next}
+                    onChange={(e) => updateOption(i, 'next', e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Next node */}
+        <div>
+          <label className={LABEL_CLS}>Next Node</label>
+          <input
+            list={datalistId}
+            className={INPUT_CLS + ' font-mono'}
+            value={local.next ?? ''}
+            onChange={(e) => set('next', e.target.value || null)}
+            placeholder='Node ID, "handoff", or leave blank'
+          />
+          <p className="text-[10px] text-gray-600 mt-1">
+            Use <code className="text-gray-400">handoff</code> to transfer to a human agent.
+          </p>
+        </div>
+
+        {/* HTTP Request (collapsible) */}
+        <div>
+          <button
+            onClick={() => setShowHttp((prev) => !prev)}
+            className="flex items-center gap-2 text-xs text-gray-400 hover:text-white
+                       transition-colors w-full"
+          >
+            <Globe className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+            <span className="font-bold uppercase tracking-widest text-[11px]">HTTP Request</span>
+            {showHttp
+              ? <ChevronUp className="w-3.5 h-3.5 ml-auto" />
+              : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
+          </button>
+          {showHttp && (
+            <div className="mt-2 space-y-1">
+              <textarea
+                rows={8}
+                className={INPUT_CLS + ' font-mono text-[11px] leading-relaxed'}
+                value={httpRaw}
+                onChange={(e) => handleHttpChange(e.target.value)}
+                placeholder={'{\n  "method": "GET",\n  "url": "https://api.example.com/data",\n  "response_variable": "result"\n}'}
+                spellCheck={false}
+              />
+              {httpErr && (
+                <p className="text-[10px] text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" /> {httpErr}
+                </p>
+              )}
+              {httpRaw && !httpErr && (
+                <button
+                  onClick={() => { setHttpRaw(''); set('http_request', null) }}
+                  className="text-[10px] text-gray-500 hover:text-red-400 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Payload Assign (collapsible) */}
+        <div>
+          <button
+            onClick={() => setShowPayload((prev) => !prev)}
+            className="flex items-center gap-2 text-xs text-gray-400 hover:text-white
+                       transition-colors w-full"
+          >
+            <span className="font-bold uppercase tracking-widest text-[11px]">Payload Assign</span>
+            {showPayload
+              ? <ChevronUp className="w-3.5 h-3.5 ml-auto" />
+              : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
+          </button>
+          {showPayload && (
+            <div className="mt-2 space-y-1">
+              <textarea
+                rows={5}
+                className={INPUT_CLS + ' font-mono text-[11px] leading-relaxed'}
+                value={payloadRaw}
+                onChange={(e) => handlePayloadChange(e.target.value)}
+                placeholder={'{\n  "service_id": ["service_id", "serviceId"]\n}'}
+                spellCheck={false}
+              />
+              {payloadErr && (
+                <p className="text-[10px] text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" /> {payloadErr}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )
 }
 
-// ─── Flow Editor Page ────────────────────────────────────────────────────────
-
-const DEFAULT_NODES: Node<FlowNodeData>[] = [
-  {
-    id: '1',
-    type: 'trigger',
-    position: { x: 250, y: 50 },
-    data: { label: 'Start', triggerType: 'greeting', keywords: '' } as TriggerNodeData,
-  },
-]
-
-const DEFAULT_EDGES: Edge[] = []
+// ── FlowEditorPage ────────────────────────────────────────────────────────────
 
 export default function FlowEditorPage() {
-  const [flows, setFlows] = useState<FlowRecord[]>([])
-  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null)
-  const [flowName, setFlowName] = useState('')
-  const [flowDescription, setFlowDescription] = useState('')
-  const [flowIsActive, setFlowIsActive] = useState(false)
-
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<FlowNodeData>>(DEFAULT_NODES)
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(DEFAULT_EDGES)
-
-  const [selectedNode, setSelectedNode] = useState<Node<FlowNodeData> | null>(null)
-  const [showPalette, setShowPalette] = useState(true)
-  const [showFlowList, setShowFlowList] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [flows, setFlows]               = useState<FlowRecord[]>([])
   const [loadingFlows, setLoadingFlows] = useState(true)
-  const [saveMsg, setSaveMsg] = useState('')
-  const [saveError, setSaveError] = useState('')
+  const [showFlowList, setShowFlowList] = useState(false)
+
+  const [selectedFlowId, setSelectedFlowId]   = useState<string | null>(null)
+  const [flowName, setFlowName]               = useState('')
+  const [flowDescription, setFlowDescription] = useState('')
+  const [flowIsActive, setFlowIsActive]       = useState(false)
+  const [flowDef, setFlowDef]                 = useState<FlowDef>(makeFlowTemplate('New Flow'))
+
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+
+  // Ref keeps the selected id current inside updateNode without adding it to deps
+  const selectedNodeIdRef = useRef<string | null>(null)
+  useEffect(() => { selectedNodeIdRef.current = selectedNodeId }, [selectedNodeId])
+
+  const [saving, setSaving]         = useState(false)
   const [activating, setActivating] = useState(false)
+  const [saveMsg, setSaveMsg]       = useState('')
+  const [saveError, setSaveError]   = useState('')
+
   const [showNewFlowModal, setShowNewFlowModal] = useState(false)
-  const [newFlowName, setNewFlowName] = useState('')
-  const [newFlowDesc, setNewFlowDesc] = useState('')
-  const [isMobile, setIsMobile] = useState(false)
+  const [newFlowName, setNewFlowName]           = useState('')
+  const [newFlowDesc, setNewFlowDesc]           = useState('')
 
-  const nodeIdCounter = useRef(100)
+  const selectedNode = flowDef.nodes.find((n) => n.id === selectedNodeId) ?? null
+  const allNodeIds   = flowDef.nodes.map((n) => n.id)
 
-  const savedFlowRef = useRef({ nodes: DEFAULT_NODES, edges: DEFAULT_EDGES })
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)')
-    const apply = () => {
-      const mobile = media.matches
-      setIsMobile(mobile)
-      if (mobile) setShowPalette(false)
-    }
-    apply()
-    media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
-  }, [])
-
-  // ── Fetch flows ──────────────────────────────────────────────────────────
+  // ── Fetch flow list ────────────────────────────────────────────────────────
   const fetchFlows = useCallback(async () => {
     try {
       const data = await chatbotApi.getFlows()
@@ -440,90 +676,84 @@ export default function FlowEditorPage() {
 
   useEffect(() => { void fetchFlows() }, [fetchFlows])
 
-  // ── Load flow into editor ─────────────────────────────────────────────────
+  // ── Load a flow into the editor ────────────────────────────────────────────
   const loadFlow = useCallback((flow: FlowRecord) => {
     setSelectedFlowId(String(flow.id))
     setFlowName(flow.name ?? '')
     setFlowDescription(flow.description ?? '')
     setFlowIsActive(Boolean(flow.is_active))
-
-    try {
-      const parsed = JSON.parse(flow.flow_json ?? '{}') as { nodes?: Node<FlowNodeData>[]; edges?: Edge[] }
-      const loadedNodes = (parsed.nodes ?? DEFAULT_NODES).map((n, i) => ({
-        ...n,
-        position: (n.position && typeof n.position.x === 'number' && typeof n.position.y === 'number')
-          ? n.position
-          : { x: 250, y: 50 + i * 120 },
-      }))
-      const loadedEdges = parsed.edges ?? DEFAULT_EDGES
-      setNodes(loadedNodes)
-      setEdges(loadedEdges)
-      savedFlowRef.current = { nodes: loadedNodes, edges: loadedEdges }
-    } catch {
-      setNodes(DEFAULT_NODES)
-      setEdges(DEFAULT_EDGES)
-      savedFlowRef.current = { nodes: DEFAULT_NODES, edges: DEFAULT_EDGES }
-    }
-    setSelectedNode(null)
+    setSelectedNodeId(null)
     setSaveMsg('')
     setSaveError('')
     setShowFlowList(false)
-  }, [setEdges, setNodes])
-
-  const onConnect = useCallback((connection: Connection) => {
-    setEdges((eds) => addEdge({
-      ...connection,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#F36F21' },
-      style: { stroke: '#F36F21', strokeWidth: 2 },
-      animated: true,
-    }, eds))
-  }, [setEdges])
-
-  // ── Add node from palette ────────────────────────────────────────────────
-  const addNode = useCallback((type: string) => {
-    nodeIdCounter.current += 1
-    const newNode: Node<FlowNodeData> = {
-      id: String(nodeIdCounter.current),
-      type,
-      position: { x: 150 + Math.random() * 200, y: 200 + Math.random() * 150 },
-      data: defaultNodeData(type),
+    try {
+      const parsed = JSON.parse(flow.flow_json ?? '{}') as Partial<FlowDef>
+      setFlowDef({
+        id:               parsed.id               ?? 'flow',
+        name:             parsed.name             ?? flow.name ?? '',
+        trigger_keywords: Array.isArray(parsed.trigger_keywords) ? parsed.trigger_keywords : [],
+        nodes:            Array.isArray(parsed.nodes)            ? parsed.nodes            : [],
+      })
+    } catch {
+      setFlowDef(makeFlowTemplate(flow.name ?? 'Flow'))
     }
-    setNodes((nds) => [...nds, newNode])
-  }, [setNodes])
-
-  // ── Node selection ────────────────────────────────────────────────────────
-  const onNodeClick = useCallback((_: React.MouseEvent, node: Node<FlowNodeData>) => {
-    setSelectedNode(node)
   }, [])
 
-  const onPaneClick = useCallback(() => {
-    setSelectedNode(null)
+  // ── Node CRUD ──────────────────────────────────────────────────────────────
+  const addNode = useCallback(() => {
+    let newId = ''
+    setFlowDef((prev) => {
+      newId = makeUniqueId(prev.nodes)
+      const node: FlowNode = { id: newId, message: '', input_type: 'none', next: null }
+      return { ...prev, nodes: [...prev.nodes, node] }
+    })
+    // Select the new node after state settles
+    setTimeout(() => setSelectedNodeId(newId), 0)
   }, [])
 
-  const handleUpdateNodeData = useCallback((id: string, data: FlowNodeData) => {
-    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data } : n))
-    setSelectedNode((prev) => prev?.id === id ? { ...prev, data } : prev)
-  }, [setNodes])
+  const updateNode = useCallback((updated: FlowNode) => {
+    setFlowDef((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) =>
+        n.id === selectedNodeIdRef.current ? updated : n
+      ),
+    }))
+    if (updated.id !== selectedNodeIdRef.current) {
+      setSelectedNodeId(updated.id)
+    }
+  }, [])
 
-  const handleDeleteNode = useCallback((id: string) => {
-    setNodes((nds) => nds.filter((n) => n.id !== id))
-    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id))
-    setSelectedNode(null)
-  }, [setEdges, setNodes])
+  const deleteNode = useCallback((id: string) => {
+    if (!window.confirm('Delete this node?')) return
+    setFlowDef((prev) => ({ ...prev, nodes: prev.nodes.filter((n) => n.id !== id) }))
+    setSelectedNodeId((prev) => (prev === id ? null : prev))
+  }, [])
 
-  // ── Save flow ─────────────────────────────────────────────────────────────
+  const moveNode = useCallback((id: string, dir: 'up' | 'down') => {
+    setFlowDef((prev) => {
+      const nodes = [...prev.nodes]
+      const idx   = nodes.findIndex((n) => n.id === id)
+      if (idx < 0) return prev
+      const swap  = dir === 'up' ? idx - 1 : idx + 1
+      if (swap < 0 || swap >= nodes.length) return prev
+      ;[nodes[idx], nodes[swap]] = [nodes[swap], nodes[idx]]
+      return { ...prev, nodes }
+    })
+  }, [])
+
+  // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!flowName.trim()) { setSaveError('Flow name is required'); return }
     setSaving(true)
     setSaveMsg('')
     setSaveError('')
     try {
-      const flowJson = JSON.stringify({ nodes, edges })
+      const def: FlowDef = { ...flowDef, name: flowName.trim() }
       const payload = {
-        name: flowName.trim(),
+        name:        flowName.trim(),
         description: flowDescription.trim() || null,
-        flow_json: flowJson,
-        is_active: flowIsActive,
+        flow_json:   JSON.stringify(def),
+        is_active:   flowIsActive,
       }
       if (selectedFlowId) {
         const updated = await chatbotApi.updateFlow(selectedFlowId, payload)
@@ -533,18 +763,23 @@ export default function FlowEditorPage() {
         if (created?.id) setSelectedFlowId(String(created.id))
         if (created?.is_active !== undefined) setFlowIsActive(Boolean(created.is_active))
       }
-      savedFlowRef.current = { nodes, edges }
-      setSaveMsg('Flow saved successfully.')
+      setSaveMsg('Saved!')
       await fetchFlows()
     } catch (err) {
-      setSaveError(toApiErrorMessage(err))
+      type ErrResp = { response?: { data?: { detail?: { errors?: string[] } | string } } }
+      const detail = (err as ErrResp)?.response?.data?.detail
+      if (detail && typeof detail === 'object' && Array.isArray((detail as { errors?: string[] }).errors)) {
+        setSaveError(`Validation: ${(detail as { errors: string[] }).errors.join(' · ')}`)
+      } else {
+        setSaveError(toApiErrorMessage(err))
+      }
     } finally {
       setSaving(false)
-      setTimeout(() => { setSaveMsg(''); setSaveError('') }, 3000)
+      setTimeout(() => setSaveMsg(''), 3000)
     }
-  }, [edges, fetchFlows, flowDescription, flowIsActive, flowName, nodes, selectedFlowId])
+  }, [fetchFlows, flowDef, flowDescription, flowIsActive, flowName, selectedFlowId])
 
-  // ── Activate flow ─────────────────────────────────────────────────────────
+  // ── Activate ───────────────────────────────────────────────────────────────
   const handleActivate = useCallback(async () => {
     if (!selectedFlowId) return
     setActivating(true)
@@ -552,7 +787,7 @@ export default function FlowEditorPage() {
       await chatbotApi.activateFlow(selectedFlowId)
       setFlowIsActive(true)
       setFlows((prev) => prev.map((f) => ({ ...f, is_active: String(f.id) === selectedFlowId })))
-      setSaveMsg('Flow activated!')
+      setSaveMsg('Activated!')
       setTimeout(() => setSaveMsg(''), 3000)
     } catch (err) {
       setSaveError(toApiErrorMessage(err))
@@ -562,117 +797,128 @@ export default function FlowEditorPage() {
     }
   }, [selectedFlowId])
 
-  // ── Delete flow ───────────────────────────────────────────────────────────
+  // ── Delete flow ────────────────────────────────────────────────────────────
   const handleDeleteFlow = useCallback(async () => {
-    if (!selectedFlowId || !window.confirm('Delete this flow?')) return
+    if (!selectedFlowId || !window.confirm('Delete this flow? This cannot be undone.')) return
     try {
       await chatbotApi.deleteFlow(selectedFlowId)
       setSelectedFlowId(null)
       setFlowName('')
       setFlowDescription('')
       setFlowIsActive(false)
-      setNodes(DEFAULT_NODES)
-      setEdges(DEFAULT_EDGES)
+      setFlowDef(makeFlowTemplate('New Flow'))
+      setSelectedNodeId(null)
+      setSaveMsg('')
+      setSaveError('')
       await fetchFlows()
     } catch (err) {
       setSaveError(toApiErrorMessage(err))
     }
-  }, [fetchFlows, selectedFlowId, setEdges, setNodes])
+  }, [fetchFlows, selectedFlowId])
 
-  // ── New flow ──────────────────────────────────────────────────────────────
+  // ── New flow ───────────────────────────────────────────────────────────────
   const handleNewFlow = useCallback(() => {
     if (!newFlowName.trim()) return
     setSelectedFlowId(null)
     setFlowName(newFlowName.trim())
     setFlowDescription(newFlowDesc.trim())
     setFlowIsActive(false)
-    setNodes(DEFAULT_NODES)
-    setEdges(DEFAULT_EDGES)
-    savedFlowRef.current = { nodes: DEFAULT_NODES, edges: DEFAULT_EDGES }
-    setSelectedNode(null)
+    setFlowDef(makeFlowTemplate(newFlowName.trim()))
+    setSelectedNodeId(null)
+    setSaveMsg('')
+    setSaveError('')
     setShowNewFlowModal(false)
     setNewFlowName('')
     setNewFlowDesc('')
-  }, [newFlowDesc, newFlowName, setEdges, setNodes])
+  }, [newFlowDesc, newFlowName])
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="h-full min-h-0 flex flex-col bg-[#0d0d1a] text-white overflow-hidden">
-      {/* ── Top Toolbar ─────────────────────────────────────────────────── */}
+
+      {/* Top toolbar */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-800 bg-[#111120] shrink-0 flex-wrap">
-        {/* Flow selector */}
         <button
           onClick={() => setShowFlowList((v) => !v)}
-          className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded text-sm transition-colors min-w-0"
+          className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700
+                     px-3 py-1.5 rounded text-sm transition-colors min-w-0"
         >
           <List className="w-4 h-4 text-brand-orange shrink-0" />
           <span className="truncate max-w-[140px]">{flowName || 'Select Flow'}</span>
-          {showFlowList ? <ChevronUp className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
+          {showFlowList
+            ? <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+            : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
         </button>
 
-        {/* Flow name edit */}
         <input
-          className="bg-transparent border border-gray-700 hover:border-gray-500 focus:border-brand-orange text-white text-sm px-3 py-1.5 rounded focus:outline-none transition-colors w-40 md:w-56"
-          placeholder="Flow name…"
+          className="bg-transparent border border-gray-700 hover:border-gray-500
+                     focus:border-brand-orange text-white text-sm px-3 py-1.5 rounded
+                     focus:outline-none transition-colors w-40 md:w-56"
+          placeholder="Flow name..."
           value={flowName}
           onChange={(e) => setFlowName(e.target.value)}
         />
 
         <div className="flex items-center gap-2 ml-auto flex-wrap">
-          {/* Active badge */}
           {flowIsActive && (
-            <span className="flex items-center gap-1.5 bg-green-900/30 border border-green-700/40 text-green-400 text-xs font-bold px-2.5 py-1 rounded-full">
+            <span className="flex items-center gap-1.5 bg-green-900/30 border border-green-700/40
+                             text-green-400 text-xs font-bold px-2.5 py-1 rounded-full">
               <CheckCircle className="w-3.5 h-3.5" /> Active
             </span>
           )}
 
-          {/* Save feedback */}
           {saveMsg && (
             <span className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
               <CheckCircle className="w-3.5 h-3.5" /> {saveMsg}
             </span>
           )}
           {saveError && (
-            <span className="flex items-center gap-1.5 text-red-400 text-xs font-medium">
-              <AlertCircle className="w-3.5 h-3.5" /> {saveError}
+            <span
+              className="flex items-center gap-1.5 text-red-400 text-xs font-medium max-w-xs truncate"
+              title={saveError}
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {saveError}
             </span>
           )}
 
-          {/* Activate */}
           {selectedFlowId && !flowIsActive && (
             <button
               onClick={() => void handleActivate()}
               disabled={activating}
-              className="flex items-center gap-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+              className="flex items-center gap-2 bg-green-700 hover:bg-green-600 disabled:opacity-50
+                         text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
             >
               {activating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               Activate
             </button>
           )}
 
-          {/* New flow */}
           <button
             onClick={() => setShowNewFlowModal(true)}
-            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors"
+            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white
+                       text-xs font-bold px-3 py-1.5 rounded transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" /> New Flow
+            <Plus className="w-3.5 h-3.5" /> New
           </button>
 
-          {/* Delete flow */}
           {selectedFlowId && (
             <button
               onClick={() => void handleDeleteFlow()}
-              className="flex items-center gap-2 bg-red-900/40 hover:bg-red-800/60 border border-red-800 text-red-400 hover:text-red-300 text-xs font-bold px-3 py-1.5 rounded transition-colors"
+              className="flex items-center gap-2 bg-red-900/40 hover:bg-red-800/60 border border-red-800
+                         text-red-400 hover:text-red-300 text-xs font-bold px-3 py-1.5 rounded
+                         transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Delete</span>
             </button>
           )}
 
-          {/* Save */}
           <button
             onClick={() => void handleSave()}
             disabled={saving}
-            className="flex items-center gap-2 bg-brand-orange hover:bg-orange-500 disabled:opacity-60 text-white text-xs font-bold px-4 py-1.5 rounded transition-colors"
+            className="flex items-center gap-2 bg-brand-orange hover:bg-orange-500
+                       disabled:opacity-60 text-white text-xs font-bold px-4 py-1.5 rounded
+                       transition-colors"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             Save
@@ -680,18 +926,47 @@ export default function FlowEditorPage() {
         </div>
       </div>
 
+      {/* Trigger keywords strip */}
+      <div className="shrink-0 border-b border-gray-800 bg-[#111120] px-4 py-2 flex items-center gap-3">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-gray-600 shrink-0">
+          Triggers
+        </span>
+        <input
+          className="flex-1 bg-transparent border-none text-xs text-gray-300 focus:outline-none
+                     placeholder-gray-700"
+          placeholder="Comma-separated trigger keywords (e.g. hello, hi, start)"
+          value={flowDef.trigger_keywords.join(', ')}
+          onChange={(e) => {
+            const kws = e.target.value.split(',').map((k) => k.trim()).filter(Boolean)
+            setFlowDef((prev) => ({ ...prev, trigger_keywords: kws }))
+          }}
+        />
+        <button
+          onClick={() => void fetchFlows()}
+          className="text-gray-600 hover:text-white transition-colors shrink-0"
+          title="Refresh flow list"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Content area */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* ── Flow list dropdown overlay ──────────────────────────────── */}
+
+        {/* Flow list dropdown overlay */}
         {showFlowList && (
-          <div className="absolute top-0 left-0 z-30 bg-[#111120] border border-gray-700 rounded-b shadow-2xl w-72 max-h-80 overflow-y-auto">
+          <div className="absolute top-0 left-0 z-30 bg-[#111120] border border-gray-700
+                          rounded-b shadow-2xl w-72 max-h-80 overflow-y-auto">
             <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Your Flows</span>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                Your Flows
+              </span>
               <button onClick={() => setShowFlowList(false)} className="text-gray-500 hover:text-white">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
             {loadingFlows ? (
-              <div className="p-4 text-center text-gray-500 text-sm">Loading…</div>
+              <div className="p-4 text-center text-gray-500 text-sm">Loading...</div>
             ) : flows.length === 0 ? (
               <div className="p-4 text-center text-gray-500 text-sm">No flows yet</div>
             ) : (
@@ -699,168 +974,170 @@ export default function FlowEditorPage() {
                 <button
                   key={f.id}
                   onClick={() => loadFlow(f)}
-                  className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800 transition-colors ${
-                    String(f.id) === selectedFlowId ? 'bg-brand-orange/10 border-l-2 border-l-brand-orange' : ''
+                  className={`w-full text-left px-4 py-3 border-b border-gray-800
+                              hover:bg-gray-800 transition-colors ${
+                    String(f.id) === selectedFlowId
+                      ? 'bg-brand-orange/10 border-l-2 border-l-brand-orange'
+                      : ''
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-white font-medium truncate">{f.name || 'Unnamed'}</span>
+                    <span className="text-sm text-white font-medium truncate">
+                      {f.name || 'Unnamed'}
+                    </span>
                     {f.is_active && <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />}
                   </div>
-                  {f.description && <p className="text-xs text-gray-500 truncate mt-0.5">{f.description}</p>}
+                  {f.description && (
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{f.description}</p>
+                  )}
                 </button>
               ))
             )}
             <button
               onClick={() => { setShowFlowList(false); setShowNewFlowModal(true) }}
-              className="w-full flex items-center gap-2 px-4 py-3 text-sm text-brand-orange hover:bg-brand-orange/10 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-3 text-sm text-brand-orange
+                         hover:bg-brand-orange/10 transition-colors"
             >
               <Plus className="w-4 h-4" /> New Flow
             </button>
           </div>
         )}
 
-        {/* ── Left Palette ────────────────────────────────────────────── */}
-        <aside
-          id="node-palette"
-          className={`${showPalette ? 'w-48 md:w-52' : 'w-0'} shrink-0 bg-[#111120] border-r border-gray-800 flex flex-col overflow-hidden transition-all duration-200`}
-        >
-          <div className="px-3 py-2.5 border-b border-gray-800 flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Node Types</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-            {NODE_PALETTE.map((p) => (
+        {/* Node cards */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {flowDef.nodes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-16">
+              <MessageSquare className="w-12 h-12 text-gray-700 mb-4" />
+              <p className="text-gray-400 font-medium mb-1">No nodes yet</p>
+              <p className="text-gray-600 text-sm mb-6">
+                Add your first node to start building the flow.
+              </p>
               <button
-                key={p.type}
-                onClick={() => addNode(p.type)}
-                title={`Add ${p.label} node`}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded border border-gray-700 bg-gray-800/50 hover:bg-gray-700 hover:border-gray-600 transition-colors text-left group"
+                onClick={addNode}
+                className="flex items-center gap-2 bg-brand-orange hover:bg-orange-500
+                           text-white font-bold px-5 py-2.5 rounded transition-colors"
               >
-                <span style={{ color: p.color }}>{p.icon}</span>
-                <div className="min-w-0">
-                  <div className="text-[12px] font-semibold text-white leading-none mb-0.5">{p.label}</div>
-                  <div className="text-[10px] text-gray-500 leading-none">{p.desc}</div>
-                </div>
-                <Plus className="w-3 h-3 text-gray-500 group-hover:text-white ml-auto shrink-0 transition-colors" />
+                <Plus className="w-4 h-4" /> Add First Node
               </button>
-            ))}
-          </div>
-          <div className="px-3 py-2 border-t border-gray-800 text-[10px] text-gray-600 text-center">
-            Click to add · drag to move
-          </div>
-        </aside>
+            </div>
+          ) : (
+            <div className="max-w-xl mx-auto space-y-3">
+              {flowDef.nodes.map((node, index) => (
+                <NodeCard
+                  key={node.id}
+                  node={node}
+                  index={index}
+                  selected={selectedNodeId === node.id}
+                  onSelect={() =>
+                    setSelectedNodeId(node.id === selectedNodeId ? null : node.id)
+                  }
+                  onDelete={() => deleteNode(node.id)}
+                  onMoveUp={() => moveNode(node.id, 'up')}
+                  onMoveDown={() => moveNode(node.id, 'down')}
+                  isFirst={index === 0}
+                  isLast={index === flowDef.nodes.length - 1}
+                />
+              ))}
 
-        {/* Toggle palette */}
-        <button
-          onClick={() => setShowPalette((v) => !v)}
-          title="Toggle palette"
-          className={`absolute bottom-12 z-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 border-l-0 text-gray-400 hover:text-white px-1 py-2 rounded-r transition-[left] duration-200 ${
-            showPalette ? 'left-48 md:left-52' : 'left-0'
-          }`}
-        >
-          {showPalette ? <ArrowLeft className="w-3 h-3" /> : <ArrowLeft className="w-3 h-3 rotate-180" />}
-        </button>
-
-        {/* ── Canvas ──────────────────────────────────────────────────── */}
-        <div className="flex-1 relative">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onPaneClick={onPaneClick}
-            nodeTypes={nodeTypes}
-            fitView
-            defaultEdgeOptions={{
-              animated: true,
-              markerEnd: { type: MarkerType.ArrowClosed, color: '#F36F21' },
-              style: { stroke: '#F36F21', strokeWidth: 2 },
-            }}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#222240" />
-            <Controls className="!bg-[#111120] !border-gray-700 !rounded [&>button]:!bg-[#111120] [&>button]:!border-gray-700 [&>button:hover]:!bg-gray-700 [&>button]:!text-gray-300" />
-            <MiniMap
-              style={{ background: '#111120', border: '1px solid #374151' }}
-              nodeColor={(n) => {
-                const colors: Record<string, string> = { trigger: '#22c55e', message: '#3b82f6', condition: '#f59e0b', quickReply: '#8b5cf6', action: '#ec4899', cta: '#14b8a6' }
-                return colors[n.type ?? ''] ?? '#6b7280'
-              }}
-            />
-            <Panel position="top-right" className="text-[10px] text-gray-600">
-              {nodes.length} nodes · {edges.length} connections
-            </Panel>
-          </ReactFlow>
+              <button
+                onClick={addNode}
+                className="w-full flex items-center justify-center gap-2 border border-dashed
+                           border-gray-700 hover:border-brand-orange/50 hover:bg-brand-orange/5
+                           text-gray-500 hover:text-brand-orange text-sm py-3 rounded-lg
+                           transition-all"
+              >
+                <Plus className="w-4 h-4" /> Add Node
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* ── Right Properties Panel ───────────────────────────────── */}
+        {/* Node edit panel */}
         {selectedNode && (
-          <aside className="absolute md:static right-0 top-0 bottom-0 z-20 w-[88vw] max-w-[20rem] md:w-64 shrink-0 bg-[#111120] border-l border-gray-800 flex flex-col overflow-hidden shadow-2xl md:shadow-none">
-            <PropertiesPanel
+          <aside
+            className="absolute md:static right-0 top-0 bottom-0 z-20
+                       w-[90vw] max-w-[22rem] md:w-80 shrink-0
+                       bg-[#111120] border-l border-gray-800 flex flex-col
+                       overflow-hidden shadow-2xl md:shadow-none"
+          >
+            <NodeEditPanel
+              key={selectedNodeId ?? undefined}
               node={selectedNode}
-              onUpdate={handleUpdateNodeData}
-              onDelete={handleDeleteNode}
+              allNodeIds={allNodeIds}
+              onUpdate={updateNode}
+              onClose={() => setSelectedNodeId(null)}
             />
           </aside>
         )}
       </div>
 
-      {/* ── Description bar ─────────────────────────────────────────────── */}
+      {/* Description bar */}
       <div className="shrink-0 border-t border-gray-800 bg-[#111120] px-4 py-2 flex items-center gap-3">
         <input
-          className="flex-1 bg-transparent border-none text-xs text-gray-400 focus:outline-none placeholder-gray-700"
-          placeholder="Flow description (optional)…"
+          className="flex-1 bg-transparent border-none text-xs text-gray-400 focus:outline-none
+                     placeholder-gray-700"
+          placeholder="Flow description (optional)..."
           value={flowDescription}
           onChange={(e) => setFlowDescription(e.target.value)}
         />
-        <div className="flex items-center gap-3 shrink-0">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-[11px] text-gray-500 uppercase tracking-widest">Active</span>
-            <button
-              onClick={() => setFlowIsActive((v) => !v)}
-              className={`relative w-8 h-4 rounded-full transition-colors ${flowIsActive ? 'bg-green-500' : 'bg-gray-700'}`}
-            >
-              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${flowIsActive ? 'left-[1.125rem]' : 'left-0.5'}`} />
-            </button>
-          </label>
+        <label className="flex items-center gap-2 cursor-pointer shrink-0">
+          <span className="text-[11px] text-gray-500 uppercase tracking-widest">Active</span>
           <button
-            onClick={() => void fetchFlows()}
-            className="text-gray-500 hover:text-white transition-colors"
-            title="Refresh flows"
+            onClick={() => setFlowIsActive((v) => !v)}
+            className={`relative w-8 h-4 rounded-full transition-colors ${
+              flowIsActive ? 'bg-green-500' : 'bg-gray-700'
+            }`}
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <span
+              className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${
+                flowIsActive ? 'left-[1.125rem]' : 'left-0.5'
+              }`}
+            />
           </button>
-        </div>
+        </label>
       </div>
 
-      {/* ── New Flow Modal ────────────────────────────────────────────── */}
+      {/* New Flow modal */}
       {showNewFlowModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#111120] border border-gray-700 rounded-lg shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4
+                        bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#111120] border border-gray-700 rounded-lg shadow-2xl
+                          w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-white font-bold text-lg">Create New Flow</h2>
-              <button onClick={() => setShowNewFlowModal(false)} className="text-gray-500 hover:text-white">
+              <button
+                onClick={() => setShowNewFlowModal(false)}
+                className="text-gray-500 hover:text-white"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-1.5">Flow Name *</label>
+                <label className="block text-xs font-bold uppercase tracking-widest
+                                   text-gray-400 mb-1.5">
+                  Flow Name *
+                </label>
                 <input
                   autoFocus
-                  className="w-full bg-[#0d0d1a] border border-gray-700 focus:border-brand-orange text-white text-sm px-3 py-2.5 rounded focus:outline-none transition-colors"
-                  placeholder="e.g. Welcome Flow"
+                  className="w-full bg-[#0d0d1a] border border-gray-700 focus:border-brand-orange
+                             text-white text-sm px-3 py-2.5 rounded focus:outline-none
+                             transition-colors"
+                  placeholder="e.g. Booking Flow"
                   value={newFlowName}
                   onChange={(e) => setNewFlowName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleNewFlow() }}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-1.5">Description</label>
+                <label className="block text-xs font-bold uppercase tracking-widest
+                                   text-gray-400 mb-1.5">
+                  Description
+                </label>
                 <input
-                  className="w-full bg-[#0d0d1a] border border-gray-700 focus:border-brand-orange text-white text-sm px-3 py-2.5 rounded focus:outline-none transition-colors"
+                  className="w-full bg-[#0d0d1a] border border-gray-700 focus:border-brand-orange
+                             text-white text-sm px-3 py-2.5 rounded focus:outline-none
+                             transition-colors"
                   placeholder="Optional description"
                   value={newFlowDesc}
                   onChange={(e) => setNewFlowDesc(e.target.value)}
@@ -868,26 +1145,22 @@ export default function FlowEditorPage() {
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 mt-6">
-              <button onClick={() => setShowNewFlowModal(false)} className="text-sm text-gray-400 hover:text-white px-4 py-2 transition-colors">
+              <button
+                onClick={() => setShowNewFlowModal(false)}
+                className="text-sm text-gray-400 hover:text-white px-4 py-2 transition-colors"
+              >
                 Cancel
               </button>
               <button
                 onClick={handleNewFlow}
                 disabled={!newFlowName.trim()}
-                className="bg-brand-orange hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-bold px-5 py-2 rounded transition-colors"
+                className="bg-brand-orange hover:bg-orange-500 disabled:opacity-50
+                           text-white text-sm font-bold px-5 py-2 rounded transition-colors"
               >
                 Create Flow
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── Help hint when empty ─────────────────────────────────────── */}
-      {nodes.length <= 1 && edges.length === 0 && !selectedFlowId && !isMobile && (
-        <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 z-20 bg-[#111120] border border-gray-700 rounded-lg px-5 py-3 text-center max-w-sm shadow-xl">
-          <p className="text-white font-bold text-sm mb-1">Build your first flow</p>
-          <p className="text-gray-400 text-xs">Click node types on the left to add them, then drag handles to connect. Save when done.</p>
         </div>
       )}
     </div>
