@@ -44,10 +44,12 @@ class PrivacyService
 
         // Bookings (own)
         $stmt = $db->prepare(
-            'SELECT id, reference_number, service_name, appointment_date, appointment_time,
-                    vehicle_info, vehicle_make, vehicle_model, vehicle_year,
-                    status, notes, created_at
-               FROM bookings WHERE user_id = :id ORDER BY created_at DESC'
+            'SELECT b.id, b.reference_number, s.title AS service_name, b.appointment_date, b.appointment_time,
+                    b.vehicle_info, b.vehicle_make, b.vehicle_model, b.vehicle_year,
+                    b.status, b.notes, b.created_at
+               FROM bookings b
+               LEFT JOIN services s ON s.id = b.service_id
+              WHERE b.user_id = :id ORDER BY b.created_at DESC'
         );
         $stmt->execute([':id' => $userId]);
         $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -62,8 +64,12 @@ class PrivacyService
 
         // Reviews
         $stmt = $db->prepare(
-            'SELECT reviewer_name, service_name, rating, review, created_at
-               FROM booking_reviews WHERE user_id = :id ORDER BY created_at DESC'
+            'SELECT u.name AS reviewer_name, s.title AS service_name, r.rating, r.review, r.created_at
+               FROM booking_reviews r
+               JOIN bookings b ON b.id = r.booking_id
+               LEFT JOIN services s ON s.id = b.service_id
+               LEFT JOIN users u ON u.id = r.user_id
+              WHERE r.user_id = :id ORDER BY r.created_at DESC'
         );
         $stmt->execute([':id' => $userId]);
         $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];

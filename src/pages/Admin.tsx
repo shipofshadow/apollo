@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
-  Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
+  Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
   Camera, MessageSquare, GitBranch,
 } from 'lucide-react';
@@ -59,68 +59,6 @@ function getAdminTabFromPath(pathname: string): string {
   }
   return 'analytics';
 }
-
-// ── Admin login screen (Unchanged) ────────────────────────────────────────────
-function AdminLogin() {
-  const { status, error, login, clearError } = useAuth();
-  const [email, setEmail] = useState('');
-  const [pw,    setPw]    = useState('');
-  const [show,  setShow]  = useState(false);
-
-  useEffect(() => () => { clearError(); }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    login(email, pw).catch(() => {});
-  };
-
-  return (
-    <div className="pt-32 pb-24 min-h-screen bg-brand-darker flex items-center justify-center">
-      <div className="bg-brand-dark p-8 rounded-sm border border-gray-800 w-full max-w-md shadow-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-display font-black text-white uppercase tracking-tighter">
-            Admin <span className="text-brand-orange">Login</span>
-          </h1>
-          <p className="text-gray-400 mt-2">Enter your admin credentials</p>
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm mb-6 text-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Email</label>
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-              placeholder="admin@example.com" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Password</label>
-            <div className="relative">
-              <input type={show ? 'text' : 'password'} required value={pw} onChange={e => setPw(e.target.value)}
-                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 pr-12 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                placeholder="••••••••" />
-              <button type="button" onClick={() => setShow(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                {show ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-          <button type="submit" disabled={status === 'loading'}
-            className="w-full bg-brand-orange text-white font-bold uppercase tracking-widest py-4 hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 rounded-sm">
-            {status === 'loading'
-              ? <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-5 h-5" />
-              : 'Sign In'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, logout, hasPermission } = useAuth();
@@ -198,7 +136,7 @@ export default function AdminPage() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  const role = user?.role ?? '';
+  const role = (user?.role) ?? '';
   const isAdmin = role === 'admin';
 
   const canAccessTab = (key: string) => {
@@ -270,7 +208,12 @@ export default function AdminPage() {
     navigate(TAB_PATHS[fallback] || TAB_PATHS.analytics, { replace: true });
   }, [activeTab, role, user, navigate]);
 
-  if (!user) return <AdminLogin />;
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
+  if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'client') return <Navigate to="/" replace />;
 
   const renderContent = () => {
@@ -353,7 +296,7 @@ export default function AdminPage() {
             )}
           </button>
           <div className="w-px h-5 bg-gray-700" />
-          <button onClick={() => logout()}
+          <button onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sign Out</span>
@@ -505,7 +448,7 @@ export default function AdminPage() {
             </button>
 
             {/* Mobile logout */}
-            <button onClick={() => logout()}
+            <button onClick={handleLogout}
               title="Sign Out"
               className="md:hidden w-full flex items-center gap-2 px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
               <LogOut className="w-4 h-4 shrink-0" />
