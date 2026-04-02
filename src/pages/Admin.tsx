@@ -156,10 +156,11 @@ export default function AdminPage() {
     if (nextTab !== 'appointments') {
       setActiveBookingId(null);
     }
-    if (location.pathname === '/admin' || location.pathname === '/admin/') {
+    const state = location.state as { openBookingId?: string } | null;
+    if ((location.pathname === '/admin' || location.pathname === '/admin/') && !state?.openBookingId) {
       navigate(TAB_PATHS.analytics, { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.state, navigate]);
 
   const handleTabChange = (key: string) => {
     const nextPath = TAB_PATHS[key] || TAB_PATHS.analytics;

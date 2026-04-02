@@ -52,6 +52,25 @@ export default function NotificationBell({ className = '' }: Props) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  const resolveBookingId = (payload: Record<string, unknown> | null): string | null => {
+    if (!payload) return null;
+
+    const direct = payload.bookingId ?? payload.booking_id ?? payload.id;
+    if (direct !== undefined && direct !== null && String(direct).trim() !== '') {
+      return String(direct);
+    }
+
+    const nestedBooking = payload.booking as Record<string, unknown> | undefined;
+    if (nestedBooking) {
+      const nestedId = nestedBooking.bookingId ?? nestedBooking.booking_id ?? nestedBooking.id;
+      if (nestedId !== undefined && nestedId !== null && String(nestedId).trim() !== '') {
+        return String(nestedId);
+      }
+    }
+
+    return null;
+  };
+
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -71,11 +90,11 @@ export default function NotificationBell({ className = '' }: Props) {
     setOpen(false);
 
     // Navigate to the related booking
-    const bookingId = n.data?.bookingId as string | undefined;
+    const bookingId = resolveBookingId(n.data);
     if (!bookingId) return;
 
     if (user?.role && user.role !== 'client') {
-      navigate('/admin', { state: { openBookingId: String(bookingId) } });
+      navigate('/admin/bookings', { state: { openBookingId: String(bookingId) } });
     } else {
       navigate(`/client/bookings/${bookingId}`);
     }

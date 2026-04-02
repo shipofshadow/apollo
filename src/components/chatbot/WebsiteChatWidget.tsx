@@ -157,6 +157,16 @@ export default function WebsiteChatWidget() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  useEffect(() => {
+    const compact = viewportWidth <= 640
+    if (!isOpen || !compact) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen, viewportWidth])
+
   const handleSend = useCallback(async (overrideValue?: string | QuickReplyPayload) => {
     const payload: QuickReplyPayload =
       typeof overrideValue === 'object' && overrideValue !== null
@@ -338,19 +348,24 @@ export default function WebsiteChatWidget() {
     <>
       {isOpen && (
         <div
-          className="fixed z-[1000] overflow-hidden border border-white/10 bg-white shadow-[0_28px_70px_rgba(2,6,23,0.45)]"
+          className={`fixed z-[1000] overflow-hidden bg-white ${
+            isCompact
+              ? 'inset-0 border-0 shadow-none'
+              : 'border border-white/10 shadow-[0_28px_70px_rgba(2,6,23,0.45)]'
+          }`}
           style={{
-            bottom: isCompact ? 84 : 90,
-            right: isCompact ? 8 : 24,
-            left: isCompact ? 8 : 'auto',
-            width: isCompact ? 'auto' : 380,
-            maxWidth: 'calc(100vw - 16px)',
-            height: isCompact ? 'calc(100vh - 96px)' : 560,
-            maxHeight: 'calc(100vh - 96px)',
-            borderRadius: isCompact ? 16 : 22,
+            top: isCompact ? 0 : 'auto',
+            bottom: isCompact ? 0 : 90,
+            right: isCompact ? 0 : 24,
+            left: isCompact ? 0 : 'auto',
+            width: isCompact ? '100vw' : 380,
+            maxWidth: isCompact ? '100vw' : 'calc(100vw - 16px)',
+            height: isCompact ? '100dvh' : 560,
+            maxHeight: isCompact ? '100dvh' : 'calc(100vh - 96px)',
+            borderRadius: isCompact ? 0 : 22,
           }}
         >
-          <div className="relative overflow-hidden bg-gradient-to-br from-brand-orange via-orange-600 to-orange-900 px-4 py-4 text-white">
+          <div className="relative overflow-hidden bg-gradient-to-br from-brand-orange via-orange-600 to-orange-900 px-4 py-4 text-white" style={{ paddingTop: isCompact ? 'calc(env(safe-area-inset-top) + 12px)' : undefined }}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_40%),linear-gradient(135deg,transparent,rgba(0,0,0,0.12))]" />
             <div className="relative flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -371,7 +386,7 @@ export default function WebsiteChatWidget() {
                   onClick={() => void handleNewChat()}
                   className="rounded-full border border-white/30 bg-white/12 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white transition hover:bg-white/20"
                 >
-                  New Chat
+                  {isCompact ? 'New' : 'New Chat'}
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
@@ -417,7 +432,7 @@ export default function WebsiteChatWidget() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="border-t border-slate-200 bg-white px-3 py-3">
+            <div className="border-t border-slate-200 bg-white px-3 py-3" style={{ paddingBottom: isCompact ? 'calc(env(safe-area-inset-bottom) + 12px)' : undefined }}>
               <div className="mb-2 rounded-2xl border border-orange-100 bg-orange-50 px-3 py-2 text-[11px] text-slate-600">
                 {serviceStatus === 'offline'
                   ? 'Chat assistant is currently offline. Please try again in a moment.'
@@ -478,27 +493,29 @@ export default function WebsiteChatWidget() {
         </div>
       )}
 
-      <button
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-label={isOpen ? 'Close chat' : 'Open chat'}
-        className="fixed z-[1001] grid place-items-center rounded-full bg-gradient-to-br from-brand-orange to-orange-800 text-white shadow-[0_12px_30px_rgba(179,72,18,0.55)] transition hover:scale-105"
-        style={{
-          bottom: isCompact ? 16 : 24,
-          right: isCompact ? 16 : 24,
-          width: isCompact ? 54 : 58,
-          height: isCompact ? 54 : 58,
-        }}
-      >
-        {isOpen ? (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-          </svg>
-        ) : (
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
-          </svg>
-        )}
-      </button>
+      {(!isOpen || !isCompact) && (
+        <button
+          onClick={() => setIsOpen((prev) => !prev)}
+          aria-label={isOpen ? 'Close chat' : 'Open chat'}
+          className="fixed z-[1001] grid place-items-center rounded-full bg-gradient-to-br from-brand-orange to-orange-800 text-white shadow-[0_12px_30px_rgba(179,72,18,0.55)] transition hover:scale-105"
+          style={{
+            bottom: isCompact ? 16 : 24,
+            right: isCompact ? 16 : 24,
+            width: isCompact ? 54 : 58,
+            height: isCompact ? 54 : 58,
+          }}
+        >
+          {isOpen ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          ) : (
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+            </svg>
+          )}
+        </button>
+      )}
     </>
   )
 }
