@@ -732,6 +732,7 @@ def _deliver_node(
 
         # --- Handle HTTP request if present ---
         http_cfg = node.get("http_request")
+        http_rendered_message = False
         if http_cfg:
             resp_data, err = _do_http_request(http_cfg, variables)
             resp_var = http_cfg.get("response_variable")
@@ -740,10 +741,20 @@ def _deliver_node(
                     {"content": f"Service error: {err}", "message_type": "text", "metadata": None}
                 )
             else:
-                if resp_var:
-                    variables = {**variables, resp_var: resp_data}
+                # If response_field is set, extract that specific key from the response
+                # dict for rendering and variable storage (e.g. "availableSlots" from
+                # the availability API which returns a wrapper object).
+                response_field = http_cfg.get("response_field")
+                render_data = (
+                    resp_data.get(response_field, [])
+                    if response_field and isinstance(resp_data, dict)
+                    else resp_data
+                )
 
-                is_empty = _is_empty_response(resp_data)
+                if resp_var:
+                    variables = {**variables, resp_var: render_data}
+
+                is_empty = _is_empty_response(render_data)
                 next_if_empty = http_cfg.get("next_if_empty")
                 next_if_not_empty = http_cfg.get("next_if_not_empty")
                 if is_empty and next_if_empty:
@@ -754,26 +765,43 @@ def _deliver_node(
                     continue
 
                 if http_cfg.get("render_cards"):
-                    cards = _extract_cards(resp_data)
+                    cards = _extract_cards(render_data)
                     if cards:
+                        # Render the node message text FIRST as a plain text bubble,
+                        # since card messages do not display their content field.
+                        intro_text = _interpolate(node.get("message", ""), variables)
+                        if intro_text:
+                            response_messages.append(
+                                {"content": intro_text, "message_type": "text", "metadata": None}
+                            )
+                            http_rendered_message = True
                         response_messages.append(
                             {
-                                "content": node.get("message", ""),
+                                "content": None,
                                 "message_type": "card",
                                 "metadata": {"cards": cards},
                             }
                         )
 
                 if http_cfg.get("render_quick_replies"):
-                    options = _extract_quick_reply_options(resp_data)
+                    options = _extract_quick_reply_options(render_data)
                     if options:
+                        # For quick replies the text is shown inside the message bubble,
+                        # so pass it as content rather than creating a separate message.
+                        qr_text = (
+                            ""
+                            if http_rendered_message
+                            else _interpolate(node.get("message", ""), variables)
+                        )
                         response_messages.append(
                             {
-                                "content": node.get("message", ""),
+                                "content": qr_text,
                                 "message_type": "quick_reply",
                                 "metadata": {"options": options},
                             }
                         )
+                        if qr_text:
+                            http_rendered_message = True
 
         # --- Render the node message ---
         message_text = _interpolate(node.get("message", ""), variables)
@@ -799,8 +827,8 @@ def _deliver_node(
             return response_messages, node["id"], variables, False
 
         elif input_type == "none":
-            # Deliver message and auto-continue
-            if message_text:
+            # Deliver message and auto-continue; skip if already rendered above
+            if message_text and not http_rendered_message:
                 response_messages.append(
                     {"content": message_text, "message_type": "text", "metadata": None}
                 )

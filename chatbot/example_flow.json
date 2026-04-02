@@ -154,6 +154,7 @@
         "method": "GET",
         "url": "http://localhost:8080/api/bookings/availability?date={appointment_date}",
         "response_variable": "available_slots",
+        "response_field": "availableSlots",
         "next_if_empty": "node_no_slots",
         "render_quick_replies": true
       },
@@ -177,7 +178,6 @@
       "validation": {
         "type": "in_list_variable",
         "list_variable": "available_slots",
-        "field": "title",
         "error_message": "Boss, pili ka lang ng time slot na nasa options sa taas."
       },
       "next": "node_notes"
@@ -292,6 +292,7 @@
         "method": "GET",
         "url": "http://localhost:8080/api/bookings/availability?date={appointment_date}",
         "response_variable": "available_slots",
+        "response_field": "availableSlots",
         "next_if_empty": "node_no_slots",
         "render_quick_replies": true
       },
@@ -305,7 +306,6 @@
       "validation": {
         "type": "in_list_variable",
         "list_variable": "available_slots",
-        "field": "title",
         "error_message": "Boss, pili ka lang ng time slot na nasa options sa taas."
       },
       "next": "node_confirm_summary"
