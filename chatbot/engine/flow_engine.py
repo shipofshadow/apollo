@@ -526,7 +526,7 @@ async def process_message(
                     "metadata": None,
                 }
             )
-            return _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
+            return await _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
 
         response_messages.append(
             {
@@ -540,12 +540,12 @@ async def process_message(
 
     # No active node (fresh session) or trigger keyword received → restart flow
     if current_node_id is None or is_trigger:
-        return _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
+        return await _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
 
     active_node = _find_node(nodes, current_node_id)
     if active_node is None:
         # Unknown node — restart from the beginning
-        return _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
+        return await _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
 
     # -----------------------------------------------------------------------
     # Process the CURRENT node: handle user input that was expected by it
@@ -592,7 +592,7 @@ async def process_message(
             return response_messages, None, variables, True
 
         if next_node_id:
-            return _deliver_node(
+            return await _deliver_node(
                 next_node_id, nodes, variables, response_messages
             )
         return response_messages, None, variables, False
@@ -672,14 +672,14 @@ async def process_message(
                 variables = _sync_selection_labels(variables)
                 next_if_extracted = active_node.get("next_if_extracted")
                 if next_if_extracted and next_if_extracted != "handoff":
-                    return _deliver_node(next_if_extracted, nodes, variables, response_messages)
+                    return await _deliver_node(next_if_extracted, nodes, variables, response_messages)
 
         next_node_id = active_node.get("next")
         if next_node_id == "handoff":
             return response_messages, None, variables, True
 
         if next_node_id:
-            return _deliver_node(next_node_id, nodes, variables, response_messages)
+            return await _deliver_node(next_node_id, nodes, variables, response_messages)
 
         return response_messages, None, variables, False
 
@@ -690,14 +690,14 @@ async def process_message(
         if next_node_id == "handoff":
             return response_messages, None, variables, True
         if next_node_id:
-            return _deliver_node(next_node_id, nodes, variables, response_messages)
+            return await _deliver_node(next_node_id, nodes, variables, response_messages)
         return response_messages, None, variables, False
 
     else:
         # Unknown input type — move to next node if available
         next_node_id = active_node.get("next")
         if next_node_id:
-            return _deliver_node(next_node_id, nodes, variables, response_messages)
+            return await _deliver_node(next_node_id, nodes, variables, response_messages)
         return response_messages, None, variables, False
 
 
