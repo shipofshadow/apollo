@@ -1,16 +1,33 @@
 {
   "id": "default_flow",
   "name": "AutoLab Booking Flow",
-  "trigger_keywords": ["hello", "hi", "start", "hey"],
+  "trigger_keywords": [
+    "hello",
+    "hi",
+    "start",
+    "hey"
+  ],
   "nodes": [
     {
       "id": "node_1",
       "message": "Yo boss, AutoBot 'to ng 1625 Auto Lab. Ano setup natin today?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "Book Appointment", "value": "book", "next": "node_services"},
-        {"label": "View Services",    "value": "services", "next": "node_services"},
-        {"label": "Talk to Human",    "value": "human",    "next": "handoff"}
+        {
+          "label": "Book Appointment",
+          "value": "book",
+          "next": "node_services"
+        },
+        {
+          "label": "View Services",
+          "value": "services",
+          "next": "node_services"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "handoff"
+        }
       ],
       "validation": null,
       "next": null
@@ -33,10 +50,20 @@
       "input_type": "text",
       "variable": "service_id",
       "payload_assign": {
-        "service_id": ["service_id", "serviceId"],
-        "service_name": ["service_name", "serviceName", "title"]
+        "service_id": [
+          "service_id",
+          "serviceId"
+        ],
+        "service_name": [
+          "service_name",
+          "serviceName",
+          "title"
+        ]
       },
-      "validation": {"type": "number", "error_message": "Boss, pili ka sa service cards sa taas o maglagay ng valid service ID."},
+      "validation": {
+        "type": "number",
+        "error_message": "Boss, pili ka sa service cards sa taas o maglagay ng valid service ID."
+      },
       "next": "node_variants"
     },
     {
@@ -50,7 +77,9 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "service_id": {"$int": "{service_id}"}
+          "service_id": {
+            "$int": "{service_id}"
+          }
         },
         "response_variable": "variants",
         "next_if_empty": "node_no_slots",
@@ -64,10 +93,20 @@
       "input_type": "text",
       "variable": "variant_id",
       "payload_assign": {
-        "variant_id": ["variant_id", "variationId"],
-        "variation_name": ["variationName", "variant_name", "title"]
+        "variant_id": [
+          "variant_id",
+          "variationId"
+        ],
+        "variation_name": [
+          "variationName",
+          "variant_name",
+          "title"
+        ]
       },
-      "validation": {"type": "number", "error_message": "Boss, pili ka sa variant cards sa taas o maglagay ng valid variant ID."},
+      "validation": {
+        "type": "number",
+        "error_message": "Boss, pili ka sa variant cards sa taas o maglagay ng valid variant ID."
+      },
       "next": "node_book_prompt"
     },
     {
@@ -75,9 +114,21 @@
       "message": "Book na ba natin 'tong variant na 'to ngayon?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "Yes, book now",  "value": "yes",   "next": "node_name"},
-        {"label": "Talk to Human",  "value": "human",  "next": "handoff"},
-        {"label": "Back to Menu",   "value": "menu",   "next": "node_start"}
+        {
+          "label": "Yes, book now",
+          "value": "yes",
+          "next": "node_name"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "handoff"
+        },
+        {
+          "label": "Back to Menu",
+          "value": "menu",
+          "next": "node_start"
+        }
       ],
       "next": null
     },
@@ -86,7 +137,9 @@
       "message": "Solid. Full name mo boss?",
       "input_type": "text",
       "variable": "name",
-      "validation": {"type": "required"},
+      "validation": {
+        "type": "required"
+      },
       "next": "node_email"
     },
     {
@@ -94,7 +147,10 @@
       "message": "Email mo?",
       "input_type": "text",
       "variable": "email",
-      "validation": {"type": "email", "error_message": "Boss, invalid email 'yan. Check mo uli."},
+      "validation": {
+        "type": "email",
+        "error_message": "Boss, invalid email 'yan. Check mo uli."
+      },
       "next": "node_phone"
     },
     {
@@ -114,7 +170,9 @@
       "message": "Anong make ng sasakyan? (hal. Honda, Toyota, BMW)",
       "input_type": "text",
       "variable": "vehicle_make",
-      "validation": {"type": "required"},
+      "validation": {
+        "type": "required"
+      },
       "next": "node_vehicle_model"
     },
     {
@@ -122,7 +180,9 @@
       "message": "Anong model? (hal. Civic, Camry, M340i)",
       "input_type": "text",
       "variable": "vehicle_model",
-      "validation": {"type": "required"},
+      "validation": {
+        "type": "required"
+      },
       "next": "node_vehicle_year"
     },
     {
@@ -143,7 +203,9 @@
       "message": "Kailan booking? Pwede YYYY-MM-DD, 'bukas', o 'next week'.",
       "input_type": "text",
       "variable": "appointment_date",
-      "validation": {"type": "date"},
+      "validation": {
+        "type": "date"
+      },
       "next": "node_availability"
     },
     {
@@ -165,8 +227,16 @@
       "message": "Boss, malas. Full na kami sa date na 'yan. Pili ka ng ibang araw?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "Oo, ibang date", "value": "yes", "next": "node_date"},
-        {"label": "Talk to Human", "value": "human", "next": "handoff"}
+        {
+          "label": "Oo, ibang date",
+          "value": "yes",
+          "next": "node_date"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "handoff"
+        }
       ],
       "next": null
     },
@@ -203,8 +273,16 @@
       "message": "Boss, pa-check kung tama:\n🚗 {vehicle_year} {vehicle_make} {vehicle_model}\n🛠 Service: {service_name} ({variation_name})\n📅 Sched: {appointment_date} @ {appointment_time}\n\nConfirm na natin 'to?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "G! Send na.", "value": "confirm", "next": "node_submit_booking"},
-        {"label": "Wait, may babaguhin ako.", "value": "edit", "next": "node_edit_menu"}
+        {
+          "label": "G! Send na.",
+          "value": "confirm",
+          "next": "node_submit_booking"
+        },
+        {
+          "label": "Wait, may babaguhin ako.",
+          "value": "edit",
+          "next": "node_edit_menu"
+        }
       ],
       "next": null
     },
@@ -213,11 +291,31 @@
       "message": "Ano gusto mong baguhin, boss?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "Service/Variant", "value": "edit_service", "next": "node_edit_services"},
-        {"label": "Date/Time", "value": "edit_schedule", "next": "node_edit_date"},
-        {"label": "Contact Details", "value": "edit_contact", "next": "node_edit_name"},
-        {"label": "Notes/Images", "value": "edit_notes", "next": "node_edit_notes"},
-        {"label": "Back to Summary", "value": "back", "next": "node_confirm_summary"}
+        {
+          "label": "Service/Variant",
+          "value": "edit_service",
+          "next": "node_edit_services"
+        },
+        {
+          "label": "Date/Time",
+          "value": "edit_schedule",
+          "next": "node_edit_date"
+        },
+        {
+          "label": "Contact Details",
+          "value": "edit_contact",
+          "next": "node_edit_name"
+        },
+        {
+          "label": "Notes/Images",
+          "value": "edit_notes",
+          "next": "node_edit_notes"
+        },
+        {
+          "label": "Back to Summary",
+          "value": "back",
+          "next": "node_confirm_summary"
+        }
       ],
       "next": null
     },
@@ -239,10 +337,20 @@
       "input_type": "text",
       "variable": "service_id",
       "payload_assign": {
-        "service_id": ["service_id", "serviceId"],
-        "service_name": ["service_name", "serviceName", "title"]
+        "service_id": [
+          "service_id",
+          "serviceId"
+        ],
+        "service_name": [
+          "service_name",
+          "serviceName",
+          "title"
+        ]
       },
-      "validation": {"type": "number", "error_message": "Boss, pili ka sa service cards sa taas o maglagay ng valid service ID."},
+      "validation": {
+        "type": "number",
+        "error_message": "Boss, pili ka sa service cards sa taas o maglagay ng valid service ID."
+      },
       "next": "node_edit_variants"
     },
     {
@@ -256,7 +364,9 @@
           "Content-Type": "application/json"
         },
         "body": {
-          "service_id": {"$int": "{service_id}"}
+          "service_id": {
+            "$int": "{service_id}"
+          }
         },
         "response_variable": "variants",
         "next_if_empty": "node_no_slots",
@@ -270,10 +380,20 @@
       "input_type": "text",
       "variable": "variant_id",
       "payload_assign": {
-        "variant_id": ["variant_id", "variationId"],
-        "variation_name": ["variationName", "variant_name", "title"]
+        "variant_id": [
+          "variant_id",
+          "variationId"
+        ],
+        "variation_name": [
+          "variationName",
+          "variant_name",
+          "title"
+        ]
       },
-      "validation": {"type": "number", "error_message": "Boss, pili ka sa variant cards sa taas o maglagay ng valid variant ID."},
+      "validation": {
+        "type": "number",
+        "error_message": "Boss, pili ka sa variant cards sa taas o maglagay ng valid variant ID."
+      },
       "next": "node_confirm_summary"
     },
     {
@@ -281,7 +401,9 @@
       "message": "Kailan bagong booking date? Pwede YYYY-MM-DD, 'bukas', o 'next week'.",
       "input_type": "text",
       "variable": "appointment_date",
-      "validation": {"type": "date"},
+      "validation": {
+        "type": "date"
+      },
       "next": "node_edit_availability"
     },
     {
@@ -315,7 +437,9 @@
       "message": "Anong tamang full name mo, boss?",
       "input_type": "text",
       "variable": "name",
-      "validation": {"type": "required"},
+      "validation": {
+        "type": "required"
+      },
       "next": "node_edit_email"
     },
     {
@@ -323,7 +447,10 @@
       "message": "Anong tamang email mo?",
       "input_type": "text",
       "variable": "email",
-      "validation": {"type": "email", "error_message": "Boss, invalid email 'yan. Check mo uli."},
+      "validation": {
+        "type": "email",
+        "error_message": "Boss, invalid email 'yan. Check mo uli."
+      },
       "next": "node_edit_phone"
     },
     {
@@ -373,16 +500,22 @@
           "vehicleMake": "{vehicle_make}",
           "vehicleModel": "{vehicle_model}",
           "vehicleYear": "{vehicle_year}",
-          "serviceId": {"$int": "{service_id}"},
-          "selectedVariations": {"$variations": {
-            "serviceId": "{service_id}",
-            "variationId": "{variant_id}",
-            "variationName": "{variation_name}"
-          }},
+          "serviceId": {
+            "$int": "{service_id}"
+          },
+          "selectedVariations": {
+            "$variations": {
+              "serviceId": "{service_id}",
+              "variationId": "{variant_id}",
+              "variationName": "{variation_name}"
+            }
+          },
           "appointmentDate": "{appointment_date}",
           "appointmentTime": "{appointment_time}",
           "notes": "{notes}",
-          "mediaUrls": {"$csv": "{images_input}"}
+          "mediaUrls": {
+            "$csv": "{images_input}"
+          }
         },
         "response_variable": "booking_result"
       },
@@ -393,9 +526,21 @@
       "message": "✅ Submitted na booking mo. Ano pa need mo?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "View Services",  "value": "services", "next": "node_services"},
-        {"label": "Talk to Human",  "value": "human",    "next": "handoff"},
-        {"label": "Done",           "value": "done",     "next": "node_start"}
+        {
+          "label": "View Services",
+          "value": "services",
+          "next": "node_services"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "handoff"
+        },
+        {
+          "label": "Done",
+          "value": "done",
+          "next": "node_start"
+        }
       ],
       "next": null
     },
@@ -404,9 +549,21 @@
       "message": "Ano pa next, boss?",
       "input_type": "quick_reply",
       "options": [
-        {"label": "Book Appointment", "value": "book",     "next": "node_services"},
-        {"label": "View Services",    "value": "services", "next": "node_services"},
-        {"label": "Talk to Human",    "value": "human",    "next": "handoff"}
+        {
+          "label": "Book Appointment",
+          "value": "book",
+          "next": "node_services"
+        },
+        {
+          "label": "View Services",
+          "value": "services",
+          "next": "node_services"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "handoff"
+        }
       ],
       "next": null
     }

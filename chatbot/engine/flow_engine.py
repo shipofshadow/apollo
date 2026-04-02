@@ -1,12 +1,13 @@
 import json
 import re
-import time
+import asyncio
 from datetime import date as _date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
 from engine.conditions import validate_input
+from engine.http_client import get_http_client
 
 
 CLOSE_CONFIRM_NODE_ID = "__close_confirm__"
@@ -418,7 +419,7 @@ def _is_empty_response(data: Any) -> bool:
     return False
 
 
-def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]]:
+async def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]]:
     """
     Execute the HTTP request defined in a node's http_request config.
 
@@ -435,15 +436,15 @@ def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[Any, Op
 
     for attempt in range(total_attempts):
         try:
-            with httpx.Client(timeout=timeout_seconds) as client:
+            client = get_http_client()
                 if method == "GET":
-                    resp = client.get(url, headers=headers)
+                resp = await client.get(url, headers=headers, timeout=timeout_seconds)
                 elif method == "POST":
-                    resp = client.post(url, json=body, headers=headers)
+                resp = await client.post(url, json=body, headers=headers, timeout=timeout_seconds)
                 elif method == "PUT":
-                    resp = client.put(url, json=body, headers=headers)
+                resp = await client.put(url, json=body, headers=headers, timeout=timeout_seconds)
                 elif method == "DELETE":
-                    resp = client.delete(url, headers=headers)
+                resp = await client.delete(url, headers=headers, timeout=timeout_seconds)
                 else:
                     return None, f"Unsupported HTTP method: {method}"
 
@@ -455,19 +456,19 @@ def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[Any, Op
         except httpx.HTTPStatusError as exc:
             should_retry = exc.response.status_code >= 500 and attempt < total_attempts - 1
             if should_retry:
-                time.sleep((retry_backoff_ms / 1000.0) * (attempt + 1))
+                await asyncio.sleep((retry_backoff_ms / 1000.0) * (attempt + 1))
                 continue
             return None, f"HTTP request failed with status {exc.response.status_code}."
         except Exception as exc:
             if attempt < total_attempts - 1:
-                time.sleep((retry_backoff_ms / 1000.0) * (attempt + 1))
+                await asyncio.sleep((retry_backoff_ms / 1000.0) * (attempt + 1))
                 continue
             return None, f"HTTP request error: {str(exc)}"
 
     return None, "HTTP request failed after retries."
 
 
-def process_message(
+async def process_message(
     flow_json: dict,
     user_input: str,
     current_node_id: Optional[str],
@@ -700,7 +701,7 @@ def process_message(
         return response_messages, None, variables, False
 
 
-def _deliver_node(
+async def _deliver_node(
     node_id: str,
     nodes: List[dict],
     variables: Dict[str, Any],
@@ -737,7 +738,7 @@ def _deliver_node(
         http_cfg = node.get("http_request")
         http_rendered_message = False
         if http_cfg:
-            resp_data, err = _do_http_request(http_cfg, variables)
+            resp_data, err = await _do_http_request(http_cfg, variables)
             resp_var = http_cfg.get("response_variable")
             if err:
                 response_messages.append(

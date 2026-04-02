@@ -135,7 +135,7 @@ def _persist_profile_memory(variables: dict, session_id: str, db: Session) -> No
 
 
 @router.post("/send", response_model=schemas.ChatResponse)
-def send_message(payload: schemas.ChatMessage, db: Session = Depends(get_db)):
+async def send_message(payload: schemas.ChatMessage, db: Session = Depends(get_db)):
     try:
         is_start_message = payload.message_type == "start"
         if not is_start_message and not payload.message.strip():
@@ -206,7 +206,7 @@ def send_message(payload: schemas.ChatMessage, db: Session = Depends(get_db)):
         # Run the flow engine
         flow_input = "start" if is_start_message else payload.message
 
-        response_msgs, next_node_id, updated_vars, is_handoff = flow_engine.process_message(
+        response_msgs, next_node_id, updated_vars, is_handoff = await flow_engine.process_message(
             flow_json=flow_dict,
             user_input=flow_input,
             current_node_id=current_node_id,
@@ -269,8 +269,7 @@ def send_message(payload: schemas.ChatMessage, db: Session = Depends(get_db)):
         raise
     except Exception:
         db.rollback()
-        logger.exception("Chat send failed for session_id=%s", payload.session_id)
-        raise HTTPException(status_code=500, detail="Internal server error.")
+        raise
 
 
 @router.post("/new", response_model=schemas.NewConversationResponse)
@@ -307,8 +306,7 @@ def new_conversation(payload: schemas.NewConversationRequest, db: Session = Depe
         )
     except Exception:
         db.rollback()
-        logger.exception("New conversation failed for session_id=%s", payload.session_id)
-        raise HTTPException(status_code=500, detail="Internal server error.")
+        raise
 
 
 @router.get("/history/{session_id}", response_model=List[schemas.MessageOut])

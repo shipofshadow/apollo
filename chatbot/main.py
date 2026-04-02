@@ -3,12 +3,14 @@ import logging
 import os
 from uuid import uuid4
 from contextlib import asynccontextmanager
-from typing import List
+from typing import Any, List
 
 import uvicorn
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 load_dotenv()
@@ -20,6 +22,8 @@ logging.basicConfig(
 
 import models
 from database import Base, SessionLocal, engine
+from engine.flow_validation import validate_flow_json_text
+from engine.http_client import close_http_client, init_http_client
 from routers import admin, chat, flows, handoff, users, manychat, customer_ops
 
 
@@ -176,12 +180,73 @@ def _seed_services() -> None:
         db.close()
 
 
+def _validate_flows_on_startup() -> None:
+    db = SessionLocal()
+    try:
+        flows_in_db = db.query(models.Flow).all()
+        if not flows_in_db:
+            raise RuntimeError("No chatbot flows found after startup seeding.")
+
+        startup_errors: List[str] = []
+        for flow in flows_in_db:
+            errors = validate_flow_json_text(flow.flow_json or "")
+            if errors:
+                startup_errors.append(
+                    f"Flow id={flow.id} name={flow.name or 'unnamed'} -> {', '.join(errors)}"
+                )
+
+        if startup_errors:
+            raise RuntimeError("Flow preflight validation failed: " + " | ".join(startup_errors))
+    finally:
+        db.close()
+
+
+async def _extract_context_ids(request: Request) -> tuple[str | None, str | None]:
+    session_id = request.path_params.get("session_id") or request.query_params.get("session_id")
+    conversation_id = request.path_params.get("conversation_id") or request.query_params.get("conversation_id")
+
+    body = await request.body()
+    if body:
+        async def _receive() -> dict[str, Any]:
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        request._receive = _receive  # type: ignore[attr-defined]
+
+        if not session_id or not conversation_id:
+            try:
+                parsed = json.loads(body.decode("utf-8"))
+                if isinstance(parsed, dict):
+                    session_id = session_id or parsed.get("session_id")
+                    conversation_id = conversation_id or parsed.get("conversation_id")
+            except Exception:
+                pass
+
+    if not conversation_id and session_id:
+        db = SessionLocal()
+        try:
+            conv = db.query(models.Conversation).filter_by(session_id=session_id).first()
+            if conv:
+                conversation_id = str(conv.id)
+        finally:
+            db.close()
+
+    return (
+        str(session_id) if session_id is not None else None,
+        str(conversation_id) if conversation_id is not None else None,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    init_http_client()
     _seed_default_flow()
     _seed_services()
-    yield
+    _validate_flows_on_startup()
+    try:
+        yield
+    finally:
+        await close_http_client()
 
 
 app = FastAPI(
@@ -226,6 +291,52 @@ async def add_request_id(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
     return response
+
+
+@app.middleware("http")
+async def handle_unexpected_errors(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        request_id = getattr(request.state, "request_id", str(uuid4()))
+        session_id, conversation_id = await _extract_context_ids(request)
+
+        logger.exception(
+            "Unhandled server error request_id=%s conversation_id=%s session_id=%s path=%s",
+            request_id,
+            conversation_id,
+            session_id,
+            request.url.path,
+        )
+
+        if request.url.path == "/chat/send":
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "messages": [
+                        {
+                            "content": "May temporary issue on our side. Please try again in a few moments.",
+                            "message_type": "text",
+                            "metadata": {
+                                "fallback": True,
+                                "request_id": request_id,
+                                "conversation_id": conversation_id,
+                            },
+                        }
+                    ],
+                    "status": "bot",
+                    "session_id": session_id or "",
+                },
+            )
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error.",
+                "request_id": request_id,
+                "conversation_id": conversation_id,
+            },
+        )
 
 app.include_router(chat.router)
 app.include_router(flows.router)

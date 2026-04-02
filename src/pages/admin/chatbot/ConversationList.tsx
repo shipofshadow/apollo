@@ -45,7 +45,7 @@ export default function ConversationList({ conversations, selectedId, onSelect }
   }
 
   return (
-    <div className="divide-y divide-gray-800">
+    <div className="space-y-1.5 p-1.5">
       {conversations.map((conv) => {
         const isSelected = conv.session_id === selectedId
         const statusKey = conv.status as keyof typeof STATUS_COLORS
@@ -69,14 +69,14 @@ export default function ConversationList({ conversations, selectedId, onSelect }
           <div
             key={conv.session_id}
             onClick={() => onSelect(conv.session_id)}
-            className={`cursor-pointer border-l-4 px-4 py-3 transition ${
+            className={`cursor-pointer rounded-md border px-3 py-2.5 transition ${
               isSelected
-                ? 'border-l-brand-orange bg-brand-orange/10'
-                : 'border-l-transparent bg-transparent hover:bg-brand-darker/70'
+                ? 'border-brand-orange/70 bg-brand-orange/10 shadow-[0_8px_20px_rgba(245,130,32,0.18)]'
+                : 'border-gray-800 bg-brand-dark/70 hover:border-gray-700 hover:bg-brand-darker/70'
             }`}
           >
             <div className="mb-1 flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border text-[11px] font-bold ${
                   isSelected
                     ? 'border-brand-orange/60 bg-brand-orange/20 text-brand-orange'
@@ -88,11 +88,11 @@ export default function ConversationList({ conversations, selectedId, onSelect }
                   <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-brand-orange" />
                 )}
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-gray-100">{title}</div>
+                  <div className="truncate text-[13px] font-semibold text-gray-100">{title}</div>
                   <div className="truncate font-mono text-[10px] text-gray-500">{subtitle}</div>
                 </div>
               </div>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColors}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusColors}`}>
                 {conv.status || 'unknown'}
               </span>
             </div>
@@ -101,7 +101,7 @@ export default function ConversationList({ conversations, selectedId, onSelect }
               <div className="mb-1 truncate font-mono text-[10px] text-gray-500">{conv.session_id}</div>
             )}
 
-            <div className="mb-1 truncate text-xs text-gray-400">
+            <div className="mb-0.5 truncate text-[11px] text-gray-400">
               {conv.last_message
                 ? conv.last_message.substring(0, 40) + (conv.last_message.length > 40 ? '...' : '')
                 : 'No recent messages'}

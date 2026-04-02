@@ -22,18 +22,8 @@ type ConversationSummary = {
   name?: string
 }
 
-type FlowNodeSummary = {
-  id: string
-  message?: string
-  input_type?: string
-  next?: string | null
-  options?: Array<{ label?: string; value?: string; next?: string | null }>
-}
-
-type FlowTemplateKind = 'text' | 'quick_reply' | 'http_request'
 type FlowModalKind =
   | 'delete-flow'
-  | 'delete-node'
   | 'starter-flow'
   | 'success'
   | 'unsaved-changes'
@@ -56,7 +46,6 @@ export default function AdminChatbotPanel() {
   const [flowJson, setFlowJson] = useState('')
   const [flowError, setFlowError] = useState('')
   const [flowMsg, setFlowMsg] = useState('')
-  const [selectedNodeId, setSelectedNodeId] = useState('')
   const [flowModal, setFlowModal] = useState<FlowModalKind>(null)
   const [successModalMsg, setSuccessModalMsg] = useState('')
   const [pendingSelectFlow, setPendingSelectFlow] = useState<Flow | null>(null)
@@ -217,118 +206,6 @@ export default function AdminChatbotPanel() {
     }
   }, [flowJson])
 
-  const parsedNodes = useMemo(() => {
-    if (!parsedFlowJson.valid || !parsedFlowJson.data) return [] as FlowNodeSummary[]
-    const nodes = parsedFlowJson.data.nodes
-    if (!Array.isArray(nodes)) return [] as FlowNodeSummary[]
-    return nodes
-      .filter((item): item is FlowNodeSummary => typeof item === 'object' && item !== null && 'id' in item)
-      .map((item) => ({
-        id: String(item.id),
-        message: typeof item.message === 'string' ? item.message : '',
-        input_type: typeof item.input_type === 'string' ? item.input_type : 'none',
-        next: typeof item.next === 'string' ? item.next : null,
-        options: Array.isArray(item.options)
-          ? item.options
-              .filter((opt): opt is Record<string, unknown> => typeof opt === 'object' && opt !== null)
-              .map((opt) => ({
-                label: typeof opt.label === 'string' ? opt.label : '',
-                value: typeof opt.value === 'string' ? opt.value : '',
-                next: typeof opt.next === 'string' ? opt.next : null,
-              }))
-          : [],
-      }))
-  }, [parsedFlowJson])
-
-  const selectedNode = useMemo(() => {
-    return parsedNodes.find((node) => node.id === selectedNodeId) || null
-  }, [parsedNodes, selectedNodeId])
-
-  const transitionCount = useMemo(() => {
-    return parsedNodes.reduce((count, node) => {
-      const optionTransitions = (node.options || []).filter((opt) => typeof opt?.next === 'string').length
-      return count + (node.next ? 1 : 0) + optionTransitions
-    }, 0)
-  }, [parsedNodes])
-
-  const flowGraphHealth = useMemo(() => {
-    if (!parsedFlowJson.valid || !parsedFlowJson.data) {
-      return {
-        issues: [] as string[],
-        reachableCount: 0,
-        unreachableCount: 0,
-      }
-    }
-
-    const issues: string[] = []
-    const nodeIds = parsedNodes.map((node) => node.id)
-    const uniqueNodeIds = new Set(nodeIds)
-
-    if (uniqueNodeIds.size !== nodeIds.length) {
-      issues.push('Duplicate node IDs detected.')
-    }
-
-    if (!uniqueNodeIds.has('start')) {
-      issues.push('Missing required entry node: start')
-    }
-
-    const missingTargets = new Set<string>()
-    parsedNodes.forEach((node) => {
-      if (node.next && node.next !== 'handoff' && !uniqueNodeIds.has(node.next)) {
-        missingTargets.add(node.next)
-      }
-      ;(node.options || []).forEach((opt) => {
-        if (opt.next && opt.next !== 'handoff' && !uniqueNodeIds.has(opt.next)) {
-          missingTargets.add(opt.next)
-        }
-      })
-    })
-
-    if (missingTargets.size > 0) {
-      issues.push(`Broken transitions: ${Array.from(missingTargets).join(', ')}`)
-    }
-
-    const reachableIds = new Set<string>()
-    const queue: string[] = uniqueNodeIds.has('start') ? ['start'] : []
-
-    while (queue.length > 0) {
-      const current = queue.shift()
-      if (!current || reachableIds.has(current)) continue
-      reachableIds.add(current)
-
-      const currentNode = parsedNodes.find((node) => node.id === current)
-      if (!currentNode) continue
-
-      const targets = [
-        currentNode.next,
-        ...(currentNode.options || []).map((opt) => opt.next || null),
-      ]
-
-      targets.forEach((target) => {
-        if (target && target !== 'handoff' && uniqueNodeIds.has(target) && !reachableIds.has(target)) {
-          queue.push(target)
-        }
-      })
-    }
-
-    const unreachableCount = parsedNodes.length - reachableIds.size
-    if (parsedNodes.length > 0 && unreachableCount > 0) {
-      issues.push(`${unreachableCount} node(s) are unreachable from start.`)
-    }
-
-    return {
-      issues,
-      reachableCount: reachableIds.size,
-      unreachableCount,
-    }
-  }, [parsedFlowJson, parsedNodes])
-
-  const triggerKeywordCount = useMemo(() => {
-    if (!parsedFlowJson.valid || !parsedFlowJson.data) return 0
-    const raw = parsedFlowJson.data.trigger_keywords
-    return Array.isArray(raw) ? raw.length : 0
-  }, [parsedFlowJson])
-
   const visibleConversations = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase()
 
@@ -373,7 +250,6 @@ export default function AdminChatbotPanel() {
     savedFlowJsonRef.current = formatted
     setFlowError('')
     setFlowMsg('')
-    setSelectedNodeId('')
   }, [])
 
   const handleSelectFlow = useCallback((flow: Flow) => {
@@ -498,7 +374,6 @@ export default function AdminChatbotPanel() {
       setFlowJson(formatted)
       savedFlowJsonRef.current = formatted
       setFlowIsActive(true)
-      setSelectedNodeId('start')
       await fetchFlows()
       setSuccessModalMsg('Flow reset to starter template and activated.')
       setFlowModal('success')
@@ -526,7 +401,6 @@ export default function AdminChatbotPanel() {
     )
     setFlowError('')
     setFlowMsg('')
-    setSelectedNodeId('')
     savedFlowJsonRef.current = ''
   }, [])
 
@@ -550,64 +424,12 @@ export default function AdminChatbotPanel() {
       setFlowIsActive(false)
       setFlowJson('')
       setFlowMsg('Flow deleted.')
-      setSelectedNodeId('')
       setFlowModal(null)
       await fetchFlows()
     } catch (e) {
       setFlowError('Failed to delete flow: ' + getErrorMessage(e))
     }
   }, [selectedFlowId, fetchFlows])
-
-  const mutateFlowJson = useCallback((mutator: (flow: Record<string, unknown>) => string | void, successMsg?: string) => {
-    setFlowError('')
-    setFlowMsg('')
-
-    let parsed: Record<string, unknown>
-    try {
-      parsed = flowJson.trim() ? JSON.parse(flowJson) : {}
-    } catch {
-      setFlowError('Fix invalid JSON before using visual editor tools.')
-      return
-    }
-
-    if (!Array.isArray(parsed.nodes)) {
-      parsed.nodes = []
-    }
-
-    const err = mutator(parsed)
-    if (err) {
-      setFlowError(err)
-      return
-    }
-
-    setFlowJson(JSON.stringify(parsed, null, 2))
-    if (successMsg) setFlowMsg(successMsg)
-  }, [flowJson])
-
-  const updateSelectedNode = useCallback((mutator: (node: Record<string, unknown>) => string | void) => {
-    if (!selectedNodeId) {
-      setFlowError('Select a node first.')
-      return
-    }
-
-    mutateFlowJson((flow) => {
-      const nodes = Array.isArray(flow.nodes) ? flow.nodes : []
-      const idx = nodes.findIndex((node) => typeof node === 'object' && node !== null && String((node as Record<string, unknown>).id || '') === selectedNodeId)
-      if (idx < 0) {
-        return 'Selected node not found in JSON.'
-      }
-
-      const originalNode = nodes[idx]
-      const nextNode: Record<string, unknown> = typeof originalNode === 'object' && originalNode !== null ? { ...(originalNode as Record<string, unknown>) } : { id: selectedNodeId }
-
-      const err = mutator(nextNode)
-      if (err) return err
-
-      nodes[idx] = nextNode
-      flow.nodes = nodes
-      return undefined
-    })
-  }, [mutateFlowJson, selectedNodeId])
 
   const handleFormatFlowJson = useCallback(() => {
     setFlowError('')
@@ -631,77 +453,6 @@ export default function AdminChatbotPanel() {
     } catch {
       setFlowError('Cannot minify invalid JSON')
     }
-  }, [flowJson])
-
-  const handleInsertNodeTemplate = useCallback((kind: FlowTemplateKind) => {
-    setFlowError('')
-    setFlowMsg('')
-
-    let parsed: Record<string, unknown>
-    try {
-      parsed = flowJson.trim() ? JSON.parse(flowJson) : {}
-    } catch {
-      setFlowError('Fix invalid JSON before inserting templates.')
-      return
-    }
-
-    const existingNodes = Array.isArray(parsed.nodes) ? parsed.nodes : []
-    const usedIds = new Set(
-      existingNodes
-        .filter((node): node is Record<string, unknown> => typeof node === 'object' && node !== null)
-        .map((node) => String(node.id || ''))
-        .filter(Boolean)
-    )
-
-    let idSeed = existingNodes.length + 1
-    let newNodeId = `node_${idSeed}`
-    while (usedIds.has(newNodeId)) {
-      idSeed += 1
-      newNodeId = `node_${idSeed}`
-    }
-
-    let template: Record<string, unknown>
-    if (kind === 'quick_reply') {
-      template = {
-        id: newNodeId,
-        message: 'Choose an option:',
-        input_type: 'quick_reply',
-        options: [
-          { label: 'Option A', value: 'a', next: null },
-          { label: 'Option B', value: 'b', next: null },
-        ],
-        next: null,
-      }
-    } else if (kind === 'http_request') {
-      template = {
-        id: newNodeId,
-        message: 'Fetching data...',
-        input_type: 'none',
-        http_request: {
-          method: 'GET',
-          url: 'http://localhost:8080/api/manychat/menu',
-          response_variable: 'result',
-        },
-        next: null,
-      }
-    } else {
-      template = {
-        id: newNodeId,
-        message: 'New text node',
-        input_type: 'text',
-        validation: null,
-        next: null,
-      }
-    }
-
-    const nextFlow = {
-      ...parsed,
-      nodes: [...existingNodes, template],
-    }
-
-    setFlowJson(JSON.stringify(nextFlow, null, 2))
-    setFlowMsg(`${kind.replace('_', ' ')} template inserted: ${newNodeId}`)
-    setSelectedNodeId(newNodeId)
   }, [flowJson])
 
   const applyStarterFlow = useCallback(() => {
@@ -733,88 +484,25 @@ export default function AdminChatbotPanel() {
     }
     setFlowJson(JSON.stringify(starterFlow, null, 2))
     setFlowMsg('Starter flow template inserted.')
-    setSelectedNodeId('start')
     setFlowModal(null)
   }, [flowName])
 
   const handleInsertStarterFlow = useCallback(() => {
-    if (parsedNodes.length > 0) {
+    if (flowJson.trim() !== '') {
       setFlowModal('starter-flow')
       return
     }
     applyStarterFlow()
-  }, [applyStarterFlow, parsedNodes.length])
-
-  const handleDeleteSelectedNode = useCallback(() => {
-    if (!selectedNodeId) {
-      setFlowError('Select a node to delete.')
-      return
-    }
-    setFlowModal('delete-node')
-  }, [selectedNodeId])
-
-  const confirmDeleteSelectedNode = useCallback(() => {
-    if (!selectedNodeId) return
-    mutateFlowJson((flow) => {
-      const nodes = Array.isArray(flow.nodes) ? flow.nodes : []
-      flow.nodes = nodes.filter(
-        (node) => !(typeof node === 'object' && node !== null && String((node as Record<string, unknown>).id || '') === selectedNodeId)
-      )
-      return undefined
-    }, `Deleted node: ${selectedNodeId}`)
-
-    setSelectedNodeId('')
-    setFlowModal(null)
-  }, [mutateFlowJson, selectedNodeId])
-
-  const handleAddOptionToSelected = useCallback(() => {
-    updateSelectedNode((node) => {
-      const options = Array.isArray(node.options) ? [...node.options] : []
-      options.push({ label: 'Option', value: 'option', next: null })
-      node.options = options
-      if (node.input_type !== 'quick_reply') {
-        node.input_type = 'quick_reply'
-      }
-      return undefined
-    })
-  }, [updateSelectedNode])
-
-  const handleUpdateSelectedOption = useCallback((index: number, key: 'label' | 'value' | 'next', value: string) => {
-    updateSelectedNode((node) => {
-      const options = Array.isArray(node.options) ? [...node.options] : []
-      if (!options[index] || typeof options[index] !== 'object' || options[index] === null) {
-        return 'Option not found.'
-      }
-      const nextOpt = { ...(options[index] as Record<string, unknown>) }
-      if (key === 'next') {
-        nextOpt.next = value.trim() || null
-      } else {
-        nextOpt[key] = value
-      }
-      options[index] = nextOpt
-      node.options = options
-      return undefined
-    })
-  }, [updateSelectedNode])
-
-  const handleRemoveSelectedOption = useCallback((index: number) => {
-    updateSelectedNode((node) => {
-      const options = Array.isArray(node.options) ? [...node.options] : []
-      node.options = options.filter((_, idx) => idx !== index)
-      return undefined
-    })
-  }, [updateSelectedNode])
+  }, [applyStarterFlow, flowJson])
 
   useEffect(() => {
-    if (parsedNodes.length === 0) {
-      if (selectedNodeId) setSelectedNodeId('')
-      return
+    if (flowModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
     }
-
-    if (!selectedNodeId || !parsedNodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId(parsedNodes[0].id)
-    }
-  }, [parsedNodes, selectedNodeId])
+    return () => { document.body.style.overflow = '' }
+  }, [flowModal])
 
   useEffect(() => {
     if (!flowModal) return
@@ -828,35 +516,35 @@ export default function AdminChatbotPanel() {
   }, [flowModal])
 
   return (
-    <section className="space-y-4">
-      <div className="bg-brand-dark border border-gray-800 rounded-sm px-4 py-3">
+    <section className="flex h-[calc(100vh-88px)]  flex-col gap-4 overflow-hidden">
+      <div className="rounded-lg border border-gray-700/70 bg-gradient-to-r from-brand-dark via-brand-darker to-brand-dark px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
         <h2 className="text-xl font-display font-bold uppercase tracking-wide text-white">Chatbot Console</h2>
-        <p className="text-xs text-gray-500 mt-1">Live support queue, human handoff, and flow management.</p>
+        <p className="mt-1 text-xs text-gray-400">Live support queue, human handoff, and flow management.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
+        <div className="rounded-lg border border-gray-700/70 bg-gradient-to-b from-brand-dark to-brand-darker px-4 py-3 shadow-sm">
           <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Conversations</p>
           <p className="mt-1 text-2xl font-display font-bold text-white">{conversations.length}</p>
         </div>
-        <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
+        <div className="rounded-lg border border-gray-700/70 bg-gradient-to-b from-brand-dark to-brand-darker px-4 py-3 shadow-sm">
           <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Need Agent</p>
           <p className="mt-1 text-2xl font-display font-bold text-brand-orange">{humanQueueCount}</p>
         </div>
-        <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
+        <div className="rounded-lg border border-gray-700/70 bg-gradient-to-b from-brand-dark to-brand-darker px-4 py-3 shadow-sm">
           <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Active Flows</p>
           <p className="mt-1 text-2xl font-display font-bold text-emerald-400">{activeFlowCount}</p>
         </div>
       </div>
 
-      <div className="flex flex-col rounded-sm border border-gray-800 bg-brand-dark xl:flex-row">
-        <div className="flex w-full flex-col border-b border-gray-800 bg-brand-darker xl:h-full xl:w-80 xl:shrink-0 xl:border-b-0 xl:border-r xl:border-gray-800">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-700/80 bg-brand-dark shadow-[0_16px_40px_rgba(0,0,0,0.35)] xl:flex-row">
+        <div className="flex w-full flex-col border-b border-gray-800 bg-brand-darker/90 xl:h-full xl:w-96 xl:shrink-0 xl:border-b-0 xl:border-r xl:border-gray-800">
           <div className="flex gap-2 border-b border-gray-800 p-3">
           <button
             onClick={() => setActiveTab('conversations')}
             className={`flex-1 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-widest transition ${
               activeTab === 'conversations'
-                ? 'bg-brand-orange text-white'
+                ? 'bg-brand-orange text-white shadow-sm'
                 : 'text-gray-300 hover:bg-gray-800/70'
             }`}
           >
@@ -865,7 +553,7 @@ export default function AdminChatbotPanel() {
           <button
             onClick={() => setActiveTab('flows')}
             className={`flex-1 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-widest transition ${
-              activeTab === 'flows' ? 'bg-brand-orange text-white' : 'text-gray-300 hover:bg-gray-800/70'
+              activeTab === 'flows' ? 'bg-brand-orange text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800/70'
             }`}
           >
             Flow Editor ({flows.length})
@@ -873,7 +561,7 @@ export default function AdminChatbotPanel() {
         </div>
 
         {activeTab === 'conversations' && (
-          <div className="flex-1 overflow-visible">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="border-b border-gray-800 px-4 py-3">
               <p className="mb-2 text-[11px] text-gray-500">Select a conversation to view profile, actions, and live messages.</p>
               <input
@@ -899,16 +587,18 @@ export default function AdminChatbotPanel() {
                 ))}
               </div>
             </div>
-            <ConversationList
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <ConversationList
               conversations={visibleConversations}
               selectedId={selectedSessionId}
               onSelect={setSelectedSessionId}
             />
+            </div>
           </div>
         )}
 
         {activeTab === 'flows' && (
-          <div className="flex-1 overflow-visible">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="border-b border-gray-800 p-3">
               <p className="mb-2 text-[11px] text-gray-500">Create and activate conversation flows.</p>
               <button
@@ -918,7 +608,8 @@ export default function AdminChatbotPanel() {
                 + New Flow
               </button>
             </div>
-            {flows.map((flow) => (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {flows.map((flow) => (
               <div
                 key={flow.id}
                 onClick={() => handleSelectFlow(flow)}
@@ -933,17 +624,18 @@ export default function AdminChatbotPanel() {
                   <span className="text-xs font-semibold text-emerald-400">● Active</span>
                 )}
               </div>
-            ))}
-            {flows.length === 0 && (
-              <div className="p-5 text-center text-sm text-gray-500">
-                No flows yet
-              </div>
-            )}
+              ))}
+              {flows.length === 0 && (
+                <div className="p-5 text-center text-sm text-gray-500">
+                  No flows yet
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="min-h-[380px] bg-brand-dark">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-700/70 bg-brand-dark shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
         {activeTab === 'conversations' && (
           <ChatView
             sessionId={selectedSessionId}
@@ -1039,27 +731,6 @@ export default function AdminChatbotPanel() {
               >
                 Starter Flow
               </button>
-              <button
-                type="button"
-                onClick={() => handleInsertNodeTemplate('text')}
-                className="rounded-sm border border-gray-700 bg-brand-dark px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white"
-              >
-                + Text Node
-              </button>
-              <button
-                type="button"
-                onClick={() => handleInsertNodeTemplate('quick_reply')}
-                className="rounded-sm border border-gray-700 bg-brand-dark px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white"
-              >
-                + Quick Reply
-              </button>
-              <button
-                type="button"
-                onClick={() => handleInsertNodeTemplate('http_request')}
-                className="rounded-sm border border-gray-700 bg-brand-dark px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white"
-              >
-                + HTTP Node
-              </button>
               <span
                 className={`inline-flex w-full items-center justify-center rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-widest sm:ml-auto sm:w-auto ${
                   parsedFlowJson.valid
@@ -1082,238 +753,14 @@ export default function AdminChatbotPanel() {
               </div>
             )}
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+            <div>
               <textarea
                 value={flowJson}
                 onChange={(e) => setFlowJson(e.target.value)}
                 spellCheck={false}
-                className="order-2 min-h-[320px] w-full resize-y rounded-sm border border-gray-700 bg-brand-darker p-3 font-mono text-xs leading-relaxed text-gray-100 outline-none transition focus:border-brand-orange sm:p-4 sm:text-sm lg:order-1"
+                className="min-h-[460px] w-full resize-y rounded-sm border border-gray-700 bg-brand-darker p-3 font-mono text-xs leading-relaxed text-gray-100 outline-none transition focus:border-brand-orange sm:p-4 sm:text-sm"
                 placeholder="Enter flow JSON..."
               />
-
-              <aside className="order-1 flex min-h-[280px] flex-col rounded-sm border border-gray-800 bg-brand-darker/60 lg:order-2">
-                <div className="grid grid-cols-3 gap-2 border-b border-gray-800 p-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Nodes</p>
-                    <p className="text-base font-bold text-white">{parsedNodes.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Links</p>
-                    <p className="text-base font-bold text-white">{transitionCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Triggers</p>
-                    <p className="text-base font-bold text-white">{triggerKeywordCount}</p>
-                  </div>
-                </div>
-
-                <div className="border-b border-gray-800 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Validation</p>
-                    <span
-                      className={`rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        flowGraphHealth.issues.length === 0
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : 'bg-amber-500/15 text-amber-300'
-                      }`}
-                    >
-                      {flowGraphHealth.issues.length === 0 ? 'Healthy' : `${flowGraphHealth.issues.length} issue(s)`}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    Reachable: {flowGraphHealth.reachableCount} | Unreachable: {flowGraphHealth.unreachableCount}
-                  </p>
-                  {flowGraphHealth.issues.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {flowGraphHealth.issues.map((issue) => (
-                        <p key={issue} className="text-[11px] text-amber-200">- {issue}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-b border-gray-800 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500">Visual Node Editor</p>
-                    <button
-                      type="button"
-                      onClick={handleDeleteSelectedNode}
-                      className="rounded-sm border border-red-600/40 bg-red-600/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 transition hover:bg-red-600/20"
-                    >
-                      Delete Node
-                    </button>
-                  </div>
-
-                  <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Node</label>
-                  <select
-                    value={selectedNodeId}
-                    onChange={(e) => setSelectedNodeId(e.target.value)}
-                    className="mb-2 w-full rounded-sm border border-gray-700 bg-brand-dark px-2 py-1.5 text-xs text-gray-100 outline-none focus:border-brand-orange"
-                  >
-                    {parsedNodes.map((node) => (
-                      <option key={node.id} value={node.id}>{node.id}</option>
-                    ))}
-                  </select>
-
-                  {selectedNode && (
-                    <div className="space-y-2">
-                      <div>
-                        <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Node ID</label>
-                        <input
-                          value={selectedNode.id}
-                          onChange={(e) => {
-                            const nextId = e.target.value.trim()
-                            if (!nextId) return
-                            updateSelectedNode((node) => {
-                              const currentId = String(node.id || '')
-                              if (currentId === nextId) return undefined
-                              if (parsedNodes.some((item) => item.id === nextId)) {
-                                return `Node ID already exists: ${nextId}`
-                              }
-                              node.id = nextId
-                              setSelectedNodeId(nextId)
-                              return undefined
-                            })
-                          }}
-                          className="w-full rounded-sm border border-gray-700 bg-brand-dark px-2 py-1.5 text-xs text-gray-100 outline-none focus:border-brand-orange"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Message</label>
-                        <textarea
-                          value={selectedNode.message || ''}
-                          onChange={(e) => updateSelectedNode((node) => {
-                            node.message = e.target.value
-                            return undefined
-                          })}
-                          className="h-16 w-full resize-none rounded-sm border border-gray-700 bg-brand-dark px-2 py-1.5 text-xs text-gray-100 outline-none focus:border-brand-orange"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div>
-                          <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Input Type</label>
-                          <select
-                            value={selectedNode.input_type || 'none'}
-                            onChange={(e) => updateSelectedNode((node) => {
-                              node.input_type = e.target.value
-                              return undefined
-                            })}
-                            className="w-full rounded-sm border border-gray-700 bg-brand-dark px-2 py-1.5 text-xs text-gray-100 outline-none focus:border-brand-orange"
-                          >
-                            <option value="text">text</option>
-                            <option value="quick_reply">quick_reply</option>
-                            <option value="none">none</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-[10px] uppercase tracking-wider text-gray-500">Next Node</label>
-                          <input
-                            value={selectedNode.next || ''}
-                            placeholder="handoff or node id"
-                            onChange={(e) => updateSelectedNode((node) => {
-                              node.next = e.target.value.trim() || null
-                              return undefined
-                            })}
-                            className="w-full rounded-sm border border-gray-700 bg-brand-dark px-2 py-1.5 text-xs text-gray-100 outline-none placeholder:text-gray-500 focus:border-brand-orange"
-                          />
-                        </div>
-                      </div>
-
-                      {(selectedNode.input_type === 'quick_reply' || (selectedNode.options || []).length > 0) && (
-                        <div className="rounded-sm border border-gray-800 bg-brand-dark/80 p-2">
-                          <div className="mb-1 flex items-center justify-between">
-                            <p className="text-[10px] uppercase tracking-wider text-gray-500">Quick Reply Options</p>
-                            <button
-                              type="button"
-                              onClick={handleAddOptionToSelected}
-                              className="rounded-sm border border-gray-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange"
-                            >
-                              + Option
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            {(selectedNode.options || []).map((opt, idx) => (
-                              <div key={`${selectedNode.id}-opt-${idx}`} className="rounded-sm border border-gray-800 p-2">
-                                <div className="grid grid-cols-1 gap-1.5">
-                                  <input
-                                    value={opt.label || ''}
-                                    placeholder="Label"
-                                    onChange={(e) => handleUpdateSelectedOption(idx, 'label', e.target.value)}
-                                    className="w-full rounded-sm border border-gray-700 bg-brand-darker px-2 py-1 text-xs text-gray-100 outline-none placeholder:text-gray-500 focus:border-brand-orange"
-                                  />
-                                  <input
-                                    value={opt.value || ''}
-                                    placeholder="Value"
-                                    onChange={(e) => handleUpdateSelectedOption(idx, 'value', e.target.value)}
-                                    className="w-full rounded-sm border border-gray-700 bg-brand-darker px-2 py-1 text-xs text-gray-100 outline-none placeholder:text-gray-500 focus:border-brand-orange"
-                                  />
-                                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-                                    <input
-                                      value={opt.next || ''}
-                                      placeholder="Next"
-                                      onChange={(e) => handleUpdateSelectedOption(idx, 'next', e.target.value)}
-                                      className="w-full rounded-sm border border-gray-700 bg-brand-darker px-2 py-1 text-xs text-gray-100 outline-none placeholder:text-gray-500 focus:border-brand-orange"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveSelectedOption(idx)}
-                                      className="rounded-sm border border-red-600/40 bg-red-600/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 transition hover:bg-red-600/20"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {!selectedNode && (
-                    <p className="text-[11px] text-gray-500">No node selected yet.</p>
-                  )}
-                </div>
-
-                <div className="p-3">
-                  {parsedNodes.length === 0 && (
-                    <p className="text-xs text-gray-500">No nodes detected. Add nodes in JSON to preview flow structure.</p>
-                  )}
-                  <div className="space-y-2">
-                    {parsedNodes.map((node) => {
-                      const optionCount = (node.options || []).length
-                      return (
-                        <div
-                          key={node.id}
-                          onClick={() => setSelectedNodeId(node.id)}
-                          className={`cursor-pointer rounded-sm border px-3 py-2 transition ${
-                            selectedNodeId === node.id
-                              ? 'border-brand-orange bg-brand-orange/10'
-                              : 'border-gray-800 bg-brand-dark hover:border-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="truncate text-xs font-bold uppercase tracking-wider text-brand-orange">{node.id}</p>
-                            <span className="rounded-sm bg-gray-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-gray-300">
-                              {node.input_type || 'none'}
-                            </span>
-                          </div>
-                          {node.message && (
-                            <p className="mt-1 line-clamp-2 text-xs text-gray-300">{node.message}</p>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider text-gray-400">
-                            <span>next: {node.next || '-'}</span>
-                            <span>options: {optionCount}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </aside>
             </div>
           </div>
         )}
@@ -1396,16 +843,14 @@ export default function AdminChatbotPanel() {
             )}
 
             {/* ── Delete / replace confirmation ── */}
-            {(flowModal === 'delete-flow' || flowModal === 'delete-node' || flowModal === 'starter-flow') && (
+            {(flowModal === 'delete-flow' || flowModal === 'starter-flow') && (
               <>
                 <h3 className="text-base font-bold text-white">
                   {flowModal === 'delete-flow' && 'Delete flow?'}
-                  {flowModal === 'delete-node' && 'Delete node?'}
                   {flowModal === 'starter-flow' && 'Replace current flow?'}
                 </h3>
                 <p className="mt-2 text-sm text-gray-300">
                   {flowModal === 'delete-flow' && 'This action removes the selected flow permanently.'}
-                  {flowModal === 'delete-node' && 'This action removes the selected node from the current flow JSON.'}
                   {flowModal === 'starter-flow' && 'This will replace current JSON with the starter flow template.'}
                 </p>
                 <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1420,7 +865,6 @@ export default function AdminChatbotPanel() {
                     type="button"
                     onClick={() => {
                       if (flowModal === 'delete-flow') { void confirmDeleteFlow(); return }
-                      if (flowModal === 'delete-node') { confirmDeleteSelectedNode(); return }
                       applyStarterFlow()
                     }}
                     className={`rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider text-white transition ${

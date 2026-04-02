@@ -90,6 +90,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const [showProfile, setShowProfile] = useState(false)
   const [showActions, setShowActions] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
 
   const formatMessageTime = useCallback((value?: string) => {
@@ -194,7 +195,10 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   }, [inputValue, sessionId, conversation?.status])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [conversation?.messages])
 
   useEffect(() => {
@@ -347,8 +351,8 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const canReplyAsAgent = canSend && !!effectiveAgentName
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-800 bg-brand-darker px-4 py-3">
+    <div className="flex h-full flex-col bg-gradient-to-b from-brand-dark to-brand-darker">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-800 bg-brand-darker/95 px-4 py-3 backdrop-blur-sm">
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-xs font-semibold text-gray-100 sm:text-sm">
             {sessionId}
@@ -377,7 +381,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         {status === 'bot' && (
           <button
             onClick={handleTakeover}
-            className="rounded-sm bg-brand-orange px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-orange-600"
+            className="rounded-sm bg-brand-orange px-3 py-2 text-xs font-bold uppercase tracking-widest text-white shadow-sm transition hover:bg-orange-600"
           >
             Take Over
           </button>
@@ -385,7 +389,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         {status === 'human' && (
           <button
             onClick={handleRelease}
-            className="rounded-sm bg-emerald-600 px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-emerald-500"
+            className="rounded-sm bg-emerald-600 px-3 py-2 text-xs font-bold uppercase tracking-widest text-white shadow-sm transition hover:bg-emerald-500"
           >
             Release to Bot
           </button>
@@ -418,7 +422,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         </div>
       )}
 
-      <div className="border-b border-gray-800 bg-brand-dark px-4 py-3">
+      <div className="border-b border-gray-800 bg-brand-dark/80 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -533,7 +537,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto bg-brand-dark px-4 py-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.03),transparent_35%),linear-gradient(to_bottom,rgba(255,255,255,0.02),transparent)] px-4 py-4">
         {messages.length === 0 && (
           <div className="mt-10 text-center text-sm text-gray-500">
             No messages in this conversation.
@@ -544,10 +548,10 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
           const isHumanAgent = msg.sender === 'human'
           const isBot = msg.sender === 'bot'
           const bubbleClasses = isUser
-            ? 'bg-brand-orange text-white rounded-[14px_14px_4px_14px]'
+            ? 'rounded-[14px_14px_4px_14px] bg-gradient-to-br from-brand-orange to-orange-600 text-white shadow-[0_8px_20px_rgba(245,130,32,0.35)]'
             : isHumanAgent
-              ? 'bg-orange-100 text-orange-900 rounded-[14px_14px_14px_4px]'
-              : 'bg-gray-200 text-gray-900 rounded-[14px_14px_14px_4px]'
+              ? 'rounded-[14px_14px_14px_4px] border border-orange-300/40 bg-orange-100 text-orange-900 shadow-sm'
+              : 'rounded-[14px_14px_14px_4px] border border-gray-300/60 bg-gray-100 text-gray-900 shadow-sm'
 
           return (
             <div
@@ -576,7 +580,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 border-t border-gray-800 bg-brand-darker px-4 py-3 sm:flex-row sm:items-end">
+      <div className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 border-t border-gray-800 bg-brand-darker/95 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-end">
         <div className="w-full rounded-sm border border-gray-700 bg-brand-dark px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-300 sm:w-52">
           {canSend ? `Replying as ${effectiveAgentName || 'Admin'}` : 'Take over first'}
         </div>

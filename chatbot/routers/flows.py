@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import get_db
+from engine.flow_validation import validate_flow_json_text
 from time_utils import now_utc8
 
 router = APIRouter(prefix="/flows", tags=["flows"])
@@ -24,6 +25,10 @@ def create_flow(payload: schemas.FlowCreate, db: Session = Depends(get_db)):
         json.loads(payload.flow_json)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=422, detail=f"Invalid flow_json: {exc}")
+
+    flow_errors = validate_flow_json_text(payload.flow_json)
+    if flow_errors:
+        raise HTTPException(status_code=422, detail={"message": "Flow validation failed.", "errors": flow_errors})
 
     # If this new flow is active, deactivate all others
     if payload.is_active:
@@ -60,6 +65,9 @@ def update_flow(flow_id: int, payload: schemas.FlowUpdate, db: Session = Depends
             json.loads(update_data["flow_json"])
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=422, detail=f"Invalid flow_json: {exc}")
+        flow_errors = validate_flow_json_text(update_data["flow_json"])
+        if flow_errors:
+            raise HTTPException(status_code=422, detail={"message": "Flow validation failed.", "errors": flow_errors})
 
     if update_data.get("is_active"):
         db.query(models.Flow).filter(models.Flow.id != flow_id).update(
