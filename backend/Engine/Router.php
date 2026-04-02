@@ -2036,9 +2036,6 @@ class Router
                     continue;
                 }
                 $specChunks[] = $label . ': ' . $value;
-                if (count($specChunks) >= 2) {
-                    break;
-                }
             }
 
             $parts = [];
@@ -2056,10 +2053,6 @@ class Router
             $subtitle = implode(' | ', $parts);
             if ($subtitle === '') {
                 $subtitle = 'Contact us for variant details.';
-            }
-
-            if (strlen($subtitle) > 230) {
-                $subtitle = substr($subtitle, 0, 227) . '...';
             }
 
             $bookingUrl = $bookingBaseUrl

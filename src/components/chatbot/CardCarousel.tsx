@@ -106,7 +106,7 @@ export default function CardCarousel({ cards, onButtonClick }: CardCarouselProps
               )}
 
               {(parsed.details || card.description) && (
-                <p className="text-[11px] leading-4 text-slate-600 line-clamp-3 sm:text-xs sm:leading-5">
+                <p className="text-[11px] leading-4 text-slate-600 sm:text-xs sm:leading-5">
                   {parsed.details || card.description}
                 </p>
               )}
