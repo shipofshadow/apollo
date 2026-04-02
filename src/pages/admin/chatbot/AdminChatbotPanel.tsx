@@ -648,44 +648,44 @@ export default function AdminChatbotPanel() {
         )}
 
         {activeTab === 'flows' && (
-          <div className="flex flex-col p-3 sm:p-4 lg:p-6">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col overflow-hidden h-full p-3 sm:p-4 lg:p-6">
+            <div className="mb-4 flex flex-col gap-3">
               <h2 className="text-lg font-bold text-white sm:text-xl">
                 {selectedFlow ? `Edit: ${selectedFlow.name || selectedFlowId}` : 'New Flow'}
               </h2>
-              <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:flex lg:flex-wrap lg:w-auto">
                 {selectedFlowId && (
                   <button
                     onClick={handleActivateFlow}
-                    className="rounded-sm bg-emerald-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-emerald-500"
+                    className="rounded-sm bg-emerald-600 px-2 sm:px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-emerald-500 whitespace-nowrap"
                   >
                     Activate
                   </button>
                 )}
                 <button
                   onClick={handleResetActivate}
-                  className="rounded-sm border border-brand-orange/40 bg-brand-orange/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-brand-orange transition hover:bg-brand-orange/20"
+                  className="rounded-sm border border-brand-orange/40 bg-brand-orange/10 px-2 sm:px-4 py-2 text-xs font-bold uppercase tracking-widest text-brand-orange transition hover:bg-brand-orange/20 whitespace-nowrap"
                 >
-                  Reset + Activate
+                  Reset + Act
                 </button>
                 {selectedFlowId && (
                   <button
                     onClick={handleDeleteFlow}
-                    className="rounded-sm bg-red-600 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-red-500"
+                    className="rounded-sm bg-red-600 px-2 sm:px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-red-500 whitespace-nowrap"
                   >
                     Delete
                   </button>
                 )}
                 <button
                   onClick={handleSaveFlow}
-                  className="rounded-sm bg-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-orange-600"
+                  className="rounded-sm bg-brand-orange px-2 sm:px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-orange-600 whitespace-nowrap"
                 >
                   {selectedFlowId ? 'Update' : 'Create'}
                 </button>
               </div>
             </div>
 
-            <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+            <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <input
                 value={flowName}
                 onChange={(e) => setFlowName(e.target.value)}
@@ -696,9 +696,9 @@ export default function AdminChatbotPanel() {
                 value={flowDescription}
                 onChange={(e) => setFlowDescription(e.target.value)}
                 placeholder="Description (optional)"
-                className="rounded-sm border border-gray-700 bg-brand-darker px-3 py-2 text-sm text-gray-100 outline-none transition placeholder:text-gray-500 focus:border-brand-orange"
+                className="rounded-sm border border-gray-700 bg-brand-darker px-3 py-2 text-sm text-gray-100 outline-none transition placeholder:text-gray-500 focus:border-brand-orange sm:col-span-1 lg:col-span-1"
               />
-              <label className="inline-flex select-none items-center gap-2 rounded-sm border border-gray-700 bg-brand-darker px-3 py-2 text-sm text-gray-200">
+              <label className="inline-flex select-none items-center gap-2 rounded-sm border border-gray-700 bg-brand-darker px-3 py-2 text-sm text-gray-200 lg:col-span-1">
                 <input
                   type="checkbox"
                   checked={flowIsActive}
@@ -709,36 +709,36 @@ export default function AdminChatbotPanel() {
               </label>
             </div>
 
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-sm border border-gray-800 bg-brand-darker/70 px-3 py-2">
+            <div className="mb-3 flex flex-col gap-2 rounded-sm border border-gray-800 bg-brand-darker/70 p-2 sm:p-3 sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 type="button"
                 onClick={handleFormatFlowJson}
-                className="rounded-sm border border-gray-700 bg-brand-dark px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white"
+                className="rounded-sm border border-gray-700 bg-brand-dark px-2 sm:px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white whitespace-nowrap"
               >
-                Format JSON
+                Format
               </button>
               <button
                 type="button"
                 onClick={handleMinifyFlowJson}
-                className="rounded-sm border border-gray-700 bg-brand-dark px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white"
+                className="rounded-sm border border-gray-700 bg-brand-dark px-2 sm:px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white whitespace-nowrap"
               >
-                Minify JSON
+                Minify
               </button>
               <button
                 type="button"
                 onClick={handleInsertStarterFlow}
-                className="rounded-sm border border-gray-700 bg-brand-dark px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white"
+                className="rounded-sm border border-gray-700 bg-brand-dark px-2 sm:px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-200 transition hover:border-brand-orange hover:text-white whitespace-nowrap"
               >
-                Starter Flow
+                Starter
               </button>
               <span
-                className={`inline-flex w-full items-center justify-center rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-widest sm:ml-auto sm:w-auto ${
+                className={`ml-auto inline-flex items-center justify-center rounded-sm border px-2 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${
                   parsedFlowJson.valid
                     ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
                     : 'border-red-500/40 bg-red-500/10 text-red-300'
                 }`}
               >
-                {parsedFlowJson.valid ? 'JSON Valid' : 'JSON Invalid'}
+                {parsedFlowJson.valid ? 'Valid' : 'Invalid'}
               </span>
             </div>
 
@@ -753,12 +753,12 @@ export default function AdminChatbotPanel() {
               </div>
             )}
 
-            <div>
+            <div className="min-h-0 flex-1 overflow-hidden">
               <textarea
                 value={flowJson}
                 onChange={(e) => setFlowJson(e.target.value)}
                 spellCheck={false}
-                className="min-h-[460px] w-full resize-y rounded-sm border border-gray-700 bg-brand-darker p-3 font-mono text-xs leading-relaxed text-gray-100 outline-none transition focus:border-brand-orange sm:p-4 sm:text-sm"
+                className="h-full w-full resize-none rounded-sm border border-gray-700 bg-brand-darker p-3 font-mono text-xs leading-relaxed text-gray-100 outline-none transition focus:border-brand-orange sm:p-4 sm:text-sm"
                 placeholder="Enter flow JSON..."
               />
             </div>

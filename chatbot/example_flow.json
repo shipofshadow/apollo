@@ -38,7 +38,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "http://localhost:8000/api/manychat/menu",
+        "url": "https://api.1625autolab.com/api/manychat/menu",
         "response_variable": "services",
         "render_cards": true
       },
@@ -72,7 +72,7 @@
       "input_type": "none",
       "http_request": {
         "method": "POST",
-        "url": "http://localhost:8000/api/manychat/variants",
+        "url": "https://api.1625autolab.com/api/manychat/variants",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -214,7 +214,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "http://localhost:8000/api/bookings/availability?date={appointment_date}",
+        "url": "https://api.1625autolab.com/api/bookings/availability?date={appointment_date}",
         "response_variable": "available_slots",
         "response_field": "availableSlots",
         "next_if_empty": "node_no_slots",
@@ -325,7 +325,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "http://localhost:8000/api/manychat/menu",
+        "url": "https://api.1625autolab.com/api/manychat/menu",
         "response_variable": "services",
         "render_cards": true
       },
@@ -359,7 +359,7 @@
       "input_type": "none",
       "http_request": {
         "method": "POST",
-        "url": "http://localhost:8000/api/manychat/variants",
+        "url": "https://api.1625autolab.com/api/manychat/variants",
         "headers": {
           "Content-Type": "application/json"
         },
@@ -412,7 +412,7 @@
       "input_type": "none",
       "http_request": {
         "method": "GET",
-        "url": "http://localhost:8000/api/bookings/availability?date={appointment_date}",
+        "url": "https://api.1625autolab.com/api/bookings/availability?date={appointment_date}",
         "response_variable": "available_slots",
         "response_field": "availableSlots",
         "next_if_empty": "node_no_slots",
@@ -487,7 +487,7 @@
       "input_type": "none",
       "http_request": {
         "method": "POST",
-        "url": "http://localhost:8000/api/booking/external",
+        "url": "https://api.1625autolab.com/api/booking/external",
         "headers": {
           "Content-Type": "application/json"
         },

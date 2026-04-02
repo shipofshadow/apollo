@@ -20,6 +20,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+logger = logging.getLogger(__name__)
+
 import models
 from auth import require_admin
 from database import Base, SessionLocal, engine
@@ -206,7 +208,14 @@ async def _extract_context_ids(request: Request) -> tuple[str | None, str | None
     session_id = request.path_params.get("session_id") or request.query_params.get("session_id")
     conversation_id = request.path_params.get("conversation_id") or request.query_params.get("conversation_id")
 
-    body = await request.body()
+    # Use cached body from request.state to avoid "stream consumed" errors
+    body = getattr(request.state, "_cached_body", None)
+    if body is None:
+        try:
+            body = await request.body()
+        except RuntimeError:
+            body = None
+    
     if body:
         async def _receive() -> dict[str, Any]:
             return {"type": "http.request", "body": body, "more_body": False}
@@ -286,6 +295,23 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def cache_request_body(request: Request, call_next):
+    """Cache request body early to prevent stream consumed errors."""
+    if request.method in ["POST", "PUT", "PATCH"]:
+        # Read and cache the body once
+        body = await request.body()
+        request.state._cached_body = body
+        
+        # Re-create the receive callable so the body can be read again
+        async def _receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+        
+        request._receive = _receive  # type: ignore[attr-defined]
+    
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Client-Request-Id") or str(uuid4())
     request.state.request_id = request_id
@@ -300,6 +326,7 @@ async def handle_unexpected_errors(request: Request, call_next):
         return await call_next(request)
     except Exception:
         request_id = getattr(request.state, "request_id", str(uuid4()))
+        # Extract context IDs using cached body
         session_id, conversation_id = await _extract_context_ids(request)
 
         logger.exception(
