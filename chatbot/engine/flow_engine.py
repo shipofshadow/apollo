@@ -744,6 +744,8 @@ async def _deliver_node(
                 response_messages.append(
                     {"content": f"Service error: {err}", "message_type": "text", "metadata": None}
                 )
+                # On HTTP error, stay at this node and let user retry
+                return response_messages, node["id"], variables, False
             else:
                 # If response_field is set, extract that specific key from the response
                 # dict for rendering and variable storage (e.g. "availableSlots" from
