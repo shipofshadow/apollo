@@ -117,27 +117,20 @@ def human_reply(
     if conversation.status == "closed":
         raise HTTPException(status_code=400, detail="Cannot reply to a closed conversation.")
 
-    team_member = None
+    agent_name = (payload.agent_name or "").strip() or "Admin"
+
+    metadata = {
+        "agent_name": agent_name,
+    }
     if payload.agent_id is not None:
-        team_member = db.query(models.TeamMember).filter_by(id=payload.agent_id, is_active=True).first()
-        if not team_member:
-            raise HTTPException(status_code=404, detail="Active team member not found for agent_id.")
-    elif payload.agent_name:
-        team_member = db.query(models.TeamMember).filter_by(name=payload.agent_name, is_active=True).first()
-        if not team_member:
-            raise HTTPException(status_code=404, detail="Active team member not found for agent_name.")
-    else:
-        raise HTTPException(status_code=422, detail="agent_id or agent_name is required.")
+        metadata["agent_id"] = payload.agent_id
 
     msg = models.Message(
         conversation_id=conversation.id,
         sender="human",
         content=payload.message,
         message_type="text",
-        metadata_json=json.dumps({
-            "agent_id": team_member.id,
-            "agent_name": team_member.name,
-        }),
+        metadata_json=json.dumps(metadata),
     )
     db.add(msg)
     conversation.status = "human"

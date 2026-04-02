@@ -45,14 +45,6 @@ type ProfileForm = {
   vehicle_year: string
 }
 
-type TeamMember = {
-  id: number
-  name: string
-  role?: string | null
-  userId?: number | null
-  email?: string | null
-}
-
 type AppointmentAction = {
   id: number
   action: 'reschedule' | 'cancel'
@@ -78,11 +70,6 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const { user } = useAuth()
   const [conversation, setConversation] = useState<ConversationDetail | null>(null)
   const [inputValue, setInputValue] = useState('')
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(() => {
-    const stored = localStorage.getItem('autobot_admin_agent_id')
-    return stored ? Number(stored) : null
-  })
   const [appointmentActions, setAppointmentActions] = useState<AppointmentAction[]>([])
   const [actionsLoading, setActionsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -151,44 +138,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     return () => clearInterval(interval)
   }, [sessionId, fetchConversation, fetchAppointmentActions])
 
-  useEffect(() => {
-    let mounted = true
-
-    chatbotApi.getTeamMembers()
-      .then((data) => {
-        if (!mounted) return
-
-        const members = Array.isArray(data) ? data : []
-        setTeamMembers(members)
-
-        const linkedMember = members.find((member) => member.userId === user?.id)
-        if (linkedMember) {
-          setSelectedAgentId(linkedMember.id)
-          return
-        }
-
-        if (selectedAgentId && members.some((member) => member.id === selectedAgentId)) {
-          return
-        }
-
-        const first = members[0]
-        if (first) {
-          setSelectedAgentId(first.id)
-        }
-      })
-      .catch(() => {
-        if (mounted) setTeamMembers([])
-      })
-
-    return () => {
-      mounted = false
-    }
-  }, [selectedAgentId, user?.id])
-
-  const linkedAgent = teamMembers.find((member) => member.userId === user?.id) ?? null
-  const fallbackAgentName = user?.role === 'admin' ? user.name : null
-  const effectiveAgentId = linkedAgent?.id ?? selectedAgentId
-  const effectiveAgentName = linkedAgent?.name ?? fallbackAgentName
+  const effectiveAgentName = user?.role === 'admin' ? user.name : null
 
   useEffect(() => {
     if (!sessionId) return
@@ -231,12 +181,6 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
       chatbotApi.setPresence(sessionId, 'agent', false).catch(() => undefined)
     }
   }, [sessionId])
-
-  useEffect(() => {
-    if (selectedAgentId) {
-      localStorage.setItem('autobot_admin_agent_id', String(selectedAgentId))
-    }
-  }, [selectedAgentId])
 
   useEffect(() => {
     if (!sessionId || conversation?.status !== 'human') return
@@ -284,10 +228,10 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const handleSend = useCallback(async () => {
     if (!sessionId) return
     const text = inputValue.trim()
-    if (!text || (!effectiveAgentId && !effectiveAgentName) || isSending) return
+    if (!text || !effectiveAgentName || isSending) return
     setIsSending(true)
     try {
-      await chatbotApi.adminReply(sessionId, text, effectiveAgentId, effectiveAgentName)
+      await chatbotApi.adminReply(sessionId, text, null, effectiveAgentName)
       setInputValue('')
       chatbotApi.setPresence(sessionId, 'agent', false).catch(() => undefined)
       chatbotApi.markRead(sessionId, 'agent').catch(() => undefined)
@@ -298,7 +242,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     } finally {
       setIsSending(false)
     }
-  }, [inputValue, effectiveAgentId, effectiveAgentName, isSending, sessionId, fetchConversation])
+  }, [inputValue, effectiveAgentName, isSending, sessionId, fetchConversation])
 
   const handleSaveProfile = useCallback(async () => {
     if (!sessionId || isSavingProfile) return
@@ -400,7 +344,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const variables = conversation.variables || {}
   const variableKeys = Object.keys(variables)
   const canSend = status === 'human'
-  const canReplyAsAgent = canSend && (!!effectiveAgentId || !!effectiveAgentName)
+  const canReplyAsAgent = canSend && !!effectiveAgentName
 
   return (
     <div className="flex h-full flex-col">
@@ -633,21 +577,9 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
       </div>
 
       <div className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 border-t border-gray-800 bg-brand-darker px-4 py-3 sm:flex-row sm:items-end">
-        <select
-          value={effectiveAgentId ?? ''}
-          onChange={(e) => setSelectedAgentId(e.target.value ? Number(e.target.value) : null)}
-          disabled={!canSend}
-          className={`w-full rounded-sm border px-3 py-2 text-sm outline-none transition sm:w-52 ${
-            canSend
-              ? 'border-gray-700 bg-brand-dark text-gray-100 focus:border-brand-orange'
-              : 'cursor-not-allowed border-gray-700 bg-brand-dark text-gray-500'
-          }`}
-        >
-          <option value="">{canSend ? 'Select agent' : 'Take over first'}</option>
-          {teamMembers.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}{m.role ? ` (${m.role})` : ''}</option>
-          ))}
-        </select>
+        <div className="w-full rounded-sm border border-gray-700 bg-brand-dark px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-300 sm:w-52">
+          {canSend ? `Replying as ${effectiveAgentName || 'Admin'}` : 'Take over first'}
+        </div>
         <textarea
           ref={composerRef}
           value={inputValue}
