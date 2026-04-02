@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import axios from 'axios'
 import logo from '../../assets/logo.png'
 import { chatbotApi, toApiErrorMessage } from '../../services/chatbotApi'
 import MessageBubble from './MessageBubble'
@@ -13,6 +14,10 @@ function createLocalId() {
 
 function isPublicWebsitePath(pathname: string) {
   return !/^\/admin(?:\/|$)/.test(pathname) && !/^\/client(?:\/|$)/.test(pathname)
+}
+
+function isUnauthorizedError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 401
 }
 
 export default function WebsiteChatWidget() {
@@ -138,7 +143,11 @@ export default function WebsiteChatWidget() {
         if (cancelled || !Array.isArray(history)) return
         setMessages(history.map(mapApiMessage))
         setAgentStatus((state?.status || 'bot') as 'bot' | 'human' | 'closed')
-      } catch {
+      } catch (error) {
+        // History/state are admin-protected; public widget should continue without sync.
+        if (isUnauthorizedError(error)) {
+          return
+        }
         setServiceStatus('offline')
       }
     }

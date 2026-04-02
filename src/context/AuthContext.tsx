@@ -38,6 +38,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   type ReactNode,
 } from 'react';
@@ -52,6 +53,7 @@ import {
   clearAuthError,
   clearAuth,
 } from '../store/authSlice';
+import { AUTH_EXPIRED_EVENT } from '../services/api';
 
 // ── Context shape ─────────────────────────────────────────────────────────────
 
@@ -153,6 +155,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user.role === 'admin') return true;
     return Array.isArray(user.permissions) && user.permissions.includes(permission);
   };
+
+  useEffect(() => {
+    const onAuthExpired = () => {
+      dispatch(clearAuth());
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired as EventListener);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired as EventListener);
+    };
+  }, [dispatch]);
 
   // ── Memoised value ────────────────────────────────────────────────────────
 

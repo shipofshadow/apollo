@@ -8,7 +8,7 @@ from typing import Any, List
 import uvicorn
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
@@ -21,6 +21,7 @@ logging.basicConfig(
 )
 
 import models
+from auth import require_admin
 from database import Base, SessionLocal, engine
 from engine.flow_validation import validate_flow_json_text
 from engine.http_client import close_http_client, init_http_client
@@ -339,12 +340,12 @@ async def handle_unexpected_errors(request: Request, call_next):
         )
 
 app.include_router(chat.router)
-app.include_router(flows.router)
-app.include_router(users.router)
-app.include_router(handoff.router)
-app.include_router(admin.router)
+app.include_router(flows.router, dependencies=[Depends(require_admin)])
+app.include_router(users.router, dependencies=[Depends(require_admin)])
+app.include_router(handoff.router, dependencies=[Depends(require_admin)])
+app.include_router(admin.router, dependencies=[Depends(require_admin)])
 app.include_router(manychat.router)
-app.include_router(customer_ops.router)
+app.include_router(customer_ops.router, dependencies=[Depends(require_admin)])
 
 
 @app.get("/", include_in_schema=False)

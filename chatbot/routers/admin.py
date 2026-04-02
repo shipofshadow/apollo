@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 
 import models
 import schemas
+from auth import require_admin
 from database import get_db
 from time_utils import now_utc8
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 def _ensure_conversation(session_id: str, db: Session) -> models.Conversation:

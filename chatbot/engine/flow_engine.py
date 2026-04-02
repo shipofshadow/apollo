@@ -437,16 +437,16 @@ async def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[A
     for attempt in range(total_attempts):
         try:
             client = get_http_client()
-                if method == "GET":
+            if method == "GET":
                 resp = await client.get(url, headers=headers, timeout=timeout_seconds)
-                elif method == "POST":
+            elif method == "POST":
                 resp = await client.post(url, json=body, headers=headers, timeout=timeout_seconds)
-                elif method == "PUT":
+            elif method == "PUT":
                 resp = await client.put(url, json=body, headers=headers, timeout=timeout_seconds)
-                elif method == "DELETE":
+            elif method == "DELETE":
                 resp = await client.delete(url, headers=headers, timeout=timeout_seconds)
-                else:
-                    return None, f"Unsupported HTTP method: {method}"
+            else:
+                return None, f"Unsupported HTTP method: {method}"
 
             resp.raise_for_status()
             try:

@@ -21,6 +21,12 @@ def _node_edges(node: Dict[str, Any]) -> List[str]:
     return edges
 
 
+def _is_waiting_node(node: Dict[str, Any]) -> bool:
+    """Return True when a node expects user input before transitioning."""
+    input_type = str(node.get("input_type", "text")).strip().lower()
+    return input_type in {"text", "quick_reply"}
+
+
 def validate_flow_definition(flow: Dict[str, Any]) -> List[str]:
     errors: List[str] = []
 
@@ -86,32 +92,64 @@ def validate_flow_definition(flow: Dict[str, Any]) -> List[str]:
     if dead_ends:
         errors.append(f"Dead-end nodes found: {', '.join(sorted(dead_ends))}.")
 
-    # Circular references (graph cycles).
-    visiting: Set[str] = set()
-    visited: Set[str] = set()
-    cycle_nodes: Set[str] = set()
+    # Cycles are valid in conversational flows when user input is required.
+    # We only reject strongly connected components that are fully automatic,
+    # because those can loop indefinitely during node auto-delivery.
+    node_by_id: Dict[str, Dict[str, Any]] = {
+        str(node.get("id", "")).strip(): node
+        for node in nodes
+        if isinstance(node.get("id"), str) and str(node.get("id", "")).strip()
+    }
 
-    def dfs(nid: str) -> None:
-        if nid in visited:
-            return
-        if nid in visiting:
-            cycle_nodes.add(nid)
-            return
-        visiting.add(nid)
+    index = 0
+    index_by_id: Dict[str, int] = {}
+    lowlink_by_id: Dict[str, int] = {}
+    stack: List[str] = []
+    on_stack: Set[str] = set()
+    bad_cycle_nodes: Set[str] = set()
+
+    def strongconnect(nid: str) -> None:
+        nonlocal index
+        index_by_id[nid] = index
+        lowlink_by_id[nid] = index
+        index += 1
+        stack.append(nid)
+        on_stack.add(nid)
+
         for nxt in edge_map.get(nid, []):
-            if nxt in visiting:
-                cycle_nodes.add(nid)
-                cycle_nodes.add(nxt)
-                continue
-            dfs(nxt)
-        visiting.remove(nid)
-        visited.add(nid)
+            if nxt not in index_by_id:
+                strongconnect(nxt)
+                lowlink_by_id[nid] = min(lowlink_by_id[nid], lowlink_by_id[nxt])
+            elif nxt in on_stack:
+                lowlink_by_id[nid] = min(lowlink_by_id[nid], index_by_id[nxt])
+
+        if lowlink_by_id[nid] == index_by_id[nid]:
+            component: List[str] = []
+            while True:
+                member = stack.pop()
+                on_stack.remove(member)
+                component.append(member)
+                if member == nid:
+                    break
+
+            has_cycle = len(component) > 1 or nid in edge_map.get(nid, [])
+            if not has_cycle:
+                return
+
+            all_automatic = all(not _is_waiting_node(node_by_id.get(member, {})) for member in component)
+            if all_automatic:
+                bad_cycle_nodes.update(component)
 
     for nid in node_id_set:
-        dfs(nid)
+        if nid not in index_by_id:
+            strongconnect(nid)
 
-    if cycle_nodes:
-        errors.append(f"Circular references detected around: {', '.join(sorted(cycle_nodes))}.")
+    if bad_cycle_nodes:
+        errors.append(
+            "Unsafe automatic cycle detected around: "
+            + ", ".join(sorted(bad_cycle_nodes))
+            + "."
+        )
 
     return errors
 

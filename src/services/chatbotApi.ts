@@ -1,7 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { BACKEND_URL, CHATBOT_API_URL } from '../config'
-
-export const AUTH_EXPIRED_EVENT = 'apollo:auth-expired'
+import { AUTH_EXPIRED_EVENT } from './api'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
