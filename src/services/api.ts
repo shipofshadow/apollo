@@ -4,10 +4,17 @@ import { BACKEND_URL } from '../config';
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 export const API_OFFLINE_EVENT = 'apollo:api-offline';
+export const AUTH_EXPIRED_EVENT = 'apollo:auth-expired';
 
 function notifyApiOffline(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(API_OFFLINE_EVENT));
+  }
+}
+
+function notifyAuthExpired(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
   }
 }
 
@@ -31,7 +38,13 @@ async function apiFetch<T>(
   }
 
   const data = await response.json();
-  if (!response.ok) throw new Error(data?.detail ?? `Request failed (${response.status})`);
+  if (!response.ok) {
+    // Auto-logout on token expiry
+    if (response.status === 401) {
+      notifyAuthExpired();
+    }
+    throw new Error(data?.detail ?? `Request failed (${response.status})`);
+  }
   return data as T;
 }
 
@@ -79,12 +92,23 @@ export const uploadProfileAvatarApi = async (token: string, file: File): Promise
     throw new Error('API is offline.');
   }
   const data = await response.json();
-  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  if (!response.ok) {
+    if (response.status === 401) {
+      notifyAuthExpired();
+    }
+    throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  }
   return (data as { url: string }).url;
 };
 
 export const logoutApi = (token: string) =>
   apiFetch<{ message: string }>('/api/auth/logout', { method: 'POST' }, token);
+
+export const refreshTokenApi = (refreshToken: string) =>
+  apiFetch<{ token: string; refresh_token: string }>('/api/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
 
 export const forgotPasswordApi = (email: string) =>
   apiFetch<{ message: string }>('/api/auth/forgot-password', {

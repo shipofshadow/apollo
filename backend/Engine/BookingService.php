@@ -42,6 +42,9 @@ class BookingService
     /** @var bool|null Cached bookings.build_slug column existence check. */
     private ?bool $hasBuildSlugColumnCache = null;
 
+    /** @var bool|null Cached team_members.user_id column existence check. */
+    private ?bool $hasTeamMemberUserIdColumnCache = null;
+
     private const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'awaiting_parts'];
 
     /** @var int|null Cached slot capacity to avoid repeated DB/file reads within one request. */
@@ -399,7 +402,7 @@ class BookingService
               'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
-                                        tm.user_id AS assigned_tech_user_id,
+                  ' . $this->assignedTechUserIdSelectSql() . '
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -815,7 +818,7 @@ class BookingService
             'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
-                    tm.user_id AS assigned_tech_user_id,
+                    ' . $this->assignedTechUserIdSelectSql() . '
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -832,7 +835,7 @@ class BookingService
             'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
-                    tm.user_id AS assigned_tech_user_id,
+                    ' . $this->assignedTechUserIdSelectSql() . '
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -857,7 +860,7 @@ class BookingService
               'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
-                                        tm.user_id AS assigned_tech_user_id,
+                  ' . $this->assignedTechUserIdSelectSql() . '
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -891,7 +894,7 @@ class BookingService
             'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
-                    tm.user_id AS assigned_tech_user_id,
+                    ' . $this->assignedTechUserIdSelectSql() . '
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -927,7 +930,7 @@ class BookingService
               'SELECT b.*, s.title AS service_name,
                     tm.name AS assigned_tech_name,
                     tm.role AS assigned_tech_role,
-                                        tm.user_id AS assigned_tech_user_id,
+                  ' . $this->assignedTechUserIdSelectSql() . '
                     tm.image_url AS assigned_tech_image_url
              FROM bookings b
              LEFT JOIN services s ON s.id = b.service_id
@@ -1131,6 +1134,34 @@ class BookingService
             'createdAt'          => $row['created_at'],
             'buildSlug'          => $this->resolveBuildSlugForBooking($row),
         ];
+    }
+
+    private function assignedTechUserIdSelectSql(): string
+    {
+        return $this->hasTeamMemberUserIdColumn()
+            ? 'tm.user_id AS assigned_tech_user_id,'
+            : 'NULL AS assigned_tech_user_id,';
+    }
+
+    private function hasTeamMemberUserIdColumn(): bool
+    {
+        if ($this->hasTeamMemberUserIdColumnCache !== null) {
+            return $this->hasTeamMemberUserIdColumnCache;
+        }
+        if (!$this->useDb) {
+            $this->hasTeamMemberUserIdColumnCache = false;
+            return false;
+        }
+
+        try {
+            $stmt = Database::getInstance()->prepare('SHOW COLUMNS FROM team_members LIKE :column');
+            $stmt->execute([':column' => 'user_id']);
+            $this->hasTeamMemberUserIdColumnCache = (bool) $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable) {
+            $this->hasTeamMemberUserIdColumnCache = false;
+        }
+
+        return $this->hasTeamMemberUserIdColumnCache;
     }
 
     // -------------------------------------------------------------------------

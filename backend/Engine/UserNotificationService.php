@@ -18,6 +18,7 @@ declare(strict_types=1);
 class UserNotificationService
 {
     private \PDO $db;
+    private ?bool $hasUserIdColumnCache = null;
 
     public function __construct()
     {
@@ -71,6 +72,21 @@ class UserNotificationService
      */
     public function getForViewer(bool $adminMode, int $userId = 0, int $limit = 50): array
     {
+        if (!$this->hasUserIdColumn()) {
+            if (!$adminMode) {
+                return [];
+            }
+
+            $stmt = $this->db->prepare(
+                'SELECT * FROM notifications
+                  ORDER BY created_at DESC
+                  LIMIT :lim'
+            );
+            $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
+            $stmt->execute();
+            return array_map([$this, 'formatRow'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
+        }
+
         if ($adminMode) {
             $stmt = $this->db->prepare(
                 'SELECT * FROM notifications
@@ -98,6 +114,18 @@ class UserNotificationService
      */
     public function getUnreadCount(bool $adminMode, int $userId = 0): int
     {
+        if (!$this->hasUserIdColumn()) {
+            if (!$adminMode) {
+                return 0;
+            }
+
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM notifications WHERE is_read = 0'
+            );
+            $stmt->execute();
+            return (int) $stmt->fetchColumn();
+        }
+
         if ($adminMode) {
             $stmt = $this->db->prepare(
                 'SELECT COUNT(*) FROM notifications WHERE user_id IS NULL AND is_read = 0'
@@ -122,6 +150,19 @@ class UserNotificationService
      */
     public function markRead(int $id, bool $adminMode, int $userId = 0): void
     {
+        if (!$this->hasUserIdColumn()) {
+            if (!$adminMode) {
+                return;
+            }
+
+            $stmt = $this->db->prepare(
+                'UPDATE notifications SET is_read = 1
+                  WHERE id = :id'
+            );
+            $stmt->execute([':id' => $id]);
+            return;
+        }
+
         if ($adminMode) {
             $stmt = $this->db->prepare(
                 'UPDATE notifications SET is_read = 1
@@ -142,6 +183,17 @@ class UserNotificationService
      */
     public function markAllRead(bool $adminMode, int $userId = 0): void
     {
+        if (!$this->hasUserIdColumn()) {
+            if (!$adminMode) {
+                return;
+            }
+
+            $this->db->exec(
+                'UPDATE notifications SET is_read = 1 WHERE is_read = 0'
+            );
+            return;
+        }
+
         if ($adminMode) {
             $this->db->exec(
                 'UPDATE notifications SET is_read = 1 WHERE user_id IS NULL AND is_read = 0'
@@ -160,6 +212,18 @@ class UserNotificationService
      */
     public function delete(int $id, bool $adminMode, int $userId = 0): void
     {
+        if (!$this->hasUserIdColumn()) {
+            if (!$adminMode) {
+                return;
+            }
+
+            $stmt = $this->db->prepare(
+                'DELETE FROM notifications WHERE id = :id'
+            );
+            $stmt->execute([':id' => $id]);
+            return;
+        }
+
         if ($adminMode) {
             $stmt = $this->db->prepare(
                 'DELETE FROM notifications WHERE id = :id AND user_id IS NULL'
@@ -180,12 +244,26 @@ class UserNotificationService
     /** @param array<string, mixed>|null $data */
     private function insert(?int $userId, string $type, string $title, string $message, ?array $data): void
     {
+        if ($this->hasUserIdColumn()) {
+            $stmt = $this->db->prepare(
+                'INSERT INTO notifications (user_id, type, title, message, data)
+                 VALUES (:uid, :type, :title, :msg, :data)'
+            );
+            $stmt->execute([
+                ':uid'   => $userId,
+                ':type'  => $type,
+                ':title' => $title,
+                ':msg'   => $message,
+                ':data'  => $data !== null ? json_encode($data) : null,
+            ]);
+            return;
+        }
+
         $stmt = $this->db->prepare(
-            'INSERT INTO notifications (user_id, type, title, message, data)
-             VALUES (:uid, :type, :title, :msg, :data)'
+            'INSERT INTO notifications (type, title, message, data)
+             VALUES (:type, :title, :msg, :data)'
         );
         $stmt->execute([
-            ':uid'   => $userId,
             ':type'  => $type,
             ':title' => $title,
             ':msg'   => $message,
@@ -206,7 +284,7 @@ class UserNotificationService
 
         return [
             'id'        => (int) $row['id'],
-            'userId'    => $row['user_id'] !== null ? (int) $row['user_id'] : null,
+            'userId'    => array_key_exists('user_id', $row) && $row['user_id'] !== null ? (int) $row['user_id'] : null,
             'type'      => (string) $row['type'],
             'title'     => (string) $row['title'],
             'message'   => (string) $row['message'],
@@ -214,5 +292,22 @@ class UserNotificationService
             'isRead'    => (bool) $row['is_read'],
             'createdAt' => (string) $row['created_at'],
         ];
+    }
+
+    private function hasUserIdColumn(): bool
+    {
+        if ($this->hasUserIdColumnCache !== null) {
+            return $this->hasUserIdColumnCache;
+        }
+
+        try {
+            $stmt = $this->db->prepare('SHOW COLUMNS FROM notifications LIKE :column');
+            $stmt->execute([':column' => 'user_id']);
+            $this->hasUserIdColumnCache = (bool) $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable) {
+            $this->hasUserIdColumnCache = false;
+        }
+
+        return $this->hasUserIdColumnCache;
     }
 }

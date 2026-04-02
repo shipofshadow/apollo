@@ -11,17 +11,42 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
 
 # PHP backend
 backend/vendor
 backend/.env
 backend/storage/
 
+# Python chatbot
+chatbot/.env
+chatbot/.venv/
+chatbot/venv/
+chatbot/__pycache__/
+chatbot/.pytest_cache/
+chatbot/.mypy_cache/
+chatbot/.ruff_cache/
+chatbot/.coverage
+chatbot/htmlcov/
+chatbot/*.pyc
+chatbot/*.pyo
+chatbot/*.sqlite3
+
+# Generic Python artifacts
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+.python-version
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj

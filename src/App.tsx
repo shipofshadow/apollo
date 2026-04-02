@@ -8,6 +8,7 @@ import ToastContainer from './components/ToastContainer';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import WebsiteChatWidget from './components/chatbot/WebsiteChatWidget';
 import { useNotificationPoller } from './hooks/useNotificationPoller';
 
 // Public pages
@@ -52,6 +53,7 @@ function PublicLayout() {
       <main className="flex-grow">
         <Outlet />
       </main>
+      <WebsiteChatWidget />
       <Footer />
     </div>
   );
@@ -102,7 +104,7 @@ function AppInner() {
       </Route>
 
       {/* ── Admin — own sidebar, no public nav ──────────────── */}
-      <Route path="/admin" element={<Admin />} />
+      <Route path="/admin/*" element={<Admin />} />
 
     </Routes>
   );

@@ -23,6 +23,7 @@ class Router
             'bookings:manage',
             'bookings:assign-tech',
             'bookings:notes',
+            'chatbot:manage',
             'build-updates:manage',
             'clients:manage',
             'users:manage',
@@ -89,6 +90,7 @@ class Router
             $r->addRoute('POST', '/api/auth/register',         'handleAuthRegister');
             $r->addRoute('POST', '/api/auth/login',            'handleAuthLogin');
             $r->addRoute('POST', '/api/auth/logout',           'handleAuthLogout');
+            $r->addRoute('POST', '/api/auth/refresh',          'handleAuthRefresh');
             $r->addRoute('GET',  '/api/auth/me',               'handleAuthMe');
             $r->addRoute('PUT',  '/api/auth/profile',          'handleAuthProfile');
             $r->addRoute('POST', '/api/auth/avatar-upload',    'handleAuthAvatarUpload');
@@ -440,6 +442,22 @@ class Router
         return in_array($permission, $permissions, true);
     }
 
+    /** @return string[] */
+    private function getRolePermissions(string $role): array
+    {
+        $role = strtolower(trim($role));
+        if ($role === '') {
+            return [];
+        }
+
+        $permissions = $this->getPermissionMap()[$role] ?? [];
+        if ($role === 'admin') {
+            $permissions = array_values(array_unique(array_merge($permissions, ['chatbot:manage'])));
+        }
+
+        return array_values(array_unique(array_map('strval', $permissions)));
+    }
+
     /** @param array<string, mixed> $payload */
     private function hasPermission(array $payload, string $permission): bool
     {
@@ -520,6 +538,9 @@ class Router
     {
         $data   = $this->jsonBody();
         $result = (new UserService())->register($data);
+        if (isset($result['user']) && is_array($result['user'])) {
+            $result['user']['permissions'] = $this->getRolePermissions((string) ($result['user']['role'] ?? ''));
+        }
         http_response_code(201);
         echo json_encode($result);
     }
@@ -563,6 +584,9 @@ class Router
 
         try {
             $result = (new UserService())->login($email, $pass);
+            if (isset($result['user']) && is_array($result['user'])) {
+                $result['user']['permissions'] = $this->getRolePermissions((string) ($result['user']['role'] ?? ''));
+            }
 
             if ($security !== null) {
                 $payload = Auth::decodeToken((string) ($result['token'] ?? ''));
@@ -624,6 +648,49 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleAuthRefresh(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $refreshToken = (string) ($data['refresh_token'] ?? '');
+
+        if ($refreshToken === '') {
+            throw new RuntimeException('refresh_token is required.', 400);
+        }
+
+        try {
+            $payload = Auth::decodeToken($refreshToken);
+            
+            // Verify it's actually a refresh token
+            if (($payload['type'] ?? '') !== 'refresh') {
+                throw new RuntimeException('Invalid token type.', 401);
+            }
+
+            $userId = (int) ($payload['sub'] ?? 0);
+            if ($userId <= 0) {
+                throw new RuntimeException('Invalid token payload.', 401);
+            }
+
+            // Issue a new access token
+            $newToken = Auth::issueToken([
+                'sub' => $userId,
+                'type' => 'access',
+            ]);
+
+            // Issue a new refresh token (rolling refresh for security)
+            $newRefreshToken = Auth::issueToken([
+                'sub' => $userId,
+                'type' => 'refresh',
+            ], 7 * 24 * 60 * 60);
+
+            echo json_encode([
+                'token' => $newToken,
+                'refresh_token' => $newRefreshToken,
+            ]);
+        } catch (RuntimeException $e) {
+            throw $e;
+        }
+    }
+
     private function handleAuthSessionList(array $vars = []): void
     {
         if (DB_NAME === '') {
@@ -689,6 +756,7 @@ class Router
     {
         $payload = $this->requireAuth();
         $user    = (new UserService())->findById((int) $payload['sub']);
+        $user['permissions'] = $this->getRolePermissions((string) ($user['role'] ?? ''));
         echo json_encode(['user' => $user]);
     }
 
@@ -698,6 +766,7 @@ class Router
         $payload = $this->requireAuth();
         $data    = $this->jsonBody();
         $user    = (new UserService())->updateProfile((int) $payload['sub'], $data);
+        $user['permissions'] = $this->getRolePermissions((string) ($user['role'] ?? ''));
         echo json_encode(['user' => $user]);
     }
 
@@ -1066,16 +1135,13 @@ class Router
                 throw new RuntimeException('assignedUserId must be a positive integer or null.', 422);
             }
 
-            $stmt = Database::getInstance()->prepare(
-                'SELECT id FROM team_members WHERE user_id = :user_id LIMIT 1'
-            );
-            $stmt->execute([':user_id' => $assignedUserId]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $teamMemberService = new TeamMemberService();
+            $existing = $teamMemberService->findByUserId($assignedUserId);
 
             if ($existing) {
                 $assignedTechId = (int) ($existing['id'] ?? 0);
             } else {
-                $created = (new TeamMemberService())->create([
+                $created = $teamMemberService->create([
                     'userId' => $assignedUserId,
                     'sortOrder' => 999,
                     'isActive' => true,

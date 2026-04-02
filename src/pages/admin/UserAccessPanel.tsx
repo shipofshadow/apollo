@@ -23,6 +23,7 @@ const PERMISSION_CATALOG = [
   { key: 'bookings:manage', label: 'Manage Bookings', description: 'Can view and update booking records.' },
   { key: 'bookings:assign-tech', label: 'Assign Technicians', description: 'Can assign team members to jobs.' },
   { key: 'bookings:notes', label: 'Internal Notes', description: 'Can edit internal booking notes.' },
+  { key: 'chatbot:manage', label: 'Manage Chatbot', description: 'Can access the chatbot console, handoff queue, and reply as an agent.' },
   { key: 'build-updates:manage', label: 'Build Updates', description: 'Can post progress updates and photos.' },
   { key: 'clients:manage', label: 'Manage Clients', description: 'Can view clients and booking counts.' },
   { key: 'users:manage', label: 'Manage Users', description: 'Can create users and change user roles.' },

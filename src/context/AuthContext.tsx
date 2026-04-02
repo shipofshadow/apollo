@@ -85,6 +85,7 @@ export interface AuthContextValue {
   // Helpers
   clearError: () => void;
   forceSignOut: () => void; // clears state + storage without an API call
+  hasPermission: (permission: string) => boolean;
 }
 
 // ── Context object ────────────────────────────────────────────────────────────
@@ -147,6 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch(clearAuth());
   };
 
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(permission);
+  };
+
   // ── Memoised value ────────────────────────────────────────────────────────
 
   const value = useMemo<AuthContextValue>(
@@ -164,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       clearError,
       forceSignOut,
+      hasPermission,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, token, status, error]

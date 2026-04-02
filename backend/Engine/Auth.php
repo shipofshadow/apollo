@@ -81,18 +81,23 @@ class Auth
      * Standard claims (iat, exp) are added automatically.
      *
      * @param  array<string, mixed> $claims  Application-specific claims.
+     * @param  int $ttl Optional custom TTL in seconds. Defaults to JWT_TTL.
      * @throws RuntimeException  If JWT_SECRET is not configured.
      */
-    public static function issueToken(array $claims): string
+    public static function issueToken(array $claims, int $ttl = 0): string
     {
         if (JWT_SECRET === '') {
             throw new RuntimeException('JWT_SECRET is not configured on the server.', 500);
         }
 
+        if ($ttl === 0) {
+            $ttl = JWT_TTL;
+        }
+
         $now     = time();
         $payload = array_merge($claims, [
             'iat' => $now,
-            'exp' => $now + JWT_TTL,
+            'exp' => $now + $ttl,
         ]);
 
         return JWT::encode($payload, JWT_SECRET, JWT_ALGORITHM);
@@ -191,6 +196,7 @@ class Auth
             'sub'  => $row['id'],
             'role' => $row['role'],
             'name' => $row['name'],
+            'type' => 'access',
         ]);
     }
 

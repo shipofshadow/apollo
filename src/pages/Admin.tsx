@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, Eye, EyeOff, AlertCircle, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera,
+  Camera, MessageSquare,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
+import AdminChatbotPanel    from './admin/chatbot/AdminChatbotPanel';
 import AnalyticsPanel       from './admin/AnalyticsPanel';
 import BookingsPanel        from './admin/BookingsPanel';
 import AdminBookingDetail   from './admin/AdminBookingDetail';
@@ -25,6 +26,37 @@ import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
 import UserAccessPanel      from './admin/UserAccessPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
+
+const TAB_PATHS: Record<string, string> = {
+  analytics: '/admin/dashboard',
+  appointments: '/admin/bookings',
+  calendar: '/admin/calendar',
+  reviews: '/admin/reviews',
+  chatbot: '/admin/chatbot',
+  services: '/admin/services',
+  products: '/admin/products',
+  'shop-hours': '/admin/shop-hours',
+  offers: '/admin/offers',
+  'before-after': '/admin/before-after',
+  content: '/admin/content',
+  faq: '/admin/faq',
+  'site-settings': '/admin/site-settings',
+  'user-access': '/admin/user-access',
+  'security-audit': '/admin/security-audit',
+  settings: '/admin/account',
+};
+
+function getAdminTabFromPath(pathname: string): string {
+  for (const [tab, path] of Object.entries(TAB_PATHS)) {
+    if (pathname === path || pathname.startsWith(`${path}/`)) {
+      return tab;
+    }
+  }
+  if (pathname === '/admin' || pathname === '/admin/') {
+    return 'analytics';
+  }
+  return 'analytics';
+}
 
 // ── Admin login screen (Unchanged) ────────────────────────────────────────────
 function AdminLogin() {
@@ -89,9 +121,10 @@ function AdminLogin() {
 
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const location = useLocation();
-  const [activeTab,       setActiveTab]       = useState('analytics');
+  const navigate = useNavigate();
+  const [activeTab,       setActiveTab]       = useState(() => getAdminTabFromPath(location.pathname));
   const [collapsed,       setCollapsed]       = useState(false);
   const [mobileOpen,      setMobileOpen]      = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
@@ -109,15 +142,31 @@ export default function AdminPage() {
     if (state?.openBookingId) {
       setActiveTab('appointments');
       setActiveBookingId(state.openBookingId);
+      if (!location.pathname.startsWith(TAB_PATHS.appointments)) {
+        navigate(TAB_PATHS.appointments, { replace: true });
+      }
       // Clear the state so a back-navigation doesn't re-trigger it
       window.history.replaceState({}, '');
     }
-  }, [location.state]);
+  }, [location.state, location.pathname, navigate]);
+
+  useEffect(() => {
+    const nextTab = getAdminTabFromPath(location.pathname);
+    setActiveTab(nextTab);
+    if (nextTab !== 'appointments') {
+      setActiveBookingId(null);
+    }
+    if (location.pathname === '/admin' || location.pathname === '/admin/') {
+      navigate(TAB_PATHS.analytics, { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   const handleTabChange = (key: string) => {
+    const nextPath = TAB_PATHS[key] || TAB_PATHS.analytics;
     setActiveTab(key);
     setActiveBookingId(null);
     setMobileOpen(false);
+    navigate(nextPath);
   };
 
   const toggleGroup = (groupKey: string) => {
@@ -149,6 +198,10 @@ export default function AdminPage() {
   const isAdmin = role === 'admin';
 
   const canAccessTab = (key: string) => {
+    if (key === 'chatbot') {
+      return hasPermission('chatbot:manage');
+    }
+
     if (isAdmin) return true;
 
     if (role === 'manager') {
@@ -169,6 +222,7 @@ export default function AdminPage() {
     { key: 'appointments', label: 'Bookings',   icon: Calendar },
     { key: 'calendar',     label: 'Calendar',   icon: CalendarDays },
     { key: 'reviews',      label: 'Reviews',    icon: Star },
+    { key: 'chatbot',      label: 'Chatbot',    icon: MessageSquare, routePath: '/admin/chatbot' },
     {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
@@ -203,7 +257,8 @@ export default function AdminPage() {
     const fallback = role === 'staff' ? 'appointments' : (role === 'manager' ? 'analytics' : 'user-access');
     setActiveTab(fallback);
     setActiveBookingId(null);
-  }, [activeTab, role, user]);
+    navigate(TAB_PATHS[fallback] || TAB_PATHS.analytics, { replace: true });
+  }, [activeTab, role, user, navigate]);
 
   if (!user) return <AdminLogin />;
   if (user.role === 'client') return <Navigate to="/" replace />;
@@ -215,18 +270,19 @@ export default function AdminPage() {
       case 'offers':        return <OffersPanel />;
       case 'before-after':  return <BeforeAfterPanel />;
       case 'content':       return <ContentPanel />;
-      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); }} />;
+      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); navigate(TAB_PATHS.appointments); }} />;
       case 'reviews':       return <ReviewsPanel />;
+      case 'chatbot':       return <AdminChatbotPanel />;
       case 'appointments':
         if (activeBookingId) {
           return (
             <AdminBookingDetail
               bookingId={activeBookingId}
-              onBack={() => setActiveBookingId(null)}
+              onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
             />
           );
         }
-        return <BookingsPanel onView={id => setActiveBookingId(id)} />;
+        return <BookingsPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.appointments); }} />;
       case 'products':      return <ProductsPanel />;
       case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;
@@ -400,7 +456,9 @@ export default function AdminPage() {
               return (
                 <div key={item.key} className="mb-1">
                   <button
-                    onClick={() => handleTabChange(item.key)}
+                    onClick={() => {
+                      handleTabChange(item.key);
+                    }}
                     title={collapsed ? item.label : undefined}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm relative ${
                       isActive

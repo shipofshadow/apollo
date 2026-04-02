@@ -48,21 +48,26 @@ class AuthSecurityService
         $eventType = $success ? 'login_success' : 'login_failed';
         $outcome = $success ? 'success' : 'failure';
 
-        $stmt = $this->db->prepare(
-            'INSERT INTO auth_audit_logs
-                (user_id, email, ip_address, user_agent, event_type, outcome, detail)
-             VALUES
-                (:user_id, :email, :ip, :ua, :event_type, :outcome, :detail)'
-        );
-        $stmt->execute([
-            ':user_id' => $userId,
-            ':email' => strtolower(trim($email)),
-            ':ip' => $this->normalizeIp($ipAddress),
-            ':ua' => $this->normalizeUserAgent($userAgent),
-            ':event_type' => $eventType,
-            ':outcome' => $outcome,
-            ':detail' => $detail !== null ? trim($detail) : null,
-        ]);
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO auth_audit_logs
+                    (user_id, email, ip_address, user_agent, event_type, outcome, detail)
+                 VALUES
+                    (:user_id, :email, :ip, :ua, :event_type, :outcome, :detail)'
+            );
+            $stmt->execute([
+                ':user_id' => $userId,
+                ':email' => strtolower(trim($email)),
+                ':ip' => $this->normalizeIp($ipAddress),
+                ':ua' => $this->normalizeUserAgent($userAgent),
+                ':event_type' => $eventType,
+                ':outcome' => $outcome,
+                ':detail' => $detail !== null ? trim($detail) : null,
+            ]);
+        } catch (\Throwable) {
+            // Older schemas may not have all expected columns; keep login functional.
+            $this->auditTableExistsCache = false;
+        }
     }
 
     public function isSuspiciousLogin(string $email, string $ipAddress): bool
@@ -119,25 +124,28 @@ class AuthSecurityService
             return;
         }
 
-        $stmt = $this->db->prepare(
-            'INSERT INTO auth_audit_logs
-                (user_id, email, ip_address, user_agent, event_type, outcome, detail)
-             VALUES
-                (NULL, :email, :ip, :ua, :event_type, :outcome, :detail)'
-        );
-
         $suffix = $detail !== null && trim($detail) !== ''
             ? ' ' . trim($detail)
             : '';
 
-        $stmt->execute([
-            ':email' => strtolower(trim($email)),
-            ':ip' => $this->normalizeIp($ipAddress),
-            ':ua' => $this->normalizeUserAgent($userAgent),
-            ':event_type' => 'login_blocked',
-            ':outcome' => 'blocked',
-            ':detail' => 'Login temporarily blocked. Retry after ' . max(1, $retryAfterSeconds) . ' second(s).' . $suffix,
-        ]);
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO auth_audit_logs
+                    (user_id, email, ip_address, user_agent, event_type, outcome, detail)
+                 VALUES
+                    (NULL, :email, :ip, :ua, :event_type, :outcome, :detail)'
+            );
+            $stmt->execute([
+                ':email' => strtolower(trim($email)),
+                ':ip' => $this->normalizeIp($ipAddress),
+                ':ua' => $this->normalizeUserAgent($userAgent),
+                ':event_type' => 'login_blocked',
+                ':outcome' => 'blocked',
+                ':detail' => 'Login temporarily blocked. Retry after ' . max(1, $retryAfterSeconds) . ' second(s).' . $suffix,
+            ]);
+        } catch (\Throwable) {
+            $this->auditTableExistsCache = false;
+        }
     }
 
     public function shouldSendSuspiciousAlert(string $email, string $ipAddress): bool
@@ -173,20 +181,24 @@ class AuthSecurityService
             return;
         }
 
-        $stmt = $this->db->prepare(
-            'INSERT INTO auth_audit_logs
-                (user_id, email, ip_address, user_agent, event_type, outcome, detail)
-             VALUES
-                (NULL, :email, :ip, :ua, :event_type, :outcome, :detail)'
-        );
-        $stmt->execute([
-            ':email' => strtolower(trim($email)),
-            ':ip' => $this->normalizeIp($ipAddress),
-            ':ua' => $this->normalizeUserAgent($userAgent),
-            ':event_type' => 'suspicious_login_alert',
-            ':outcome' => 'warning',
-            ':detail' => trim($detail),
-        ]);
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO auth_audit_logs
+                    (user_id, email, ip_address, user_agent, event_type, outcome, detail)
+                 VALUES
+                    (NULL, :email, :ip, :ua, :event_type, :outcome, :detail)'
+            );
+            $stmt->execute([
+                ':email' => strtolower(trim($email)),
+                ':ip' => $this->normalizeIp($ipAddress),
+                ':ua' => $this->normalizeUserAgent($userAgent),
+                ':event_type' => 'suspicious_login_alert',
+                ':outcome' => 'warning',
+                ':detail' => trim($detail),
+            ]);
+        } catch (\Throwable) {
+            $this->auditTableExistsCache = false;
+        }
     }
 
     public function createSession(
@@ -202,19 +214,23 @@ class AuthSecurityService
 
         $tokenHash = hash('sha256', $token);
 
-        $stmt = $this->db->prepare(
-            'INSERT INTO user_sessions
-                (user_id, token_hash, ip_address, user_agent, issued_at, expires_at, last_seen_at)
-             VALUES
-                (:uid, :token_hash, :ip, :ua, NOW(), FROM_UNIXTIME(:exp), NOW())'
-        );
-        $stmt->execute([
-            ':uid' => $userId,
-            ':token_hash' => $tokenHash,
-            ':ip' => $this->normalizeIp($ipAddress),
-            ':ua' => $this->normalizeUserAgent($userAgent),
-            ':exp' => $expUnix,
-        ]);
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO user_sessions
+                    (user_id, token_hash, ip_address, user_agent, issued_at, expires_at, last_seen_at)
+                 VALUES
+                    (:uid, :token_hash, :ip, :ua, NOW(), FROM_UNIXTIME(:exp), NOW())'
+            );
+            $stmt->execute([
+                ':uid' => $userId,
+                ':token_hash' => $tokenHash,
+                ':ip' => $this->normalizeIp($ipAddress),
+                ':ua' => $this->normalizeUserAgent($userAgent),
+                ':exp' => $expUnix,
+            ]);
+        } catch (\Throwable) {
+            $this->sessionsTableExistsCache = false;
+        }
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -363,7 +379,12 @@ class AuthSecurityService
              LIMIT :lim'
         );
         $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
-        $stmt->execute();
+        try {
+            $stmt->execute();
+        } catch (\Throwable) {
+            $this->auditTableExistsCache = false;
+            return [];
+        }
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         return array_map(static function (array $row): array {

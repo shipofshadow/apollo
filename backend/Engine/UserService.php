@@ -54,11 +54,14 @@ class UserService
         $user  = $this->findById((int) $this->db->lastInsertId());
         $token = $this->issueTokenFor($user);
 
+        // Issue a long-lived refresh token (7 days)
+        $refreshToken = Auth::issueToken(['sub' => $user['id'], 'type' => 'refresh'], 7 * 24 * 60 * 60);
+
         // Claim any anonymous bookings submitted with this email before the
         // account existed (guest bookings have user_id = NULL).
         $this->claimAnonymousBookings((int) $user['id'], strtolower(trim((string) ($data['email'] ?? ''))));
 
-        return ['token' => $token, 'user' => $user];
+        return ['token' => $token, 'refresh_token' => $refreshToken, 'user' => $user];
     }
 
     /**
@@ -72,9 +75,13 @@ class UserService
     {
         $token   = Auth::login(['email' => $email, 'password' => $password]);
         $payload = Auth::decodeToken($token);
-        $user    = $this->findById((int) $payload['sub']);
+        $userId  = (int) $payload['sub'];
+        $user    = $this->findById($userId);
 
-        return ['token' => $token, 'user' => $user];
+        // Issue a long-lived refresh token (7 days)
+        $refreshToken = Auth::issueToken(['sub' => $userId, 'type' => 'refresh'], 7 * 24 * 60 * 60);
+
+        return ['token' => $token, 'refresh_token' => $refreshToken, 'user' => $user];
     }
 
     /**
@@ -607,6 +614,7 @@ class UserService
             'sub'  => $user['id'],
             'role' => $user['role'],
             'name' => $user['name'],
+            'type' => 'access',
         ]);
     }
 

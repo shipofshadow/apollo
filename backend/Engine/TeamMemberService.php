@@ -14,6 +14,7 @@ class TeamMemberService
 {
     private bool $useDb;
     private static string $storageFile = __DIR__ . '/../storage/team_members.json';
+    private ?bool $hasUserIdColumnCache = null;
 
     public function __construct()
     {
@@ -56,6 +57,36 @@ class TeamMemberService
         $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
     }
 
+    /** @return array<string, mixed>|null */
+    public function findByUserId(int $userId): ?array
+    {
+        if ($userId <= 0 || !$this->useDb) {
+            return null;
+        }
+
+        if ($this->hasUserIdColumn()) {
+            $stmt = Database::getInstance()->prepare(
+                'SELECT * FROM team_members WHERE user_id = :user_id LIMIT 1'
+            );
+            $stmt->execute([':user_id' => $userId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ? $this->mapRow($row) : null;
+        }
+
+        $user = $this->getUserIdentity($userId);
+        $email = strtolower(trim((string) ($user['email'] ?? '')));
+        if ($email === '') {
+            return null;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM team_members WHERE LOWER(TRIM(email)) = :email LIMIT 1'
+        );
+        $stmt->execute([':email' => $email]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->mapRow($row) : null;
+    }
+
     // -------------------------------------------------------------------------
     // DB
     // -------------------------------------------------------------------------
@@ -88,12 +119,24 @@ class TeamMemberService
     private function dbCreate(array $data): array
     {
         $payload = $this->withUserIdentity($data);
-        $db   = Database::getInstance();
-        $stmt = $db->prepare(
-            'INSERT INTO team_members (user_id, name, role, image_url, bio, full_bio, email, phone, facebook, instagram, sort_order, is_active)
-             VALUES (:user_id, :name, :role, :image_url, :bio, :full_bio, :email, :phone, :facebook, :instagram, :sort_order, :is_active)'
-        );
-        $stmt->execute($this->bindParams($payload));
+        $db = Database::getInstance();
+
+        if ($this->hasUserIdColumn()) {
+            $stmt = $db->prepare(
+                'INSERT INTO team_members (user_id, name, role, image_url, bio, full_bio, email, phone, facebook, instagram, sort_order, is_active)
+                 VALUES (:user_id, :name, :role, :image_url, :bio, :full_bio, :email, :phone, :facebook, :instagram, :sort_order, :is_active)'
+            );
+            $stmt->execute($this->bindParams($payload));
+        } else {
+            $stmt = $db->prepare(
+                'INSERT INTO team_members (name, role, image_url, bio, full_bio, email, phone, facebook, instagram, sort_order, is_active)
+                 VALUES (:name, :role, :image_url, :bio, :full_bio, :email, :phone, :facebook, :instagram, :sort_order, :is_active)'
+            );
+            $params = $this->bindParams($payload);
+            unset($params[':user_id']);
+            $stmt->execute($params);
+        }
+
         return $this->dbGetById((int) $db->lastInsertId());
     }
 
@@ -103,14 +146,28 @@ class TeamMemberService
         $current = $this->dbGetById($id);
         $merged  = $this->withUserIdentity(array_merge($current, $data));
 
-        $stmt = Database::getInstance()->prepare(
-            'UPDATE team_members SET user_id = :user_id, name = :name, role = :role, image_url = :image_url,
-             bio = :bio, full_bio = :full_bio, email = :email, phone = :phone,
-             facebook = :facebook, instagram = :instagram,
-             sort_order = :sort_order, is_active = :is_active
-             WHERE id = :id'
-        );
+        if ($this->hasUserIdColumn()) {
+            $stmt = Database::getInstance()->prepare(
+                'UPDATE team_members SET user_id = :user_id, name = :name, role = :role, image_url = :image_url,
+                 bio = :bio, full_bio = :full_bio, email = :email, phone = :phone,
+                 facebook = :facebook, instagram = :instagram,
+                 sort_order = :sort_order, is_active = :is_active
+                 WHERE id = :id'
+            );
+        } else {
+            $stmt = Database::getInstance()->prepare(
+                'UPDATE team_members SET name = :name, role = :role, image_url = :image_url,
+                 bio = :bio, full_bio = :full_bio, email = :email, phone = :phone,
+                 facebook = :facebook, instagram = :instagram,
+                 sort_order = :sort_order, is_active = :is_active
+                 WHERE id = :id'
+            );
+        }
+
         $params        = $this->bindParams($merged);
+        if (!$this->hasUserIdColumn()) {
+            unset($params[':user_id']);
+        }
         $params[':id'] = $id;
         $stmt->execute($params);
 
@@ -324,7 +381,7 @@ class TeamMemberService
     private function validatePayload(array $data): void
     {
         $hasUser = (int) ($data['userId'] ?? 0) > 0 || (int) ($data['user_id'] ?? 0) > 0;
-        if ($this->useDb && !$hasUser) {
+        if ($this->useDb && $this->hasUserIdColumn() && !$hasUser) {
             throw new RuntimeException('Team member must be linked to an existing user.', 422);
         }
         if (!$hasUser && empty(trim((string) ($data['name'] ?? '')))) {
@@ -340,6 +397,24 @@ class TeamMemberService
             return $data;
         }
 
+        $user = $this->getUserIdentity($userId);
+
+        $data['userId'] = $this->hasUserIdColumn() ? (int) $user['id'] : null;
+        $data['name'] = (string) ($user['name'] ?? '');
+        $data['email'] = (string) ($user['email'] ?? '');
+        $data['phone'] = (string) ($user['phone'] ?? '');
+        $data['role'] = (string) ($user['role'] ?? ($data['role'] ?? ''));
+
+        return $data;
+    }
+
+    /** @return array<string, mixed> */
+    private function getUserIdentity(int $userId): array
+    {
+        if ($userId <= 0) {
+            throw new RuntimeException('Selected user was not found.', 422);
+        }
+
         $stmt = Database::getInstance()->prepare(
             'SELECT id, name, email, phone, role FROM users WHERE id = :id LIMIT 1'
         );
@@ -352,13 +427,28 @@ class TeamMemberService
             throw new RuntimeException('Client accounts cannot be assigned as team members.', 422);
         }
 
-        $data['userId'] = (int) $user['id'];
-        $data['name'] = (string) ($user['name'] ?? '');
-        $data['email'] = (string) ($user['email'] ?? '');
-        $data['phone'] = (string) ($user['phone'] ?? '');
-        $data['role'] = (string) ($user['role'] ?? ($data['role'] ?? ''));
+        return $user;
+    }
 
-        return $data;
+    private function hasUserIdColumn(): bool
+    {
+        if ($this->hasUserIdColumnCache !== null) {
+            return $this->hasUserIdColumnCache;
+        }
+        if (!$this->useDb) {
+            $this->hasUserIdColumnCache = false;
+            return false;
+        }
+
+        try {
+            $stmt = Database::getInstance()->prepare('SHOW COLUMNS FROM team_members LIKE :column');
+            $stmt->execute([':column' => 'user_id']);
+            $this->hasUserIdColumnCache = (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable) {
+            $this->hasUserIdColumnCache = false;
+        }
+
+        return $this->hasUserIdColumnCache;
     }
 
     private function deleteManagedImageUrl(string $url): void

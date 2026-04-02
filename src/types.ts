@@ -9,12 +9,14 @@ export interface User {
   phone: string;
   avatar_url?: string | null;
   role: UserRole;
+  permissions?: string[];
   created_at: string;
 }
 
 export interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   status: 'idle' | 'loading' | 'success' | 'error';
   error: string | null;
 }

@@ -6,16 +6,19 @@ import {
   fetchMeApi,
   updateProfileApi,
   logoutApi,
+  refreshTokenApi,
 } from '../services/api';
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
 
 const TOKEN_KEY = 'apollo_token';
+const REFRESH_TOKEN_KEY = 'apollo_refresh_token';
 const USER_KEY  = 'apollo_user';
 
-function saveToStorage(token: string, user: User): void {
+function saveToStorage(token: string, refreshToken: string, user: User): void {
   try {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch { /* storage unavailable */ }
 }
@@ -23,27 +26,29 @@ function saveToStorage(token: string, user: User): void {
 function clearStorage(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   } catch { /* ignore */ }
 }
 
-function loadFromStorage(): { token: string | null; user: User | null } {
+function loadFromStorage(): { token: string | null; refreshToken: string | null; user: User | null } {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
-    const raw   = localStorage.getItem(USER_KEY);
-    if (!token || !raw) return { token: null, user: null };
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    const raw = localStorage.getItem(USER_KEY);
+    if (!token || !refreshToken || !raw) return { token: null, refreshToken: null, user: null };
 
     // Decode the JWT payload (middle segment) to check expiry without a lib
-    const parts   = token.split('.');
+    const parts = token.split('.');
     const payload = JSON.parse(atob(parts[1]));
     if ((payload.exp ?? 0) * 1000 < Date.now()) {
-      clearStorage();
-      return { token: null, user: null };
+      // Token expired but we have refresh token
+      return { token: null, refreshToken, user: null };
     }
 
-    return { token, user: JSON.parse(raw) as User };
+    return { token, refreshToken, user: JSON.parse(raw) as User };
   } catch {
-    return { token: null, user: null };
+    return { token: null, refreshToken: null, user: null };
   }
 }
 
@@ -112,15 +117,28 @@ export const logoutAsync = createAsyncThunk(
   }
 );
 
+export const refreshTokenAsync = createAsyncThunk(
+  'auth/refreshToken',
+  async (refreshToken: string, { rejectWithValue }) => {
+    try {
+      const { token: newToken, refresh_token: newRefreshToken } = await refreshTokenApi(refreshToken);
+      return { token: newToken, refreshToken: newRefreshToken };
+    } catch (e: unknown) {
+      return rejectWithValue((e as Error).message ?? 'Token refresh failed.');
+    }
+  }
+);
+
 // ── Slice ─────────────────────────────────────────────────────────────────────
 
 const stored = loadFromStorage();
 
 const initialState: AuthState = {
-  user:   stored.user,
-  token:  stored.token,
+  user: stored.user,
+  token: stored.token,
+  refreshToken: stored.refreshToken,
   status: 'idle',
-  error:  null,
+  error: null,
 };
 
 const authSlice = createSlice({
@@ -129,10 +147,11 @@ const authSlice = createSlice({
   reducers: {
     clearAuthError: (state) => { state.error = null; },
     clearAuth: (state) => {
-      state.user  = null;
+      state.user = null;
       state.token = null;
+      state.refreshToken = null;
       state.status = 'idle';
-      state.error  = null;
+      state.error = null;
       clearStorage();
     },
   },
@@ -145,8 +164,11 @@ const authSlice = createSlice({
     builder.addCase(loginAsync.fulfilled, (state, action) => {
       state.status = 'success';
       state.token  = action.payload.token;
+      state.refreshToken = (action.payload as any).refresh_token || null;
       state.user   = action.payload.user;
-      saveToStorage(action.payload.token, action.payload.user);
+      if (state.refreshToken) {
+        saveToStorage(action.payload.token, state.refreshToken, action.payload.user);
+      }
     });
     builder.addCase(loginAsync.rejected, (state, action) => {
       state.status = 'error';
@@ -161,8 +183,11 @@ const authSlice = createSlice({
     builder.addCase(registerAsync.fulfilled, (state, action) => {
       state.status = 'success';
       state.token  = action.payload.token;
+      state.refreshToken = (action.payload as any).refresh_token || null;
       state.user   = action.payload.user;
-      saveToStorage(action.payload.token, action.payload.user);
+      if (state.refreshToken) {
+        saveToStorage(action.payload.token, state.refreshToken, action.payload.user);
+      }
     });
     builder.addCase(registerAsync.rejected, (state, action) => {
       state.status = 'error';
@@ -172,7 +197,7 @@ const authSlice = createSlice({
     // ── fetchMe ──────────────────────────────────────────────────────────
     builder.addCase(fetchMeAsync.fulfilled, (state, action) => {
       state.user = action.payload;
-      if (state.token) saveToStorage(state.token, action.payload);
+      if (state.token && state.refreshToken) saveToStorage(state.token, state.refreshToken, action.payload);
     });
 
     // ── updateProfile ─────────────────────────────────────────────────────
@@ -183,7 +208,7 @@ const authSlice = createSlice({
     builder.addCase(updateProfileAsync.fulfilled, (state, action) => {
       state.status = 'success';
       state.user   = action.payload;
-      if (state.token) saveToStorage(state.token, action.payload);
+      if (state.token && state.refreshToken) saveToStorage(state.token, state.refreshToken, action.payload);
     });
     builder.addCase(updateProfileAsync.rejected, (state, action) => {
       state.status = 'error';
@@ -192,10 +217,32 @@ const authSlice = createSlice({
 
     // ── logout ────────────────────────────────────────────────────────────
     builder.addCase(logoutAsync.fulfilled, (state) => {
-      state.user   = null;
-      state.token  = null;
-      state.status = 'idle';
-      state.error  = null;
+      state.user       = null;
+      state.token      = null;
+      state.refreshToken = null;
+      state.status     = 'idle';
+      state.error      = null;
+    });
+
+    // ── refreshToken ────────────────────────────────────────────────────────
+    builder.addCase(refreshTokenAsync.pending, (state) => {
+      state.status = 'loading';
+    });
+    builder.addCase(refreshTokenAsync.fulfilled, (state, action) => {
+      state.status = 'success';
+      state.token = action.payload.token;
+      state.refreshToken = action.payload.refreshToken;
+      if (state.user) {
+        saveToStorage(action.payload.token, action.payload.refreshToken, state.user);
+      }
+    });
+    builder.addCase(refreshTokenAsync.rejected, (state, action) => {
+      state.status = 'error';
+      state.error = action.payload as string;
+      state.user = null;
+      state.token = null;
+      state.refreshToken = null;
+      clearStorage();
     });
   },
 });
