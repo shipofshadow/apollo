@@ -12,6 +12,8 @@ import {
   fetchAuthSessionsApi,
   revokeAuthSessionApi,
   revokeOtherAuthSessionsApi,
+  exportMyDataApi,
+  deleteMyAccountApi,
 } from '../../services/api';
 import type { NotificationPreferences } from '../../types';
 
@@ -57,6 +59,10 @@ export default function Profile() {
   const [sessions, setSessions] = useState<AuthSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionBusyId, setSessionBusyId] = useState<number | null>(null);
+  const [exportingData, setExportingData] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirmPw, setDeleteConfirmPw] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [revokeOthersBusy, setRevokeOthersBusy] = useState(false);
 
   useEffect(() => {
@@ -540,6 +546,97 @@ export default function Profile() {
         </div>
 
       </div>{/* end two-column grid */}
+
+      {/* ── Data Privacy ───────────────────────────────────────────────── */}
+      <div className="mt-8 bg-[#111] border border-gray-800 rounded-xl p-6 space-y-5">
+        <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+          <Shield className="w-4 h-4 text-brand-orange" /> Data Privacy
+        </h3>
+
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Export Data */}
+          <button
+            disabled={exportingData}
+            onClick={async () => {
+              if (!token) return;
+              setExportingData(true);
+              try {
+                await exportMyDataApi(token);
+                showToast('Your data export has started downloading.', 'success');
+              } catch (e) {
+                showToast((e as Error).message ?? 'Export failed.', 'error');
+              } finally { setExportingData(false); }
+            }}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand-darker border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-colors disabled:opacity-50"
+          >
+            {exportingData ? <Loader2 className="w-4 h-4 animate-spin" /> : <Monitor className="w-4 h-4" />}
+            Export My Data
+          </button>
+
+          {/* Delete Account */}
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-950/40 border border-red-900/60 text-red-400 hover:border-red-500 hover:text-red-300 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Delete My Account
+          </button>
+        </div>
+
+        <p className="text-[11px] text-gray-600 leading-relaxed">
+          Exporting downloads a JSON file with your profile, bookings, vehicles, and reviews.
+          Account deletion permanently removes all your personal data and cannot be undone.
+        </p>
+      </div>
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-sm bg-[#111] border border-red-900/60 rounded-xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-red-400 uppercase tracking-widest">Delete Account</h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              This will permanently delete your account and all associated data. This action <strong className="text-white">cannot be undone</strong>.
+            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Confirm Password</label>
+              <input
+                type="password"
+                value={deleteConfirmPw}
+                onChange={e => setDeleteConfirmPw(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 rounded-sm focus:outline-none focus:border-red-500 transition-colors"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmPw(''); }}
+                className="flex-1 px-4 py-2.5 border border-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deletingAccount || !deleteConfirmPw}
+                onClick={async () => {
+                  if (!token) return;
+                  setDeletingAccount(true);
+                  try {
+                    await deleteMyAccountApi(token, deleteConfirmPw);
+                    showToast('Account deleted. Goodbye!', 'success');
+                    setShowDeleteModal(false);
+                    // Log out
+                    window.location.href = '/';
+                  } catch (e) {
+                    showToast((e as Error).message ?? 'Deletion failed.', 'error');
+                  } finally { setDeletingAccount(false); }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-700 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {deletingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

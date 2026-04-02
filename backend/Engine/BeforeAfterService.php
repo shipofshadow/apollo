@@ -58,12 +58,36 @@ class BeforeAfterService
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function dbGetAll(bool $includeInactive): array
+    public function getAll(bool $includeInactive = false, string $vehicleMake = '', string $vehicleModel = ''): array
     {
-        $where = $includeInactive ? '' : 'WHERE is_active = 1 ';
-        $stmt = Database::getInstance()->query(
+        return $this->useDb
+            ? $this->dbGetAll($includeInactive, $vehicleMake, $vehicleModel)
+            : $this->fileGetAll($includeInactive, $vehicleMake, $vehicleModel);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function dbGetAll(bool $includeInactive, string $vehicleMake = '', string $vehicleModel = ''): array
+    {
+        $conditions = [];
+        $params     = [];
+
+        if (!$includeInactive) {
+            $conditions[] = 'is_active = 1';
+        }
+        if ($vehicleMake !== '') {
+            $conditions[] = 'LOWER(vehicle_make) LIKE :make';
+            $params[':make'] = '%' . strtolower($vehicleMake) . '%';
+        }
+        if ($vehicleModel !== '') {
+            $conditions[] = 'LOWER(vehicle_model) LIKE :model';
+            $params[':model'] = '%' . strtolower($vehicleModel) . '%';
+        }
+
+        $where = $conditions ? ('WHERE ' . implode(' AND ', $conditions) . ' ') : '';
+        $stmt  = Database::getInstance()->prepare(
             "SELECT * FROM before_after_items {$where}ORDER BY sort_order ASC, id ASC"
         );
+        $stmt->execute($params);
         return array_map([$this, 'mapRow'], $stmt->fetchAll());
     }
 
@@ -82,15 +106,15 @@ class BeforeAfterService
         return $this->mapRow($row);
     }
 
-    /** @param array<string, mixed> $data @return array<string, mixed> */
+    /** @return array<string, mixed> */
     private function dbCreate(array $data): array
     {
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO before_after_items
-            (title, description, before_image_url, after_image_url, is_active, sort_order)
+            (title, description, vehicle_make, vehicle_model, before_image_url, after_image_url, is_active, sort_order)
             VALUES
-            (:title, :description, :before_image_url, :after_image_url, :is_active, :sort_order)'
+            (:title, :description, :vehicle_make, :vehicle_model, :before_image_url, :after_image_url, :is_active, :sort_order)'
         );
         $stmt->execute($this->bindParams($data));
         return $this->dbGetById((int) $db->lastInsertId(), false);
@@ -104,6 +128,8 @@ class BeforeAfterService
         $merged = array_merge([
             'title' => $current['title'],
             'description' => $current['description'],
+            'vehicleMake' => $current['vehicleMake'],
+            'vehicleModel' => $current['vehicleModel'],
             'beforeImageUrl' => $current['beforeImageUrl'],
             'afterImageUrl' => $current['afterImageUrl'],
             'isActive' => $current['isActive'],
@@ -114,6 +140,8 @@ class BeforeAfterService
             'UPDATE before_after_items SET
                 title = :title,
                 description = :description,
+                vehicle_make = :vehicle_make,
+                vehicle_model = :vehicle_model,
                 before_image_url = :before_image_url,
                 after_image_url = :after_image_url,
                 is_active = :is_active,
@@ -138,11 +166,19 @@ class BeforeAfterService
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function fileGetAll(bool $includeInactive): array
+    private function fileGetAll(bool $includeInactive, string $vehicleMake = '', string $vehicleModel = ''): array
     {
         $all = $this->fileRead();
         if (!$includeInactive) {
             $all = array_values(array_filter($all, fn ($item) => (bool) ($item['isActive'] ?? true)));
+        }
+        if ($vehicleMake !== '') {
+            $makeLower = strtolower($vehicleMake);
+            $all = array_values(array_filter($all, fn ($item) => str_contains(strtolower((string) ($item['vehicleMake'] ?? '')), $makeLower)));
+        }
+        if ($vehicleModel !== '') {
+            $modelLower = strtolower($vehicleModel);
+            $all = array_values(array_filter($all, fn ($item) => str_contains(strtolower((string) ($item['vehicleModel'] ?? '')), $modelLower)));
         }
         usort($all, fn ($a, $b) => ($a['sortOrder'] ?? 0) <=> ($b['sortOrder'] ?? 0));
         return $all;
@@ -244,6 +280,8 @@ class BeforeAfterService
             'id' => (int) $row['id'],
             'title' => (string) ($row['title'] ?? ''),
             'description' => (string) ($row['description'] ?? ''),
+            'vehicleMake' => (string) ($row['vehicle_make'] ?? ''),
+            'vehicleModel' => (string) ($row['vehicle_model'] ?? ''),
             'beforeImageUrl' => (string) ($row['before_image_url'] ?? ''),
             'afterImageUrl' => (string) ($row['after_image_url'] ?? ''),
             'isActive' => (bool) ($row['is_active'] ?? 1),
@@ -259,6 +297,8 @@ class BeforeAfterService
         return [
             ':title' => trim((string) ($data['title'] ?? '')),
             ':description' => trim((string) ($data['description'] ?? '')),
+            ':vehicle_make' => trim((string) ($data['vehicleMake'] ?? '')),
+            ':vehicle_model' => trim((string) ($data['vehicleModel'] ?? '')),
             ':before_image_url' => trim((string) ($data['beforeImageUrl'] ?? '')),
             ':after_image_url' => trim((string) ($data['afterImageUrl'] ?? '')),
             ':is_active' => !empty($data['isActive']) ? 1 : 0,
@@ -275,6 +315,8 @@ class BeforeAfterService
             'id' => $id,
             'title' => trim((string) ($data['title'] ?? '')),
             'description' => trim((string) ($data['description'] ?? '')),
+            'vehicleMake' => trim((string) ($data['vehicleMake'] ?? '')),
+            'vehicleModel' => trim((string) ($data['vehicleModel'] ?? '')),
             'beforeImageUrl' => trim((string) ($data['beforeImageUrl'] ?? '')),
             'afterImageUrl' => trim((string) ($data['afterImageUrl'] ?? '')),
             'isActive' => !empty($data['isActive']),

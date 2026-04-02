@@ -99,6 +99,9 @@ class Router
             $r->addRoute('GET',  '/api/auth/sessions',         'handleAuthSessionList');
             $r->addRoute('DELETE', '/api/auth/sessions/revoke-others', 'handleAuthSessionRevokeOthers');
             $r->addRoute('DELETE', '/api/auth/sessions/{id:\d+}', 'handleAuthSessionRevoke');
+            // ── GDPR / Data Privacy ─────────────────────────────────────────
+            $r->addRoute('GET',    '/api/auth/data-export',       'handleAuthDataExport');
+            $r->addRoute('DELETE', '/api/auth/account',           'handleAuthAccountDelete');
 
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
@@ -117,6 +120,7 @@ class Router
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',             'handleBookingPartsUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/qa-photos',         'handleBookingQaPhotosUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/notes',             'handleBookingInternalNotes');
+            $r->addRoute('PATCH', '/api/bookings/{id}/calibration',       'handleBookingCalibrationUpdate');
             $r->addRoute('GET',   '/api/bookings/{id}/activity',          'handleBookingActivityList');
 
             // ── Build updates (progress photos – admin write, owner read) ────
@@ -203,6 +207,11 @@ class Router
             $r->addRoute('POST',   '/api/team-members',          'handleTeamMemberCreate');
             $r->addRoute('PUT',    '/api/team-members/{id:\d+}', 'handleTeamMemberUpdate');
             $r->addRoute('DELETE', '/api/team-members/{id:\d+}', 'handleTeamMemberDelete');
+
+            // ── Booking Waitlist ─────────────────────────────────────────────
+            $r->addRoute('POST',   '/api/waitlist',          'handleWaitlistJoin');
+            $r->addRoute('GET',    '/api/waitlist',          'handleWaitlistList');
+            $r->addRoute('DELETE', '/api/waitlist/{id:\d+}', 'handleWaitlistRemove');
 
             // ── Testimonials (public read, admin write) ──────────────────────
             $r->addRoute('GET',    '/api/testimonials',          'handleTestimonialList');
@@ -540,6 +549,13 @@ class Router
         $result = (new UserService())->register($data);
         if (isset($result['user']) && is_array($result['user'])) {
             $result['user']['permissions'] = $this->getRolePermissions((string) ($result['user']['role'] ?? ''));
+
+            // Record consent if the client sent the consent flag
+            if (!empty($data['consentGiven']) && isset($result['user']['id'])) {
+                try {
+                    (new PrivacyService())->recordConsent((int) $result['user']['id'], '1.0');
+                } catch (\Throwable) { /* non-blocking */ }
+            }
         }
         http_response_code(201);
         echo json_encode($result);
@@ -2789,7 +2805,10 @@ class Router
             } catch (RuntimeException) { /* treat as public */ }
         }
 
-        $items = (new BeforeAfterService())->getAll($includeInactive);
+        $make  = trim((string) ($_GET['make']  ?? ''));
+        $model = trim((string) ($_GET['model'] ?? ''));
+
+        $items = (new BeforeAfterService())->getAll($includeInactive, $make, $model);
         echo json_encode(['items' => $items]);
     }
 
@@ -2890,6 +2909,127 @@ class Router
             http_response_code($e->getCode() ?: 404);
             echo json_encode(['error' => $e->getMessage()]);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Calibration Certificate
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** @param array<string, string> $vars */
+    private function handleBookingCalibrationUpdate(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $id   = $vars['id'] ?? '';
+        $data = $this->jsonBody();
+        $svc  = new BookingService();
+        $booking = $svc->updateCalibrationData($id, $data);
+        echo json_encode(['booking' => $booking]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GDPR / Data Privacy
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** @param array<string, string> $vars */
+    private function handleAuthDataExport(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $data    = (new PrivacyService())->exportData($userId);
+
+        $filename = 'my-data-' . date('Y-m-d') . '.json';
+        header('Content-Type: application/json');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthAccountDelete(array $vars = []): void
+    {
+        $payload  = $this->requireAuth();
+        $userId   = (int) ($payload['sub'] ?? 0);
+        $body     = $this->jsonBody();
+
+        // Require the user to confirm with their password before deletion
+        $password = trim((string) ($body['password'] ?? ''));
+        if ($password === '') {
+            throw new RuntimeException('Password confirmation is required to delete your account.', 422);
+        }
+
+        $db   = Database::getInstance();
+        $stmt = $db->prepare('SELECT password FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $row = $stmt->fetch();
+        if (!$row || !password_verify($password, (string) ($row['password'] ?? ''))) {
+            throw new RuntimeException('Incorrect password. Account not deleted.', 401);
+        }
+
+        (new PrivacyService())->deleteAccount($userId);
+        echo json_encode(['message' => 'Your account and all associated data have been permanently deleted.']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Booking Waitlist
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** @param array<string, string> $vars */
+    private function handleWaitlistJoin(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+
+        // Attach logged-in user ID if available
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $data['userId'] = (int) ($payload['sub'] ?? 0);
+                if (empty($data['name'])) {
+                    $data['name'] = (string) ($payload['name'] ?? '');
+                }
+                if (empty($data['email'])) {
+                    $data['email'] = (string) ($payload['email'] ?? '');
+                }
+            } catch (RuntimeException) { /* anonymous */ }
+        }
+
+        $entry = (new WaitlistService())->join($data);
+        http_response_code(201);
+        echo json_encode(['entry' => $entry]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleWaitlistList(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $status = trim((string) ($_GET['status'] ?? ''));
+        $entries = (new WaitlistService())->getAll($status);
+        echo json_encode(['entries' => $entries]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleWaitlistRemove(array $vars = []): void
+    {
+        $id = (int) ($vars['id'] ?? 0);
+
+        // Admin can remove any entry; authenticated clients can remove their own
+        $token = Auth::tokenFromHeader();
+        $requestingUserId = null;
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'bookings:manage');
+                if (!$isAdmin) {
+                    $requestingUserId = (int) ($payload['sub'] ?? 0);
+                }
+            } catch (RuntimeException) {
+                throw new RuntimeException('Authentication required.', 401);
+            }
+        } else {
+            throw new RuntimeException('Authentication required.', 401);
+        }
+
+        (new WaitlistService())->remove($id, $requestingUserId);
+        echo json_encode(['message' => 'Waitlist entry removed.']);
     }
 }
 

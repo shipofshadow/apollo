@@ -23,6 +23,7 @@ import {
   createBuildUpdateApi,
   uploadBuildUpdateMediaApi,
   updateInternalNotesApi,
+  updateCalibrationDataApi,
   updateBookingQaPhotosApi,
   deleteBookingApi,
   fetchCustomerStatsApi,
@@ -361,6 +362,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
   // Internal notes state
   const [internalNotes,     setInternalNotes]     = useState('');
+  const [calibration, setCalibration] = useState({ beamAngle: '', luxOutput: '', notes: '' });
+  const [calibSaving, setCalibSaving] = useState(false);
   const [notesEditing,      setNotesEditing]      = useState(false);
   const [notesBusy,         setNotesBusy]         = useState(false);
 
@@ -399,6 +402,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
     setPartsNotes(booking.partsNotes ?? '');
     setInternalNotes(booking.internalNotes ?? '');
+    const cd = booking.calibrationData;
+    if (cd) setCalibration({ beamAngle: cd.beamAngle ?? '', luxOutput: cd.luxOutput ?? '', notes: cd.notes ?? '' });
     setBeforePhotos(booking.beforePhotos ?? []);
     setAfterPhotos(booking.afterPhotos ?? []);
     if (booking.assignedTech?.userId != null) {
@@ -1459,6 +1464,60 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Calibration Data */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+              <Shield className="w-3.5 h-3.5 text-gray-400" /> Calibration Data
+            </p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block mb-1">Beam Angle</label>
+                  <input
+                    value={calibration.beamAngle}
+                    onChange={e => setCalibration(p => ({ ...p, beamAngle: e.target.value }))}
+                    placeholder="e.g. 0.2° down"
+                    className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-orange/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block mb-1">Lux Output</label>
+                  <input
+                    value={calibration.luxOutput}
+                    onChange={e => setCalibration(p => ({ ...p, luxOutput: e.target.value }))}
+                    placeholder="e.g. 1200 lux"
+                    className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-orange/50"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block mb-1">Notes</label>
+                <input
+                  value={calibration.notes}
+                  onChange={e => setCalibration(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Additional calibration notes…"
+                  className="w-full bg-black/40 border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-orange/50"
+                />
+              </div>
+              <button
+                disabled={calibSaving}
+                onClick={async () => {
+                  if (!token) return;
+                  setCalibSaving(true);
+                  try {
+                    await updateCalibrationDataApi(token, booking.id, calibration);
+                    showToast('Calibration data saved.', 'success');
+                  } catch (e) {
+                    showToast((e as Error).message ?? 'Failed to save.', 'error');
+                  } finally { setCalibSaving(false); }
+                }}
+                className="px-4 py-2 bg-brand-orange text-white text-[10px] font-bold uppercase tracking-widest rounded hover:bg-brand-orange/80 transition-colors disabled:opacity-50"
+              >
+                {calibSaving ? 'Saving…' : 'Save Calibration'}
+              </button>
+            </div>
           </div>
 
           {/* Customer History */}

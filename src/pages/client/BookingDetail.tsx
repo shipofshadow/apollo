@@ -727,14 +727,23 @@ export default function BookingDetail() {
               <span className="w-1.5 h-1.5 rounded-full bg-brand-orange" /> Assigned Operator
             </p>
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded bg-brand-darker border border-gray-700 flex items-center justify-center shrink-0">
-                <Wrench className="w-4 h-4 text-gray-400" />
-              </div>
+              {booking.assignedTech.imageUrl ? (
+                <img
+                  src={booking.assignedTech.imageUrl}
+                  alt={booking.assignedTech.name}
+                  className="w-12 h-12 rounded-full object-cover border border-brand-orange/30 shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-brand-darker border border-gray-700 flex items-center justify-center shrink-0">
+                  <Wrench className="w-5 h-5 text-gray-400" />
+                </div>
+              )}
               <div className="overflow-hidden">
                 <p className="text-sm font-bold text-white truncate">{booking.assignedTech.name}</p>
                 {booking.assignedTech.role && (
                   <p className="text-[10px] font-mono text-brand-orange/80 mt-0.5 truncate">{booking.assignedTech.role}</p>
                 )}
+                <p className="text-[10px] text-gray-600 mt-0.5">Your installer for this job</p>
               </div>
             </div>
           </div>
@@ -750,6 +759,48 @@ export default function BookingDetail() {
         <div className="mt-6 bg-brand-orange/5 border-l-2 border-brand-orange p-4 rounded-r-lg">
           <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange/70 mb-2">Contextual Notes</p>
           <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{booking.notes}</p>
+        </div>
+      )}
+
+      {/* Calibration Certificate */}
+      {booking.calibrationData && booking.status === 'completed' && (
+        <div className="mt-6 bg-[#111] border border-brand-orange/20 rounded-lg p-5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange/70 mb-4 flex items-center gap-2">
+            <BadgeCheck className="w-3.5 h-3.5 text-brand-orange" /> Calibration Certificate
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+            {booking.calibrationData.beamAngle && (
+              <div>
+                <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Beam Angle</p>
+                <p className="text-sm font-bold text-white">{booking.calibrationData.beamAngle}</p>
+              </div>
+            )}
+            {booking.calibrationData.luxOutput && (
+              <div>
+                <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Lux Output</p>
+                <p className="text-sm font-bold text-white">{booking.calibrationData.luxOutput}</p>
+              </div>
+            )}
+            {booking.assignedTech && (
+              <div>
+                <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Technician</p>
+                <p className="text-sm font-bold text-white">{booking.assignedTech.name}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-1">Date</p>
+              <p className="text-sm font-bold text-white">{booking.appointmentDate}</p>
+            </div>
+          </div>
+          {booking.calibrationData.notes && (
+            <p className="text-xs text-gray-400 leading-relaxed border-t border-white/5 pt-3">{booking.calibrationData.notes}</p>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded hover:bg-brand-orange/20 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+          </button>
         </div>
       )}
     </div>

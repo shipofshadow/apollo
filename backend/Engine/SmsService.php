@@ -76,7 +76,7 @@ class SmsService
     }
 
     /**
-     * Send an appointment reminder SMS (e.g. 24 h before).
+     * Send an appointment reminder SMS 24 h before (in Filipino/Tagalog).
      *
      * @param array<string, mixed> $booking
      */
@@ -85,14 +85,39 @@ class SmsService
         $phone = $this->normalisePhone((string) ($booking['phone'] ?? ''));
         if ($phone === '') return;
 
-        $name    = (string) ($booking['name']            ?? 'there');
-        $service = (string) ($booking['serviceName']     ?? 'your service');
-        $time    = (string) ($booking['appointmentTime'] ?? '');
+        $name    = (string) ($booking['name']            ?? 'po');
+        $service = (string) ($booking['serviceName']     ?? $booking['service_name'] ?? 'inyong serbisyo');
+        $time    = (string) ($booking['appointmentTime'] ?? $booking['appointment_time'] ?? '');
 
         $this->send(
             $phone,
-            "Hi {$name}! Reminder: your {$service} appointment is TOMORROW at {$time}. "
-          . "Reply STOP to unsubscribe. – 1625 Auto Lab"
+            "Kamusta {$name}! 🔧 Paalala lang po – bukas na ang inyong appointment para sa "
+          . "{$service}" . ($time !== '' ? " sa {$time}" : '') . ". "
+          . "Huwag kalimutang dumating sa 1625 Auto Lab. "
+          . "Reply STOP para mag-unsubscribe."
+        );
+    }
+
+    /**
+     * Notify a waitlisted customer that a slot has become available.
+     *
+     * @param array<string, mixed> $data  Keys: name, phone, date, time
+     */
+    public function waitlistSlotAvailable(array $data): void
+    {
+        $phone = $this->normalisePhone((string) ($data['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $name = (string) ($data['name'] ?? 'po');
+        $date = (string) ($data['date'] ?? '');
+        $time = (string) ($data['time'] ?? '');
+
+        $this->send(
+            $phone,
+            "Hi {$name}! Magandang balita – may bakanteng slot na sa {$date}"
+          . ($time !== '' ? " at {$time}" : '') . ". "
+          . "I-book na agad bago maubusan! – 1625 Auto Lab. "
+          . "Reply STOP para mag-unsubscribe."
         );
     }
 
