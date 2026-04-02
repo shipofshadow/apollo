@@ -1,36 +1,13 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
-from time_utils import today_utc8
+from time_utils import parse_date_input
 
 
 def _err(rule: dict, default: str) -> str:
     """Return error_message override from rule if set, otherwise the default."""
     return rule.get("error_message") or default
-
-
-def _parse_relative_date_local(text: str) -> str | None:
-    t = (text or "").strip().lower()
-    today = today_utc8()
-
-    quick = {
-        "today": 0,
-        "ngayon": 0,
-        "tomorrow": 1,
-        "bukas": 1,
-        "day after tomorrow": 2,
-        "makalawa": 2,
-        "next week": 7,
-        "susunod na linggo": 7,
-    }
-    if t in quick:
-        return (today + timedelta(days=quick[t])).strftime("%Y-%m-%d")
-
-    match = re.match(r"^(?:in\s+)?(\d+)\s+days?$", t)
-    if match:
-        return (today + timedelta(days=int(match.group(1)))).strftime("%Y-%m-%d")
-    return None
 
 
 def validate_input(value: str, rule: dict) -> tuple[bool, str]:
@@ -61,13 +38,10 @@ def validate_input(value: str, rule: dict) -> tuple[bool, str]:
         if not value or not value.strip():
             return False, _err(rule, "Petsa ay required boss.")
 
-        parsed = _parse_relative_date_local(value)
-        candidate = parsed if parsed else value.strip()
-        try:
-            datetime.strptime(candidate, "%Y-%m-%d")
+        parsed = parse_date_input(value.strip())
+        if parsed:
             return True, ""
-        except ValueError:
-            return False, _err(rule, "Boss, format ng petsa ay YYYY-MM-DD (e.g., 2026-04-15). Try mo ulit.")
+        return False, _err(rule, "Boss, di ko ma-parse ang petsa. Subukan mo: 'bukas', 'March 20 2026', '2026-04-15', o '03/20/2026'.")
 
     if rule_type == "min_length":
         min_len = rule.get("value", 1)

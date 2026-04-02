@@ -85,15 +85,16 @@ def _reset_session_data(session_id: str, db: Session) -> bool:
 def _save_message(
     conversation_id: int,
     sender: str,
-    content: str,
+    content: str | None,
     message_type: str = "text",
     metadata: dict = None,
     db: Session = None,
 ) -> models.Message:
+    safe_content = content if isinstance(content, str) else ""
     msg = models.Message(
         conversation_id=conversation_id,
         sender=sender,
-        content=content,
+        content=safe_content,
         message_type=message_type,
         metadata_json=json.dumps(metadata) if metadata else None,
     )
@@ -241,7 +242,7 @@ def send_message(payload: schemas.ChatMessage, db: Session = Depends(get_db)):
             _save_message(
                 conversation_id=conversation.id,
                 sender="bot",
-                content=msg["content"],
+                content=msg.get("content"),
                 message_type=msg.get("message_type", "text"),
                 metadata=msg.get("metadata"),
                 db=db,
@@ -253,7 +254,7 @@ def send_message(payload: schemas.ChatMessage, db: Session = Depends(get_db)):
         return schemas.ChatResponse(
             messages=[
                 schemas.BotResponseMessage(
-                    content=m["content"],
+                    content=m.get("content") or "",
                     message_type=m.get("message_type", "text"),
                     metadata=m.get("metadata"),
                 )

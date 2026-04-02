@@ -216,7 +216,7 @@ class AuthSecurityService
 
         try {
             $stmt = $this->db->prepare(
-                'INSERT INTO user_sessions
+                'INSERT INTO auth_sessions
                     (user_id, token_hash, ip_address, user_agent, issued_at, expires_at, last_seen_at)
                  VALUES
                     (:uid, :token_hash, :ip, :ua, NOW(), FROM_UNIXTIME(:exp), NOW())'
@@ -244,7 +244,7 @@ class AuthSecurityService
 
         $stmt = $this->db->prepare(
             'SELECT id, user_id, token_hash, ip_address, user_agent, issued_at, expires_at, last_seen_at, revoked_at, revoked_reason
-             FROM user_sessions
+             FROM auth_sessions
              WHERE user_id = :uid
              ORDER BY issued_at DESC, id DESC
              LIMIT :lim'
@@ -281,7 +281,7 @@ class AuthSecurityService
 
         $stmt = $this->db->prepare(
             'SELECT token_hash, expires_at
-             FROM user_sessions
+             FROM auth_sessions
              WHERE id = :id AND user_id = :uid
              LIMIT 1'
         );
@@ -292,7 +292,7 @@ class AuthSecurityService
         }
 
         $this->db->prepare(
-            'UPDATE user_sessions
+            'UPDATE auth_sessions
              SET revoked_at = NOW(), revoked_reason = :reason
              WHERE id = :id AND user_id = :uid AND revoked_at IS NULL'
         )->execute([
@@ -313,7 +313,7 @@ class AuthSecurityService
 
         $stmt = $this->db->prepare(
             'SELECT id, token_hash, expires_at
-             FROM user_sessions
+             FROM auth_sessions
              WHERE user_id = :uid
                AND revoked_at IS NULL
                AND token_hash <> :current_hash'
@@ -330,7 +330,7 @@ class AuthSecurityService
         }
 
         $this->db->prepare(
-            'UPDATE user_sessions
+            'UPDATE auth_sessions
              SET revoked_at = NOW(), revoked_reason = :reason
              WHERE user_id = :uid
                AND revoked_at IS NULL
@@ -352,7 +352,7 @@ class AuthSecurityService
 
         $hash = hash('sha256', $token);
         $this->db->prepare(
-            'UPDATE user_sessions
+            'UPDATE auth_sessions
              SET revoked_at = NOW(), revoked_reason = :reason
              WHERE token_hash = :hash AND revoked_at IS NULL'
         )->execute([
@@ -537,7 +537,7 @@ class AuthSecurityService
         }
 
         try {
-            $this->db->query('SELECT 1 FROM user_sessions LIMIT 1');
+            $this->db->query('SELECT 1 FROM auth_sessions LIMIT 1');
             $this->sessionsTableExistsCache = true;
         } catch (\Throwable) {
             $this->sessionsTableExistsCache = false;

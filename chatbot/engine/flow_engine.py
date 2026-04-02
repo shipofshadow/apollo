@@ -623,9 +623,12 @@ def process_message(
 
         validation = active_node.get("validation")
 
-        # Pre-process relative date expressions (bukas, next week, …) before validation.
+        # Pre-process any date expression (relative or absolute format) before validation.
         if validation and validation.get("type") == "date":
             parsed_date = _parse_relative_date(user_input)
+            if not parsed_date:
+                from time_utils import parse_date_input as _parse_date_input
+                parsed_date = _parse_date_input(user_input)
             if parsed_date:
                 user_input = parsed_date
 

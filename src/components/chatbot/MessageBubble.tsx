@@ -1,3 +1,4 @@
+import React from 'react'
 import CardCarousel from './CardCarousel'
 import QuickReplies from './QuickReplies'
 import type { CardButton, CardData, ChatMessage } from './types'
@@ -12,6 +13,33 @@ type MessageBubbleProps = {
   isQuickReplyActive?: boolean
   onQuickReply: (value: string | QuickReplyPayload) => void
   quickRepliesDisabled: boolean
+}
+
+const URL_RE = /https?:\/\/[^\s<>"')\]]+/g
+
+function linkify(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  URL_RE.lastIndex = 0
+  while ((match = URL_RE.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index))
+    const href = match[0]
+    parts.push(
+      <a
+        key={match.index}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline break-all hover:opacity-80"
+      >
+        {href}
+      </a>
+    )
+    last = match.index + href.length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
 }
 
 function formatTime(timestamp?: string) {
@@ -142,7 +170,7 @@ export default function MessageBubble({ message, isQuickReplyActive = false, onQ
             {message.content ? <span className="col-span-full text-sm leading-6">{message.content}</span> : null}
           </div>
         ) : (
-          <span className="text-sm leading-6">{message.content}</span>
+          <span className="text-sm leading-6">{linkify(message.content ?? '')}</span>
         )}
       </div>
 
