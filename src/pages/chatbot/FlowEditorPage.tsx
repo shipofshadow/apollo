@@ -148,7 +148,7 @@ function NodeCard({
           {cfg.label}
         </span>
         {node.http_request && (
-          <Globe className="w-3 h-3 text-teal-400 shrink-0" title="Has HTTP request" />
+          <Globe className="w-3 h-3 text-teal-400 shrink-0" aria-label="Has HTTP request" />
         )}
         {/* Controls visible on hover */}
         <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
