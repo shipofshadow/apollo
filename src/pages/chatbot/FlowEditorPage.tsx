@@ -69,7 +69,7 @@ const NODE_TYPE_CFG = {
 
 function makeUniqueId(nodes: FlowNode[]): string {
   const ids = new Set(nodes.map((n) => n.id))
-  let i = nodes.length + 1
+  let i = 1
   while (ids.has(`node_${i}`)) i++
   return `node_${i}`
 }
@@ -294,7 +294,8 @@ function NodeEditPanel({
       const opts = [...(prev.options ?? [])]
       opts[i] = { ...opts[i], [key]: value }
       if (key === 'label' && !opts[i].value) {
-        opts[i].value = value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+        const generated = value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+        opts[i].value = generated || `opt_${i + 1}`
       }
       return { ...prev, options: opts }
     })
@@ -768,8 +769,11 @@ export default function FlowEditorPage() {
     } catch (err) {
       type ErrResp = { response?: { data?: { detail?: { errors?: string[] } | string } } }
       const detail = (err as ErrResp)?.response?.data?.detail
-      if (detail && typeof detail === 'object' && Array.isArray((detail as { errors?: string[] }).errors)) {
-        setSaveError(`Validation: ${(detail as { errors: string[] }).errors.join(' · ')}`)
+      const errors = detail && typeof detail === 'object'
+        ? (detail as { errors?: string[] }).errors
+        : undefined
+      if (Array.isArray(errors)) {
+        setSaveError(`Validation: ${errors.join(' · ')}`)
       } else {
         setSaveError(toApiErrorMessage(err))
       }
