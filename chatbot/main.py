@@ -298,15 +298,13 @@ app.add_middleware(
 async def cache_request_body(request: Request, call_next):
     """Cache request body early to prevent stream consumed errors."""
     if request.method in ["POST", "PUT", "PATCH"]:
-        # Read and cache the body once
-        body = await request.body()
-        request.state._cached_body = body
-        
-        # Re-create the receive callable so the body can be read again
-        async def _receive():
-            return {"type": "http.request", "body": body, "more_body": False}
-        
-        request._receive = _receive  # type: ignore[attr-defined]
+        try:
+            # Read and cache the body. After this, Starlette will cache it internally.
+            body = await request.body()
+            request.state._cached_body = body
+        except Exception:
+            # If reading fails, continue anyway - body might still work through internal caching
+            pass
     
     return await call_next(request)
 
