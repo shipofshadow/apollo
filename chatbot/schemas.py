@@ -284,3 +284,22 @@ class AppointmentActionOut(BaseModel):
     reason: Optional[str] = None
     status: str
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Admin settings
+# ---------------------------------------------------------------------------
+
+class AdminSettingsUpdate(BaseModel):
+    agent_color: Optional[str] = Field(default=None, max_length=64)
+    sound_enabled: Optional[bool] = None
+    send_on_enter: Optional[bool] = None
+    polling_interval: Optional[int] = Field(default=None, ge=1000, le=60000)
+
+
+class AdminSettingsOut(BaseModel):
+    agent_color: str
+    sound_enabled: bool
+    send_on_enter: bool
+    polling_interval: int
+    updated_at: Optional[datetime] = None

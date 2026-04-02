@@ -179,6 +179,19 @@ class TeamMember(MySQLMixin, Base):
     updated_at = Column(DateTime, default=_now, onupdate=_now, nullable=False)
 
 
+class ChatbotAdminSettings(MySQLMixin, Base):
+    __tablename__ = "chatbot_admin_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, unique=True, index=True, nullable=False)
+    agent_color = Column(String(64), nullable=False, default="#fdba74")
+    sound_enabled = Column(Boolean, nullable=False, default=False)
+    send_on_enter = Column(Boolean, nullable=False, default=True)
+    polling_interval = Column(Integer, nullable=False, default=3000)
+    created_at = Column(DateTime, default=_now, nullable=False)
+    updated_at = Column(DateTime, default=_now, onupdate=_now, nullable=False)
+
+
 class Booking(MySQLMixin, Base):
     __tablename__ = "bookings"
 

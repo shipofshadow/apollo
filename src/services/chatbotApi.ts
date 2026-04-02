@@ -16,6 +16,19 @@ type FlowPayload = {
   is_active: boolean
 }
 
+export type ChatbotAdminSettings = {
+  agent_color: string
+  sound_enabled: boolean
+  send_on_enter: boolean
+  polling_interval: number
+  updated_at?: string | null
+}
+
+export type ChatbotAdminSettingsUpdate = Partial<Pick<
+  ChatbotAdminSettings,
+  'agent_color' | 'sound_enabled' | 'send_on_enter' | 'polling_interval'
+>>
+
 type RetryConfig = InternalAxiosRequestConfig & {
   __retryCount?: number
   retryable?: boolean
@@ -139,6 +152,16 @@ export const chatbotApi = {
   getConversation: (sessionId: string) =>
     axiosInstance
       .get(`/admin/conversations/${sessionId}`)
+      .then((res) => res.data),
+
+  getAdminSettings: () =>
+    axiosInstance
+      .get<ChatbotAdminSettings>('/admin/settings')
+      .then((res) => res.data),
+
+  updateAdminSettings: (payload: ChatbotAdminSettingsUpdate) =>
+    axiosInstance
+      .put<ChatbotAdminSettings>('/admin/settings', payload, { retryable: false })
       .then((res) => res.data),
 
   deleteConversation: (sessionId: string) =>

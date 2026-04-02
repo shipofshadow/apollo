@@ -13,6 +13,26 @@ from time_utils import now_utc8
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
+def _admin_user_id(payload: dict) -> int:
+    raw_sub = payload.get("sub")
+    if raw_sub is None:
+        raise HTTPException(status_code=401, detail="Invalid token payload.")
+    try:
+        return int(str(raw_sub))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid token subject.") from exc
+
+
+def _default_settings() -> schemas.AdminSettingsOut:
+    return schemas.AdminSettingsOut(
+        agent_color="#fdba74",
+        sound_enabled=False,
+        send_on_enter=True,
+        polling_interval=3000,
+        updated_at=None,
+    )
+
+
 def _ensure_conversation(session_id: str, db: Session) -> models.Conversation:
     conversation = db.query(models.Conversation).filter_by(session_id=session_id).first()
     if conversation:
@@ -203,5 +223,71 @@ def close_conversation(session_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(conversation)
     return conversation
+
+
+@router.get("/settings", response_model=schemas.AdminSettingsOut)
+def get_admin_settings(
+    payload: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    user_id = _admin_user_id(payload)
+    settings = db.query(models.ChatbotAdminSettings).filter_by(user_id=user_id).first()
+    if not settings:
+        return _default_settings()
+
+    return schemas.AdminSettingsOut(
+        agent_color=settings.agent_color,
+        sound_enabled=settings.sound_enabled,
+        send_on_enter=settings.send_on_enter,
+        polling_interval=settings.polling_interval,
+        updated_at=settings.updated_at,
+    )
+
+
+@router.put("/settings", response_model=schemas.AdminSettingsOut)
+def upsert_admin_settings(
+    body: schemas.AdminSettingsUpdate,
+    payload: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    user_id = _admin_user_id(payload)
+    settings = db.query(models.ChatbotAdminSettings).filter_by(user_id=user_id).first()
+    if not settings:
+        defaults = _default_settings()
+        settings = models.ChatbotAdminSettings(
+            user_id=user_id,
+            agent_color=defaults.agent_color,
+            sound_enabled=defaults.sound_enabled,
+            send_on_enter=defaults.send_on_enter,
+            polling_interval=defaults.polling_interval,
+        )
+        db.add(settings)
+        db.flush()
+
+    if body.agent_color is not None:
+        value = body.agent_color.strip()
+        if value != "":
+            settings.agent_color = value
+
+    if body.sound_enabled is not None:
+        settings.sound_enabled = bool(body.sound_enabled)
+
+    if body.send_on_enter is not None:
+        settings.send_on_enter = bool(body.send_on_enter)
+
+    if body.polling_interval is not None:
+        settings.polling_interval = int(body.polling_interval)
+
+    settings.updated_at = now_utc8()
+    db.commit()
+    db.refresh(settings)
+
+    return schemas.AdminSettingsOut(
+        agent_color=settings.agent_color,
+        sound_enabled=settings.sound_enabled,
+        send_on_enter=settings.send_on_enter,
+        polling_interval=settings.polling_interval,
+        updated_at=settings.updated_at,
+    )
 
 

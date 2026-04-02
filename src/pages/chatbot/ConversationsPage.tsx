@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Filter, RefreshCw, MessageSquare, Bot, User, X } from 'lucide-react'
+import { Search, Filter, RefreshCw, MessageSquare, Bot, User, X, Settings2 } from 'lucide-react'
 import { chatbotApi } from '../../services/chatbotApi'
 import ConversationList from '../admin/chatbot/ConversationList'
 import ChatView from '../admin/chatbot/ChatView'
+import { useSettings } from '../../hooks/useSettings'
+import SettingsModal from '../../components/admin/chatbot/SettingsModal'
 
 type ConversationSummary = {
   session_id: string
@@ -22,6 +24,8 @@ export default function ConversationsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'human' | 'bot' | 'closed'>('all')
   const [loading, setLoading] = useState(true)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const { settings, updateSettings, isSyncing } = useSettings()
 
   const customerNameCacheRef = useRef<Record<string, string>>({})
   const pendingNameLoadsRef = useRef<Set<string>>(new Set())
@@ -164,12 +168,20 @@ export default function ConversationsPage() {
           <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
           <div className="ml-2 hidden sm:block text-xs text-gray-500">{conversations.length} conversations</div>
         </div>
-        <button
-          onClick={() => void fetchConversations()}
-          className="flex items-center gap-2 text-xs text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-sm transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-2 text-xs text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-sm transition-colors"
+          >
+            <Settings2 className="w-3.5 h-3.5" /> Settings
+          </button>
+          <button
+            onClick={() => void fetchConversations()}
+            className="flex items-center gap-2 text-xs text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-sm transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
@@ -314,6 +326,16 @@ export default function ConversationsPage() {
           )}
         </main>
       </div>
+
+      <SettingsModal
+        open={showSettings}
+        settings={settings}
+        isSaving={isSyncing}
+        onClose={() => setShowSettings(false)}
+        onSave={(next) => {
+          void updateSettings(next)
+        }}
+      />
     </div>
   )
 }

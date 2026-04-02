@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react'
 import { chatbotApi, toApiErrorMessage } from '../../../services/chatbotApi'
 import { useAuth } from '../../../context/AuthContext'
+import { useSettings } from '../../../hooks/useSettings'
 
 const STATUS_COLORS = {
   bot: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
@@ -55,8 +56,6 @@ type AppointmentAction = {
   created_at: string
 }
 
-const POLL_INTERVAL_MS = 3000
-
 function getAgentName(msg: ConversationMessage): string | null {
   if (msg.metadata?.agent_name) return msg.metadata.agent_name
   if (!msg.metadata_json) return null
@@ -70,6 +69,7 @@ function getAgentName(msg: ConversationMessage): string | null {
 
 export default function ChatView({ sessionId, onDeleteConversation }: ChatViewProps) {
   const { user } = useAuth()
+  const { settings } = useSettings()
   const [conversation, setConversation] = useState<ConversationDetail | null>(null)
   const [inputValue, setInputValue] = useState('')
   const [appointmentActions, setAppointmentActions] = useState<AppointmentAction[]>([])
@@ -94,6 +94,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
+  const prevMessageCountRef = useRef(0)
 
   const formatMessageTime = useCallback((value?: string) => {
     if (!value) return ''
@@ -181,10 +182,10 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
         fetchConversation(false),
         syncPresenceAndProfile(),
       ])
-    }, POLL_INTERVAL_MS)
+    }, settings.pollingInterval)
 
     return () => clearInterval(interval)
-  }, [sessionId, fetchConversation, fetchAppointmentActions, syncPresenceAndProfile])
+  }, [sessionId, fetchConversation, fetchAppointmentActions, settings.pollingInterval, syncPresenceAndProfile])
 
   const effectiveAgentName = user?.role === 'admin' ? user.name : null
 
@@ -325,13 +326,62 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (settings.sendOnEnter && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         handleSend()
       }
     },
-    [handleSend]
+    [handleSend, settings.sendOnEnter]
   )
+
+  const playNotificationTone = useCallback(() => {
+    if (!settings.soundEnabled) return
+
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctx) return
+
+      const ctx = new Ctx()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime)
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.04, ctx.currentTime + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18)
+
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start()
+      oscillator.stop(ctx.currentTime + 0.18)
+
+      oscillator.onended = () => {
+        void ctx.close()
+      }
+    } catch (error) {
+      console.error('Failed to play message tone', error)
+    }
+  }, [settings.soundEnabled])
+
+  useEffect(() => {
+    const messages = conversation?.messages || []
+    const count = messages.length
+    if (prevMessageCountRef.current === 0) {
+      prevMessageCountRef.current = count
+      return
+    }
+
+    if (count > prevMessageCountRef.current) {
+      const newMessages = messages.slice(prevMessageCountRef.current)
+      const shouldPlaySound = newMessages.some((msg) => msg.sender === 'bot' || msg.sender === 'human')
+      if (shouldPlaySound) {
+        playNotificationTone()
+      }
+    }
+
+    prevMessageCountRef.current = count
+  }, [conversation?.messages, playNotificationTone])
 
   if (!sessionId) {
     return (
@@ -579,7 +629,10 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
               className={`mb-2.5 flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
             >
               {isHumanAgent && (
-                <span className="mb-0.5 ml-1 text-[11px] font-semibold text-orange-300">
+                <span
+                  className={`mb-0.5 ml-1 text-[11px] font-semibold ${settings.agentColor.startsWith('#') ? '' : settings.agentColor}`}
+                  style={settings.agentColor.startsWith('#') ? { color: settings.agentColor } : undefined}
+                >
                   {getAgentName(msg) || 'Agent'}
                 </span>
               )}
