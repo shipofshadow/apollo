@@ -152,16 +152,15 @@ class MigrationRunner
         $statements = $this->splitStatements($sql);
 
         $this->db->beginTransaction();
+        $transactionOpen = true;
         try {
             foreach ($statements as $statement) {
                 $this->db->exec($statement);
-                // DDL statements (CREATE TABLE, ALTER TABLE, etc.) cause MySQL to
-                // issue an implicit commit, silently ending the transaction.
-                // After each statement we check whether we are still in a
-                // transaction so that the final commit/rollBack calls are only
-                // made when a real transaction is still open.
-                if (!$this->db->inTransaction()) {
-                    break;
+                // DDL statements may trigger an implicit commit on MySQL.
+                // Keep executing remaining statements, but avoid commit/rollback
+                // once the transaction has been auto-closed.
+                if ($transactionOpen && !$this->db->inTransaction()) {
+                    $transactionOpen = false;
                 }
             }
 
@@ -170,11 +169,11 @@ class MigrationRunner
             );
             $stmt->execute([':name' => $name]);
 
-            if ($this->db->inTransaction()) {
+            if ($transactionOpen && $this->db->inTransaction()) {
                 $this->db->commit();
             }
         } catch (\Throwable $e) {
-            if ($this->db->inTransaction()) {
+            if ($transactionOpen && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             throw new RuntimeException(

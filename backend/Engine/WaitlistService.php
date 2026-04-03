@@ -13,10 +13,14 @@ declare(strict_types=1);
 class WaitlistService
 {
     private bool $useDb;
+    private int $claimTtlMinutes;
 
     public function __construct()
     {
         $this->useDb = DB_NAME !== '';
+        $this->claimTtlMinutes = defined('WAITLIST_CLAIM_TTL_MINUTES')
+            ? max(5, (int) WAITLIST_CLAIM_TTL_MINUTES)
+            : 30;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -84,6 +88,7 @@ class WaitlistService
         if (!$this->useDb) {
             return [];
         }
+        $this->expireStaleClaims();
         $where  = $status !== '' ? 'WHERE w.status = :status ' : '';
         $params = $status !== '' ? [':status' => $status] : [];
 
@@ -107,13 +112,111 @@ class WaitlistService
         if (!$this->useDb) {
             return [];
         }
+        $this->expireStaleClaims();
         $stmt = Database::getInstance()->prepare(
             'SELECT * FROM booking_waitlist
-              WHERE slot_date = :date AND slot_time = :time AND status = :status
+              WHERE slot_date = :date
+                AND (slot_time = :time OR slot_time = "any")
+                AND status = :status
               ORDER BY created_at ASC'
         );
         $stmt->execute([':date' => $date, ':time' => $time, ':status' => $status]);
         return array_map([$this, 'mapRow'], $stmt->fetchAll());
+    }
+
+    /**
+     * Resolve and validate a claim token.
+     *
+     * @return array<string, mixed>
+     */
+    public function getClaimByToken(string $token): array
+    {
+        if (!$this->useDb) {
+            throw new RuntimeException('Waitlist claim requires a database connection.', 503);
+        }
+
+        $clean = trim($token);
+        if ($clean === '') {
+            throw new RuntimeException('Claim token is required.', 422);
+        }
+
+        $this->expireStaleClaims();
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM booking_waitlist WHERE claim_token = :token LIMIT 1'
+        );
+        $stmt->execute([':token' => $clean]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            throw new RuntimeException('Claim link is invalid or has expired.', 404);
+        }
+
+        $entry = $this->mapRow($row);
+        if (($entry['status'] ?? '') === 'booked') {
+            throw new RuntimeException('This claim link has already been used.', 409);
+        }
+        if (($entry['status'] ?? '') === 'expired') {
+            throw new RuntimeException('This claim link has expired.', 409);
+        }
+        if (($entry['status'] ?? '') !== 'notified') {
+            throw new RuntimeException('This waitlist entry is not claimable.', 409);
+        }
+
+        $expiresAt = (string) ($entry['claimExpiresAt'] ?? '');
+        if ($expiresAt !== '' && strtotime($expiresAt) !== false && strtotime($expiresAt) < time()) {
+            $this->markExpired((int) $entry['id']);
+            throw new RuntimeException('This claim link has expired.', 409);
+        }
+
+        return $entry;
+    }
+
+    /**
+     * Validate a claim token against booking data.
+     *
+     * @param array<string, mixed> $bookingData
+     * @return array<string, mixed>
+     */
+    public function validateClaimForBooking(string $token, array $bookingData): array
+    {
+        $entry = $this->getClaimByToken($token);
+
+        $date = trim((string) ($bookingData['appointmentDate'] ?? ''));
+        $time = trim((string) ($bookingData['appointmentTime'] ?? ''));
+        $email = strtolower(trim((string) ($bookingData['email'] ?? '')));
+
+        if ($date !== (string) ($entry['slotDate'] ?? '')) {
+            throw new RuntimeException('Claim token date does not match the selected appointment date.', 409);
+        }
+
+        $entrySlotTime = (string) ($entry['slotTime'] ?? '');
+        if ($entrySlotTime !== 'any' && $time !== $entrySlotTime) {
+            throw new RuntimeException('Claim token time does not match the selected appointment time.', 409);
+        }
+
+        $entryEmail = strtolower((string) ($entry['email'] ?? ''));
+        if ($entryEmail !== '' && $email !== '' && $entryEmail !== $email) {
+            throw new RuntimeException('Claim token email does not match this booking email.', 409);
+        }
+
+        return $entry;
+    }
+
+    public function markBookedByClaimToken(string $token, string $bookingId): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'UPDATE booking_waitlist
+             SET status = "booked", claimed_at = NOW(), booked_booking_id = :booking_id
+             WHERE claim_token = :token AND status = "notified"'
+        );
+        $stmt->execute([
+            ':booking_id' => $bookingId,
+            ':token' => trim($token),
+        ]);
     }
 
     /** Remove a waitlist entry (admin or self). */
@@ -150,12 +253,26 @@ class WaitlistService
         $name = (string) ($entry['name']     ?? 'there');
         $email = (string) ($entry['email']   ?? '');
         $phone = (string) ($entry['phone']   ?? '');
+        $claimToken = $this->createClaimToken();
+        $claimExpiresAt = date('Y-m-d H:i:s', time() + ($this->claimTtlMinutes * 60));
+        $claimUrl = $this->buildClaimUrl($claimToken);
 
         // Mark as notified immediately to prevent duplicate sends
         $stmt = Database::getInstance()->prepare(
-            'UPDATE booking_waitlist SET status = "notified", notified_at = NOW() WHERE id = :id'
+            'UPDATE booking_waitlist
+             SET status = "notified",
+                 notified_at = NOW(),
+                 claim_token = :claim_token,
+                 claim_expires_at = :claim_expires_at,
+                 claimed_at = NULL,
+                 booked_booking_id = NULL
+             WHERE id = :id'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([
+            ':id' => $id,
+            ':claim_token' => $claimToken,
+            ':claim_expires_at' => $claimExpiresAt,
+        ]);
 
         // In-app notification for logged-in users
         $userId = isset($entry['userId']) && $entry['userId'] ? (int) $entry['userId'] : null;
@@ -193,7 +310,14 @@ class WaitlistService
         if ($email !== '') {
             try {
                 $ns = new NotificationService();
-                $ns->sendWaitlistSlotAvailable($name, $email, $date, $time);
+                $ns->sendWaitlistSlotAvailable(
+                    $name,
+                    $email,
+                    $date,
+                    $time,
+                    $claimUrl,
+                    $this->claimTtlMinutes
+                );
             } catch (\Throwable) {
                 // fail silently
             }
@@ -206,6 +330,7 @@ class WaitlistService
      */
     public function handleBookingCancelled(string $slotDate, string $slotTime): void
     {
+        $this->expireStaleClaims();
         $waiting = $this->getForSlot($slotDate, $slotTime, 'waiting');
         if (empty($waiting)) {
             return;
@@ -248,6 +373,10 @@ class WaitlistService
             'notes'       => isset($row['notes']) ? (string) $row['notes'] : null,
             'status'      => (string) ($row['status']      ?? 'waiting'),
             'notifiedAt'  => isset($row['notified_at']) ? (string) $row['notified_at'] : null,
+            'claimToken'  => isset($row['claim_token']) ? (string) $row['claim_token'] : null,
+            'claimExpiresAt' => isset($row['claim_expires_at']) ? (string) $row['claim_expires_at'] : null,
+            'claimedAt'   => isset($row['claimed_at']) ? (string) $row['claimed_at'] : null,
+            'bookedBookingId' => isset($row['booked_booking_id']) ? (string) $row['booked_booking_id'] : null,
             'createdAt'   => (string) ($row['created_at']  ?? ''),
             'updatedAt'   => (string) ($row['updated_at']  ?? ''),
         ];
@@ -265,5 +394,44 @@ class WaitlistService
         if (!filter_var($data['email'] ?? '', FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('Invalid email address.', 422);
         }
+    }
+
+    private function expireStaleClaims(): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'UPDATE booking_waitlist
+             SET status = "expired"
+             WHERE status = "notified"
+               AND claim_expires_at IS NOT NULL
+               AND claim_expires_at < NOW()'
+        );
+        $stmt->execute();
+    }
+
+    private function markExpired(int $id): void
+    {
+        $stmt = Database::getInstance()->prepare(
+            'UPDATE booking_waitlist SET status = "expired" WHERE id = :id'
+        );
+        $stmt->execute([':id' => $id]);
+    }
+
+    private function createClaimToken(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+
+    private function buildClaimUrl(string $claimToken): string
+    {
+        $baseUrl = rtrim((defined('APP_URL') ? APP_URL : ''), '/');
+        if ($baseUrl === '') {
+            return '/booking?waitlist_claim=' . urlencode($claimToken);
+        }
+
+        return $baseUrl . '/booking?waitlist_claim=' . urlencode($claimToken);
     }
 }

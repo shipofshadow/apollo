@@ -11,33 +11,30 @@
 
 -- Only rename if the old table has the auth-specific column user_id AND
 -- the new name does not yet exist.
-DROP PROCEDURE IF EXISTS _rename_auth_sessions;
-
-DELIMITER $$
-CREATE PROCEDURE _rename_auth_sessions()
-BEGIN
-    DECLARE old_has_uid INT DEFAULT 0;
-    DECLARE new_exists  INT DEFAULT 0;
-
-    SELECT COUNT(*) INTO old_has_uid
+SET @old_has_uid := (
+    SELECT COUNT(*)
     FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_NAME   = 'user_sessions'
-      AND COLUMN_NAME  = 'user_id';
+      AND COLUMN_NAME  = 'user_id'
+);
 
-    SELECT COUNT(*) INTO new_exists
+SET @new_exists := (
+    SELECT COUNT(*)
     FROM information_schema.TABLES
     WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME   = 'auth_sessions';
+      AND TABLE_NAME   = 'auth_sessions'
+);
 
-    IF old_has_uid > 0 AND new_exists = 0 THEN
-        RENAME TABLE user_sessions TO auth_sessions;
-    END IF;
-END$$
-DELIMITER ;
+SET @rename_sql := IF(
+    @old_has_uid > 0 AND @new_exists = 0,
+    'RENAME TABLE user_sessions TO auth_sessions',
+    'DO 0'
+);
 
-CALL _rename_auth_sessions();
-DROP PROCEDURE IF EXISTS _rename_auth_sessions;
+PREPARE rename_stmt FROM @rename_sql;
+EXECUTE rename_stmt;
+DEALLOCATE PREPARE rename_stmt;
 
 -- Ensure auth_sessions exists for fresh installs that never had user_sessions.
 CREATE TABLE IF NOT EXISTS auth_sessions (

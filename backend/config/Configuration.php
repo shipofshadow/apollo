@@ -122,3 +122,12 @@ define('TWILIO_FROM',        $_ENV['TWILIO_FROM']        ?? '');
 // ---------------------------------------------------------------------------
 
 define('TURNSTILE_SECRET_KEY', $_ENV['TURNSTILE_SECRET_KEY'] ?? '');
+define('TURNSTILE_BYPASS', filter_var($_ENV['TURNSTILE_BYPASS'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
+
+// ---------------------------------------------------------------------------
+// Waitlist automation
+// WAITLIST_CLAIM_TTL_MINUTES controls how long a notified customer has to
+// claim a newly opened slot before the offer expires.
+// ---------------------------------------------------------------------------
+
+define('WAITLIST_CLAIM_TTL_MINUTES', (int)($_ENV['WAITLIST_CLAIM_TTL_MINUTES'] ?? 30));

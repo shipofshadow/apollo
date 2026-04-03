@@ -215,14 +215,32 @@ class ProductService
     {
         $db   = Database::getInstance();
         $params = $this->bindParams($data);
-        if ($this->hasProductColumn('uuid')) {
+        if ($this->hasProductColumn('uuid') && $this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
+            $stmt = $db->prepare(
+                'INSERT INTO products
+                 (uuid, name, description, price, category, image_url, features, sort_order, is_active, track_stock, stock_qty)
+                 VALUES
+                 (:uuid, :name, :description, :price, :category, :image_url, :features, :sort_order, :is_active, :track_stock, :stock_qty)'
+            );
+            $stmt->execute($params);
+        } elseif ($this->hasProductColumn('uuid')) {
             $stmt = $db->prepare(
                 'INSERT INTO products
                  (uuid, name, description, price, category, image_url, features, sort_order, is_active)
                  VALUES
                  (:uuid, :name, :description, :price, :category, :image_url, :features, :sort_order, :is_active)'
             );
-            $stmt->execute($params);
+            $stmt->execute([
+                ':uuid'        => $params[':uuid'],
+                ':name'        => $params[':name'],
+                ':description' => $params[':description'],
+                ':price'       => $params[':price'],
+                ':category'    => $params[':category'],
+                ':image_url'   => $params[':image_url'],
+                ':features'    => $params[':features'],
+                ':sort_order'  => $params[':sort_order'],
+                ':is_active'   => $params[':is_active'],
+            ]);
         } else {
             $stmt = $db->prepare(
                 'INSERT INTO products
@@ -258,23 +276,64 @@ class ProductService
             'features'    => $current['features'],
             'sortOrder'   => $current['sortOrder'],
             'isActive'    => $current['isActive'],
+                        'trackStock'  => $current['trackStock'] ?? true,
+                        'stockQty'    => $current['stockQty'] ?? 0,
         ], $data);
 
-        $stmt = Database::getInstance()->prepare(
-            'UPDATE products SET
-               name        = :name,
-               description = :description,
-               price       = :price,
-               category    = :category,
-               image_url   = :image_url,
-               features    = :features,
-               sort_order  = :sort_order,
-               is_active   = :is_active
-             WHERE id = :id'
-        );
+                $sql = $this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')
+                        ? 'UPDATE products SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             category    = :category,
+                             image_url   = :image_url,
+                             features    = :features,
+                             sort_order  = :sort_order,
+                             is_active   = :is_active,
+                             track_stock = :track_stock,
+                             stock_qty   = :stock_qty
+                         WHERE id = :id'
+                        : 'UPDATE products SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             category    = :category,
+                             image_url   = :image_url,
+                             features    = :features,
+                             sort_order  = :sort_order,
+                             is_active   = :is_active
+                         WHERE id = :id';
+
+                $stmt = Database::getInstance()->prepare($sql);
         $params        = $this->bindParams($merged);
         $params[':id'] = $id;
-        $stmt->execute($params);
+                if ($this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
+                    $stmt->execute([
+                        ':id'          => $params[':id'],
+                        ':name'        => $params[':name'],
+                        ':description' => $params[':description'],
+                        ':price'       => $params[':price'],
+                        ':category'    => $params[':category'],
+                        ':image_url'   => $params[':image_url'],
+                        ':features'    => $params[':features'],
+                        ':sort_order'  => $params[':sort_order'],
+                        ':is_active'   => $params[':is_active'],
+                        ':track_stock' => $params[':track_stock'],
+                        ':stock_qty'   => $params[':stock_qty'],
+                    ]);
+                } else {
+                    $stmt->execute([
+                        ':id'          => $params[':id'],
+                        ':name'        => $params[':name'],
+                        ':description' => $params[':description'],
+                        ':price'       => $params[':price'],
+                        ':category'    => $params[':category'],
+                        ':image_url'   => $params[':image_url'],
+                        ':features'    => $params[':features'],
+                        ':sort_order'  => $params[':sort_order'],
+                        ':is_active'   => $params[':is_active'],
+                    ]);
+                }
 
         $oldImage = trim((string) ($current['imageUrl'] ?? ''));
         $newImage = trim((string) ($merged['imageUrl'] ?? ($merged['image_url'] ?? '')));
@@ -474,6 +533,8 @@ class ProductService
             'variations'  =>        $variations,
             'sortOrder'   => (int)  $row['sort_order'],
             'isActive'    => (bool) $row['is_active'],
+            'trackStock'  => isset($row['track_stock']) ? ((int) $row['track_stock'] === 1) : true,
+            'stockQty'    => isset($row['stock_qty']) ? (int) $row['stock_qty'] : 0,
             'createdAt'   =>        $row['created_at'],
             'updatedAt'   =>        $row['updated_at'],
         ];
@@ -497,6 +558,8 @@ class ProductService
             ':features'    => json_encode(array_values($features)),
             ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             ':is_active'   => (int) ($data['isActive']  ?? ($data['is_active']  ?? 1)),
+            ':track_stock' => (int) ($data['trackStock'] ?? ($data['track_stock'] ?? 1)),
+            ':stock_qty'   => max(0, (int) ($data['stockQty'] ?? ($data['stock_qty'] ?? 0))),
         ];
     }
 
@@ -520,6 +583,8 @@ class ProductService
             'variations'  => [],
             'sortOrder'   => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
             'isActive'    => (bool) ($data['isActive'] ?? ($data['is_active'] ?? true)),
+            'trackStock'  => (bool) ($data['trackStock'] ?? ($data['track_stock'] ?? true)),
+            'stockQty'    => max(0, (int) ($data['stockQty'] ?? ($data['stock_qty'] ?? 0))),
             'createdAt'   => $data['createdAt'] ?? date('c'),
             'updatedAt'   => date('c'),
         ];
@@ -634,6 +699,8 @@ class ProductService
             'colors'      => $colors,
             'colorImages' => $colorImages,
             'sortOrder'   => (int) $row['sort_order'],
+            'trackStock'  => isset($row['track_stock']) ? ((int) $row['track_stock'] === 1) : true,
+            'stockQty'    => isset($row['stock_qty']) ? (int) $row['stock_qty'] : 0,
         ];
     }
 
@@ -649,7 +716,13 @@ class ProductService
         $db   = Database::getInstance();
         $params = $this->bindVariationParams($productId, $data);
 
-        if ($this->hasVariationColumns(['colors', 'color_images'])) {
+        if ($this->hasVariationColumns(['colors', 'color_images', 'track_stock', 'stock_qty'])) {
+            $stmt = $db->prepare(
+                  'INSERT INTO product_variations (product_id, name, description, price, images, specs, colors, color_images, sort_order, track_stock, stock_qty)
+                   VALUES (:product_id, :name, :description, :price, :images, :specs, :colors, :color_images, :sort_order, :track_stock, :stock_qty)'
+            );
+            $stmt->execute($params);
+        } elseif ($this->hasVariationColumns(['colors', 'color_images'])) {
             $stmt = $db->prepare(
                   'INSERT INTO product_variations (product_id, name, description, price, images, specs, colors, color_images, sort_order)
                    VALUES (:product_id, :name, :description, :price, :images, :specs, :colors, :color_images, :sort_order)'
@@ -694,34 +767,90 @@ class ProductService
             'colors'      => $current['colors'] ?? [],
             'colorImages' => $current['colorImages'] ?? [],
             'sortOrder'   => $current['sortOrder'],
+                        'trackStock'  => $current['trackStock'] ?? true,
+                        'stockQty'    => $current['stockQty'] ?? 0,
         ], $data);
 
-        $withColorColumns = $this->hasVariationColumns(['colors', 'color_images']);
-        $sql = $withColorColumns
-            ? 'UPDATE product_variations SET
-               name        = :name,
-               description = :description,
-               price       = :price,
-               images      = :images,
-               specs       = :specs,
-               colors      = :colors,
-               color_images = :color_images,
-               sort_order  = :sort_order
-             WHERE id = :id AND product_id = :product_id'
-            : 'UPDATE product_variations SET
-               name        = :name,
-               description = :description,
-               price       = :price,
-               images      = :images,
-               specs       = :specs,
-               sort_order  = :sort_order
-             WHERE id = :id AND product_id = :product_id';
+                $withColorColumns = $this->hasVariationColumns(['colors', 'color_images']);
+                $withStockColumns = $this->hasVariationColumns(['track_stock', 'stock_qty']);
+
+                if ($withColorColumns && $withStockColumns) {
+                        $sql = 'UPDATE product_variations SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             images      = :images,
+                             specs       = :specs,
+                             colors      = :colors,
+                             color_images = :color_images,
+                             sort_order  = :sort_order,
+                             track_stock = :track_stock,
+                             stock_qty   = :stock_qty
+                         WHERE id = :id AND product_id = :product_id';
+                } elseif ($withColorColumns) {
+                        $sql = 'UPDATE product_variations SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             images      = :images,
+                             specs       = :specs,
+                             colors      = :colors,
+                             color_images = :color_images,
+                             sort_order  = :sort_order
+                         WHERE id = :id AND product_id = :product_id';
+                } elseif ($withStockColumns) {
+                        $sql = 'UPDATE product_variations SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             images      = :images,
+                             specs       = :specs,
+                             sort_order  = :sort_order,
+                             track_stock = :track_stock,
+                             stock_qty   = :stock_qty
+                         WHERE id = :id AND product_id = :product_id';
+                } else {
+                        $sql = 'UPDATE product_variations SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             images      = :images,
+                             specs       = :specs,
+                             sort_order  = :sort_order
+                         WHERE id = :id AND product_id = :product_id';
+                }
 
         $stmt = Database::getInstance()->prepare($sql);
         $params                = $this->bindVariationParams($productId, $merged);
         $params[':id']         = $varId;
-        if ($withColorColumns) {
+        if ($withColorColumns && $withStockColumns) {
             $stmt->execute($params);
+        } elseif ($withColorColumns) {
+            $stmt->execute([
+                ':id'          => $params[':id'],
+                ':product_id'  => $params[':product_id'],
+                ':name'        => $params[':name'],
+                ':description' => $params[':description'],
+                ':price'       => $params[':price'],
+                ':images'      => $params[':images'],
+                ':specs'       => $params[':specs'],
+                ':colors'      => $params[':colors'],
+                ':color_images'=> $params[':color_images'],
+                ':sort_order'  => $params[':sort_order'],
+            ]);
+        } elseif ($withStockColumns) {
+            $stmt->execute([
+                ':id'          => $params[':id'],
+                ':product_id'  => $params[':product_id'],
+                ':name'        => $params[':name'],
+                ':description' => $params[':description'],
+                ':price'       => $params[':price'],
+                ':images'      => $params[':images'],
+                ':specs'       => $params[':specs'],
+                ':sort_order'  => $params[':sort_order'],
+                ':track_stock' => $params[':track_stock'],
+                ':stock_qty'   => $params[':stock_qty'],
+            ]);
         } else {
             $stmt->execute([
                 ':id'          => $params[':id'],
@@ -872,6 +1001,8 @@ class ProductService
             ':colors'      => json_encode($colors),
             ':color_images' => json_encode($normalizedColorImages),
             ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
+            ':track_stock' => (int) ($data['trackStock'] ?? ($data['track_stock'] ?? 1)),
+            ':stock_qty'   => max(0, (int) ($data['stockQty'] ?? ($data['stock_qty'] ?? 0))),
         ];
     }
 
@@ -883,6 +1014,9 @@ class ProductService
         }
         if (!isset($data['price']) || !is_numeric($data['price']) || (float) $data['price'] < 0) {
             throw new RuntimeException('A valid product price is required.', 422);
+        }
+        if (isset($data['stockQty']) && (int) $data['stockQty'] < 0) {
+            throw new RuntimeException('Stock quantity cannot be negative.', 422);
         }
     }
 

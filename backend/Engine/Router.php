@@ -175,6 +175,14 @@ class Router
             $r->addRoute('POST',   '/api/products/{id:[A-Za-z0-9-]+}/variations',              'handleProductVariationCreate');
             $r->addRoute('PUT',    '/api/products/{id:[A-Za-z0-9-]+}/variations/{vid:\d+}',    'handleProductVariationUpdate');
             $r->addRoute('DELETE', '/api/products/{id:[A-Za-z0-9-]+}/variations/{vid:\d+}',    'handleProductVariationDelete');
+            // Product orders (public checkout, authenticated tracking, admin fulfillment)
+            $r->addRoute('POST',   '/api/orders',                         'handleOrderCreate');
+            $r->addRoute('GET',    '/api/orders/mine',                    'handleOrderMine');
+            $r->addRoute('GET',    '/api/orders/{id:\d+}',               'handleOrderGet');
+            $r->addRoute('GET',    '/api/admin/orders',                   'handleAdminOrderList');
+            $r->addRoute('PATCH',  '/api/admin/orders/{id:\d+}/status',  'handleAdminOrderStatusUpdate');
+            $r->addRoute('PATCH',  '/api/admin/orders/{id:\d+}/tracking','handleAdminOrderTrackingUpdate');
+            $r->addRoute('PATCH',  '/api/admin/orders/{id:\d+}/payment', 'handleAdminOrderPaymentUpdate');
 
             // ── Portfolio (public read, admin write) ─────────────────────────
             $r->addRoute('GET',    '/api/portfolio',                          'handlePortfolioList');
@@ -212,6 +220,7 @@ class Router
             $r->addRoute('POST',   '/api/waitlist',          'handleWaitlistJoin');
             $r->addRoute('GET',    '/api/waitlist',          'handleWaitlistList');
             $r->addRoute('DELETE', '/api/waitlist/{id:\d+}', 'handleWaitlistRemove');
+            $r->addRoute('GET',    '/api/waitlist/claim/{token:[A-Za-z0-9]+}', 'handleWaitlistClaimGet');
 
             // ── Testimonials (public read, admin write) ──────────────────────
             $r->addRoute('GET',    '/api/testimonials',          'handleTestimonialList');
@@ -316,6 +325,10 @@ class Router
      */
     private function validateTurnstile(array $data): void
     {
+        if (defined('TURNSTILE_BYPASS') && TURNSTILE_BYPASS) {
+            return;
+        }
+
         $secret = defined('TURNSTILE_SECRET_KEY') ? TURNSTILE_SECRET_KEY : ($_ENV['TURNSTILE_SECRET_KEY'] ?? '');
 
         // Skip validation when no secret is configured (dev / test environments)
@@ -2486,6 +2499,114 @@ class Router
     }
 
     // -------------------------------------------------------------------------
+    // Order handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleOrderCreate(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $token = Auth::tokenFromHeader();
+        $userId = null;
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $userId = (int) ($payload['sub'] ?? 0);
+                if ($userId <= 0) {
+                    $userId = null;
+                }
+            } catch (RuntimeException) {
+                // continue as guest checkout
+            }
+        }
+
+        $order = (new OrderService())->create($data, $userId);
+        http_response_code(201);
+        echo json_encode(['order' => $order]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleOrderMine(array $vars = []): void
+    {
+        $payload = $this->requireAuth();
+        $userId  = (int) ($payload['sub'] ?? 0);
+        $orders  = (new OrderService())->listMine($userId);
+        echo json_encode(['orders' => $orders]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleOrderGet(array $vars = []): void
+    {
+        $orderId = (int) ($vars['id'] ?? 0);
+        if ($orderId <= 0) {
+            throw new RuntimeException('Order not found.', 404);
+        }
+
+        $payload = $this->requireAuth();
+        $userId = (int) ($payload['sub'] ?? 0);
+        $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'products:manage');
+
+        $order = (new OrderService())->getById(
+            $orderId,
+            $isAdmin ? null : $userId,
+            $isAdmin ? null : true
+        );
+        echo json_encode(['order' => $order]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminOrderList(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $filters = [
+            'status' => trim((string) ($_GET['status'] ?? '')),
+            'paymentStatus' => trim((string) ($_GET['paymentStatus'] ?? '')),
+            'fulfillmentType' => trim((string) ($_GET['fulfillmentType'] ?? '')),
+            'query' => trim((string) ($_GET['query'] ?? '')),
+            'createdFrom' => trim((string) ($_GET['createdFrom'] ?? '')),
+            'createdTo' => trim((string) ($_GET['createdTo'] ?? '')),
+        ];
+        $pageSize = (int) ($_GET['pageSize'] ?? 25);
+        $page = (int) ($_GET['page'] ?? 1);
+        $result = (new OrderService())->listAll($filters, $pageSize, $page);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminOrderStatusUpdate(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $orderId = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $status = trim((string) ($data['status'] ?? ''));
+        $order = (new OrderService())->updateStatus($orderId, $status);
+        echo json_encode(['order' => $order]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminOrderTrackingUpdate(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $orderId = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $courierName = (string) ($data['courierName'] ?? '');
+        $trackingNumber = (string) ($data['trackingNumber'] ?? '');
+        $order = (new OrderService())->updateTracking($orderId, $courierName, $trackingNumber);
+        echo json_encode(['order' => $order]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminOrderPaymentUpdate(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $orderId = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $paymentStatus = (string) ($data['paymentStatus'] ?? '');
+        $order = (new OrderService())->updatePaymentStatus($orderId, $paymentStatus);
+        echo json_encode(['order' => $order]);
+    }
+
+    // -------------------------------------------------------------------------
     // Portfolio handlers
     // -------------------------------------------------------------------------
 
@@ -3137,6 +3258,14 @@ class Router
 
         (new WaitlistService())->remove($id, $requestingUserId);
         echo json_encode(['message' => 'Waitlist entry removed.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleWaitlistClaimGet(array $vars = []): void
+    {
+        $token = (string) ($vars['token'] ?? '');
+        $entry = (new WaitlistService())->getClaimByToken($token);
+        echo json_encode(['entry' => $entry]);
     }
 }
 

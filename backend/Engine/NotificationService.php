@@ -219,7 +219,9 @@ class NotificationService
         string $name,
         string $email,
         string $date,
-        string $time
+        string $time,
+        string $claimUrl,
+        int $claimWindowMinutes = 30
     ): void {
         if (MAIL_FROM === '' || $email === '') {
             return;
@@ -228,7 +230,8 @@ class NotificationService
         $safeName = htmlspecialchars($name);
         $safeDate = htmlspecialchars($date);
         $safeTime = htmlspecialchars($time);
-        $bookingUrl = htmlspecialchars((defined('APP_URL') ? APP_URL : '') . '/booking');
+        $safeClaimUrl = htmlspecialchars($claimUrl);
+        $claimWindow = max(5, $claimWindowMinutes);
 
         $body = "
         <div style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>
@@ -239,11 +242,11 @@ class NotificationService
             <strong>Date:</strong> {$safeDate}<br/>
             <strong>Time:</strong> {$safeTime}
           </div>
-          <p>Book now before it's taken!</p>
+                    <p>This slot is being held for you for the next <strong>{$claimWindow} minutes</strong>.</p>
           <p>
-            <a href='{$bookingUrl}'
+                        <a href='{$safeClaimUrl}'
                style='background:#f36f21;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold'>
-              Book Now
+                            Claim & Book Now
             </a>
           </p>
           <p style='color:#888;font-size:12px;margin-top:32px'>– 1625 Auto Lab</p>

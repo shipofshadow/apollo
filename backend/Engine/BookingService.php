@@ -87,7 +87,17 @@ class BookingService
         // Server-side capacity check – reject immediately if the slot is already full
         $date = trim($data['appointmentDate']);
         $time = trim($data['appointmentTime']);
-        if (in_array($time, $this->getBookedSlots($date), true)) {
+        $waitlistClaimToken = trim((string) ($data['waitlistClaimToken'] ?? ''));
+        $claimEntry = null;
+        if ($waitlistClaimToken !== '') {
+            $claimEntry = (new WaitlistService())->validateClaimForBooking($waitlistClaimToken, [
+                'appointmentDate' => $date,
+                'appointmentTime' => $time,
+                'email' => (string) ($data['email'] ?? ''),
+            ]);
+        }
+
+        if ($claimEntry === null && in_array($time, $this->getBookedSlots($date), true)) {
             throw new RuntimeException(
                 'This time slot is fully booked. Please choose a different time.',
                 409
@@ -141,6 +151,14 @@ class BookingService
         );
 
         (new NotificationService())->bookingCreated($booking);
+
+        if ($waitlistClaimToken !== '') {
+            try {
+                (new WaitlistService())->markBookedByClaimToken($waitlistClaimToken, (string) $booking['id']);
+            } catch (\Throwable) {
+                // don't block booking creation
+            }
+        }
 
         // In-app notification for admin
         if ($this->useDb) {
@@ -694,6 +712,14 @@ class BookingService
             sprintf('%s %s -> %s %s', $oldDate, $oldTime, $date, $time)
         );
 
+        if (($oldDate !== '' && $oldTime !== '') && ($oldDate !== $date || $oldTime !== $time)) {
+            try {
+                (new WaitlistService())->handleBookingCancelled($oldDate, $oldTime);
+            } catch (\Throwable) {
+                // fail silently – don't block reschedule
+            }
+        }
+
         return $updated;
     }
 
@@ -758,6 +784,14 @@ class BookingService
             $userId,
             'client'
         );
+
+        if (($oldDate !== '' && $oldTime !== '') && ($oldDate !== $date || $oldTime !== $time)) {
+            try {
+                (new WaitlistService())->handleBookingCancelled($oldDate, $oldTime);
+            } catch (\Throwable) {
+                // fail silently – don't block reschedule
+            }
+        }
 
         return $updated;
     }
