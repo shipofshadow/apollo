@@ -134,7 +134,7 @@ export default function SignaturePad({ value, onChange }: Props) {
           style={{ display: 'block' }}
         />
         {!value && (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-gray-400 select-none">
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-center px-4 text-xs text-gray-400 select-none">
             Sign here — I accept responsibility for custom electrical work on my vehicle
           </span>
         )}
