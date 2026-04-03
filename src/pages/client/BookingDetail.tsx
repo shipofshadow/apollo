@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Mail, Phone,
   FileText, CheckCircle2, XCircle, Loader2, AlertCircle,
   Edit3, ChevronDown, ChevronUp, Image as ImageIcon,
-  Package, BadgeCheck, ChevronLeft, ChevronRight, Camera, Printer,
+  Package, BadgeCheck, ChevronLeft, ChevronRight, Camera, Download,
   Wrench, History,
 } from 'lucide-react';
 import {
@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 import BookingReviewWidget from '../../components/BookingReviewWidget';
+import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -501,6 +502,14 @@ export default function BookingDetail() {
   const isConfirmed = booking.status === 'confirmed';
   const hasMedia  = (booking.mediaUrls ?? []).length > 0;
 
+  const handleDownloadJobSheet = async () => {
+    try {
+      await generateJobCompletionPDF(booking, { buildUpdates });
+    } catch {
+      showToast('Failed to generate job sheet PDF.', 'error');
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -796,10 +805,10 @@ export default function BookingDetail() {
             <p className="text-xs text-gray-400 leading-relaxed border-t border-white/5 pt-3">{booking.calibrationData.notes}</p>
           )}
           <button
-            onClick={() => window.print()}
+            onClick={() => void handleDownloadJobSheet()}
             className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded hover:bg-brand-orange/20 transition-colors"
           >
-            <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+            <Download className="w-3.5 h-3.5" /> Download Job Sheet (PDF)
           </button>
         </div>
       )}
@@ -1064,17 +1073,17 @@ export default function BookingDetail() {
       )}
 
       {/* Print Receipt */}
-      {(booking.status === 'completed' || booking.status === 'confirmed') && (
+      {booking.status === 'completed' && booking.calibrationData && (
         <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-white text-sm font-semibold">Receipt / Summary</p>
-            <p className="text-gray-500 text-xs mt-0.5">Print or save as PDF</p>
+            <p className="text-gray-500 text-xs mt-0.5">Download your completed job sheet as PDF</p>
           </div>
           <button
-            onClick={() => window.print()}
+            onClick={() => void handleDownloadJobSheet()}
             className="flex items-center gap-2 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-md"
           >
-            <Printer className="w-3.5 h-3.5" /> Print Receipt
+            <Download className="w-3.5 h-3.5" /> Download Job Sheet (PDF)
           </button>
         </div>
       )}

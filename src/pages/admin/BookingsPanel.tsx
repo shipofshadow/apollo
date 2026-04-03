@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  Calendar, Clock, Loader2, XCircle, Eye, Search, X as XIcon, Trash2, AlertTriangle,
+  Calendar, Clock, Loader2, XCircle, Eye, Search, X as XIcon, Trash2, AlertTriangle, Download,
 } from 'lucide-react';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
@@ -9,7 +9,8 @@ import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
-import { deleteBookingApi } from '../../services/api';
+import { deleteBookingApi, fetchBookingByIdApi, fetchBuildUpdatesApi } from '../../services/api';
+import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
@@ -32,6 +33,7 @@ export default function BookingsPanel({ onView }: Props) {
   const [search, setSearch] = useState('');
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));
@@ -60,6 +62,36 @@ export default function BookingsPanel({ onView }: Props) {
       showToast((e as Error).message ?? 'Failed to delete booking.', 'error');
     } finally {
       setDeleteBusyId(null);
+    }
+  };
+
+  const handleDownloadPdf = async (rowBooking: Booking) => {
+    if (!token) return;
+    if (rowBooking.status !== 'completed') {
+      showToast('PDF is available only for completed bookings.', 'error');
+      return;
+    }
+
+    setPdfBusyId(rowBooking.id);
+    try {
+      const [{ booking }, { updates }] = await Promise.all([
+        fetchBookingByIdApi(token, rowBooking.id),
+        fetchBuildUpdatesApi(token, rowBooking.id).catch(() => ({ updates: [] })),
+      ]);
+
+      if (!booking.calibrationData) {
+        showToast('Calibration data is required to generate the PDF.', 'error');
+        return;
+      }
+
+      await generateJobCompletionPDF(booking, {
+        buildUpdates: updates,
+        includeAdminExtras: true,
+      });
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to generate booking PDF.', 'error');
+    } finally {
+      setPdfBusyId(null);
     }
   };
 
@@ -241,6 +273,17 @@ export default function BookingsPanel({ onView }: Props) {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+
+                        {b.status === 'completed' && (
+                          <button
+                            onClick={() => void handleDownloadPdf(b)}
+                            title="Download PDF"
+                            disabled={pdfBusyId === b.id}
+                            className="flex items-center justify-center w-8 h-8 bg-[#181818] border border-gray-700 hover:border-blue-400 hover:text-blue-300 text-gray-400 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {pdfBusyId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                          </button>
+                        )}
                         
                         {b.status !== 'cancelled' && b.status !== 'completed' && (
                           <button onClick={() => handleCancel(b.id)}
@@ -310,6 +353,17 @@ export default function BookingsPanel({ onView }: Props) {
                   </div>
                   
                   <div className="flex items-center gap-2">
+                    {b.status === 'completed' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleDownloadPdf(b); }}
+                        title="Download PDF"
+                        disabled={pdfBusyId === b.id}
+                        className="p-1.5 text-gray-500 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {pdfBusyId === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      </button>
+                    )}
+
                     {b.status !== 'cancelled' && b.status !== 'completed' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleCancel(b.id); }}

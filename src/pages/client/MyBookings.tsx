@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Calendar, Loader2, PlusCircle, ChevronRight } from 'lucide-react';
+import { Calendar, Loader2, PlusCircle, ChevronRight, Download } from 'lucide-react';
 import { fetchMyBookingsAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
+import { fetchBookingByIdApi } from '../../services/api';
+import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
 
 type Filter = 'all' | Booking['status'];
 
@@ -29,6 +32,7 @@ const STATUS_STRIP: Record<Booking['status'], string> = {
 export default function MyBookings() {
   const dispatch               = useDispatch<AppDispatch>();
   const { token, user }        = useAuth();
+  const { showToast }          = useToast();
   const { appointments, status } = useSelector((s: RootState) => s.booking);
 
   const [filter, setFilter] = useState<Filter>('all');
@@ -68,6 +72,25 @@ export default function MyBookings() {
       day: 'numeric',
       year: 'numeric',
     });
+
+  const handleDownloadPdf = async (booking: Booking) => {
+    if (!token) return;
+
+    try {
+      const fullBooking = booking.calibrationData
+        ? booking
+        : (await fetchBookingByIdApi(token, booking.id)).booking;
+
+      if (fullBooking.status !== 'completed' || !fullBooking.calibrationData) {
+        showToast('Job sheet is available only for completed calibrated bookings.', 'error');
+        return;
+      }
+
+      await generateJobCompletionPDF(fullBooking);
+    } catch {
+      showToast('Failed to generate job sheet PDF.', 'error');
+    }
+  };
 
   return (
     <div className="space-y-6 w-full">
@@ -200,6 +223,23 @@ export default function MyBookings() {
                 <span className={`hidden sm:inline-block px-2.5 py-1 text-xs font-bold uppercase tracking-widest rounded-md border ${STATUS_STYLES[b.status]}`}>
                   {formatStatus(b.status)}
                 </span>
+                <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest text-gray-500 group-hover:text-gray-300 transition-colors">
+                  View
+                </span>
+                {b.status === 'completed' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void handleDownloadPdf(b);
+                    }}
+                    title="Download Job Sheet (PDF)"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-700 text-gray-400 hover:border-brand-orange hover:text-brand-orange rounded-md transition-colors text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    <Download className="w-3 h-3" /> PDF
+                  </button>
+                )}
                 <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors" />
               </div>
             </Link>

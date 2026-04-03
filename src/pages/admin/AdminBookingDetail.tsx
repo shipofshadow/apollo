@@ -6,7 +6,7 @@ import {
   Package, Phone, User, Wrench, X, XCircle,
   ChevronLeft, ChevronRight, AlertTriangle, RefreshCw,
   ClipboardList, BadgeCheck, Camera, Plus, StickyNote, Trash2,
-  Shield, Award, Activity
+  Shield, Award, Activity, Download
 } from 'lucide-react';
 import {
   fetchAllBookingsAsync,
@@ -37,6 +37,8 @@ import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivity
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
+import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
+import { generateTechnicianJobSheetPDF } from '../../utils/generateTechnicianJobSheetPDF';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -705,6 +707,25 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const hasBeforePhotos = beforePhotos.length > 0;
   const hasAfterPhotos = (booking.afterPhotos?.length ?? 0) > 0;
 
+  const handleDownloadJobSheet = async () => {
+    try {
+      await generateJobCompletionPDF(booking, {
+        buildUpdates,
+        includeAdminExtras: true,
+      });
+    } catch {
+      showToast('Failed to generate admin job sheet PDF.', 'error');
+    }
+  };
+
+  const handleDownloadTechnicianSheet = async () => {
+    try {
+      await generateTechnicianJobSheetPDF(booking);
+    } catch {
+      showToast('Failed to generate technician job sheet PDF.', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6 w-full max-w-[1400px]">
 
@@ -1316,6 +1337,26 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             </p>
             
             <div className="space-y-3">
+              {booking.status !== 'cancelled' && (
+                <button
+                  onClick={() => void handleDownloadTechnicianSheet()}
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-gray-600 text-gray-300 hover:border-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-colors"
+                >
+                  <span>Technician Job Sheet</span>
+                  <Download className="w-4 h-4 opacity-70" />
+                </button>
+              )}
+
+              {booking.status === 'completed' && booking.calibrationData && (
+                <button
+                  onClick={() => void handleDownloadJobSheet()}
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors"
+                >
+                  <span>Download Job Sheet</span>
+                  <Download className="w-4 h-4 opacity-70" />
+                </button>
+              )}
+
               {canConfirm && (
                 <button
                   onClick={() => setCheckInOpen(true)}
