@@ -10,7 +10,6 @@ export default function SignaturePad({ value, onChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing   = useRef(false);
 
-  // Restore saved signature when component mounts or value resets to ''
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -63,8 +62,95 @@ export default function SignaturePad({ value, onChange }: Props) {
     const pos = getPos(e, canvas);
     ctx.lineWidth   = 2.5;
     ctx.lineCap     = 'round';
-    ctx.strokeStyle = '#ffffff';
+    
+    // Updated to black ink
+    ctx.strokeStyle = '#000000'; 
+    
     ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }, []);
+
+  const stopDrawing = useCallback(() => {
+    if (!drawing.current) return;
+    drawing.current = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    onChange(canvas.toDataURL('image/png'));
+  }, [onChange]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.addEventListener('mousedown',  startDrawing);
+    canvas.addEventListener('mousemove',  draw);
+    canvas.addEventListener('mouseup',    stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove',  draw,         { passive: false });
+    canvas.addEventListener('touchend',   stopDrawing);
+
+    return () => {
+      canvas.removeEventListener('mousedown',  startDrawing);
+      canvas.removeEventListener('mousemove',  draw);
+      canvas.removeEventListener('mouseup',    stopDrawing);
+      canvas.removeEventListener('mouseleave', stopDrawing);
+      canvas.removeEventListener('touchstart', startDrawing);
+      canvas.removeEventListener('touchmove',  draw);
+      canvas.removeEventListener('touchend',   stopDrawing);
+    };
+  }, [startDrawing, draw, stopDrawing]);
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height);
+    onChange('');
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+          Signature / Waiver Consent *
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={clear}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-400 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" /> Clear
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-gray-600">Use your finger or mouse to draw your signature in the box below.</p>
+      
+      {/* Changed bg-brand-darker to bg-gray-50 for visibility */}
+      <div className="relative border border-gray-700 rounded-sm bg-gray-50 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={160}
+          className="w-full h-32 cursor-crosshair touch-none"
+          style={{ display: 'block' }}
+        />
+        {!value && (
+          {/* Changed text-gray-700 to text-gray-400 for better contrast on light bg */}
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-gray-400 select-none">
+            Sign here — I accept responsibility for custom electrical work on my vehicle
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] text-gray-600 leading-relaxed">
+        By signing above, you acknowledge that custom electrical/optical modifications may void OEM warranties
+        and agree to hold 1625 Auto Lab harmless for any pre-existing issues unrelated to the work performed.
+      </p>
+    </div>
+  );
+}
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
