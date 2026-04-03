@@ -10,15 +10,17 @@ interface Props {
 
 export default function TurnstileWidget({ onVerify, onExpire, resetKey }: Props) {
   return (
-    <Turnstile
-      sitekey={TURNSTILE_SITE_KEY}
-      onVerify={onVerify}
-      onExpire={() => {
-        onExpire?.();
-      }}
-      onError={() => {/* re-mount via key */}}
-      key={resetKey}
-      theme="dark"
-    />
+    <div className="flex justify-center w-full">
+      <Turnstile
+        sitekey={TURNSTILE_SITE_KEY}
+        onVerify={onVerify}
+        onExpire={() => {
+          onExpire?.();
+        }}
+        onError={() => {/* re-mount via key */}}
+        key={resetKey}
+        theme="dark"
+      />
+    </div>
   );
 }
