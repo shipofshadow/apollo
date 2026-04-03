@@ -18,14 +18,6 @@ class BeforeAfterService
         $this->useDb = DB_NAME !== '';
     }
 
-    /** @return array<int, array<string, mixed>> */
-    public function getAll(bool $includeInactive = false): array
-    {
-        return $this->useDb
-            ? $this->dbGetAll($includeInactive)
-            : $this->fileGetAll($includeInactive);
-    }
-
     /** @return array<string, mixed> */
     public function getById(int $id, bool $requireActive = true): array
     {
