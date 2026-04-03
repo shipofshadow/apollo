@@ -89,6 +89,8 @@ export interface BookingPayload {
   mediaUrls?: string[];
   /** Cloudflare Turnstile token */
   'cf-turnstile-response'?: string;
+  /** Optional waitlist claim token used to reserve a released slot */
+  waitlistClaimToken?: string;
 }
 
 export interface BookingState {
@@ -235,6 +237,8 @@ export interface ProductVariation {
   colors?: string[];
   colorImages?: Record<string, string[]>;
   sortOrder: number;
+  trackStock?: boolean;
+  stockQty?: number;
 }
 
 export interface Product {
@@ -249,6 +253,8 @@ export interface Product {
   variations: ProductVariation[];
   sortOrder: number;
   isActive: boolean;
+  trackStock?: boolean;
+  stockQty?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -454,8 +460,67 @@ export interface WaitlistEntry {
   notes: string | null;
   status: 'waiting' | 'notified' | 'booked' | 'expired';
   notifiedAt: string | null;
+  claimToken?: string | null;
+  claimExpiresAt?: string | null;
+  claimedAt?: string | null;
+  bookedBookingId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CartItem {
+  productId: number | string;
+  variationId?: number | null;
+  quantity: number;
+  name: string;
+  variationName?: string;
+  unitPrice: number;
+  imageUrl?: string;
+}
+
+export interface ProductOrderItem {
+  id: number;
+  productId: number;
+  variationId: number | null;
+  productName: string;
+  variationName: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export type ProductOrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'out_for_delivery'
+  | 'completed'
+  | 'cancelled';
+
+export interface ProductOrder {
+  id: number;
+  orderNumber: string;
+  userId: number | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  fulfillmentType: 'courier' | 'walk_in';
+  deliveryAddress: string | null;
+  deliveryCity: string;
+  deliveryProvince: string;
+  deliveryPostalCode: string;
+  status: ProductOrderStatus;
+  paymentStatus: 'unpaid' | 'paid' | 'cod';
+  courierName: string;
+  trackingNumber: string;
+  notes: string | null;
+  subtotal: number;
+  shippingFee: number;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  items: ProductOrderItem[];
 }
 
 // ── Build Update ───────────────────────────────────────────────────────────────

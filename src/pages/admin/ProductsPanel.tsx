@@ -29,11 +29,14 @@ interface ProductForm {
   features: string;
   sortOrder: number;
   isActive: boolean;
+  trackStock: boolean;
+  stockQty: number;
 }
 
 const EMPTY_PRODUCT_FORM: ProductForm = {
   name: '', description: '', price: '', category: '',
   imageUrl: '', features: '', sortOrder: 0, isActive: true,
+  trackStock: true, stockQty: 0,
 };
 
 function productToForm(p: Product): ProductForm {
@@ -46,6 +49,8 @@ function productToForm(p: Product): ProductForm {
     features:    p.features.join('\n'),
     sortOrder:   p.sortOrder,
     isActive:    p.isActive,
+    trackStock:  p.trackStock ?? true,
+    stockQty:    p.stockQty ?? 0,
   };
 }
 
@@ -59,6 +64,8 @@ function productFormToPayload(f: ProductForm): Partial<Omit<Product, 'id' | 'cre
     features:    f.features.split('\n').map(l => l.trim()).filter(Boolean),
     sortOrder:   f.sortOrder,
     isActive:    f.isActive,
+    trackStock:  f.trackStock,
+    stockQty:    Math.max(0, f.stockQty),
   };
 }
 
@@ -233,12 +240,36 @@ export default function ProductsPanel() {
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
             </div>
 
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Stock Quantity</label>
+              <input
+                type="number"
+                min={0}
+                value={form.stockQty}
+                disabled={!form.trackStock}
+                onChange={e => setForm(p => ({ ...p, stockQty: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm disabled:opacity-50"
+              />
+            </div>
+
             <div className="flex items-center gap-3 pt-6">
               <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-sm font-bold uppercase tracking-widest">
                 <input type="checkbox" checked={form.isActive}
                   onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))}
                   className="accent-brand-orange w-4 h-4" />
                 Active (visible on site)
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3 pt-6">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-sm font-bold uppercase tracking-widest">
+                <input
+                  type="checkbox"
+                  checked={form.trackStock}
+                  onChange={e => setForm(p => ({ ...p, trackStock: e.target.checked }))}
+                  className="accent-brand-orange w-4 h-4"
+                />
+                Track Stock
               </label>
             </div>
           </div>
@@ -325,6 +356,9 @@ export default function ProductsPanel() {
                   </span>
                   {prod.features.length > 0 && (
                     <span className="bg-gray-800 px-2 py-0.5 rounded">{prod.features.length} features</span>
+                  )}
+                  {prod.trackStock && (
+                    <span className="bg-gray-800 px-2 py-0.5 rounded">Stock: {prod.stockQty ?? 0}</span>
                   )}
                 </div>
               </div>

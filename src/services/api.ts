@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -1215,3 +1215,77 @@ export const fetchWaitlistApi = (token: string, status?: string) => {
 
 export const removeWaitlistEntryApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/waitlist/${id}`, { method: 'DELETE' }, token);
+
+export const fetchWaitlistClaimApi = (claimToken: string) =>
+  apiFetch<{ entry: WaitlistEntry }>(`/api/waitlist/claim/${encodeURIComponent(claimToken)}`);
+
+// ── Orders ───────────────────────────────────────────────────────────────────
+
+export interface CreateOrderPayload {
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  fulfillmentType: 'courier' | 'walk_in';
+  deliveryAddress?: string;
+  deliveryCity?: string;
+  deliveryProvince?: string;
+  deliveryPostalCode?: string;
+  shippingFee?: number;
+  notes?: string;
+  items: Array<Pick<CartItem, 'productId' | 'variationId' | 'quantity'>>;
+}
+
+export const createOrderApi = (data: CreateOrderPayload, token?: string | null) =>
+  apiFetch<{ order: ProductOrder }>('/api/orders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const fetchMyOrdersApi = (token: string) =>
+  apiFetch<{ orders: ProductOrder[] }>('/api/orders/mine', {}, token);
+
+export const fetchOrderByIdApi = (token: string, id: number) =>
+  apiFetch<{ order: ProductOrder }>(`/api/orders/${id}`, {}, token);
+
+export interface AdminOrderFilters {
+  status?: ProductOrderStatus;
+  paymentStatus?: 'unpaid' | 'paid' | 'cod';
+  fulfillmentType?: 'courier' | 'walk_in';
+  query?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export const fetchAdminOrdersApi = (token: string, filters: AdminOrderFilters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.paymentStatus) params.set('paymentStatus', filters.paymentStatus);
+  if (filters.fulfillmentType) params.set('fulfillmentType', filters.fulfillmentType);
+  if (filters.query) params.set('query', filters.query);
+  if (filters.createdFrom) params.set('createdFrom', filters.createdFrom);
+  if (filters.createdTo) params.set('createdTo', filters.createdTo);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch<{ orders: ProductOrder[]; total: number; page: number; pageSize: number }>(`/api/admin/orders${qs}`, {}, token);
+};
+
+export const updateAdminOrderStatusApi = (token: string, id: number, status: ProductOrderStatus) =>
+  apiFetch<{ order: ProductOrder }>(`/api/admin/orders/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }, token);
+
+export const updateAdminOrderTrackingApi = (token: string, id: number, courierName: string, trackingNumber: string) =>
+  apiFetch<{ order: ProductOrder }>(`/api/admin/orders/${id}/tracking`, {
+    method: 'PATCH',
+    body: JSON.stringify({ courierName, trackingNumber }),
+  }, token);
+
+export const updateAdminOrderPaymentApi = (token: string, id: number, paymentStatus: 'unpaid' | 'paid' | 'cod') =>
+  apiFetch<{ order: ProductOrder }>(`/api/admin/orders/${id}/payment`, {
+    method: 'PATCH',
+    body: JSON.stringify({ paymentStatus }),
+  }, token);

@@ -1,5 +1,5 @@
 import { Provider } from 'react-redux';
-import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { store } from './store';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -15,7 +15,10 @@ import { useNotificationPoller } from './hooks/useNotificationPoller';
 import Home from './pages/Home';
 import ServicesPage from './pages/ServicesPage';
 import ServiceDetail from './pages/ServiceDetail';
+import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
+import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
 import Portfolio from './pages/Portfolio';
 import About from './pages/About';
 import BookingPage from './pages/BookingPage';
@@ -37,6 +40,8 @@ import MyBookings from './pages/client/MyBookings';
 import BookingDetail from './pages/client/BookingDetail';
 import MyGarage from './pages/client/MyGarage';
 import Profile from './pages/client/Profile';
+import MyOrders from './pages/client/MyOrders';
+import OrderReceiptPage from './pages/OrderReceiptPage';
 
 
 // Admin
@@ -71,8 +76,10 @@ function AppInner() {
         <Route path="/"             element={<Home />} />
         <Route path="/services"     element={<ServicesPage />} />
         <Route path="/services/:slug" element={<ServiceDetail />} />
-        <Route path="/products"     element={<Navigate to="/services" replace />} />
+        <Route path="/products"     element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/cart"         element={<CartPage />} />
+        <Route path="/checkout"     element={<CheckoutPage />} />
         <Route path="/portfolio"    element={<Portfolio />} />
         <Route path="/builds/:slug" element={<BuildShowcase />} />
         <Route path="/blog"         element={<Blog />} />
@@ -99,12 +106,23 @@ function AppInner() {
         <Route path="dashboard"     element={<ClientDashboard />} />
         <Route path="bookings"      element={<MyBookings />} />
         <Route path="bookings/:id"  element={<BookingDetail />} />
+        <Route path="orders"        element={<MyOrders />} />
         <Route path="garage"        element={<MyGarage />} />
         <Route path="profile"       element={<Profile />} />
       </Route>
 
       {/* ── Admin — own sidebar, no public nav ──────────────── */}
       <Route path="/admin/*" element={<Admin />} />
+
+      {/* ── Order receipt — auth required, no header/footer ─── */}
+      <Route
+        path="/orders/:id/receipt"
+        element={
+          <ProtectedRoute>
+            <OrderReceiptPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* ── Chatbot standalone pages — protected (staff+) ────── */}
       <Route

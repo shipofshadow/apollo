@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, ShoppingCart } from 'lucide-react';
 import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import VariationGallery from '../components/VariationGallery';
 import PublishedReviews from '../components/PublishedReviews';
 import { formatPrice } from '../utils/formatPrice';
 import PageSEO from '../components/PageSEO';
+import { addToCart } from '../utils/cart';
+import { useToast } from '../context/ToastContext';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +17,8 @@ export default function ProductDetail() {
   const { items: products, status } = useSelector((s: RootState) => s.products);
   const [selectedVariationId, setSelectedVariationId] = useState<number | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (status === 'idle') {
@@ -71,6 +75,20 @@ export default function ProductDetail() {
     setSelectedVariationId(variation.id);
     setSelectedColor(null);
   }, []);
+
+  const handleAddToCart = () => {
+    const unitPrice = selectedVariation?.price ? Number(selectedVariation.price) : product.price;
+    addToCart({
+      productId: product.uuid ?? product.id,
+      variationId: selectedVariation?.id ?? null,
+      quantity,
+      name: product.name,
+      variationName: selectedVariation?.name,
+      unitPrice: Number.isFinite(unitPrice) ? unitPrice : product.price,
+      imageUrl: product.imageUrl,
+    });
+    showToast('Added to cart.', 'success');
+  };
 
   return (
     <div className="min-h-screen bg-brand-darker pb-20 relative overflow-hidden">
@@ -191,6 +209,25 @@ export default function ProductDetail() {
                 className="block w-full bg-brand-orange hover:bg-orange-500 text-white font-display font-bold uppercase tracking-widest text-sm px-5 py-3 rounded-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(243,111,33,0.4)] mb-3"
               >
                 Inquire Now
+              </Link>
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+                  className="w-20 bg-black/20 border border-gray-700 text-white text-sm px-2 py-2 rounded-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="flex-1 inline-flex items-center justify-center gap-2 border border-brand-orange/40 text-brand-orange hover:text-white hover:bg-brand-orange px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-colors"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
+                </button>
+              </div>
+              <Link to="/cart" className="text-xs text-gray-400 hover:text-white uppercase tracking-widest font-bold transition-colors">
+                View Cart
               </Link>
               <p className="text-gray-600 text-[0.7rem]">Free consultation · No hidden fees</p>
               {selectedVariation?.name && (

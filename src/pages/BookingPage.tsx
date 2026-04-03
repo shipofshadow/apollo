@@ -16,6 +16,7 @@ import {
   fetchShopHoursApi, fetchMyVehiclesApi,
   fetchShopClosedDatesApi,
   joinWaitlistApi,
+  fetchWaitlistClaimApi,
 } from '../services/api';
 import { BACKEND_URL } from '../config';
 import type { ClientVehicle, ShopDayHours } from '../types';
@@ -136,6 +137,8 @@ export default function BookingPage() {
   const [closureReason, setClosureReason] = useState<string | null>(null);
   const [shopCloseTime, setShopCloseTime] = useState('18:00');
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [waitlistClaimToken, setWaitlistClaimToken] = useState<string>('');
+  const [waitlistClaimNotice, setWaitlistClaimNotice] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name:  user?.name  ?? '',
@@ -204,6 +207,33 @@ export default function BookingPage() {
       setShopHoursLoaded(true);
     }
   }, [dispatch, token]);
+
+  useEffect(() => {
+    const tokenFromUrl = new URLSearchParams(location.search).get('waitlist_claim')?.trim() ?? '';
+    if (!tokenFromUrl || !BACKEND_URL) {
+      return;
+    }
+
+    setWaitlistClaimToken(tokenFromUrl);
+    fetchWaitlistClaimApi(tokenFromUrl)
+      .then(({ entry }) => {
+        const date = entry.slotDate ? new Date(`${entry.slotDate}T00:00:00`) : null;
+        if (date && !Number.isNaN(date.getTime())) {
+          setSelectedDate(date);
+          void handleDateSelect(date);
+        }
+
+        if (entry.slotTime && entry.slotTime !== 'any') {
+          setSelectedTime(entry.slotTime);
+        }
+
+        setWaitlistClaimNotice(`Waitlist claim active. Complete your booking in this window to secure ${entry.slotDate} ${entry.slotTime === 'any' ? '(any available slot)' : `at ${entry.slotTime}`}.`);
+      })
+      .catch((e: unknown) => {
+        setWaitlistClaimToken('');
+        setWaitlistClaimNotice((e as Error).message ?? 'This waitlist claim link is invalid or expired.');
+      });
+  }, [location.search]);
 
   useEffect(() => {
     if (!token || !user) {
@@ -366,6 +396,7 @@ export default function BookingPage() {
           signatureData:   signatureData || undefined,
           mediaUrls:       mediaUrls.length ? mediaUrls : undefined,
           'cf-turnstile-response': turnstileToken,
+          waitlistClaimToken: waitlistClaimToken || undefined,
         },
         token,
       })
@@ -415,6 +446,11 @@ export default function BookingPage() {
             Book <span className="text-brand-orange">Appointment</span>
           </h1>
           <p className="text-gray-400 text-lg">Select your services, choose a date and time, then provide your details.</p>
+          {waitlistClaimNotice && (
+            <div className="mt-4 mx-auto max-w-3xl text-left border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 rounded-sm">
+              <p className="text-sm text-brand-orange">{waitlistClaimNotice}</p>
+            </div>
+          )}
         </div>
 
         {/* Step indicators */}

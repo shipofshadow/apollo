@@ -15,6 +15,7 @@ import AdminBookingDetail   from './admin/AdminBookingDetail';
 import ServicesPanel        from './admin/ServicesPanel';
 import ContentPanel         from './admin/ContentPanel';
 import ProductsPanel        from './admin/ProductsPanel';
+import OrdersPanel          from './admin/OrdersPanel';
 import AccountSettingsPanel from './admin/AccountSettingsPanel';
 import ShopHoursPanel       from './admin/ShopHoursPanel';
 import SiteSettingsPanel    from './admin/SiteSettingsPanel';
@@ -37,6 +38,7 @@ const TAB_PATHS: Record<string, string> = {
   'chatbot-flow': '/chatbot/flow-editor',
   services: '/admin/services',
   products: '/admin/products',
+  orders: '/admin/orders',
   'shop-hours': '/admin/shop-hours',
   offers: '/admin/offers',
   'before-after': '/admin/before-after',
@@ -140,6 +142,10 @@ export default function AdminPage() {
   const isAdmin = role === 'admin';
 
   const canAccessTab = (key: string) => {
+    if (['products', 'orders'].includes(key)) {
+      return hasPermission('products:manage');
+    }
+
     if (['chatbot', 'chatbot-conversations', 'chatbot-flow'].includes(key)) {
       return hasPermission('chatbot:manage');
     }
@@ -176,6 +182,7 @@ export default function AdminPage() {
       children: [
         { key: 'services',   label: 'Services',   icon: Wrench },
         { key: 'products',   label: 'Products',   icon: Package },
+        { key: 'orders',     label: 'Orders',     icon: Package },
         { key: 'shop-hours', label: 'Shop Hours', icon: Clock },
       ]
     },
@@ -238,6 +245,7 @@ export default function AdminPage() {
         }
         return <BookingsPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.appointments); }} />;
       case 'products':      return <ProductsPanel />;
+      case 'orders':        return <OrdersPanel />;
       case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;
       case 'site-settings': return <SiteSettingsPanel />;

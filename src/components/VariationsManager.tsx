@@ -38,6 +38,8 @@ interface VariationForm {
   colorsCsv: string;
   colorImages: Record<string, string[]>;
   sortOrder: number;
+  trackStock: boolean;
+  stockQty: number;
 }
 
 const EMPTY_FORM: VariationForm = {
@@ -49,6 +51,8 @@ const EMPTY_FORM: VariationForm = {
   colorsCsv: '',
   colorImages: {},
   sortOrder: 0,
+  trackStock: true,
+  stockQty: 0,
 };
 
 function variationToForm(v: Variation): VariationForm {
@@ -61,6 +65,8 @@ function variationToForm(v: Variation): VariationForm {
     colorsCsv:   (v.colors ?? []).join(', '),
     colorImages: { ...(v.colorImages ?? {}) },
     sortOrder:   v.sortOrder,
+    trackStock:  'trackStock' in v ? (v.trackStock ?? true) : true,
+    stockQty:    'stockQty' in v ? (v.stockQty ?? 0) : 0,
   };
 }
 
@@ -131,11 +137,14 @@ export default function VariationsManager({ variations, parentId, parentType, to
       }
       return acc;
     }, {});
-    const payload = {
+    const payloadBase = {
       ...form,
       colors,
       colorImages,
     };
+    const payload = parentType === 'product'
+      ? { ...payloadBase, trackStock: form.trackStock, stockQty: Math.max(0, form.stockQty) }
+      : payloadBase;
     setSaving(true);
     setSaveError(null);
     try {
@@ -452,6 +461,33 @@ export default function VariationsManager({ variations, parentId, parentType, to
             />
           </div>
 
+          {parentType === 'product' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Stock Quantity</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.stockQty}
+                  disabled={!form.trackStock}
+                  onChange={e => setForm(p => ({ ...p, stockQty: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                  className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm disabled:opacity-50"
+                />
+              </div>
+              <div className="flex items-end pb-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-xs font-bold uppercase tracking-widest">
+                  <input
+                    type="checkbox"
+                    checked={form.trackStock}
+                    onChange={e => setForm(p => ({ ...p, trackStock: e.target.checked }))}
+                    className="accent-brand-orange w-4 h-4"
+                  />
+                  Track Stock
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2 border-t border-gray-800">
             <button
               type="submit"
@@ -527,6 +563,9 @@ export default function VariationsManager({ variations, parentId, parentType, to
                 <div className="flex gap-2 mt-1 text-xs text-gray-600">
                   <span>{v.images.length} image{v.images.length !== 1 ? 's' : ''}</span>
                   {v.specs.length > 0 && <span>{v.specs.length} spec{v.specs.length !== 1 ? 's' : ''}</span>}
+                  {parentType === 'product' && 'trackStock' in v && v.trackStock && (
+                    <span>Stock: {'stockQty' in v ? (v.stockQty ?? 0) : 0}</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">

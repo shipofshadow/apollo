@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut, MessageSquare, GitBranch } from 'lucide-react';
+import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut, MessageSquare, GitBranch, ShoppingCart, Package } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
+import { cartCount, readCart } from '../utils/cart';
 
 const LOGO_URL = 'https://cdn.1625autolab.com/1625autolab/logos/logo.png';
 
@@ -18,6 +19,7 @@ export default function Header() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isChatbotDropdownOpen, setIsChatbotDropdownOpen] = useState(false);
   const [isMobileChatbotOpen, setIsMobileChatbotOpen] = useState(false);
+  const [cartItemsCount, setCartItemsCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const chatbotDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +56,13 @@ export default function Header() {
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    const syncCart = () => setCartItemsCount(cartCount(readCart()));
+    syncCart();
+    window.addEventListener('apollo:cart-updated', syncCart as EventListener);
+    return () => window.removeEventListener('apollo:cart-updated', syncCart as EventListener);
+  }, []);
+
   const handleLogout = async () => {
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
@@ -65,6 +74,7 @@ export default function Header() {
   const navLinks = [
     { name: 'Home', href: '/' },
     { name: 'Services', href: '/services' },
+    { name: 'Products', href: '/products' },
     { name: 'Portfolio', href: '/portfolio' },
     { name: 'Blog', href: '/blog' },
     { name: 'About', href: '/about' },
@@ -74,6 +84,7 @@ export default function Header() {
   const clientMenu = [
     { label: 'Dashboard', href: '/client/dashboard', icon: LayoutDashboard },
     { label: 'My Bookings', href: '/client/bookings', icon: Calendar },
+    { label: 'My Orders', href: '/client/orders', icon: Package },
     { label: 'Profile', href: '/client/profile', icon: User },
   ];
 
@@ -165,6 +176,20 @@ export default function Header() {
 
         {/* Desktop Auth/Actions - Shifted to lg breakpoint */}
         <div className="hidden lg:flex items-center gap-4">
+          <Link
+            to="/cart"
+            className={`relative inline-flex items-center justify-center w-10 h-10 rounded-sm border transition-colors ${
+              location.pathname === '/cart' ? 'border-brand-orange text-brand-orange bg-brand-orange/10' : 'border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange'
+            }`}
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            {cartItemsCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-brand-orange text-white text-[10px] font-bold flex items-center justify-center">
+                {cartItemsCount}
+              </span>
+            )}
+          </Link>
           {!user ? (
             <>
               <Link to="/login"
@@ -220,6 +245,14 @@ export default function Header() {
 
         {/* Mobile Toggle Button */}
         <div className="lg:hidden flex items-center gap-4 z-50">
+          <Link to="/cart" className="relative text-white p-1" aria-label="Open cart">
+            <ShoppingCart className="w-6 h-6" />
+            {cartItemsCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-brand-orange text-white text-[9px] font-bold flex items-center justify-center">
+                {cartItemsCount}
+              </span>
+            )}
+          </Link>
           {user && <NotificationBell />}
           <button className="text-white p-1" onClick={() => setIsMobileMenuOpen(v => !v)} aria-label="Toggle menu">
             {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
