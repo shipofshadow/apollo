@@ -1,15 +1,18 @@
-import { useRef, useEffect, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useRef, useEffect, useCallback, useState } from 'react';
+import { Trash2, X, PenLine } from 'lucide-react'; // Added X and PenLine icons
 
 interface Props {
-  value: string;           // base64 data URL or empty string
+  value: string;           
   onChange: (data: string) => void;
+  isModal?: boolean;       // Toggle modal behavior
 }
 
-export default function SignaturePad({ value, onChange }: Props) {
+export default function SignaturePad({ value, onChange, isModal = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing   = useRef(false);
+  const [isOpen, setIsOpen] = useState(false); // Modal state
 
+  // Added isOpen and isModal dependencies so it repopulates when modal mounts
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -21,7 +24,7 @@ export default function SignaturePad({ value, onChange }: Props) {
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-  }, [value]);
+  }, [value, isOpen, isModal]);
 
   const getPos = (
     e: MouseEvent | TouchEvent,
@@ -77,6 +80,7 @@ export default function SignaturePad({ value, onChange }: Props) {
     onChange(canvas.toDataURL('image/png'));
   }, [onChange]);
 
+  // Added isOpen and isModal to ensure event listeners bind to the dynamic canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -98,7 +102,7 @@ export default function SignaturePad({ value, onChange }: Props) {
       canvas.removeEventListener('touchmove',  draw);
       canvas.removeEventListener('touchend',   stopDrawing);
     };
-  }, [startDrawing, draw, stopDrawing]);
+  }, [startDrawing, draw, stopDrawing, isOpen, isModal]);
 
   const clear = () => {
     const canvas = canvasRef.current;
@@ -107,9 +111,10 @@ export default function SignaturePad({ value, onChange }: Props) {
     onChange('');
   };
 
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+  // Reusable core pad UI to avoid duplicating the code block
+  const CanvasUI = (
+    <>
+      <div className="flex items-center justify-between mb-2">
         <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
           Signature / Waiver Consent *
         </label>
@@ -123,7 +128,7 @@ export default function SignaturePad({ value, onChange }: Props) {
           </button>
         )}
       </div>
-      <p className="text-xs text-gray-600">Use your finger or mouse to draw your signature in the box below.</p>
+      <p className="text-xs text-gray-600 mb-2">Use your finger or mouse to draw your signature in the box below.</p>
       
       <div className="relative border border-gray-700 rounded-sm bg-gray-50 overflow-hidden">
         <canvas
@@ -139,10 +144,67 @@ export default function SignaturePad({ value, onChange }: Props) {
           </span>
         )}
       </div>
-      <p className="text-[11px] text-gray-600 leading-relaxed">
+      <p className="text-[11px] text-gray-600 leading-relaxed mt-2">
         By signing above, you acknowledge that custom electrical/optical modifications may void OEM warranties
         and agree to hold 1625 Auto Lab harmless for any pre-existing issues unrelated to the work performed.
       </p>
-    </div>
+    </>
   );
+
+  // Return the modal setup if requested
+  if (isModal) {
+    return (
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+          Signature / Waiver Consent *
+        </label>
+        
+        {/* Trigger Button */}
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="w-full h-24 border border-gray-700 border-dashed rounded-sm bg-brand-darker flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-white hover:border-gray-500 transition-colors overflow-hidden"
+        >
+          {value ? (
+            <div className="w-full h-full bg-gray-50 flex items-center justify-center">
+              <img src={value} alt="Signature Preview" className="h-full object-contain" />
+            </div>
+          ) : (
+            <>
+              <PenLine className="w-5 h-5" />
+              <span className="text-xs">Click to Sign Document</span>
+            </>
+          )}
+        </button>
+
+        {/* Overlay */}
+        {isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-[#111] border border-gray-800 p-5 rounded-md w-full max-w-2xl shadow-2xl relative">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              {CanvasUI}
+              
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="w-full mt-4 bg-white text-black font-bold py-2 rounded-sm hover:bg-gray-200 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fall back to standard inline layout
+  return <div className="space-y-2">{CanvasUI}</div>;
 }
