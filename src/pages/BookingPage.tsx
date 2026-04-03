@@ -881,8 +881,13 @@ export default function BookingPage() {
 
                     {/* Section: Signature */}
                     <div className="space-y-2">
-                        <SignaturePad value={signatureData} onChange={setSignatureData} />
-                    </div>
+    <SignaturePad 
+        value={signatureData} 
+        onChange={setSignatureData} 
+        isModal 
+    />
+</div>
+
 
                     <TurnstileWidget
                       onVerify={setTurnstileToken}
