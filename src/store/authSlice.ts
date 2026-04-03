@@ -56,9 +56,9 @@ function loadFromStorage(): { token: string | null; refreshToken: string | null;
 
 export const loginAsync = createAsyncThunk(
   'auth/login',
-  async (creds: { email: string; password: string }, { rejectWithValue }) => {
+  async (creds: { email: string; password: string; cfTurnstileToken: string }, { rejectWithValue }) => {
     try {
-      return await loginApi(creds.email, creds.password);
+      return await loginApi(creds.email, creds.password, creds.cfTurnstileToken);
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Login failed.');
     }
@@ -68,7 +68,7 @@ export const loginAsync = createAsyncThunk(
 export const registerAsync = createAsyncThunk(
   'auth/register',
   async (
-    data: { name: string; email: string; phone: string; password: string },
+    data: { name: string; email: string; phone: string; password: string; cfTurnstileToken: string },
     { rejectWithValue }
   ) => {
     try {

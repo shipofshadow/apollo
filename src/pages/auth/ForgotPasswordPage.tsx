@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { forgotPasswordApi } from '../../services/api';
+import TurnstileWidget from '../../components/TurnstileWidget';
 
 export default function ForgotPasswordPage() {
   const [email,   setEmail]   = useState('');
   const [status,  setStatus]  = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,12 +17,13 @@ export default function ForgotPasswordPage() {
     setMessage('');
 
     try {
-      const data = await forgotPasswordApi(email);
+      const data = await forgotPasswordApi(email, turnstileToken);
       setStatus('success');
       setMessage(data.message);
     } catch (err: unknown) {
       setStatus('error');
       setMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setTurnstileKey(k => k + 1);
     }
   };
 
@@ -73,9 +77,15 @@ export default function ForgotPasswordPage() {
                   />
                 </div>
 
+                <TurnstileWidget
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken('')}
+                  resetKey={turnstileKey}
+                />
+
                 <button
                   type="submit"
-                  disabled={status === 'loading'}
+                  disabled={status === 'loading' || !turnstileToken}
                   className="w-full bg-brand-orange text-white font-bold uppercase tracking-widest py-4 hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-sm mt-2"
                 >
                   {status === 'loading' ? (

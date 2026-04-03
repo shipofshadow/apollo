@@ -87,6 +87,8 @@ export interface BookingPayload {
   signatureData?: string;
   /** URLs returned by the media-upload endpoint */
   mediaUrls?: string[];
+  /** Cloudflare Turnstile token */
+  'cf-turnstile-response'?: string;
 }
 
 export interface BookingState {

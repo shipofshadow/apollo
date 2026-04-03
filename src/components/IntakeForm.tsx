@@ -7,6 +7,7 @@ import { MapPin, Phone, Mail, Clock, CheckCircle, AlertCircle } from 'lucide-rea
 import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, VEHICLE_YEARS, type VehicleMake } from '../data/vehicles';
 import { fetchVehicleMakesApi, fetchVehicleModelsApi, fetchAvailabilityApi } from '../services/api';
 import { BACKEND_URL } from '../config';
+import TurnstileWidget from './TurnstileWidget';
 
 /** Fallback: generate next 30 open dates skipping Sundays */
 function getDefaultDates(): string[] {
@@ -37,6 +38,8 @@ export default function IntakeForm() {
   const [vehicleMake,  setVehicleMake]  = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear,  setVehicleYear]  = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
 
   // Dynamic vehicle data (CarAPI proxy), fall back to static dataset
   const [dynamicMakes,  setDynamicMakes]  = useState<string[]>([]);
@@ -133,6 +136,7 @@ export default function IntakeForm() {
           formData.locationPreference && `Location: ${formData.locationPreference}`,
           formData.specificRequests,
         ].filter(Boolean).join(' | '),
+        'cf-turnstile-response': turnstileToken,
       },
     }));
   };
@@ -153,6 +157,8 @@ export default function IntakeForm() {
     setVehicleModel('');
     setVehicleYear('');
     setDynamicModels([]);
+    setTurnstileToken('');
+    setTurnstileKey(k => k + 1);
   };
 
   return (
@@ -397,9 +403,15 @@ export default function IntakeForm() {
                     ></textarea>
                   </div>
 
+                  <TurnstileWidget
+                    onVerify={setTurnstileToken}
+                    onExpire={() => setTurnstileToken('')}
+                    resetKey={turnstileKey}
+                  />
+
                   <button
                     type="submit"
-                    disabled={status === 'loading'}
+                    disabled={status === 'loading' || !turnstileToken}
                     className="w-full bg-brand-orange text-white font-display uppercase tracking-wider px-8 py-4 rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {status === 'loading' ? (

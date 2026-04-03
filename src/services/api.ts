@@ -50,18 +50,18 @@ async function apiFetch<T>(
 
 // ── Auth API ─────────────────────────────────────────────────────────────────
 
-export const loginApi = (email: string, password: string) =>
+export const loginApi = (email: string, password: string, cfTurnstileToken: string) =>
   apiFetch<{ token: string; user: User }>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, 'cf-turnstile-response': cfTurnstileToken }),
   });
 
 export const registerApi = (data: {
-  name: string; email: string; phone: string; password: string;
+  name: string; email: string; phone: string; password: string; cfTurnstileToken: string;
 }) =>
   apiFetch<{ token: string; user: User }>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, 'cf-turnstile-response': data.cfTurnstileToken }),
   });
 
 export const fetchMeApi = (token: string) =>
@@ -110,16 +110,16 @@ export const refreshTokenApi = (refreshToken: string) =>
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
 
-export const forgotPasswordApi = (email: string) =>
+export const forgotPasswordApi = (email: string, cfTurnstileToken: string) =>
   apiFetch<{ message: string }>('/api/auth/forgot-password', {
     method: 'POST',
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, 'cf-turnstile-response': cfTurnstileToken }),
   });
 
-export const resetPasswordApi = (token: string, password: string, passwordConfirm: string) =>
+export const resetPasswordApi = (token: string, password: string, passwordConfirm: string, cfTurnstileToken: string) =>
   apiFetch<{ message: string }>('/api/auth/reset-password', {
     method: 'POST',
-    body: JSON.stringify({ token, password, passwordConfirm }),
+    body: JSON.stringify({ token, password, passwordConfirm, 'cf-turnstile-response': cfTurnstileToken }),
   });
 
 export const fetchAuthSessionsApi = (token: string) =>
@@ -253,7 +253,7 @@ export const deleteServiceVariationApi = (token: string, serviceId: number | str
 
 // ── Booking API ──────────────────────────────────────────────────────────────
 
-export const submitBookingApi = (payload: BookingPayload, token?: string | null) =>
+export const submitBookingApi = (payload: BookingPayload & { 'cf-turnstile-response'?: string }, token?: string | null) =>
   apiFetch<{ booking: Booking }>('/api/bookings', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -1005,6 +1005,7 @@ export interface ContactMessagePayload {
   phone?: string;
   subject: string;
   message: string;
+  'cf-turnstile-response': string;
 }
 
 export const sendContactMessageApi = (payload: ContactMessagePayload) =>

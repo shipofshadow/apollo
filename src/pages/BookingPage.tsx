@@ -24,6 +24,7 @@ import CustomCalendar from '../components/CustomCalendar';
 import PageSEO from '../components/PageSEO';
 import SignaturePad from '../components/SignaturePad';
 import { formatPrice } from '../utils/formatPrice';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 // ── Constants & Helpers ───────────────────────────────────────────────────────
 
@@ -167,6 +168,8 @@ export default function BookingPage() {
 
   const [signatureData, setSignatureData] = useState('');
   const [formErrors, setFormErrors] = useState<{ phone?: string; email?: string }>({});
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
   const selectedServices = services.filter(s => s.id === selectedId);
@@ -362,11 +365,16 @@ export default function BookingPage() {
           notes:           form.notes,
           signatureData:   signatureData || undefined,
           mediaUrls:       mediaUrls.length ? mediaUrls : undefined,
+          'cf-turnstile-response': turnstileToken,
         },
         token,
       })
     );
-    if (submitBookingAsync.fulfilled.match(result)) setStep(4);
+    if (submitBookingAsync.fulfilled.match(result)) {
+      setStep(4);
+    } else {
+      setTurnstileKey(k => k + 1);
+    }
   };
 
   const reset = () => {
@@ -387,6 +395,8 @@ export default function BookingPage() {
     setMediaFiles([]); setMediaPreviews([]);
     setSignatureData('');
     setFormErrors({});
+    setTurnstileToken('');
+    setTurnstileKey(k => k + 1);
   };
 
   // Shared generic input style
@@ -874,6 +884,12 @@ export default function BookingPage() {
                         <SignaturePad value={signatureData} onChange={setSignatureData} />
                     </div>
 
+                    <TurnstileWidget
+                      onVerify={setTurnstileToken}
+                      onExpire={() => setTurnstileToken('')}
+                      resetKey={turnstileKey}
+                    />
+
                     {bookError && (
                         <div className="bg-red-500/10 border-l-4 border-red-500 p-4 rounded-sm">
                             <p className="text-sm text-red-400 font-medium">{bookError}</p>
@@ -936,8 +952,8 @@ export default function BookingPage() {
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button type="submit" form="booking-form"
-                  disabled={bookStatus === 'loading' || mediaUploadBusy || !signatureData}
-                  title={!signatureData ? 'Please sign the waiver to continue' : undefined}
+                  disabled={bookStatus === 'loading' || mediaUploadBusy || !signatureData || !turnstileToken}
+                  title={!signatureData ? 'Please sign the waiver to continue' : !turnstileToken ? 'Please complete the CAPTCHA' : undefined}
                   className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(255,102,0,0.2)]">
                   {(bookStatus === 'loading' || mediaUploadBusy)
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> {mediaUploadBusy ? 'Uploading…' : 'Finalizing…'}</>

@@ -114,3 +114,11 @@ define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));
 define('TWILIO_ACCOUNT_SID', $_ENV['TWILIO_ACCOUNT_SID'] ?? '');
 define('TWILIO_AUTH_TOKEN',  $_ENV['TWILIO_AUTH_TOKEN']  ?? '');
 define('TWILIO_FROM',        $_ENV['TWILIO_FROM']        ?? '');
+
+// ---------------------------------------------------------------------------
+// Cloudflare Turnstile
+// TURNSTILE_SECRET_KEY: server-side secret from the Turnstile dashboard.
+// Leave empty to skip validation (development only).
+// ---------------------------------------------------------------------------
+
+define('TURNSTILE_SECRET_KEY', $_ENV['TURNSTILE_SECRET_KEY'] ?? '');

@@ -6,6 +6,7 @@ import { fetchSiteSettingsAsync } from '../store/siteSettingsSlice';
 import type { AppDispatch, RootState } from '../store';
 import { sendContactMessageApi } from '../services/api';
 import PageSEO from '../components/PageSEO';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 // Define the shape so TypeScript stops panicking
 type InfoItem = {
@@ -35,6 +36,8 @@ export default function ContactPage() {
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [formError, setFormError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -51,12 +54,16 @@ export default function ContactPage() {
         phone: formData.phone || undefined,
         subject: formData.subject,
         message: formData.message,
+        'cf-turnstile-response': turnstileToken,
       });
       setFormStatus('success');
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+      setTurnstileToken('');
+      setTurnstileKey(k => k + 1);
     } catch (err: unknown) {
       setFormStatus('error');
       setFormError((err as Error).message || 'Failed to send message. Please try again.');
+      setTurnstileKey(k => k + 1);
     }
   };
 
@@ -310,9 +317,15 @@ export default function ContactPage() {
                     </div>
                   )}
 
+                  <TurnstileWidget
+                    onVerify={setTurnstileToken}
+                    onExpire={() => setTurnstileToken('')}
+                    resetKey={turnstileKey}
+                  />
+
                   <button
                     type="submit"
-                    disabled={formStatus === 'sending'}
+                    disabled={formStatus === 'sending' || !turnstileToken}
                     className="inline-flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {formStatus === 'sending' ? (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { KeyRound, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { resetPasswordApi } from '../../services/api';
+import TurnstileWidget from '../../components/TurnstileWidget';
 
 const REDIRECT_DELAY_MS = 3000;
 
@@ -16,6 +17,8 @@ export default function ResetPasswordPage() {
   const [showCf,    setShowCf]    = useState(false);
   const [status,    setStatus]    = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message,   setMessage]   = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -36,13 +39,14 @@ export default function ResetPasswordPage() {
     setMessage('');
 
     try {
-      const data = await resetPasswordApi(token, password, confirm);
+      const data = await resetPasswordApi(token, password, confirm, turnstileToken);
       setStatus('success');
       setMessage(data.message);
       setTimeout(() => navigate('/login'), REDIRECT_DELAY_MS);
     } catch (err: unknown) {
       setStatus('error');
       setMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setTurnstileKey(k => k + 1);
     }
   };
 
@@ -132,9 +136,15 @@ export default function ResetPasswordPage() {
                   </div>
                 </div>
 
+                <TurnstileWidget
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken('')}
+                  resetKey={turnstileKey}
+                />
+
                 <button
                   type="submit"
-                  disabled={status === 'loading' || !token}
+                  disabled={status === 'loading' || !token || !turnstileToken}
                   className="w-full bg-brand-orange text-white font-bold uppercase tracking-widest py-4 hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-sm mt-2"
                 >
                   {status === 'loading' ? (

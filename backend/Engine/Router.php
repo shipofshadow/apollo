@@ -309,6 +309,62 @@ class Router
     }
 
     /**
+     * Validate a Cloudflare Turnstile token via the Siteverify API.
+     * Throws a 422 RuntimeException if the token is missing or invalid.
+     *
+     * @param array<string, mixed> $data  The decoded JSON body; should contain 'cf-turnstile-response'
+     */
+    private function validateTurnstile(array $data): void
+    {
+        $secret = defined('TURNSTILE_SECRET_KEY') ? TURNSTILE_SECRET_KEY : ($_ENV['TURNSTILE_SECRET_KEY'] ?? '');
+
+        // Skip validation when no secret is configured (dev / test environments)
+        if ($secret === '') {
+            return;
+        }
+
+        $token = trim((string) ($data['cf-turnstile-response'] ?? ''));
+
+        if ($token === '') {
+            throw new RuntimeException('CAPTCHA token is required. Please complete the challenge.', 422);
+        }
+
+        $ip = $this->getClientIp();
+
+        $postData = ['secret' => $secret, 'response' => $token];
+        if ($ip !== '') {
+            $postData['remoteip'] = $ip;
+        }
+
+        $options = [
+            'http' => [
+                'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+                'method'  => 'POST',
+                'content' => http_build_query($postData),
+                'timeout' => 5,
+            ],
+        ];
+
+        $context  = stream_context_create($options);
+        $response = @file_get_contents('https://challenges.cloudflare.com/turnstile/v0/siteverify', false, $context);
+
+        if ($response === false) {
+            // Network failure – fail open to avoid blocking real users
+            error_log('Turnstile: siteverify request failed (network).');
+            return;
+        }
+
+        /** @var array<string, mixed>|null $result */
+        $result = json_decode($response, true);
+
+        if (!is_array($result) || empty($result['success'])) {
+            $codes = implode(', ', (array) ($result['error-codes'] ?? ['unknown']));
+            error_log('Turnstile validation failed: ' . $codes);
+            throw new RuntimeException('CAPTCHA verification failed. Please try again.', 422);
+        }
+    }
+
+    /**
      * Require a valid Bearer JWT and return its payload.
      * Optionally enforce a specific role.
      *
@@ -546,6 +602,7 @@ class Router
     private function handleAuthRegister(array $vars = []): void
     {
         $data   = $this->jsonBody();
+        $this->validateTurnstile($data);
         $result = (new UserService())->register($data);
         if (isset($result['user']) && is_array($result['user'])) {
             $result['user']['permissions'] = $this->getRolePermissions((string) ($result['user']['role'] ?? ''));
@@ -565,6 +622,7 @@ class Router
     private function handleAuthLogin(array $vars = []): void
     {
         $data   = $this->jsonBody();
+        $this->validateTurnstile($data);
         $email  = (string) ($data['email']    ?? '');
         $pass   = (string) ($data['password'] ?? '');
         $security = null;
@@ -826,6 +884,7 @@ class Router
     private function handleAuthForgotPassword(array $vars = []): void
     {
         $data  = $this->jsonBody();
+        $this->validateTurnstile($data);
         $email = strtolower(trim((string) ($data['email'] ?? '')));
 
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -847,6 +906,7 @@ class Router
     private function handleAuthResetPassword(array $vars = []): void
     {
         $data     = $this->jsonBody();
+        $this->validateTurnstile($data);
         $token    = trim((string) ($data['token']    ?? ''));
         $password = (string) ($data['password']       ?? '');
         $confirm  = (string) ($data['passwordConfirm'] ?? '');
@@ -870,6 +930,7 @@ class Router
     private function handleBookingCreate(array $vars = []): void
     {
         $data = $this->jsonBody();
+        $this->validateTurnstile($data);
 
         // Allow both guest and authenticated booking submission.
         $userId = null;
@@ -2911,6 +2972,7 @@ class Router
     private function handleContactMessage(array $vars = []): void
     {
         $data    = $this->jsonBody();
+        $this->validateTurnstile($data);
         $name    = trim((string) ($data['name']    ?? ''));
         $email   = trim((string) ($data['email']   ?? ''));
         $phone   = trim((string) ($data['phone']   ?? ''));

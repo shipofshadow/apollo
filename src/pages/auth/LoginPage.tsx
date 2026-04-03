@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import TurnstileWidget from '../../components/TurnstileWidget';
 
 export default function LoginPage() {
   const navigate   = useNavigate();
@@ -15,6 +16,8 @@ export default function LoginPage() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
   const hasShownToast = useRef(false);
 
   // Redirect if already authenticated
@@ -33,7 +36,8 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, password).catch(() => {});
+    login(email, password, turnstileToken)
+      .catch(() => setTurnstileKey(k => k + 1));
   };
 
   return (
@@ -103,9 +107,15 @@ export default function LoginPage() {
               </div>
             </div>
 
+            <TurnstileWidget
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken('')}
+              resetKey={turnstileKey}
+            />
+
             <button
               type="submit"
-              disabled={status === 'loading'}
+              disabled={status === 'loading' || !turnstileToken}
               className="w-full bg-brand-orange text-white font-bold uppercase tracking-widest py-4 hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-sm mt-2"
             >
               {status === 'loading' ? (
