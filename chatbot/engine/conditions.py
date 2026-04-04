@@ -20,59 +20,72 @@ def validate_input(value: str, rule: dict) -> tuple[bool, str]:
         return True, ""
 
     rule_type = rule.get("type", "")
+    val = (value or "").strip()
+
+    # Support for optional/skip/none
+    if val.lower() in {"skip", "none", "n/a", "na"}:
+        if rule_type == "required":
+            return False, _err(rule, "Boss, required ito. Di pwedeng i-skip!")
+        return True, ""
 
     if rule_type == "required":
-        if not value or not value.strip():
+        if not val:
             return False, _err(rule, "Boss, wag mo 'to laktawan. Required ito.")
         return True, ""
 
     if rule_type == "email":
-        if not value or not value.strip():
+        if not val:
             return False, _err(rule, "Email ay required boss.")
         pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-        if not re.match(pattern, value.strip()):
-            return False, _err(rule, f"Boss, invalid email '{value.strip()}' 'yan. Check mo uli.")
+        if not re.match(pattern, val):
+            return False, _err(rule, f"Boss, parang mali ang email '{val}'. Paki-check mo uli.")
+        return True, ""
+
+    if rule_type == "phone":
+        # PH mobile: 09xxxxxxxxx or +639xxxxxxxxx
+        pattern = r"^(?:\+63|0)?9\d{9}$"
+        if not re.match(pattern, val):
+            return False, _err(rule, "Boss, valid PH mobile number lang (e.g., 09171234567 or +639171234567).")
         return True, ""
 
     if rule_type == "date":
-        if not value or not value.strip():
+        if not val:
             return False, _err(rule, "Petsa ay required boss.")
-
-        parsed = parse_date_input(value.strip())
+        parsed = parse_date_input(val)
         if parsed:
             return True, ""
         return False, _err(rule, "Boss, di ko ma-parse ang petsa. Subukan mo: 'bukas', 'March 20 2026', '2026-04-15', o '03/20/2026'.")
 
     if rule_type == "min_length":
         min_len = rule.get("value", 1)
-        if len(value.strip()) < min_len:
-            return False, _err(rule, f"Dapat at least {min_len} characters ang sagot.")
+        if len(val) < min_len:
+            return False, _err(rule, f"Boss, dapat at least {min_len} characters ang sagot mo.")
         return True, ""
 
     if rule_type == "max_length":
         max_len = rule.get("value", 255)
-        if len(value.strip()) > max_len:
-            return False, _err(rule, f"Hindi dapat himagit sa {max_len} characters.")
+        if len(val) > max_len:
+            return False, _err(rule, f"Boss, hanggang {max_len} characters lang dapat.")
         return True, ""
 
     if rule_type == "regex":
         pattern = rule.get("pattern", "")
-        if not re.match(pattern, value.strip()):
-            return False, _err(rule, "Invalid ang format. Check mo uli boss.")
+        if not re.match(pattern, val):
+            return False, _err(rule, "Boss, parang mali ang format. Paki-check mo uli.")
         return True, ""
 
     if rule_type == "number":
         try:
-            float(value.strip())
+            float(val)
             return True, ""
         except ValueError:
-            return False, _err(rule, "Number lang ang valid dito boss (e.g., 1, 2, 3).")
+            return False, _err(rule, "Boss, number lang ang valid dito (e.g., 1, 2, 3).")
 
     if rule_type == "year_range":
         min_year = int(rule.get("min", 1980))
         max_year = int(rule.get("max", 2027))
         try:
-            year = int(value.strip())
+            year = int(val)
             if min_year <= year <= max_year:
                 return True, ""
             return False, _err(rule, f"Boss, {min_year}–{max_year} lang ang tinatanggap na taon ng sasakyan.")
@@ -88,16 +101,13 @@ def validate_input(value: str, rule: dict) -> tuple[bool, str]:
         if not isinstance(items, list) or not items:
             return True, ""
 
-        raw_value = (value or "").strip()
-        candidate = raw_value if case_sensitive else raw_value.lower()
-
+        candidate = val if case_sensitive else val.lower()
         allowed = []
         for item in items:
             if isinstance(item, dict):
                 if field:
                     check_val = item.get(field)
                 else:
-                    # Auto-discover common slot fields when no explicit field is configured.
                     check_val = (
                         item.get("value")
                         or item.get("label")
