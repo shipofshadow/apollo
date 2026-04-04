@@ -164,7 +164,7 @@ async def _llm_json_response(
     return await _openai_json_response(user_message, kb_text)
 
 
-def _format_kb_text(raw_kb: any) -> str:
+def _format_kb_text(raw_kb: Any) -> str:
     """
     Convert the live menu data (from /api/services) into a clean, readable
     text block that the LLM can reference without confusion.
@@ -210,7 +210,7 @@ def _format_kb_text(raw_kb: any) -> str:
     return str(data)[:3000]
 
 
-def _build_system_prompt(kb_text: any) -> str:
+def _build_system_prompt(kb_text: Any) -> str:
     formatted_kb = _format_kb_text(kb_text)
     kb_section = formatted_kb if formatted_kb else "(No live menu data available)"
     return f"""You are AutoBot, the AI assistant and booking agent for 1625 Auto Lab — a premium automotive retrofitting shop in San Fernando, Pampanga, Philippines.
