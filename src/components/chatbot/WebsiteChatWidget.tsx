@@ -33,6 +33,7 @@ export default function WebsiteChatWidget() {
   const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280)
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -120,7 +121,13 @@ export default function WebsiteChatWidget() {
   }, [isOpen])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) return
+    // Only auto-scroll if the user is within 120px of the bottom (not back-reading)
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    if (distanceFromBottom <= 120) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, isTyping])
 
   useEffect(() => {
@@ -185,6 +192,9 @@ export default function WebsiteChatWidget() {
     const submitText = (payload.value ?? inputValue).trim()
     const displayText = String(payload.display !== undefined ? payload.display : submitText).trim()
     if (!submitText || !sessionId) return
+
+    // Force-scroll to bottom when the user actively sends a message
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
 
     addMessages([
       {
@@ -411,7 +421,7 @@ export default function WebsiteChatWidget() {
           </div>
 
           <div className="flex h-[calc(100%-82px)] flex-col bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)]">
-            <div className="flex-1 overflow-y-auto px-3 py-3">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3 py-3">
               {messages.map((message, index) => {
                 const hasLaterUserReply = messages.slice(index + 1).some((item) => item.sender === 'user')
                 const isQuickReplyActive = message.message_type === 'quick_reply' && !hasLaterUserReply

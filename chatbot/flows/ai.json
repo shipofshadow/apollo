@@ -61,40 +61,53 @@
       },
       "normalize_skip": false,
       "payload_assign": {
-        "ai_reply": "ai_response_object.message",
-        "ai_intent": "ai_response_object.suggested_action"
+        "ai_reply": ["message"],
+        "ai_intent": ["suggested_action"]
       }
     },
     {
       "id": "node_ai_router",
-      "message": "",
+      "message": "{ai_reply}",
       "input_type": "none",
       "routing_rules": [
-        {
-          "condition": "{ai_intent} == book",
-          "next": "node_services"
-        },
-        {
-          "condition": "{ai_intent} == services",
-          "next": "node_services"
-        },
-        {
-          "condition": "{ai_intent} == info",
-          "next": "node_shop_info"
-        },
-        {
-          "condition": "{ai_intent} == human",
-          "next": "node_handoff_prompt"
-        }
+        {"condition": "{ai_intent} == trigger_booking", "next": "node_services"},
+        {"condition": "{ai_intent} == book", "next": "node_services"},
+        {"condition": "{ai_intent} == services", "next": "node_services"},
+        {"condition": "{ai_intent} == info", "next": "node_shop_info"},
+        {"condition": "{ai_intent} == location", "next": "node_shop_info"},
+        {"condition": "{ai_intent} == small_talk", "next": "node_ai_listen"},
+        {"condition": "{ai_intent} == kwento", "next": "node_ai_listen"},
+        {"condition": "{ai_intent} == none", "next": "node_ai_listen"},
+        {"condition": "{ai_intent} == handoff", "next": "node_handoff_prompt"},
+        {"condition": "{ai_intent} == human", "next": "node_handoff_prompt"}
       ],
       "next": "node_ai_listen"
     },
     {
       "id": "node_ai_listen",
-      "message": "",
+      "message": "May iba ka pa bang gusto malaman o gawin, boss? 😊",
+      "input_type": "quick_reply",
+      "validation": null,
+      "options": [
+        {"label": "📋 Book Appointment", "value": "book", "next": "node_services"},
+        {"label": "🔧 View Services", "value": "services", "next": "node_services"},
+        {"label": "📍 Shop Info", "value": "info", "next": "node_shop_info"},
+        {"label": "💬 Ask something", "value": "ask", "next": "node_ai_type_input"},
+        {"label": "👤 Talk to Human", "value": "human", "next": "node_handoff_prompt"}
+      ],
+      "next": null
+    },
+    {
+      "id": "node_ai_type_input",
+      "message": "Sige boss, i-type mo lang ang tanong o gustong gawin mo:",
       "input_type": "text",
       "variable": "last_user_input",
-      "next": "node_fetch_context"
+      "validation": null,
+      "options": [],
+      "next": "node_fetch_context",
+      "http_request": null,
+      "normalize_skip": false,
+      "payload_assign": null
     },
     {
       "id": "node_ai_fallback",
@@ -142,7 +155,7 @@
     },
     {
       "id": "node_shop_info",
-      "message": "Nasa San Fernando, Pampanga kami, boss! 🚗\n\nNKKS Arcade, Krystal Homes, Brgy. Alasas.\nOpen kami Mon–Sat, 9am–6pm.\nContact: 0939 330 8263\n\nMay gusto ka pa bang malaman? Huwag mahiyang magtanong!",
+      "message": "Nasa San Fernando, Pampanga kami, boss! 🚗\n\nNKKS Arcade, Krystal Homes, Brgy. Alasas.\nOpen kami Mon-Sat, 9am-6pm.\nContact: 0939 330 8263\n\nMay gusto ka pa bang malaman? Huwag mahiyang magtanong!",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -180,7 +193,7 @@
     },
     {
       "id": "node_services",
-      "message": "", 
+      "message": "Eto yung mga services namin, boss! Pili ka: 👇",
       "input_type": "none",
       "validation": null,
       "options": [],

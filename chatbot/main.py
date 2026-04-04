@@ -276,10 +276,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS configuration
-# Set ALLOWED_ORIGINS to a comma-separated list of trusted origins in production,
-# e.g. "https://mysite.com,https://other.com".
-# Leave unset (or set to "*") to allow all origins (development only).
 _raw_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
 if not _raw_origins or _raw_origins == "*":
     _allow_origins = ["*"]

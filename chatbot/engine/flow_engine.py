@@ -73,7 +73,14 @@ def _interpolate(text: str, variables: Dict[str, Any]) -> str:
     """Replace {variable} placeholders with values from variables dict."""
     def replacer(match: re.Match) -> str:
         key = match.group(1)
-        return str(variables.get(key, match.group(0)))
+        val = variables.get(key, match.group(0))
+        # Serialize dicts/lists as JSON so the result is always valid text
+        if isinstance(val, (dict, list)):
+            try:
+                return json.dumps(val, ensure_ascii=False)
+            except Exception:
+                return str(val)
+        return str(val)
 
     return re.sub(r"\{(\w+)\}", replacer, text)
 

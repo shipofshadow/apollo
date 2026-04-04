@@ -147,16 +147,17 @@ class AIEvaluateRequest(BaseModel):
 class AIEvaluateResponse(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     suggested_action: Literal[
-        "trigger_booking",
-        "small_talk",
-        "handoff",
-        "none",
         "services",
         "book",
         "info",
         "location",
+        "small_talk",
+        "handoff",
+        "none",
+        # Legacy aliases accepted but mapped in router
+        "trigger_booking",
         "kwento",
-        "human"
+        "human",
     ]
 
 

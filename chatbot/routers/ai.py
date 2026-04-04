@@ -24,15 +24,17 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 # The flow engine's router only acts on a subset of these, but they must all
 # pass _normalize_action unchanged so routing rules can match them correctly.
 _ALLOWED_ACTIONS = {
-    "trigger_booking",
+    "services",
+    "book",
+    "info",
+    "location",
+    "small_talk",
     "handoff",
     "none",
-    "small_talk",       # rule-based + LLM (via prompt hint)
-    "kwento",           # rule-based alias — router treats same as small_talk
-    "services",         # convenience intents that map directly to flow nodes
-    "book",
-    "location",
-    "info",
+    # Legacy aliases kept for backward compat
+    "trigger_booking",
+    "kwento",
+    "human",
 }
 
 _UNKNOWN_REPLY = "Hindi ko sure boss, pero pwede ko i-forward sa tao namin para ma-check."
@@ -95,6 +97,11 @@ def _rule_based_response(user_message: str, kb_text: str) -> schemas.AIEvaluateR
     """
     text = user_message.lower()
 
+    services_words = {
+        "services", "service", "menu", "presyo", "price", "pricing",
+        "anong meron", "ano meron", "magkano", "ano services", "ayus", "ayos",
+        "gaano", "halaga", "serbisyo", "anong services",
+    }
     booking_words = {
         "book", "booking", "schedule", "appointment", "pa-schedule",
         "paschedule", "reserve", "set natin",
@@ -110,17 +117,21 @@ def _rule_based_response(user_message: str, kb_text: str) -> schemas.AIEvaluateR
         "chikahan", "kamustahan", "balita", "anong balita", "kamusta buhay",
     }
 
+    if any(word in text for word in services_words):
+        return schemas.AIEvaluateResponse(
+            message="Eto yung mga services namin boss, pili ka!",
+            suggested_action="services",
+        )
+
     if any(word in text for word in booking_words):
         return schemas.AIEvaluateResponse(
-            message="Sige boss, set natin appointment mo ngayon.",
-            suggested_action="trigger_booking",
+            message="Sige boss, simulan na natin booking mo!",
+            suggested_action="book",
         )
 
     if any(word in text for word in small_talk_words):
         return schemas.AIEvaluateResponse(
             message="Game boss, kwentuhan muna tayo! Anong gusto mong pag-usapan?",
-            # Use "small_talk" (canonical) rather than the alias "kwento"
-            # so it matches the routing rule in node_ai_router.
             suggested_action="small_talk",
         )
 
@@ -153,35 +164,101 @@ async def _llm_json_response(
     return await _openai_json_response(user_message, kb_text)
 
 
-def _build_system_prompt(kb_text: str) -> str:
-    return f"""You are AutoBot, the frontline sales AI for 1625 Auto Lab.
-            Your job is to read the user's message, determine their intent, and output a STRICT JSON object.
+def _format_kb_text(raw_kb: Any) -> str:
+    """
+    Convert the live menu data (from /api/services) into a clean, readable
+    text block that the LLM can reference without confusion.
+    """
+    if isinstance(raw_kb, str):
+        # Try to parse if it's a JSON string
+        try:
+            data = json.loads(raw_kb)
+        except (json.JSONDecodeError, ValueError):
+            return raw_kb.strip()
+    else:
+        data = raw_kb
 
-            # BUSINESS DATA
-            Entity: 1625 Auto Lab
-            Specialty: Premium Automotive Retrofitting
-            Location: NKKS Arcade, Krystal Homes, Brgy. Alasas, San Fernando, Pampanga, Philippines 2000
-            Contact: 0939 330 8263 | 1625autolab@gmail.com
-            Tone: Street-smart, conversational Taglish (e.g., "Yo boss", "Solid", "G!"). Zero corporate cringe.
+    if not data:
+        return ""
 
-            # LIVE MENU DATA / ADMIN KB
-            {kb_text}
+    # Handle list of services
+    if isinstance(data, list):
+        lines = ["AVAILABLE SERVICES:"]
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or item.get("title") or ""
+            desc = item.get("description") or item.get("subtitle") or ""
+            service_id = item.get("id") or item.get("service_id") or ""
+            if name:
+                line = f"- {name}"
+                if service_id:
+                    line += f" (ID: {service_id})"
+                if desc:
+                    line += f": {desc}"
+                lines.append(line)
+        return "\n".join(lines)
 
-            # OUTPUT FORMAT (STRICT JSON ONLY)
-            You must reply with a valid JSON object containing exactly two keys: "message" and "suggested_action".
+    # Handle dict response (e.g. {data: [...], ...})
+    if isinstance(data, dict):
+        inner = data.get("data") or data.get("services") or data.get("items") or []
+        if isinstance(inner, list) and inner:
+            return _format_kb_text(inner)
+        # Fallback: stringify cleanly
+        return json.dumps(data, ensure_ascii=False, indent=2)[:3000]
 
-            # ROUTING RULES FOR "suggested_action"
-            1. "services" -> Use this if the user asks for a list of services, pricing, "anong meron", or "ano mga services niyo". 
-            - message MUST BE: "Ito yung service menu natin boss:"
-            2. "book" -> Use this if the user explicitly asks to book or schedule an appointment.
-            - message MUST BE: "Sige boss, pa-book natin."
-            3. "info" -> Use this if the user asks for shop location, operating hours, or contact number.
-            - message MUST BE: "Eto ang shop details natin boss:"
-            4. "handoff" -> Use this if the user wants to speak to a real person, is angry, or asks for mechanic diagnosis.
-            - message MUST BE: "Sige boss, iko-connect kita."
-            5. "small_talk" -> Use this for general small talk, greetings, or specific car questions.
-            - message MUST BE: A natural Taglish response using the Business Data.
-            6. "none" -> General question; user is not ready to book yet."""
+    return str(data)[:3000]
+
+
+def _build_system_prompt(kb_text: Any) -> str:
+    formatted_kb = _format_kb_text(kb_text)
+    kb_section = formatted_kb if formatted_kb else "(No live menu data available)"
+    return f"""You are AutoBot, the AI assistant and booking agent for 1625 Auto Lab — a premium automotive retrofitting shop in San Fernando, Pampanga, Philippines.
+
+Your personality: Street-smart, friendly, conversational Taglish. Use phrases like "Yo boss", "Solid", "G!", "No worries". Never sound corporate.
+
+## BUSINESS FACTS
+- Shop: 1625 Auto Lab
+- Specialty: Premium Automotive Retrofitting (lighting, audio, accessories, coatings, wraps, etc.)
+- Address: NKKS Arcade, Krystal Homes, Brgy. Alasas, San Fernando, Pampanga 2000, Philippines
+- Hours: Monday–Saturday, 9:00 AM – 6:00 PM
+- Contact: 0939 330 8263 | 1625autolab@gmail.com
+- Booking: Done through this chat — the bot will guide the customer step by step
+
+## LIVE SERVICES MENU
+{kb_section}
+
+## YOUR TASK
+Read the user's latest message. Determine their intent. Output ONLY a valid JSON object with exactly two keys:
+- "message": Your reply to the user (in Taglish, 1–3 sentences max)
+- "suggested_action": One of the action strings below
+
+## INTENT → ACTION MAPPING (choose the BEST match)
+
+"services" — User asks to see services, pricing, "anong meron", "ano mga ayos niyo", "magkano", or mentions a specific service from the menu.
+  → message: Acknowledge and say you'll show the menu. E.g. "Eto yung services namin boss, pili ka!"
+
+"book" — User says they want to book, schedule, reserve, or make an appointment.
+  → message: Confirm you'll start the booking. E.g. "Sige boss, simulan na natin booking mo!"
+
+"info" — User asks about location, address, directions, operating hours, contact info.
+  → message: Give the relevant shop info directly from the BUSINESS FACTS above.
+
+"small_talk" — User is making small talk, greeting, asking how you are, sharing a story, or asking general car questions not in the menu.
+  → message: Respond naturally and warmly in Taglish. Be helpful and guide them toward a service if relevant.
+
+"handoff" — User is angry, frustrated, insists on speaking to a real person, wants a refund, or asks for a technical diagnosis.
+  → message: Empathize and say you'll connect them to the team. E.g. "Sige boss, iko-connect kita sa team namin!"
+
+"none" — User's message is unclear, a follow-up question, or doesn't fit the above categories.
+  → message: Give your best helpful answer in Taglish and invite them to ask more or pick an option.
+
+## RULES
+1. NEVER invent services, prices, promos, or dates not in the LIVE SERVICES MENU or BUSINESS FACTS.
+2. If you don't know the answer, reply: "Hindi ko sure boss, pero pwede ko i-forward sa team namin para ma-check."
+3. Always output valid JSON. No markdown, no commentary outside the JSON.
+4. Keep "message" under 200 characters unless the user asked a detailed question.
+5. For "info" intent, include the actual address/hours/contact in the message."""
 
 def _parse_structured_output(content: str) -> Optional[schemas.AIEvaluateResponse]:
     """
@@ -271,7 +348,10 @@ async def _openai_json_response(
                             "suggested_action": {
                                 "type": "string",
                                 "enum": [
-                                    "trigger_booking",
+                                    "services",
+                                    "book",
+                                    "info",
+                                    "location",
                                     "small_talk",
                                     "handoff",
                                     "none",
@@ -401,7 +481,10 @@ async def evaluate_intent(
          incomplete response, fall through to _rule_based_response.
       3. _rule_based_response is guaranteed to always return a valid response.
     """
-    kb_text = _clean_kb_text(payload.kb_context or "")
+    # Format live KB context first (handles JSON objects like {"services": [...]}).
+    kb_text = _format_kb_text(payload.kb_context or "")
+
+    # Only fall back to admin KB when live data yields nothing.
     if not kb_text:
         try:
             latest = (
@@ -426,6 +509,26 @@ async def evaluate_intent(
         print(f"[ai_router] Unhandled error in _llm_json_response: {exc}\n{traceback.format_exc()}")
 
     if llm_result is not None:
+        # Keyword-based intent override: some models generate the correct reply
+        # message but misclassify the intent.  For unambiguous service/booking
+        # queries, trust the keyword match over the LLM's suggested_action.
+        text_lower = payload.user_message.lower()
+        _services_kw = {
+            "services", "service", "menu", "presyo", "price", "pricing",
+            "magkano", "ayos", "ayus", "serbisyo",
+        }
+        _booking_kw = {
+            "book", "booking", "schedule", "appointment",
+            "pa-schedule", "reserve",
+        }
+        if any(kw in text_lower for kw in _services_kw) and llm_result.suggested_action not in ("services", "book"):
+            return schemas.AIEvaluateResponse(
+                message=llm_result.message, suggested_action="services"
+            )
+        if any(kw in text_lower for kw in _booking_kw) and llm_result.suggested_action != "book":
+            return schemas.AIEvaluateResponse(
+                message=llm_result.message, suggested_action="book"
+            )
         return llm_result
 
     # LLM unavailable or returned unusable data — use deterministic guardrail.
