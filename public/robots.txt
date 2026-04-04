@@ -1,10 +1,37 @@
+###############################################
+# robots.txt for https://1625autolab.com      #
+# Last updated: 2026-04-04                    #
+###############################################
+
 User-agent: *
+# Allow all public pages
 Allow: /
+
+# Disallow sensitive or duplicate content
 Disallow: /admin
 Disallow: /client
 Disallow: /login
 Disallow: /register
 Disallow: /forgot-password
 Disallow: /reset-password
+Disallow: /api
+Disallow: /private
+Disallow: /tmp
+Disallow: /backend
+Disallow: /config
+Disallow: /.git
+Disallow: /node_modules
+Disallow: /vendor
 
+# Crawl-delay for all bots (optional, some bots ignore this)
+Crawl-delay: 10
+
+# Subdomain crawling notes:
+# To block bots from crawling subdomains like cdn.1625autolab.com, api.1625autolab.com, or chatbot.1625autolab.com,
+# you must place a separate robots.txt file at the root of each subdomain (e.g., https://api.1625autolab.com/robots.txt)
+# Example for those subdomains:
+#   User-agent: *
+#   Disallow: /
+
+# Sitemap location
 Sitemap: https://1625autolab.com/sitemap.xml

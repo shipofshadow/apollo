@@ -38,11 +38,12 @@ $db = Database::getInstance();
 
 // Fetch all confirmed/pending bookings for tomorrow that haven't been cancelled
 $stmt = $db->prepare(
-    "SELECT id, name, phone, service_name, appointment_date, appointment_time
-       FROM bookings
-      WHERE appointment_date = :date
-        AND status IN ('confirmed', 'pending')
-      ORDER BY appointment_time ASC"
+        "SELECT b.id, b.name, b.phone, s.title AS service_name, b.appointment_date, b.appointment_time
+             FROM bookings b
+             JOIN services s ON b.service_id = s.id
+            WHERE b.appointment_date = :date
+                AND b.status IN ('confirmed', 'pending')
+            ORDER BY b.appointment_time ASC"
 );
 $stmt->execute([':date' => $tomorrow]);
 $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);

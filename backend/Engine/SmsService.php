@@ -1,14 +1,13 @@
+use Twilio\Rest\Client;
 <?php
-
-declare(strict_types=1);
 
 /**
  * Sends SMS notifications via the Twilio REST API.
  *
  * Configuration (set in .env / Configuration.php):
- *   TWILIO_ACCOUNT_SID  – Twilio Account SID
- *   TWILIO_AUTH_TOKEN   – Twilio Auth Token
- *   TWILIO_FROM         – Twilio phone number in E.164 format, e.g. +15551234567
+ *   TWILIO_ACCOUNT_SID  - Twilio Account SID
+ *   TWILIO_AUTH_TOKEN   - Twilio Auth Token
+ *   TWILIO_FROM         - Twilio phone number in E.164 format, e.g. +15551234567
  *
  * All methods fail silently when Twilio credentials are not configured, so the
  * booking flow is never interrupted by missing SMS setup.
@@ -50,7 +49,7 @@ class SmsService
         $this->send(
             $phone,
             "Hi {$name}! Your booking for {$service} on {$date} at {$time} has been CONFIRMED. "
-          . "Reply STOP to unsubscribe. – 1625 Auto Lab"
+          . "Reply STOP to unsubscribe. - 1625 Auto Lab"
         );
     }
 
@@ -71,7 +70,7 @@ class SmsService
         $this->send(
             $phone,
             "Hi {$name}! Your {$service} booking status is now: {$status}. "
-          . "Reply STOP to unsubscribe. – 1625 Auto Lab"
+          . "Reply STOP to unsubscribe. - 1625 Auto Lab"
         );
     }
 
@@ -90,11 +89,10 @@ class SmsService
         $time    = (string) ($booking['appointmentTime'] ?? $booking['appointment_time'] ?? '');
 
         $this->send(
-            $phone,
-            "Kamusta {$name}! 🔧 Paalala lang po – bukas na ang inyong appointment para sa "
-          . "{$service}" . ($time !== '' ? " sa {$time}" : '') . ". "
-          . "Huwag kalimutang dumating sa 1625 Auto Lab. "
-          . "Reply STOP para mag-unsubscribe."
+                $phone,
+                "Hello {$name}! 🔧 Just a reminder - your appointment for {$service}" .
+                ($time !== '' ? " at {$time}" : '') .
+                " is tomorrow. Please don't forget to come to 1625 Auto Lab. Reply STOP to unsubscribe."
         );
     }
 
@@ -114,9 +112,9 @@ class SmsService
 
         $this->send(
             $phone,
-            "Hi {$name}! Magandang balita – may bakanteng slot na sa {$date}"
+            "Hi {$name}! Magandang balita - may bakanteng slot na sa {$date}"
           . ($time !== '' ? " at {$time}" : '') . ". "
-          . "I-book na agad bago maubusan! – 1625 Auto Lab. "
+          . "I-book na agad bago maubusan! - 1625 Auto Lab. "
           . "Reply STOP para mag-unsubscribe."
         );
     }
@@ -136,18 +134,15 @@ class SmsService
     {
         if (!$this->enabled) return;
 
-        $url = "https://api.twilio.com/2010-04-01/Accounts/{$this->accountSid}/Messages.json";
-
         try {
-            $client = new \GuzzleHttp\Client(['timeout' => 5]);
-            $client->post($url, [
-                'auth'        => [$this->accountSid, $this->authToken],
-                'form_params' => [
-                    'To'   => $to,
-                    'From' => $this->from,
-                    'Body' => $body,
-                ],
-            ]);
+            $twilio = new Client($this->accountSid, $this->authToken);
+            $twilio->messages->create(
+                $to,
+                [
+                    'from' => $this->from,
+                    'body' => $body,
+                ]
+            );
         } catch (\Throwable $e) {
             error_log('[SmsService] Failed to send SMS to ' . substr($to, 0, 4) . '****' . ': ' . $e->getMessage());
         }
