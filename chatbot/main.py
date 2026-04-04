@@ -374,9 +374,9 @@ app.include_router(ai.router)
 app.include_router(customer_ops.router, dependencies=[Depends(require_admin)])
 
 
-@app.get("/", include_in_schema=False)
-def root() -> RedirectResponse:
-    return RedirectResponse(url="/swagger")
+@app.get("/")
+def root() -> dict:
+    return {"message": "No"}
 
 @app.get("/health", tags=["health"])
 def health_check() -> dict:
