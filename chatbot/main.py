@@ -382,42 +382,10 @@ app.include_router(customer_ops.router, dependencies=[Depends(require_admin)])
 def root() -> RedirectResponse:
     return RedirectResponse(url="/swagger")
 
-
-# ---------------------------------------------------------------------------
-# Demo endpoint (used by the example flow's HTTP request node)
-# ---------------------------------------------------------------------------
-
-@app.get("/demo/services", tags=["demo"])
-def demo_services() -> List[dict]:
-    return [
-        {
-            "id": 1,
-            "name": "Haircut",
-            "price": 25,
-            "duration": "30min",
-            "image": "https://picsum.photos/200/150?random=1",
-        },
-        {
-            "id": 2,
-            "name": "Hair Coloring",
-            "price": 80,
-            "duration": "2h",
-            "image": "https://picsum.photos/200/150?random=2",
-        },
-        {
-            "id": 3,
-            "name": "Manicure",
-            "price": 35,
-            "duration": "45min",
-            "image": "https://picsum.photos/200/150?random=3",
-        },
-    ]
-
-
 @app.get("/health", tags=["health"])
 def health_check() -> dict:
     return {"status": "ok"}
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8300, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8300)

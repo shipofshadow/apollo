@@ -12,6 +12,19 @@ from engine.http_client import get_http_client
 
 CLOSE_CONFIRM_NODE_ID = "__close_confirm__"
 
+# ---------------------------------------------------------------------------
+# AI node constants
+# ---------------------------------------------------------------------------
+
+_AI_PROCESSING_NODE_ID = "node_ai_processing"
+_AI_ROUTER_NODE_ID = "node_ai_router"
+_AI_FALLBACK_NODE_ID = "node_ai_fallback"
+
+_AI_FALLBACK_MESSAGE = (
+    "Ay, sorry boss, may problema sa AI ko ngayon. 😅\n\n"
+    "Pwede mo bang i-rephrase o pumili sa menu sa ibaba?"
+)
+
 _AFFIRMATIVE_CLOSE_VALUES = {
     "yes",
     "y",
@@ -555,6 +568,22 @@ def _is_empty_response(data: Any) -> bool:
     return False
 
 
+def _is_valid_ai_response(data: Any) -> bool:
+    """
+    Return True only when the AI API returned a usable response dict with
+    non-empty "message" and "suggested_action" fields.
+
+    Accepts both the raw HTTP response shape and a pre-extracted inner dict,
+    so the check is safe to call regardless of where in the pipeline it is
+    invoked.
+    """
+    if not isinstance(data, dict):
+        return False
+    message = str(data.get("message", "")).strip()
+    action = str(data.get("suggested_action", "")).strip()
+    return bool(message) and bool(action)
+
+
 async def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]]:
     """
     Execute the HTTP request defined in a node's http_request config.
@@ -602,6 +631,36 @@ async def _do_http_request(http_cfg: dict, variables: Dict[str, Any]) -> Tuple[A
             return None, f"HTTP request error: {str(exc)}"
 
     return None, "HTTP request failed after retries."
+
+
+async def _route_to_ai_fallback(
+    nodes: List[dict],
+    variables: Dict[str, Any],
+    response_messages: List[Dict[str, Any]],
+    reason: Optional[str] = None,
+) -> Tuple[List[Dict[str, Any]], Optional[str], Dict[str, Any], bool]:
+    """
+    Emit a friendly error message and hand off to the AI fallback node.
+    Called whenever the AI pipeline produces a missing, malformed, or
+    otherwise unusable response so the user is never left in a dead-end.
+
+    ``reason`` is an optional internal string used only for logging; it is
+    never surfaced to the user.
+    """
+    if reason:
+        # Log internally without exposing details to the end user.
+        print(f"[flow_engine] AI fallback triggered: {reason}")
+
+    response_messages.append(
+        {
+            "content": _AI_FALLBACK_MESSAGE,
+            "message_type": "text",
+            "metadata": None,
+        }
+    )
+    return await _deliver_node(
+        _AI_FALLBACK_NODE_ID, nodes, variables, response_messages
+    )
 
 
 async def process_message(
@@ -786,8 +845,10 @@ async def process_message(
         variable_name = active_node.get("variable")
         if variable_name:
             variables = {**variables, variable_name: user_input.strip()}
-            variables = _sync_vehicle_info(variables)
-            variables = _sync_selection_labels(variables)
+            
+        if is_trigger and active_node.get("next") == _AI_PROCESSING_NODE_ID:
+            return await _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
+
 
         # Vehicle info auto-extraction: parse 'YEAR MAKE MODEL' from free text
         # and store vehicle_year / vehicle_make / vehicle_model automatically.
@@ -870,6 +931,48 @@ async def _deliver_node(
         if http_cfg:
             resp_data, err = await _do_http_request(http_cfg, variables)
             resp_var = http_cfg.get("response_variable")
+
+            # ------------------------------------------------------------------
+            # AI processing node — validate the API response before proceeding.
+            #
+            # This guard fires on *any* of these failure modes:
+            #   1. HTTP-level error (err is set)
+            #   2. Response is not a dict (e.g. a plain string or None)
+            #   3. Response dict is missing "message" or "suggested_action"
+            #   4. Either of those fields is blank / whitespace-only
+            #
+            # In every case we abort the normal pipeline and route directly to
+            # the fallback node so the user always sees a coherent UI.
+            # ------------------------------------------------------------------
+            if node.get("id") == _AI_PROCESSING_NODE_ID:
+                if err:
+                    return await _route_to_ai_fallback(
+                        nodes, variables, response_messages,
+                        reason=f"HTTP error on AI node: {err}",
+                    )
+                if not _is_valid_ai_response(resp_data):
+                    return await _route_to_ai_fallback(
+                        nodes, variables, response_messages,
+                        reason=(
+                            f"Invalid AI response shape: "
+                            f"type={type(resp_data).__name__}, value={resp_data!r}"
+                        ),
+                    )
+                # Valid response — store it and let normal flow continue.
+                if resp_var:
+                    variables = {**variables, resp_var: resp_data}
+
+                # Apply payload_assign immediately so that ai_reply / ai_intent
+                # are populated before node_ai_router evaluates its routing rules.
+                if node.get("payload_assign"):
+                    variables = _apply_payload_assign(
+                        variables, node.get("payload_assign"), resp_data
+                    )
+
+                # Advance to the router node directly (skip generic HTTP handling).
+                node_id = node.get("next") or _AI_ROUTER_NODE_ID
+                continue
+
             if err:
                 response_messages.append(
                     {"content": f"Service error: {err}", "message_type": "text", "metadata": None}
@@ -944,6 +1047,45 @@ async def _deliver_node(
             payload_source = latest_http_render_data if isinstance(latest_http_render_data, dict) else None
             variables = _apply_payload_assign(variables, node.get("payload_assign"), payload_source)
 
+        # ------------------------------------------------------------------
+        # AI router node — guard against unresolvable / empty routing state.
+        #
+        # Even if node_ai_processing ran cleanly, it is possible that:
+        #   • ai_reply ended up blank after variable interpolation
+        #   • ai_intent is empty, None, or an unrecognised value that no
+        #     routing rule matches (e.g. "trigger_booking" returned by the
+        #     LLM but not present in the routing_rules list)
+        #
+        # Without this guard the router silently falls through to its static
+        # "next" (node_ai_fallback) but emits a blank message bubble first,
+        # which looks broken to the user.  We detect both problems here and
+        # route cleanly to the fallback node.
+        # ------------------------------------------------------------------
+        if node.get("id") == _AI_ROUTER_NODE_ID:
+            ai_reply = str(variables.get("ai_reply", "")).strip()
+            ai_intent = str(variables.get("ai_intent", "")).strip()
+
+            if not ai_reply or not ai_intent:
+                # Variables were not populated — route straight to fallback.
+                return await _route_to_ai_fallback(
+                    nodes, variables, response_messages,
+                    reason=(
+                        f"AI router missing variables: "
+                        f"ai_reply={ai_reply!r}, ai_intent={ai_intent!r}"
+                    ),
+                )
+
+            # Render the AI reply as a proper message bubble so it is always
+            # visible to the user before any follow-up node is delivered.
+            response_messages.append(
+                {"content": ai_reply, "message_type": "text", "metadata": None}
+            )
+
+            # Resolve routing normally; unrecognised intents fall through to
+            # the static "next" (node_ai_fallback) which is the correct UX.
+            node_id = _resolve_routing_next(node, variables)
+            continue
+
         # --- Render the node message ---
         message_text = _interpolate(node.get("message", ""), variables)
         input_type = node.get("input_type", "text")
@@ -961,9 +1103,10 @@ async def _deliver_node(
             return response_messages, node["id"], variables, False
 
         elif input_type == "text":
-            response_messages.append(
-                {"content": message_text, "message_type": "text", "metadata": None}
-            )
+            if message_text:
+                response_messages.append(
+                    {"content": message_text, "message_type": "text", "metadata": None}
+                )
             # Wait for user input
             return response_messages, node["id"], variables, False
 

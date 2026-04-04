@@ -7,22 +7,38 @@
     "start",
     "hey"
   ],
+  "suggested_action": {
+      "type": "string",
+      "enum": [
+          "trigger_booking",
+          "small_talk",
+          "handoff",
+          "none",
+          "services",
+          "book",
+          "info",
+          "location",
+          "kwento"
+      ]
+  },
   "nodes": [
     {
       "id": "node_1",
-      "message": "Hey boss! 👋\nAko si AutoBot ng 1625 Auto Lab.\n\nKamusta ka? Anong balita?\n\nPwede kitang tulungan sa:\n• Pag-book ng service\n• Pag-check ng available services\n• Info tungkol sa shop\n\nSabihin mo lang, hal. 'anong services nyo', 'book ako', o 'saan location nyo?'\n\nKwentuhan muna tayo kung gusto mo! 😄",
+      "message": "Yo boss, AutoBot 'to ng 1625 Auto Lab. Ano setup natin today?",
       "input_type": "text",
       "variable": "last_user_input",
-      "validation": null,
-      "options": [
-        {"label": "Tingnan ang Services", "value": "services", "next": "node_services"},
-        {"label": "Book Now", "value": "book", "next": "node_services"},
-        {"label": "Shop Info", "value": "info", "next": "node_shop_info"}
-      ],
+      "next": "node_fetch_context"
+    },
+    {
+      "id": "node_fetch_context",
+      "message": "",
+      "input_type": "none",
       "next": "node_ai_processing",
-      "http_request": null,
-      "normalize_skip": false,
-      "payload_assign": null
+      "http_request": {
+        "method": "GET",
+        "url": "http://localhost:8000/api/services",
+        "response_variable": "live_menu_data"
+      }
     },
     {
       "id": "node_ai_processing",
@@ -39,75 +55,132 @@
         },
         "body": {
           "user_message": "{last_user_input}",
-          "kb_context": "{admin_kb_text}"
+          "kb_context": "{live_menu_data}"
         },
         "response_variable": "ai_response_object"
       },
       "normalize_skip": false,
       "payload_assign": {
-        "ai_reply": [
-          "ai_response_object.message"
-        ],
-        "ai_intent": [
-          "ai_response_object.suggested_action"
-        ]
+        "ai_reply": "ai_response_object.message",
+        "ai_intent": "ai_response_object.suggested_action"
       }
     },
     {
       "id": "node_ai_router",
-      "message": "{ai_reply}\n\nMay gusto ka pa bang itanong, boss? Kung may follow-up ka, go lang! 👂",
+      "message": "",
       "input_type": "none",
-      "validation": null,
-      "options": [],
-      "next": "node_ai_fallback",
-      "http_request": null,
-      "normalize_skip": false,
-      "payload_assign": null,
       "routing_rules": [
-        {"condition": "{ai_intent} == 'services'", "next": "node_services"},
-        {"condition": "{ai_intent} == 'book'", "next": "node_services"},
-        {"condition": "{ai_intent} == 'location'", "next": "node_shop_info"},
-        {"condition": "{ai_intent} == 'info'", "next": "node_shop_info"},
-        {"condition": "{ai_intent} == 'fallback'", "next": "node_ai_fallback"}
-      ]
-    },
-    {
-      "id": "node_ai_fallback",
-      "message": "Ay, sorry boss, parang di ko masyadong nakuha. 😅\n\nBaka puyat lang ako! Pwede mo bang i-rephrase o pumili sa menu sa ibaba?\n\nKung gusto mo rin magkwento o magtanong ng kahit ano, game ako!",
-      "input_type": "quick_reply",
-      "options": [
-        {"label": "Tingnan ang Services", "value": "services", "next": "node_services"},
-        {"label": "Book Now", "value": "book", "next": "node_services"},
-        {"label": "Shop Info", "value": "info", "next": "node_shop_info"}
+        {
+          "condition": "{ai_intent} == book",
+          "next": "node_services"
+        },
+        {
+          "condition": "{ai_intent} == services",
+          "next": "node_services"
+        },
+        {
+          "condition": "{ai_intent} == info",
+          "next": "node_shop_info"
+        },
+        {
+          "condition": "{ai_intent} == human",
+          "next": "node_handoff_prompt"
+        }
       ],
-      "next": "node_ai_idle"
+      "next": "node_ai_listen"
     },
     {
-      "id": "node_shop_info",
-      "message": "Nasa Quezon City kami, boss! Metro Manila represent. 🚗\n\nOpen kami Mon–Sat, 9am–6pm.\n\nMay gusto ka pa bang malaman o itanong? Huwag mahiyang magtanong, parang tropa lang tayo dito!",
-      "input_type": "quick_reply",
-      "options": [
-        {"label": "Tingnan ang Services", "value": "services", "next": "node_services"},
-        {"label": "Book Now", "value": "book", "next": "node_services"},
-        {"label": "Wala na, salamat!", "value": "end", "next": "node_ai_idle"}
-      ],
-      "next": "node_ai_idle"
-    },
-    {
-      "id": "node_ai_idle",
+      "id": "node_ai_listen",
       "message": "",
       "input_type": "text",
       "variable": "last_user_input",
+      "next": "node_fetch_context"
+    },
+    {
+      "id": "node_ai_fallback",
+      "message": "Ay, sorry boss, parang di ko masyadong nakuha. 😅\n\nPwede mo bang i-rephrase o pumili sa menu sa ibaba?\n\nKung gusto mo magkwento o magtanong ng kahit ano, game ako!",
+      "input_type": "quick_reply",
+      "validation": null,
+      "options": [
+        {
+          "label": "Book Service",
+          "value": "book",
+          "next": "node_services"
+        },
+        {
+          "label": "View Services",
+          "value": "services",
+          "next": "node_services"
+        },
+        {
+          "label": "Shop Info",
+          "value": "info",
+          "next": "node_shop_info"
+        },
+        {
+          "label": "Kwentuhan Tayo",
+          "value": "kwento",
+          "next": "node_small_talk"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "node_handoff_prompt"
+        }
+      ],
+      "next": "node_ai_listen",
+      "http_request": null,
+      "normalize_skip": false,
+      "payload_assign": null
+    },
+    {
+      "id": "node_small_talk",
+      "message": "Sige boss, kwentuhan muna tayo! 😄\n\nPwede kang mag-share ng kahit anong kwento—car stories, trip mo, o kahit anong random.\n\nKung gusto mo bumalik sa services, sabihin mo lang!",
+      "input_type": "text",
+      "variable": "last_user_input",
+      "next": "node_fetch_context"
+    },
+    {
+      "id": "node_shop_info",
+      "message": "Nasa San Fernando, Pampanga kami, boss! 🚗\n\nNKKS Arcade, Krystal Homes, Brgy. Alasas.\nOpen kami Mon–Sat, 9am–6pm.\nContact: 0939 330 8263\n\nMay gusto ka pa bang malaman? Huwag mahiyang magtanong!",
+      "input_type": "quick_reply",
+      "validation": null,
+      "options": [
+        {
+          "label": "View Services",
+          "value": "services",
+          "next": "node_services"
+        },
+        {
+          "label": "Book Now",
+          "value": "book",
+          "next": "node_services"
+        },
+        {
+          "label": "Wala na, salamat!",
+          "value": "end",
+          "next": "node_1"
+        }
+      ],
+      "next": "node_1",
+      "http_request": null,
+      "normalize_skip": false,
+      "payload_assign": null
+    },
+    {
+      "id": "node_handoff_prompt",
+      "message": "Sige boss, iko-connect kita sa aming team ngayon. Sandali lang! 🙏",
+      "input_type": "none",
       "validation": null,
       "options": [],
-      "next": "node_ai_processing",
+      "next": "handoff",
       "http_request": null,
       "normalize_skip": false,
       "payload_assign": null
     },
     {
       "id": "node_services",
-      "message": "Eto ang mga services na pwede naming gawin para sa'yo, boss! Pili ka lang o itanong mo kung curious ka sa details. Kung gusto mo ng recommendation, sabihin mo lang anong trip mo sa kotse mo!",
+      "message": "", 
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -123,7 +196,7 @@
     },
     {
       "id": "node_choose_service",
-      "message": "Pindot ka lang ng service card sa taas, o i-type mo kung may specific kang gusto. Kung di ka sure, tanong ka lang—walang mali sa magtanong!",
+      "message": "Pindot ka lang ng service card button sa taas.",
       "input_type": "text",
       "variable": "service_id",
       "validation": {
@@ -148,7 +221,7 @@
     },
     {
       "id": "node_variants",
-      "message": "Boss, eto ang mga variants na pwede mong pagpilian para sa service na yan. Kung gusto mo ng tips o may tanong ka, sabihin mo lang!",
+      "message": "Eto mga available variants:",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -165,15 +238,37 @@
           }
         },
         "response_variable": "variants",
-        "next_if_empty": "node_no_slots",
+        "next_if_empty": "node_no_variants",
         "render_cards": true
       },
       "normalize_skip": false,
       "payload_assign": null
     },
     {
+      "id": "node_no_variants",
+      "message": "Boss, wala pa kaming variants para sa service na 'yan. Pili ka ng ibang service o kausapin ang aming team?",
+      "input_type": "quick_reply",
+      "validation": null,
+      "options": [
+        {
+          "label": "Piliin ibang service",
+          "value": "back",
+          "next": "node_services"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "node_handoff_prompt"
+        }
+      ],
+      "next": "node_services",
+      "http_request": null,
+      "normalize_skip": false,
+      "payload_assign": null
+    },
+    {
       "id": "node_select_variant",
-      "message": "Pindot ka lang ng variant card sa taas, o i-type mo kung may specific kang gusto. Kung di ka sigurado, itanong mo lang—walang judgment dito!",
+      "message": "Pindot ka lang ng variant card button sa taas.",
       "input_type": "text",
       "variable": "variant_id",
       "validation": {
@@ -206,7 +301,7 @@
     },
     {
       "id": "node_book_prompt",
-      "message": "Game na ba, boss?\n\n'{variation_name}' ang napili mo.\n{variation_details}\n\nKung ready ka na, pindot lang. Kung may tanong ka pa, wag mahiyang magtanong!",
+      "message": "Book na ba natin 'tong {variation_name} ngayon?\n{variation_details}",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -218,12 +313,12 @@
         {
           "label": "Talk to Human",
           "value": "human",
-          "next": "handoff"
+          "next": "node_handoff_prompt"
         },
         {
           "label": "Back to Menu",
           "value": "menu",
-          "next": "node_start"
+          "next": "node_1"
         }
       ],
       "next": null,
@@ -233,7 +328,7 @@
     },
     {
       "id": "node_name",
-      "message": "Solid! Pahingi ng full name mo, boss, para maayos natin ang booking mo. Promise, di ko ipopost sa FB! 😁",
+      "message": "Solid. Full name mo boss?",
       "input_type": "text",
       "variable": "name",
       "validation": {
@@ -247,7 +342,7 @@
     },
     {
       "id": "node_email",
-      "message": "Email address mo, boss? Para ma-confirm ko ang booking at ma-update ka agad. Hindi ako mag-spam, scout's honor!",
+      "message": "Email mo?",
       "input_type": "text",
       "variable": "email",
       "validation": {
@@ -262,7 +357,7 @@
     },
     {
       "id": "node_phone",
-      "message": "Contact number mo, boss? (Promise, di kita tatawagan ng 3am 😂) Kung gusto mo Viber o WhatsApp, sabihin mo rin!",
+      "message": "Phone number mo?",
       "input_type": "text",
       "variable": "phone",
       "validation": {
@@ -278,7 +373,7 @@
     },
     {
       "id": "node_vehicle_make",
-      "message": "Anong make ng sasakyan mo, boss? (hal. Honda, Toyota, BMW) Kung may kwento ka sa kotse mo, share mo rin!",
+      "message": "Anong make ng sasakyan? (hal. Honda, Toyota, BMW)",
       "input_type": "text",
       "variable": "vehicle_make",
       "validation": {
@@ -292,7 +387,7 @@
     },
     {
       "id": "node_vehicle_model",
-      "message": "Model ng sasakyan mo? (hal. Civic, Camry, M340i) Curious ako kung anong ride mo!",
+      "message": "Anong model? (hal. Civic, Camry, M340i)",
       "input_type": "text",
       "variable": "vehicle_model",
       "validation": {
@@ -306,7 +401,7 @@
     },
     {
       "id": "node_vehicle_year",
-      "message": "Anong year ng sasakyan mo, boss? (1980-2027 lang) Classic ba o bago?",
+      "message": "Anong year? (1980-2027 lang)",
       "input_type": "text",
       "variable": "vehicle_year",
       "validation": {
@@ -323,7 +418,7 @@
     },
     {
       "id": "node_date",
-      "message": "Kailan mo gusto magpa-book, boss? Pwede YYYY-MM-DD, 'bukas', o 'next week'. Kung may special request ka sa date, sabihin mo lang!",
+      "message": "Kailan booking? Pwede YYYY-MM-DD, 'bukas', o 'next week'.",
       "input_type": "text",
       "variable": "appointment_date",
       "validation": {
@@ -337,7 +432,7 @@
     },
     {
       "id": "node_availability",
-      "message": "Eto ang mga available na oras para sa {appointment_date}, boss. Pili ka lang o itanong mo kung may concern ka. Kung gusto mo ng coffee habang naghihintay, libre yan! ☕",
+      "message": "Eto available times para sa {appointment_date}:",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -355,7 +450,7 @@
     },
     {
       "id": "node_no_slots",
-      "message": "Ay, sorry boss, puno na kami sa date na 'yan. 😔\n\nPili ka ng ibang araw o itanong mo kung may special request ka. Baka may ma-suggest akong alternative!",
+      "message": "Boss, malas. Full na kami sa date na 'yan. Pili ka ng ibang araw?",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -367,7 +462,7 @@
         {
           "label": "Talk to Human",
           "value": "human",
-          "next": "handoff"
+          "next": "node_handoff_prompt"
         }
       ],
       "next": null,
@@ -377,7 +472,7 @@
     },
     {
       "id": "node_time",
-      "message": "Pili ka ng oras sa taas o i-type mo exact (hal. 10:00 AM). Kung may preferred time ka, sabihin mo lang—flexible kami!",
+      "message": "Pili ka ng oras sa taas o i-type mo exact (hal. 10:00 AM).",
       "input_type": "text",
       "variable": "appointment_time",
       "validation": {
@@ -393,7 +488,7 @@
     },
     {
       "id": "node_notes",
-      "message": "May gusto ka bang idagdag na notes, boss? Type 'skip' kung wala na.\n\nKahit kwento lang, okay lang! Mahilig din ako makinig ng car stories.",
+      "message": "May notes ka pa ba? Type skip kung wala.",
       "input_type": "text",
       "variable": "notes",
       "validation": null,
@@ -405,7 +500,7 @@
     },
     {
       "id": "node_images",
-      "message": "Kung may photos ka ng sasakyan, upload mo dito gamit ang 📎. Type 'skip' kung wala.\n\nMas madali naming ma-assess kung may pics! Gusto mo, pwede mo rin i-share best angle ng ride mo!",
+      "message": "Paki-upload ang mga photos ng sasakyan gamit ang 📎 button sa ibaba. Type skip kung wala.",
       "input_type": "text",
       "variable": "images_input",
       "validation": null,
@@ -417,7 +512,7 @@
     },
     {
       "id": "node_confirm_summary",
-      "message": "Boss, pacheck kung tama ang details:\n🚗 {vehicle_year} {vehicle_make} {vehicle_model}\n🛠 Service: {service_name} ({variation_name})\n📅 Sched: {appointment_date} @ {appointment_time}\n\nTama ba lahat? Kung may gusto kang baguhin, sabihin mo lang—walang problema!",
+      "message": "Boss, pa-check kung tama:\n🚗 {vehicle_year} {vehicle_make} {vehicle_model}\n🛠 Service: {service_name} ({variation_name})\n📅 Sched: {appointment_date} @ {appointment_time}\n\nConfirm na natin 'to?",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -534,7 +629,7 @@
           }
         },
         "response_variable": "variants",
-        "next_if_empty": "node_no_slots",
+        "next_if_empty": "node_no_variants",
         "render_cards": true
       },
       "normalize_skip": false,
@@ -684,7 +779,7 @@
     },
     {
       "id": "node_submit_booking",
-      "message": "Sige boss, isusubmit ko na booking request mo...\n\nHintay lang ng konti, tapos update kita agad! Excited na ako makita ang ride mo!",
+      "message": "Sige boss, submit ko na booking request mo...",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -721,14 +816,37 @@
             "$csv": "{images_input}"
           }
         },
-        "response_variable": "booking_result"
+        "response_variable": "booking_result",
+        "next_if_error": "node_booking_error"
       },
       "normalize_skip": false,
       "payload_assign": null
     },
     {
+      "id": "node_booking_error",
+      "message": "Boss, may problema sa pag-submit ng booking mo. 😟\n\nPwede mo itong subukan ulit o kausapin ang aming team directly.",
+      "input_type": "quick_reply",
+      "validation": null,
+      "options": [
+        {
+          "label": "Subukan ulit",
+          "value": "retry",
+          "next": "node_submit_booking"
+        },
+        {
+          "label": "Talk to Human",
+          "value": "human",
+          "next": "node_handoff_prompt"
+        }
+      ],
+      "next": null,
+      "http_request": null,
+      "normalize_skip": false,
+      "payload_assign": null
+    },
+    {
       "id": "node_booking_done",
-      "message": "✅ Ayos! Submitted na booking mo, boss.\n\nKung may gusto ka pang ipa-assist, itanong, o magkwento lang, nandito lang ako! Salamat sa tiwala!",
+      "message": "✅ Submitted na booking mo, boss! Aabangan ka namin. 🙌\n\nMay iba ka pa bang kailangan?",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -740,27 +858,15 @@
         {
           "label": "Talk to Human",
           "value": "human",
-          "next": "handoff"
+          "next": "node_handoff_prompt"
         },
         {
           "label": "Done",
           "value": "done",
-          "next": "node_start"
+          "next": "node_1"
         }
       ],
       "next": null,
-      "http_request": null,
-      "normalize_skip": false,
-      "payload_assign": null
-    },
-    {
-      "id": "node_start",
-      "message": "Ano pa ang pwede kong gawin para sa'yo, boss? Usap pa tayo! O kung gusto mo mag-share ng car tips, game ako!",
-      "input_type": "text",
-      "variable": "last_user_input",
-      "validation": null,
-      "options": [],
-      "next": "node_ai_processing",
       "http_request": null,
       "normalize_skip": false,
       "payload_assign": null

@@ -143,9 +143,21 @@ class AIEvaluateRequest(BaseModel):
     kb_context: Optional[str] = Field(default="", max_length=20000)
 
 
+
 class AIEvaluateResponse(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
-    suggested_action: Literal["trigger_booking", "handoff", "none"]
+    suggested_action: Literal[
+        "trigger_booking",
+        "small_talk",
+        "handoff",
+        "none",
+        "services",
+        "book",
+        "info",
+        "location",
+        "kwento",
+        "human"
+    ]
 
 
 # ---------------------------------------------------------------------------
