@@ -10,11 +10,15 @@
   "nodes": [
     {
       "id": "node_1",
-      "message": "Yo boss, AutoBot 'to ng 1625 Auto Lab. Ano setup natin today?",
+      "message": "Hey boss! 👋\nAko si AutoBot ng 1625 Auto Lab.\n\nKamusta ka? Anong balita?\n\nPwede kitang tulungan sa:\n• Pag-book ng service\n• Pag-check ng available services\n• Info tungkol sa shop\n\nSabihin mo lang, hal. 'anong services nyo', 'book ako', o 'saan location nyo?'\n\nKwentuhan muna tayo kung gusto mo! 😄",
       "input_type": "text",
       "variable": "last_user_input",
       "validation": null,
-      "options": [],
+      "options": [
+        {"label": "Tingnan ang Services", "value": "services", "next": "node_services"},
+        {"label": "Book Now", "value": "book", "next": "node_services"},
+        {"label": "Shop Info", "value": "info", "next": "node_shop_info"}
+      ],
       "next": "node_ai_processing",
       "http_request": null,
       "normalize_skip": false,
@@ -51,14 +55,43 @@
     },
     {
       "id": "node_ai_router",
-      "message": "{ai_reply}",
+      "message": "{ai_reply}\n\nMay gusto ka pa bang itanong, boss? Kung may follow-up ka, go lang! 👂",
       "input_type": "none",
       "validation": null,
       "options": [],
-      "next": "node_ai_idle",
+      "next": "node_ai_fallback",
       "http_request": null,
       "normalize_skip": false,
-      "payload_assign": null
+      "payload_assign": null,
+      "routing_rules": [
+        {"condition": "{ai_intent} == 'services'", "next": "node_services"},
+        {"condition": "{ai_intent} == 'book'", "next": "node_services"},
+        {"condition": "{ai_intent} == 'location'", "next": "node_shop_info"},
+        {"condition": "{ai_intent} == 'info'", "next": "node_shop_info"},
+        {"condition": "{ai_intent} == 'fallback'", "next": "node_ai_fallback"}
+      ]
+    },
+    {
+      "id": "node_ai_fallback",
+      "message": "Ay, sorry boss, parang di ko masyadong nakuha. 😅\n\nBaka puyat lang ako! Pwede mo bang i-rephrase o pumili sa menu sa ibaba?\n\nKung gusto mo rin magkwento o magtanong ng kahit ano, game ako!",
+      "input_type": "quick_reply",
+      "options": [
+        {"label": "Tingnan ang Services", "value": "services", "next": "node_services"},
+        {"label": "Book Now", "value": "book", "next": "node_services"},
+        {"label": "Shop Info", "value": "info", "next": "node_shop_info"}
+      ],
+      "next": "node_ai_idle"
+    },
+    {
+      "id": "node_shop_info",
+      "message": "Nasa Quezon City kami, boss! Metro Manila represent. 🚗\n\nOpen kami Mon–Sat, 9am–6pm.\n\nMay gusto ka pa bang malaman o itanong? Huwag mahiyang magtanong, parang tropa lang tayo dito!",
+      "input_type": "quick_reply",
+      "options": [
+        {"label": "Tingnan ang Services", "value": "services", "next": "node_services"},
+        {"label": "Book Now", "value": "book", "next": "node_services"},
+        {"label": "Wala na, salamat!", "value": "end", "next": "node_ai_idle"}
+      ],
+      "next": "node_ai_idle"
     },
     {
       "id": "node_ai_idle",
@@ -74,7 +107,7 @@
     },
     {
       "id": "node_services",
-      "message": "Ito yung service menu natin:",
+      "message": "Eto ang mga services na pwede naming gawin para sa'yo, boss! Pili ka lang o itanong mo kung curious ka sa details. Kung gusto mo ng recommendation, sabihin mo lang anong trip mo sa kotse mo!",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -90,7 +123,7 @@
     },
     {
       "id": "node_choose_service",
-      "message": "Pindot ka lang ng service card button sa taas.",
+      "message": "Pindot ka lang ng service card sa taas, o i-type mo kung may specific kang gusto. Kung di ka sure, tanong ka lang—walang mali sa magtanong!",
       "input_type": "text",
       "variable": "service_id",
       "validation": {
@@ -115,7 +148,7 @@
     },
     {
       "id": "node_variants",
-      "message": "Eto mga available variants:",
+      "message": "Boss, eto ang mga variants na pwede mong pagpilian para sa service na yan. Kung gusto mo ng tips o may tanong ka, sabihin mo lang!",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -140,7 +173,7 @@
     },
     {
       "id": "node_select_variant",
-      "message": "Pindot ka lang ng variant card button sa taas.",
+      "message": "Pindot ka lang ng variant card sa taas, o i-type mo kung may specific kang gusto. Kung di ka sigurado, itanong mo lang—walang judgment dito!",
       "input_type": "text",
       "variable": "variant_id",
       "validation": {
@@ -173,7 +206,7 @@
     },
     {
       "id": "node_book_prompt",
-      "message": "Book na ba natin 'tong {variation_name} ngayon?\n{variation_details}",
+      "message": "Game na ba, boss?\n\n'{variation_name}' ang napili mo.\n{variation_details}\n\nKung ready ka na, pindot lang. Kung may tanong ka pa, wag mahiyang magtanong!",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -200,7 +233,7 @@
     },
     {
       "id": "node_name",
-      "message": "Solid. Full name mo boss?",
+      "message": "Solid! Pahingi ng full name mo, boss, para maayos natin ang booking mo. Promise, di ko ipopost sa FB! 😁",
       "input_type": "text",
       "variable": "name",
       "validation": {
@@ -214,7 +247,7 @@
     },
     {
       "id": "node_email",
-      "message": "Email mo?",
+      "message": "Email address mo, boss? Para ma-confirm ko ang booking at ma-update ka agad. Hindi ako mag-spam, scout's honor!",
       "input_type": "text",
       "variable": "email",
       "validation": {
@@ -229,7 +262,7 @@
     },
     {
       "id": "node_phone",
-      "message": "Phone number mo?",
+      "message": "Contact number mo, boss? (Promise, di kita tatawagan ng 3am 😂) Kung gusto mo Viber o WhatsApp, sabihin mo rin!",
       "input_type": "text",
       "variable": "phone",
       "validation": {
@@ -245,7 +278,7 @@
     },
     {
       "id": "node_vehicle_make",
-      "message": "Anong make ng sasakyan? (hal. Honda, Toyota, BMW)",
+      "message": "Anong make ng sasakyan mo, boss? (hal. Honda, Toyota, BMW) Kung may kwento ka sa kotse mo, share mo rin!",
       "input_type": "text",
       "variable": "vehicle_make",
       "validation": {
@@ -259,7 +292,7 @@
     },
     {
       "id": "node_vehicle_model",
-      "message": "Anong model? (hal. Civic, Camry, M340i)",
+      "message": "Model ng sasakyan mo? (hal. Civic, Camry, M340i) Curious ako kung anong ride mo!",
       "input_type": "text",
       "variable": "vehicle_model",
       "validation": {
@@ -273,7 +306,7 @@
     },
     {
       "id": "node_vehicle_year",
-      "message": "Anong year? (1980-2027 lang)",
+      "message": "Anong year ng sasakyan mo, boss? (1980-2027 lang) Classic ba o bago?",
       "input_type": "text",
       "variable": "vehicle_year",
       "validation": {
@@ -290,7 +323,7 @@
     },
     {
       "id": "node_date",
-      "message": "Kailan booking? Pwede YYYY-MM-DD, 'bukas', o 'next week'.",
+      "message": "Kailan mo gusto magpa-book, boss? Pwede YYYY-MM-DD, 'bukas', o 'next week'. Kung may special request ka sa date, sabihin mo lang!",
       "input_type": "text",
       "variable": "appointment_date",
       "validation": {
@@ -304,7 +337,7 @@
     },
     {
       "id": "node_availability",
-      "message": "Eto available times para sa {appointment_date}:",
+      "message": "Eto ang mga available na oras para sa {appointment_date}, boss. Pili ka lang o itanong mo kung may concern ka. Kung gusto mo ng coffee habang naghihintay, libre yan! ☕",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -322,7 +355,7 @@
     },
     {
       "id": "node_no_slots",
-      "message": "Boss, malas. Full na kami sa date na 'yan. Pili ka ng ibang araw?",
+      "message": "Ay, sorry boss, puno na kami sa date na 'yan. 😔\n\nPili ka ng ibang araw o itanong mo kung may special request ka. Baka may ma-suggest akong alternative!",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -344,7 +377,7 @@
     },
     {
       "id": "node_time",
-      "message": "Pili ka ng oras sa taas o i-type mo exact (hal. 10:00 AM).",
+      "message": "Pili ka ng oras sa taas o i-type mo exact (hal. 10:00 AM). Kung may preferred time ka, sabihin mo lang—flexible kami!",
       "input_type": "text",
       "variable": "appointment_time",
       "validation": {
@@ -360,7 +393,7 @@
     },
     {
       "id": "node_notes",
-      "message": "May notes ka pa ba? Type skip kung wala.",
+      "message": "May gusto ka bang idagdag na notes, boss? Type 'skip' kung wala na.\n\nKahit kwento lang, okay lang! Mahilig din ako makinig ng car stories.",
       "input_type": "text",
       "variable": "notes",
       "validation": null,
@@ -372,7 +405,7 @@
     },
     {
       "id": "node_images",
-      "message": "Paki-upload ang mga photos ng sasakyan gamit ang 📎 button sa ibaba. Type skip kung wala.",
+      "message": "Kung may photos ka ng sasakyan, upload mo dito gamit ang 📎. Type 'skip' kung wala.\n\nMas madali naming ma-assess kung may pics! Gusto mo, pwede mo rin i-share best angle ng ride mo!",
       "input_type": "text",
       "variable": "images_input",
       "validation": null,
@@ -384,7 +417,7 @@
     },
     {
       "id": "node_confirm_summary",
-      "message": "Boss, pa-check kung tama:\n🚗 {vehicle_year} {vehicle_make} {vehicle_model}\n🛠 Service: {service_name} ({variation_name})\n📅 Sched: {appointment_date} @ {appointment_time}\n\nConfirm na natin 'to?",
+      "message": "Boss, pacheck kung tama ang details:\n🚗 {vehicle_year} {vehicle_make} {vehicle_model}\n🛠 Service: {service_name} ({variation_name})\n📅 Sched: {appointment_date} @ {appointment_time}\n\nTama ba lahat? Kung may gusto kang baguhin, sabihin mo lang—walang problema!",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -651,7 +684,7 @@
     },
     {
       "id": "node_submit_booking",
-      "message": "Sige boss, submit ko na booking request mo...",
+      "message": "Sige boss, isusubmit ko na booking request mo...\n\nHintay lang ng konti, tapos update kita agad! Excited na ako makita ang ride mo!",
       "input_type": "none",
       "validation": null,
       "options": [],
@@ -695,7 +728,7 @@
     },
     {
       "id": "node_booking_done",
-      "message": "✅ Submitted na booking mo. Ano pa need mo?",
+      "message": "✅ Ayos! Submitted na booking mo, boss.\n\nKung may gusto ka pang ipa-assist, itanong, o magkwento lang, nandito lang ako! Salamat sa tiwala!",
       "input_type": "quick_reply",
       "validation": null,
       "options": [
@@ -722,7 +755,7 @@
     },
     {
       "id": "node_start",
-      "message": "Ano pa next, boss?",
+      "message": "Ano pa ang pwede kong gawin para sa'yo, boss? Usap pa tayo! O kung gusto mo mag-share ng car tips, game ako!",
       "input_type": "text",
       "variable": "last_user_input",
       "validation": null,

@@ -674,8 +674,9 @@ async def process_message(
         _append_close_confirmation_prompt(response_messages)
         return response_messages, CLOSE_CONFIRM_NODE_ID, variables, False
 
-    # No active node (fresh session) or trigger keyword received → restart flow
-    if current_node_id is None or is_trigger:
+    # Only restart the flow if this is a fresh session (current_node_id is None)
+    # Do NOT restart on trigger keywords if already in an active conversation
+    if current_node_id is None or (is_trigger and current_node_id is None):
         return await _deliver_node(nodes[0]["id"], nodes, variables, response_messages)
 
     active_node = _find_node(nodes, current_node_id)
