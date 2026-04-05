@@ -3,6 +3,7 @@
  * Non-component utilities live in _sharedUtils.ts.
  */
 import type { ConfirmDialogState } from './_sharedUtils';
+import { TABLE_PAGE_SIZE } from './_sharedUtils';
 export { TABLE_PAGE_SIZE } from './_sharedUtils';
 
 // ── Role badge ────────────────────────────────────────────────────────────────
