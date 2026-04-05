@@ -94,9 +94,9 @@ export default function CheckoutPage() {
             <div className="border border-gray-800 bg-brand-dark/80 rounded-sm p-4">
               <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Contact Details</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Full name" className="bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm" />
-                <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone" className="bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm" />
-                <input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="Email" className="md:col-span-2 bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm" />
+                <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Full name" className="bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange transition-colors" />
+                <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone" className="bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange transition-colors" />
+                <input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="Email" className="md:col-span-2 bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange transition-colors" />
               </div>
             </div>
 
@@ -109,14 +109,14 @@ export default function CheckoutPage() {
 
               {fulfillmentType === 'courier' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <textarea value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Delivery address" className="md:col-span-2 bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm min-h-20" />
-                  <input value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} placeholder="City" className="bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm" />
-                  <input value={deliveryProvince} onChange={e => setDeliveryProvince(e.target.value)} placeholder="Province" className="bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm" />
-                  <input value={deliveryPostalCode} onChange={e => setDeliveryPostalCode(e.target.value)} placeholder="Postal code" className="bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm" />
+                  <textarea value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Delivery address" className="md:col-span-2 bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm min-h-20 focus:outline-none focus:border-brand-orange transition-colors" />
+                  <input value={deliveryCity} onChange={e => setDeliveryCity(e.target.value)} placeholder="City" className="bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange transition-colors" />
+                  <input value={deliveryProvince} onChange={e => setDeliveryProvince(e.target.value)} placeholder="Province" className="bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange transition-colors" />
+                  <input value={deliveryPostalCode} onChange={e => setDeliveryPostalCode(e.target.value)} placeholder="Postal code" className="bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm focus:outline-none focus:border-brand-orange transition-colors" />
                 </div>
               )}
 
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Order notes (optional)" className="mt-3 w-full bg-black/20 border border-gray-700 text-white px-3 py-2.5 rounded-sm min-h-20" />
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Order notes (optional)" className="mt-3 w-full bg-black/20 border border-gray-700 text-white placeholder:text-gray-600 px-3 py-2.5 rounded-sm min-h-20 focus:outline-none focus:border-brand-orange transition-colors" />
             </div>
           </div>
 
