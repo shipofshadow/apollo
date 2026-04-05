@@ -12,6 +12,8 @@ import {
   TABLE_PAGE_SIZE,
   StatusBadge,
   ConfirmDialog,
+  ModalShell,
+  Breadcrumbs,
   Pager,
 } from './_sharedComponents';
 import { type ConfirmDialogState } from './_sharedUtils';
@@ -133,6 +135,7 @@ export default function ManageClientsPanel({ onView }: Props) {
         item.id === id ? { ...item, name: updated.name, email: updated.email, phone: updated.phone } : item
       ));
       setEditingClientId(null);
+      setClientEditDraft({ name: '', email: '', phone: '' });
       showToast('Client info updated.', 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to update client info.', 'error');
@@ -152,6 +155,9 @@ export default function ManageClientsPanel({ onView }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs items={[{ label: 'Admin' }, { label: 'Manage Clients' }]} />
+
       {/* Header */}
       <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand-orange/15 blur-3xl" />
@@ -179,11 +185,13 @@ export default function ManageClientsPanel({ onView }: Props) {
           </p>
           <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5 flex-wrap">
             <input value={clientSearch} onChange={e => setClientSearch(e.target.value)}
-              placeholder="Search clients"
+              placeholder="Search by name or email"
+              aria-label="Search clients"
               className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange flex-1 xs:flex-none min-w-0 xs:min-w-40" />
             <div className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" aria-hidden="true" />
               <select value={clientStatusFilter} onChange={e => setClientStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                aria-label="Filter by status"
                 className="bg-brand-darker border border-gray-700 text-white px-2 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange">
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -198,8 +206,9 @@ export default function ManageClientsPanel({ onView }: Props) {
         </div>
 
         {loadingClients ? (
-          <div className="py-10 flex items-center justify-center">
+          <div className="py-10 flex items-center justify-center gap-2 text-gray-400">
             <Loader2 className="w-5 h-5 animate-spin text-brand-orange" />
+            <span className="text-xs">Loading clients...</span>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-800 -mx-3 md:mx-0">
@@ -217,48 +226,33 @@ export default function ManageClientsPanel({ onView }: Props) {
               </thead>
               <tbody>
                 {pagedClients.length === 0 ? (
-                  <tr><td colSpan={7} className="py-8 text-center text-xs text-gray-500">No clients found.</td></tr>
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Users className="w-8 h-8 text-gray-700" />
+                        <p className="text-sm text-gray-500">No clients found.</p>
+                        <p className="text-xs text-gray-600">Try adjusting your search or filter.</p>
+                      </div>
+                    </td>
+                  </tr>
                 ) : pagedClients.map(item => {
                   const isClientActive = item.is_active !== false;
-                  const isEditingThis = editingClientId === item.id;
-                  const isSavingThis = savingClientId === item.id;
                   const isTogglingThis = togglingStatusId === item.id;
 
                   return (
-                    <tr key={item.id} className={`border-b border-gray-800/70 align-top ${!isClientActive ? 'opacity-60' : ''}`}>
+                    <tr key={item.id} className={`border-b border-gray-800/70 align-middle ${!isClientActive ? 'opacity-60' : ''}`}>
                       <td className="py-2.5 px-3 md:px-4 text-white font-medium">
-                        {isEditingThis ? (
-                          <input value={clientEditDraft.name}
-                            onChange={e => setClientEditDraft(prev => ({ ...prev, name: e.target.value }))}
-                            className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-w-28"
-                            placeholder="Name" />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => onView(item)}
-                            className="text-left hover:text-brand-orange transition-colors flex items-center gap-1 group"
-                          >
-                            {item.name}
-                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onView(item)}
+                          className="text-left hover:text-brand-orange transition-colors flex items-center gap-1 group"
+                        >
+                          {item.name}
+                          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        </button>
                       </td>
-                      <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs">
-                        {isEditingThis ? (
-                          <input value={clientEditDraft.email} type="email"
-                            onChange={e => setClientEditDraft(prev => ({ ...prev, email: e.target.value }))}
-                            className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-w-36"
-                            placeholder="Email" />
-                        ) : item.email}
-                      </td>
-                      <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden lg:table-cell text-xs">
-                        {isEditingThis ? (
-                          <input value={clientEditDraft.phone}
-                            onChange={e => setClientEditDraft(prev => ({ ...prev, phone: e.target.value }))}
-                            className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-w-28"
-                            placeholder="Phone" />
-                        ) : (item.phone || '—')}
-                      </td>
+                      <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs">{item.email}</td>
+                      <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden lg:table-cell text-xs">{item.phone || '—'}</td>
                       <td className="py-2.5 px-3 md:px-4 hidden sm:table-cell">
                         <StatusBadge isActive={isClientActive} />
                       </td>
@@ -268,55 +262,39 @@ export default function ManageClientsPanel({ onView }: Props) {
                       </td>
                       {canManageUsers ? (
                         <td className="py-2.5 px-3 md:px-4">
-                          <div className="flex items-center gap-1">
-                            {isEditingThis ? (
-                              <>
-                                <button type="button" disabled={isSavingThis}
-                                  onClick={() => handleSaveClientEdit(item.id, item.name)}
-                                  className="p-1.5 rounded-sm border border-gray-700 text-gray-200 hover:border-brand-orange hover:text-white disabled:opacity-60"
-                                  title="Save">
-                                  {isSavingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                                </button>
-                                <button type="button" onClick={handleCancelClientEdit}
-                                  className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-gray-500"
-                                  title="Cancel">
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </>
-                            ) : (
-                              <button type="button" onClick={() => handleEditClient(item)}
-                                className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
-                                title="Edit client info">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <button type="button"
+                              onClick={() => handleEditClient(item)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap transition-colors">
+                              <Pencil className="w-3.5 h-3.5" />
+                              Edit Details
+                            </button>
                             <button type="button" onClick={() => onView(item)}
-                              className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
-                              title="View client details">
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap transition-colors">
                               <ExternalLink className="w-3.5 h-3.5" />
+                              View Profile
                             </button>
                             <button type="button" disabled={isTogglingThis}
                               onClick={() => handleToggleStatus(item.id, isClientActive, item.name)}
-                              className={`p-1.5 rounded-sm border text-xs disabled:opacity-60 transition-colors ${
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-60 transition-colors ${
                                 isClientActive
                                   ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
                                   : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
-                              }`}
-                              title={isClientActive ? 'Disable account' : 'Enable account'}>
+                              }`}>
                               {isTogglingThis
-                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
                                 : isClientActive
-                                  ? <Ban className="w-3.5 h-3.5" />
-                                  : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                  ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
+                                  : <><CheckCircle2 className="w-3.5 h-3.5" /><span>Enable</span></>}
                             </button>
                           </div>
                         </td>
                       ) : (
                         <td className="py-2.5 px-3 md:px-4">
                           <button type="button" onClick={() => onView(item)}
-                            className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
-                            title="View client details">
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap transition-colors">
                             <ExternalLink className="w-3.5 h-3.5" />
+                            View Profile
                           </button>
                         </td>
                       )}
@@ -329,6 +307,77 @@ export default function ManageClientsPanel({ onView }: Props) {
           </div>
         )}
       </section>
+
+      {/* Edit Client Modal */}
+      {editingClientId !== null && (() => {
+        const editingClient = clients.find(c => c.id === editingClientId);
+        const isSavingThis = savingClientId === editingClientId;
+        return (
+          <ModalShell
+            title="Edit Client Details"
+            description="Update the client's contact information. Changes will be saved to their account."
+            onClose={() => { if (!isSavingThis) handleCancelClientEdit(); }}
+          >
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Full Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={clientEditDraft.name}
+                  onChange={e => setClientEditDraft(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Client name"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={clientEditDraft.email}
+                  type="email"
+                  onChange={e => setClientEditDraft(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="Email address"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Phone Number <span className="text-gray-600">(optional)</span>
+                </label>
+                <input
+                  value={clientEditDraft.phone}
+                  onChange={e => setClientEditDraft(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Phone number"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={handleCancelClientEdit}
+                  disabled={isSavingThis}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingThis}
+                  onClick={() => handleSaveClientEdit(editingClientId, editingClient?.name ?? '')}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+                >
+                  {isSavingThis
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving...</>
+                    : <><Save className="w-3.5 h-3.5" />Save Changes</>}
+                </button>
+              </div>
+            </div>
+          </ModalShell>
+        );
+      })()}
 
       {confirmDialog && (
         <ConfirmDialog
