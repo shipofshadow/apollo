@@ -187,6 +187,10 @@ class Auth
             throw new RuntimeException('Invalid email or password.', 401);
         }
 
+        if (isset($row['is_active']) && !(bool) $row['is_active']) {
+            throw new RuntimeException('This account has been deactivated. Please contact support.', 403);
+        }
+
         if (self::needsRehash($row['password'])) {
             $db->prepare('UPDATE users SET password = :p WHERE id = :id')
                ->execute([':p' => self::hashPassword($pass), ':id' => $row['id']]);

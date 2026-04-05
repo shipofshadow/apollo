@@ -679,6 +679,7 @@ export interface AdminManagedUser {
   email: string;
   phone: string;
   role: UserRole;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -717,6 +718,22 @@ export const updateAdminUserRoleApi = (token: string, id: number, role: UserRole
     body: JSON.stringify({ role }),
   }, token);
 
+export const updateAdminUserStatusApi = (token: string, id: number, isActive: boolean) =>
+  apiFetch<{ user: AdminManagedUser }>(`/api/admin/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: isActive }),
+  }, token);
+
+export const updateAdminUserInfoApi = (
+  token: string,
+  id: number,
+  data: { name?: string; email?: string; phone?: string }
+) =>
+  apiFetch<{ user: AdminManagedUser }>(`/api/admin/users/${id}/info`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
+
 export const fetchAdminClientsApi = (token: string, params?: { search?: string }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
@@ -724,6 +741,12 @@ export const fetchAdminClientsApi = (token: string, params?: { search?: string }
   const path = query ? `/api/admin/clients?${query}` : '/api/admin/clients';
   return apiFetch<{ clients: ClientAdminSummary[] }>(path, {}, token);
 };
+
+export const fetchAdminClientBookingsApi = (token: string, clientId: number) =>
+  apiFetch<{ bookings: Booking[] }>(`/api/admin/clients/${clientId}/bookings`, {}, token);
+
+export const fetchAdminClientVehiclesApi = (token: string, clientId: number) =>
+  apiFetch<{ vehicles: ClientVehicle[] }>(`/api/admin/clients/${clientId}/vehicles`, {}, token);
 
 export const fetchAdminRolesApi = (token: string) =>
   apiFetch<{ roles: AdminRole[] }>('/api/admin/roles', {}, token);

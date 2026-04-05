@@ -118,6 +118,7 @@ export interface ClientAdminSummary {
   email: string;
   phone: string;
   role: UserRole;
+  is_active: boolean;
   created_at: string;
   bookingCount: number;
   lastBookingAt: string | null;
