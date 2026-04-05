@@ -284,19 +284,17 @@ export default function ManageClientsPanel({ onView }: Props) {
                                 </button>
                               </>
                             ) : (
-                              <>
-                                <button type="button" onClick={() => onView(item)}
-                                  className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
-                                  title="View client details">
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </button>
-                                <button type="button" onClick={() => handleEditClient(item)}
-                                  className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
-                                  title="Edit client info">
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                              </>
+                              <button type="button" onClick={() => handleEditClient(item)}
+                                className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
+                                title="Edit client info">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
                             )}
+                            <button type="button" onClick={() => onView(item)}
+                              className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white"
+                              title="View client details">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
                             <button type="button" disabled={isTogglingThis}
                               onClick={() => handleToggleStatus(item.id, isClientActive, item.name)}
                               className={`p-1.5 rounded-sm border text-xs disabled:opacity-60 transition-colors ${
