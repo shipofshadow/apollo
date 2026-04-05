@@ -145,7 +145,8 @@ export default function UserAccessPanel() {
   const [editingClientId, setEditingClientId] = useState<number | null>(null);
   const [clientEditDraft, setClientEditDraft] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   const [savingClientId, setSavingClientId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'role-matrix' | 'roles' | 'users' | 'clients'>('role-matrix');  const [rolePage, setRolePage] = useState(1);
+  const [activeTab, setActiveTab] = useState<'role-matrix' | 'roles' | 'users' | 'clients'>('role-matrix');
+  const [rolePage, setRolePage] = useState(1);
   const [usersPage, setUsersPage] = useState(1);
   const [clientsPage, setClientsPage] = useState(1);
 

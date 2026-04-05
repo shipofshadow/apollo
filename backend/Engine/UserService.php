@@ -669,7 +669,6 @@ class UserService
         return $this->findById($id);
     }
 
-
     private function issueTokenFor(array $user): string
     {
         return Auth::issueToken([
