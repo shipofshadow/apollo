@@ -17,6 +17,8 @@ import {
   RoleBadge,
   StatusBadge,
   ConfirmDialog,
+  ModalShell,
+  Breadcrumbs,
   Pager,
 } from './_sharedComponents';
 import { type ConfirmDialogState } from './_sharedUtils';
@@ -42,6 +44,7 @@ export default function ManageUsersPanel() {
 
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmingDialog, setConfirmingDialog] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const roleOptions = useMemo<UserRole[]>(() => roles.map(r => r.key).filter(Boolean), [roles]);
   const nonClientRoleOptions = useMemo<UserRole[]>(() => roleOptions.filter(r => r !== 'client'), [roleOptions]);
@@ -114,6 +117,7 @@ export default function ManageUsersPanel() {
       const { user: created } = await createAdminUserApi(token, payload);
       setUsers(prev => [created, ...prev]);
       setNewUser({ name: '', email: '', phone: '', password: '', role: roleOptions.includes('staff') ? 'staff' : (roleOptions[0] ?? newUser.role) });
+      setShowCreateModal(false);
       showToast('User account created.', 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to create user.', 'error');
@@ -187,6 +191,9 @@ export default function ManageUsersPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs items={[{ label: 'Admin' }, { label: 'Manage Users' }]} />
+
       {/* Header */}
       <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand-orange/15 blur-3xl" />
@@ -199,47 +206,18 @@ export default function ManageUsersPanel() {
               Create internal accounts, assign roles, and control access for staff, managers, and admins.
             </p>
           </div>
+          {canManageUsers && (
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add New User
+            </button>
+          )}
         </div>
       </section>
-
-      {/* Create user */}
-      {canManageUsers && (
-        <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-            <UserPlus className="w-3.5 h-3.5" /> Create User Account
-          </p>
-          <form className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3" onSubmit={handleCreateUser}>
-            <input value={newUser.name} onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Full name" required
-              className="bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange" />
-            <input value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-              placeholder="Email" type="email" required
-              className="bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange" />
-            <input value={newUser.phone} onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
-              placeholder="Phone (optional)"
-              className="bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange" />
-            <input value={newUser.password} onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-              placeholder="Password" type="password" minLength={8} required
-              className="bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange" />
-            <div className="flex gap-2">
-              <select value={newUser.role} onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
-                disabled={!roleOptions.length}
-                className="flex-1 bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange">
-                {roleOptions.length > 0
-                  ? roleOptions.map(role => <option key={role} value={role}>{role}</option>)
-                  : <option value="" disabled>No roles available</option>}
-              </select>
-              <button type="submit" disabled={creatingUser || !roleOptions.length}
-                className="px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60">
-                {creatingUser ? 'Creating...' : 'Create'}
-              </button>
-            </div>
-          </form>
-          {!roleOptions.length && (
-            <p className="text-xs text-yellow-400">No roles loaded from API. User creation is disabled while API is offline.</p>
-          )}
-        </section>
-      )}
 
       {/* Users list */}
       {canManageUsers && (
@@ -250,11 +228,13 @@ export default function ManageUsersPanel() {
             </p>
             <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5 flex-wrap">
               <input value={userSearch} onChange={e => setUserSearch(e.target.value)}
-                placeholder="Search users"
+                placeholder="Search by name or email"
+                aria-label="Search users"
                 className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange flex-1 xs:flex-none min-w-0 xs:min-w-40" />
               <div className="flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" aria-hidden="true" />
                 <select value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)}
+                  aria-label="Filter by role"
                   className="bg-brand-darker border border-gray-700 text-white px-2 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange">
                   <option value="">All Roles</option>
                   {nonClientRoleOptions.map(role => <option key={role} value={role}>{role}</option>)}
@@ -280,8 +260,9 @@ export default function ManageUsersPanel() {
           )}
 
           {loadingUsers ? (
-            <div className="py-10 flex items-center justify-center">
+            <div className="py-10 flex items-center justify-center gap-2 text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin text-brand-orange" />
+              <span className="text-xs">Loading users...</span>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-gray-800 -mx-3 md:mx-0">
@@ -298,7 +279,15 @@ export default function ManageUsersPanel() {
                 </thead>
                 <tbody>
                   {pagedUsers.length === 0 ? (
-                    <tr><td colSpan={6} className="py-8 text-center text-xs text-gray-500">No users found.</td></tr>
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                          <Users className="w-8 h-8 text-gray-700" />
+                          <p className="text-sm text-gray-500">No users found.</p>
+                          <p className="text-xs text-gray-600">Try adjusting your search or filter.</p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : pagedUsers.map(item => {
                     const isActive = item.is_active !== false;
                     return (
@@ -307,7 +296,8 @@ export default function ManageUsersPanel() {
                         <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs">{item.email}</td>
                         <td className="py-2.5 px-3 md:px-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <select value={item.role}
+                            <label className="sr-only" htmlFor={`role-select-${item.id}`}>Change role for {item.name}</label>
+                            <select id={`role-select-${item.id}`} value={item.role}
                               disabled={updatingRoleId === item.id || !roleOptions.length}
                               onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
                               className="bg-brand-darker border border-gray-700 text-white px-1.5 py-1 rounded-sm text-xs focus:outline-none focus:border-brand-orange disabled:opacity-60">
@@ -326,17 +316,16 @@ export default function ManageUsersPanel() {
                           <button type="button"
                             disabled={togglingStatusId === item.id}
                             onClick={() => handleToggleStatus(item.id, isActive, item.name)}
-                            className={`p-1.5 rounded-sm border text-xs disabled:opacity-60 transition-colors ${
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-60 transition-colors ${
                               isActive
                                 ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
                                 : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
-                            }`}
-                            title={isActive ? 'Disable account' : 'Enable account'}>
+                            }`}>
                             {togglingStatusId === item.id
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
                               : isActive
-                                ? <Ban className="w-3.5 h-3.5" />
-                                : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
+                                : <><CheckCircle2 className="w-3.5 h-3.5" /><span>Enable</span></>}
                           </button>
                         </td>
                       </tr>
@@ -348,6 +337,111 @@ export default function ManageUsersPanel() {
             </div>
           )}
         </section>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <ModalShell
+          title="Add New User"
+          description="Create an internal account for a staff member, manager, or admin."
+          onClose={() => { if (!creatingUser) setShowCreateModal(false); }}
+        >
+          <form
+            className="space-y-4"
+            onSubmit={e => { handleCreateUser(e); }}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Full Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={newUser.name}
+                  onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Jane Smith"
+                  required
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={newUser.email}
+                  onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="e.g. jane@example.com"
+                  type="email"
+                  required
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Phone Number <span className="text-gray-600">(optional)</span>
+                </label>
+                <input
+                  value={newUser.phone}
+                  onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="e.g. 555-123-4567"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Password <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={newUser.password}
+                  onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Min. 8 characters"
+                  type="password"
+                  minLength={8}
+                  required
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Role <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={newUser.role}
+                  onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
+                  disabled={!roleOptions.length}
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                >
+                  {roleOptions.length > 0
+                    ? roleOptions.map(role => <option key={role} value={role}>{role}</option>)
+                    : <option value="" disabled>No roles available</option>}
+                </select>
+                {!roleOptions.length && (
+                  <p className="text-xs text-yellow-400">No roles loaded from API. User creation is disabled while API is offline.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => { if (!creatingUser) setShowCreateModal(false); }}
+                disabled={creatingUser}
+                className="px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={creatingUser || !roleOptions.length}
+                className="flex items-center gap-2 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+              >
+                {creatingUser
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Creating...</>
+                  : <><UserPlus className="w-3.5 h-3.5" />Create User</>}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
       )}
 
       {confirmDialog && (
