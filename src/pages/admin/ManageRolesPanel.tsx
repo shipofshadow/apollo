@@ -150,7 +150,8 @@ export default function ManageRolesPanel() {
       setRoles(nextRoles);
       refreshRoleEditState(nextRoles);
       setEditingRoleId(null);
-      showToast('Role updated.', 'success');    } catch (e) {
+      showToast('Role updated.', 'success');
+    } catch (e) {
       showToast((e as Error).message ?? 'Failed to update role.', 'error');
     } finally {
       setSavingRoleId(null);
@@ -335,7 +336,11 @@ export default function ManageRolesPanel() {
                   return (
                     <tr key={role.id} className="border-b border-gray-800/70 align-middle text-xs md:text-sm">
                       <td className="py-2.5 px-3 text-white">
-                        <div className="flex items-center gap-1.5">{role.name}<RoleBadge role={role.key} /></div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {role.name}
+                          <RoleBadge role={role.key} />
+                        </div>
+                        <p className="text-[10px] text-gray-600 mt-0.5 font-mono">{role.key}</p>
                       </td>
                       <td className="py-2.5 px-3 text-gray-300 max-w-xs hidden md:table-cell">
                         {role.description || <span className="text-gray-600">No description</span>}
