@@ -254,7 +254,7 @@ export default function Header() {
             )}
           </Link>
           {user && <NotificationBell />}
-          <button className="text-white p-1" onClick={() => setIsMobileMenuOpen(v => !v)} aria-label="Toggle menu">
+          <button className="text-white p-1" onClick={() => setIsMobileMenuOpen(v => !v)} aria-label="Toggle menu" aria-expanded={isMobileMenuOpen}>
             {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
           </button>
         </div>

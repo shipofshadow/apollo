@@ -1,4 +1,4 @@
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -9,7 +9,7 @@ import { formatPrice } from '../utils/formatPrice';
 
 export default function Products() {
   const dispatch = useDispatch<AppDispatch>();
-  const { items: products, status } = useSelector((s: RootState) => s.products);
+  const { items: products, status, error } = useSelector((s: RootState) => s.products);
 
   useEffect(() => {
     dispatch(fetchProductsAsync(null));
@@ -92,7 +92,22 @@ export default function Products() {
           </div>
         )}
 
-        {status !== 'loading' && (
+        {status === 'error' && (
+          <div className="text-center py-24 space-y-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-dark border border-red-900/50 rounded-sm mb-2">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+            </div>
+            <p className="text-gray-400 text-lg">{error ?? 'Failed to load products.'}</p>
+            <button
+              onClick={() => dispatch(fetchProductsAsync(null))}
+              className="inline-flex items-center gap-2 mt-2 px-6 py-2.5 bg-brand-dark border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-white text-sm font-bold uppercase tracking-widest rounded-sm transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try Again
+            </button>
+          </div>
+        )}
+
+        {status !== 'loading' && status !== 'error' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
             <Link 
@@ -144,7 +159,7 @@ export default function Products() {
         </div>
         )}
 
-        {status !== 'loading' && filteredProducts.length === 0 && (
+        {status !== 'loading' && status !== 'error' && filteredProducts.length === 0 && (
           <div className="text-center py-24">
             <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
             <button 
@@ -152,7 +167,7 @@ export default function Products() {
                 setActiveCategory('All');
                 setSearchQuery('');
               }}
-              className="mt-4 text-brand-orange hover:text-white transition-colors underline"
+              className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 bg-brand-dark border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-white text-sm font-bold uppercase tracking-widest rounded-sm transition-colors"
             >
               Clear filters
             </button>

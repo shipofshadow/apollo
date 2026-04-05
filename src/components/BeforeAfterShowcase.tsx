@@ -213,6 +213,7 @@ export default function BeforeAfterShowcase({ cases: propCases }: BeforeAfterSho
                 max={100}
                 value={splitPercent}
                 onChange={(e) => setSplitPercent(Number(e.target.value))}
+                aria-label="Drag to compare before and after"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-col-resize z-40"
               />
             </div>

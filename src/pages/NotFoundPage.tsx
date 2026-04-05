@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Home, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Home, ArrowLeft, Wrench, ShoppingBag, Mail } from 'lucide-react';
 
 export default function NotFoundPage() {
   return (
@@ -20,7 +20,7 @@ export default function NotFoundPage() {
         The page you're looking for doesn't exist or has been moved. Let's get you back on the road.
       </p>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 mb-12">
         <Link
           to="/"
           className="inline-flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm"
@@ -33,6 +33,30 @@ export default function NotFoundPage() {
         >
           <ArrowLeft className="w-4 h-4" /> Go Back
         </button>
+      </div>
+
+      <div className="border-t border-gray-800 pt-10 w-full max-w-md">
+        <p className="text-gray-600 text-xs uppercase tracking-widest mb-5">Or explore these pages</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link
+            to="/services"
+            className="inline-flex items-center gap-2 border border-gray-800 text-gray-400 px-5 py-2 text-sm font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors rounded-sm"
+          >
+            <Wrench className="w-3.5 h-3.5" /> Services
+          </Link>
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-2 border border-gray-800 text-gray-400 px-5 py-2 text-sm font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors rounded-sm"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" /> Products
+          </Link>
+          <Link
+            to="/contact"
+            className="inline-flex items-center gap-2 border border-gray-800 text-gray-400 px-5 py-2 text-sm font-bold uppercase tracking-widest hover:border-brand-orange hover:text-brand-orange transition-colors rounded-sm"
+          >
+            <Mail className="w-3.5 h-3.5" /> Contact
+          </Link>
+        </div>
       </div>
     </div>
   );

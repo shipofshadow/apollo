@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Lightbulb, MonitorPlay, Wrench, ShieldAlert, Zap, CarFront, Loader2 } from 'lucide-react';
+import { Lightbulb, MonitorPlay, Wrench, ShieldAlert, Zap, CarFront, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { fetchServicesAsync } from '../store/servicesSlice';
 import type { AppDispatch, RootState } from '../store';
 import { formatPrice } from '../utils/formatPrice';
@@ -17,7 +17,7 @@ const IconMap: Record<string, React.ElementType> = {
 
 export default function ServicesGrid() {
   const dispatch = useDispatch<AppDispatch>();
-  const { items: services, status } = useSelector((s: RootState) => s.services);
+  const { items: services, status, error } = useSelector((s: RootState) => s.services);
 
   useEffect(() => {
     // Optimization: Only fetch if we haven't already, or handle it based on your slice logic
@@ -50,8 +50,22 @@ export default function ServicesGrid() {
           </div>
         )}
 
+        {/* Error State */}
+        {status === 'error' && (
+          <div className="text-center py-16 bg-brand-darker/50 border border-red-900/30 rounded-sm space-y-3">
+            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
+            <p className="text-gray-400">{error ?? 'Failed to load services.'}</p>
+            <button
+              onClick={() => dispatch(fetchServicesAsync(null))}
+              className="inline-flex items-center gap-2 mt-2 px-6 py-2.5 bg-brand-dark border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-white text-sm font-bold uppercase tracking-widest rounded-sm transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" /> Try Again
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {status !== 'loading' && visible.length === 0 && (
+        {status !== 'loading' && status !== 'error' && visible.length === 0 && (
           <div className="text-center py-16 bg-brand-darker/50 border border-gray-800 rounded-sm">
             <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-400 uppercase tracking-widest">No Services Found</h3>
@@ -60,7 +74,7 @@ export default function ServicesGrid() {
         )}
 
         {/* Grid */}
-        {status !== 'loading' && visible.length > 0 && (
+        {status !== 'loading' && status !== 'error' && visible.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {visible.map((service) => {
               const Icon = IconMap[service.icon] ?? Wrench;
