@@ -256,9 +256,11 @@ class Router
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
-            $r->addRoute('GET',  '/api/admin/users',   'handleAdminUserList');
-            $r->addRoute('POST', '/api/admin/users',   'handleAdminUserCreate');
-            $r->addRoute('PATCH', '/api/admin/users/{id:\d+}/role', 'handleAdminUserRoleUpdate');
+            $r->addRoute('GET',    '/api/admin/users',   'handleAdminUserList');
+            $r->addRoute('POST',   '/api/admin/users',   'handleAdminUserCreate');
+            $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/role',   'handleAdminUserRoleUpdate');
+            $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/status', 'handleAdminUserStatusUpdate');
+            $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/info',   'handleAdminUserInfoUpdate');
             $r->addRoute('GET',  '/api/admin/clients', 'handleAdminClientList');
             $r->addRoute('GET',  '/api/admin/roles',   'handleAdminRoleList');
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
@@ -1744,6 +1746,33 @@ class Router
         $actorId = (int) ($payload['sub'] ?? 0);
         $actorName = (string) ($payload['name'] ?? '');
         $user = (new UserService())->updateRole($id, $role, $actorId > 0 ? $actorId : null, $actorName);
+        echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminUserStatusUpdate(array $vars = []): void
+    {
+        $this->requirePermission('users:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid user id.', 422);
+        }
+        $data     = $this->jsonBody();
+        $isActive = (bool) ($data['is_active'] ?? true);
+        $user     = (new UserService())->updateUserStatus($id, $isActive);
+        echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminUserInfoUpdate(array $vars = []): void
+    {
+        $this->requirePermission('users:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid user id.', 422);
+        }
+        $data = $this->jsonBody();
+        $user = (new UserService())->updateUserInfo($id, $data);
         echo json_encode(['user' => $user]);
     }
 

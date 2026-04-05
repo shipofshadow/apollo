@@ -569,7 +569,7 @@ class UserService
     {
         $search = trim((string) ($filters['search'] ?? ''));
 
-        $sql = "SELECT u.id, u.name, u.email, u.phone, u.role, u.created_at,
+        $sql = "SELECT u.id, u.name, u.email, u.phone, u.role, u.is_active, u.created_at,
                        COUNT(b.id) AS booking_count,
                        MAX(b.created_at) AS last_booking_at
                 FROM users u
@@ -596,6 +596,7 @@ class UserService
                 'email'        => (string) $row['email'],
                 'phone'        => (string) ($row['phone'] ?? ''),
                 'role'         => (string) $row['role'],
+                'is_active'    => isset($row['is_active']) ? (bool) $row['is_active'] : true,
                 'created_at'   => (string) $row['created_at'],
                 'bookingCount' => (int) ($row['booking_count'] ?? 0),
                 'lastBookingAt' => $row['last_booking_at'] !== null ? (string) $row['last_booking_at'] : null,
@@ -607,7 +608,68 @@ class UserService
     // Helpers
     // -------------------------------------------------------------------------
 
-    /** @param array<string, mixed> $user */
+    /**
+     * Enable or disable a user account.
+     *
+     * @return array<string, mixed>
+     */
+    public function updateUserStatus(int $id, bool $isActive): array
+    {
+        $this->findById($id); // throws 404 if not found
+        $this->db->prepare('UPDATE users SET is_active = :is_active WHERE id = :id')
+            ->execute([':is_active' => (int) $isActive, ':id' => $id]);
+        return $this->findById($id);
+    }
+
+    /**
+     * Update editable info fields (name, email, phone) for a user from admin panel.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function updateUserInfo(int $id, array $data): array
+    {
+        $fields = [];
+        $params = [':id' => $id];
+
+        if (array_key_exists('name', $data)) {
+            $name = trim((string) $data['name']);
+            if ($name === '') {
+                throw new RuntimeException('Name is required.', 422);
+            }
+            $fields[]      = 'name = :name';
+            $params[':name'] = $name;
+        }
+
+        if (array_key_exists('email', $data)) {
+            $email = strtolower(trim((string) $data['email']));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new RuntimeException('A valid email address is required.', 422);
+            }
+            $dup = $this->db->prepare('SELECT id FROM users WHERE email = :email AND id <> :id LIMIT 1');
+            $dup->execute([':email' => $email, ':id' => $id]);
+            if ($dup->fetch()) {
+                throw new RuntimeException('That email address is already registered.', 409);
+            }
+            $fields[]       = 'email = :email';
+            $params[':email'] = $email;
+        }
+
+        if (array_key_exists('phone', $data)) {
+            $fields[]       = 'phone = :phone';
+            $params[':phone'] = trim((string) $data['phone']);
+        }
+
+        if (empty($fields)) {
+            return $this->findById($id);
+        }
+
+        $sql = 'UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $this->db->prepare($sql)->execute($params);
+        return $this->findById($id);
+    }
+
+
     private function issueTokenFor(array $user): string
     {
         return Auth::issueToken([
@@ -623,6 +685,7 @@ class UserService
     {
         unset($row['password']);
         $row['avatar_url'] = $row['avatar_url'] ?? null;
+        $row['is_active']  = isset($row['is_active']) ? (bool) $row['is_active'] : true;
         return $row;
     }
 

@@ -679,6 +679,7 @@ export interface AdminManagedUser {
   email: string;
   phone: string;
   role: UserRole;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -715,6 +716,22 @@ export const updateAdminUserRoleApi = (token: string, id: number, role: UserRole
   apiFetch<{ user: AdminManagedUser }>(`/api/admin/users/${id}/role`, {
     method: 'PATCH',
     body: JSON.stringify({ role }),
+  }, token);
+
+export const updateAdminUserStatusApi = (token: string, id: number, isActive: boolean) =>
+  apiFetch<{ user: AdminManagedUser }>(`/api/admin/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: isActive }),
+  }, token);
+
+export const updateAdminUserInfoApi = (
+  token: string,
+  id: number,
+  data: { name?: string; email?: string; phone?: string }
+) =>
+  apiFetch<{ user: AdminManagedUser }>(`/api/admin/users/${id}/info`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   }, token);
 
 export const fetchAdminClientsApi = (token: string, params?: { search?: string }) => {

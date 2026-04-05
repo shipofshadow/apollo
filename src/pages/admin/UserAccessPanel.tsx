@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Pencil, Save, ShieldCheck, Trash2, Users, UserPlus, X } from 'lucide-react';
+import { Ban, CheckCircle2, Filter, Loader2, Pencil, Save, ShieldCheck, Trash2, Users, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -10,7 +10,9 @@ import {
   fetchAdminRolesApi,
   fetchAdminUsersApi,
   updateAdminRoleApi,
+  updateAdminUserInfoApi,
   updateAdminUserRoleApi,
+  updateAdminUserStatusApi,
   type AdminRole,
   type AdminManagedUser,
 } from '../../services/api';
@@ -40,6 +42,30 @@ const PERMISSION_LABELS: Record<string, string> = PERMISSION_CATALOG.reduce((acc
   acc[item.key] = item.label;
   return acc;
 }, {} as Record<string, string>);
+
+const ROLE_BADGE_STYLES: Record<string, string> = {
+  admin:   'bg-red-900/50 text-red-300 border-red-800',
+  manager: 'bg-amber-900/50 text-amber-300 border-amber-800',
+  staff:   'bg-blue-900/50 text-blue-300 border-blue-800',
+  client:  'bg-gray-800 text-gray-400 border-gray-700',
+};
+
+function RoleBadge({ role }: { role: string }) {
+  const cls = ROLE_BADGE_STYLES[role] ?? 'bg-purple-900/50 text-purple-300 border-purple-800';
+  return (
+    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest ${cls}`}>
+      {role}
+    </span>
+  );
+}
+
+function StatusBadge({ isActive }: { isActive: boolean }) {
+  return (
+    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest ${isActive ? 'bg-green-900/50 text-green-300 border-green-800' : 'bg-red-900/50 text-red-300 border-red-800'}`}>
+      {isActive ? 'Active' : 'Disabled'}
+    </span>
+  );
+}
 
 function stringifyPermissions(list: string[]): string {
   return list.join(', ');
@@ -115,13 +141,18 @@ export default function UserAccessPanel() {
   const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
   const [savingRoleId, setSavingRoleId] = useState<number | null>(null);
   const [deletingRoleId, setDeletingRoleId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'role-matrix' | 'roles' | 'users' | 'clients'>('role-matrix');
-  const [rolePage, setRolePage] = useState(1);
+  const [togglingStatusId, setTogglingStatusId] = useState<number | null>(null);
+  const [editingClientId, setEditingClientId] = useState<number | null>(null);
+  const [clientEditDraft, setClientEditDraft] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
+  const [savingClientId, setSavingClientId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'role-matrix' | 'roles' | 'users' | 'clients'>('role-matrix');  const [rolePage, setRolePage] = useState(1);
   const [usersPage, setUsersPage] = useState(1);
   const [clientsPage, setClientsPage] = useState(1);
 
   const [userSearch, setUserSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [clientStatusFilter, setClientStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const [newUser, setNewUser] = useState({
     name: '',
@@ -146,18 +177,37 @@ export default function UserAccessPanel() {
     return [...users].sort((a, b) => a.id - b.id);
   }, [users]);
 
+  const nonClientUsers = useMemo(() => {
+    return sortedUsers.filter(u => u.role !== 'client');
+  }, [sortedUsers]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userRoleFilter) return nonClientUsers;
+    return nonClientUsers.filter(u => u.role === userRoleFilter);
+  }, [nonClientUsers, userRoleFilter]);
+
+  const filteredClients = useMemo(() => {
+    if (clientStatusFilter === 'all') return clients;
+    const wantActive = clientStatusFilter === 'active';
+    return clients.filter(c => (c.is_active !== false) === wantActive);
+  }, [clients, clientStatusFilter]);
+
   const roleOptions = useMemo<UserRole[]>(() => {
     const dynamic = roles.map(r => r.key).filter(Boolean);
     return dynamic;
   }, [roles]);
+
+  const nonClientRoleOptions = useMemo<UserRole[]>(() => {
+    return roleOptions.filter(r => r !== 'client');
+  }, [roleOptions]);
 
   const sortedRoles = useMemo(() => {
     return [...roles].sort((a, b) => a.name.localeCompare(b.name));
   }, [roles]);
 
   const roleTotalPages = Math.max(1, Math.ceil(sortedRoles.length / TABLE_PAGE_SIZE));
-  const usersTotalPages = Math.max(1, Math.ceil(sortedUsers.length / TABLE_PAGE_SIZE));
-  const clientsTotalPages = Math.max(1, Math.ceil(clients.length / TABLE_PAGE_SIZE));
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / TABLE_PAGE_SIZE));
+  const clientsTotalPages = Math.max(1, Math.ceil(filteredClients.length / TABLE_PAGE_SIZE));
 
   const pagedRoles = useMemo(() => {
     const start = (rolePage - 1) * TABLE_PAGE_SIZE;
@@ -166,22 +216,22 @@ export default function UserAccessPanel() {
 
   const pagedUsers = useMemo(() => {
     const start = (usersPage - 1) * TABLE_PAGE_SIZE;
-    return sortedUsers.slice(start, start + TABLE_PAGE_SIZE);
-  }, [sortedUsers, usersPage]);
+    return filteredUsers.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredUsers, usersPage]);
 
   const pagedClients = useMemo(() => {
     const start = (clientsPage - 1) * TABLE_PAGE_SIZE;
-    return clients.slice(start, start + TABLE_PAGE_SIZE);
-  }, [clients, clientsPage]);
+    return filteredClients.slice(start, start + TABLE_PAGE_SIZE);
+  }, [filteredClients, clientsPage]);
 
   const visibleTabs = useMemo(() => {
     const tabs: Array<{ key: 'role-matrix' | 'roles' | 'users' | 'clients'; label: string }> = [
       { key: 'role-matrix', label: 'Role Matrix' },
-      { key: 'clients', label: 'Clients' },
+      { key: 'clients', label: 'Manage Clients' },
     ];
 
     if (canManageUsers) {
-      tabs.splice(1, 0, { key: 'roles', label: 'Roles' }, { key: 'users', label: 'Users' });
+      tabs.splice(1, 0, { key: 'roles', label: 'Roles' }, { key: 'users', label: 'Manage Users' });
     }
 
     return tabs;
@@ -270,8 +320,16 @@ export default function UserAccessPanel() {
   }, [roleTotalPages]);
 
   useEffect(() => {
+    setUsersPage(1);
+  }, [userRoleFilter]);
+
+  useEffect(() => {
     setUsersPage(prev => Math.min(prev, usersTotalPages));
   }, [usersTotalPages]);
+
+  useEffect(() => {
+    setClientsPage(1);
+  }, [clientStatusFilter]);
 
   useEffect(() => {
     setClientsPage(prev => Math.min(prev, clientsTotalPages));
@@ -372,6 +430,77 @@ export default function UserAccessPanel() {
       message: `${label} will be moved from ${currentRole} to ${nextRole}.`,
       confirmLabel: 'Change Role',
       onConfirm: async () => performRoleChange(id, nextRole),
+    });
+  };
+
+  const performToggleUserStatus = async (id: number, makeActive: boolean) => {
+    if (!token || !canManageUsers) return;
+    setTogglingStatusId(id);
+    try {
+      const { user: updated } = await updateAdminUserStatusApi(token, id, makeActive);
+      setUsers(prev => prev.map(item => (item.id === id ? updated : item)));
+      setClients(prev => prev.map(item => (item.id === id ? { ...item, is_active: updated.is_active } : item)));
+      showToast(makeActive ? 'Account enabled.' : 'Account disabled.', 'success');
+    } catch (e) {
+      showToast((e as Error).message ?? 'Failed to update account status.', 'error');
+    } finally {
+      setTogglingStatusId(null);
+    }
+  };
+
+  const handleToggleUserStatus = (id: number, currentIsActive: boolean, name: string) => {
+    const makeActive = !currentIsActive;
+    requestConfirmation({
+      title: makeActive ? 'Enable account?' : 'Disable account?',
+      message: makeActive
+        ? `${name}'s account will be re-enabled and they will be able to log in.`
+        : `${name}'s account will be disabled. They will not be able to log in until re-enabled.`,
+      confirmLabel: makeActive ? 'Enable Account' : 'Disable Account',
+      tone: makeActive ? 'default' : 'danger',
+      onConfirm: async () => performToggleUserStatus(id, makeActive),
+    });
+  };
+
+  const handleEditClient = (client: ClientAdminSummary) => {
+    setEditingClientId(client.id);
+    setClientEditDraft({ name: client.name, email: client.email, phone: client.phone });
+  };
+
+  const handleCancelClientEdit = () => {
+    setEditingClientId(null);
+    setClientEditDraft({ name: '', email: '', phone: '' });
+  };
+
+  const performSaveClientEdit = async (id: number) => {
+    if (!token || !canManageUsers) return;
+    setSavingClientId(id);
+    try {
+      const { user: updated } = await updateAdminUserInfoApi(token, id, {
+        name: clientEditDraft.name.trim(),
+        email: clientEditDraft.email.trim(),
+        phone: clientEditDraft.phone.trim(),
+      });
+      setClients(prev => prev.map(item =>
+        item.id === id
+          ? { ...item, name: updated.name, email: updated.email, phone: updated.phone }
+          : item
+      ));
+      setUsers(prev => prev.map(item => (item.id === id ? updated : item)));
+      setEditingClientId(null);
+      showToast('Client info updated.', 'success');
+    } catch (e) {
+      showToast((e as Error).message ?? 'Failed to update client info.', 'error');
+    } finally {
+      setSavingClientId(null);
+    }
+  };
+
+  const handleSaveClientEdit = (id: number, name: string) => {
+    requestConfirmation({
+      title: 'Save client changes?',
+      message: `Updates to ${name}'s profile will be applied.`,
+      confirmLabel: 'Save Changes',
+      onConfirm: async () => performSaveClientEdit(id),
     });
   };
 
@@ -579,7 +708,10 @@ export default function UserAccessPanel() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {sortedRoles.map(role => (
               <article key={role.id} className="rounded-lg border border-gray-800 bg-brand-darker/70 p-4">
-                <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-1">{role.name}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-xs font-bold uppercase tracking-widest text-brand-orange">{role.name}</p>
+                  <RoleBadge role={role.key} />
+                </div>
                 <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">{role.key}</p>
                 <p className="text-xs text-gray-400 mb-3 min-h-[2.5rem]">{role.description || 'No description.'}</p>
                 <ul className="space-y-1.5 text-xs text-gray-300">
@@ -709,7 +841,12 @@ export default function UserAccessPanel() {
                             onChange={e => setRoleEdits(prev => ({ ...prev, [role.id]: { ...draft, name: e.target.value } }))}
                             className="bg-brand-darker border border-gray-700 text-white px-1.5 md:px-2 py-1 md:py-1.5 rounded-sm text-xs w-24 md:w-40"
                           />
-                        ) : role.name}
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            {role.name}
+                            <RoleBadge role={role.key} />
+                          </div>
+                        )}
                       </td>
                       <td className="py-1.5 md:py-2.5 px-2 md:pr-4 text-gray-300 max-w-xs hidden md:table-cell">
                         {isEditing ? (
@@ -881,15 +1018,28 @@ export default function UserAccessPanel() {
         <section className="rounded-xl border border-gray-800 bg-brand-dark p-3 md:p-5 space-y-3 md:space-y-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" /> Manage Users
+              <Users className="w-3.5 h-3.5" /> Internal Users
             </p>
-            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5">
+            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5 flex-wrap">
               <input
                 value={userSearch}
                 onChange={e => setUserSearch(e.target.value)}
                 placeholder="Search users"
                 className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange flex-1 xs:flex-none min-w-0 xs:min-w-40"
               />
+              <div className="flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                <select
+                  value={userRoleFilter}
+                  onChange={e => setUserRoleFilter(e.target.value)}
+                  className="bg-brand-darker border border-gray-700 text-white px-2 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange"
+                >
+                  <option value="">All Roles</option>
+                  {nonClientRoleOptions.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -903,42 +1053,93 @@ export default function UserAccessPanel() {
             </div>
           </div>
 
+          {nonClientRoleOptions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {nonClientRoleOptions.map(role => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setUserRoleFilter(prev => prev === role ? '' : role)}
+                  className={`transition-opacity ${userRoleFilter && userRoleFilter !== role ? 'opacity-40' : 'opacity-100'}`}
+                >
+                  <RoleBadge role={role} />
+                </button>
+              ))}
+            </div>
+          )}
+
           {loadingUsers ? (
             <div className="py-8 md:py-10 flex items-center justify-center"><Loader2 className="w-4 md:w-5 h-4 md:h-5 animate-spin text-brand-orange" /></div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-gray-800 -mx-3 md:mx-0">
-              <table className="w-full text-left text-xs md:text-sm inline-block md:table min-w-full\">
+              <table className="w-full text-left text-xs md:text-sm">
                 <thead>
                   <tr className="text-gray-500 text-[10px] md:text-[11px] uppercase tracking-widest border-b border-gray-800">
                     <th className="py-1.5 md:py-2 px-3 md:px-4">Name</th>
                     <th className="py-1.5 md:py-2 px-3 md:px-4 hidden md:table-cell">Email</th>
                     <th className="py-1.5 md:py-2 px-3 md:px-4">Role</th>
+                    <th className="py-1.5 md:py-2 px-3 md:px-4 hidden sm:table-cell">Status</th>
                     <th className="py-1.5 md:py-2 px-3 md:px-4 hidden lg:table-cell">Created</th>
+                    <th className="py-1.5 md:py-2 px-3 md:px-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedUsers.map(item => (
-                    <tr key={item.id} className="border-b border-gray-800/70">
-                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-white font-medium">{item.name}</td>
-                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs md:text-sm">{item.email}</td>
-                      <td className="py-1.5 md:py-2.5 px-3 md:px-4">
-                        <select
-                          value={item.role}
-                          disabled={updatingRoleId === item.id || roleOptions.length === 0}
-                          onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
-                          className="bg-brand-darker border border-gray-700 text-white px-1.5 md:px-2 py-1 md:py-1.5 rounded-sm text-xs focus:outline-none focus:border-brand-orange disabled:opacity-60"
-                        >
-                          {roleOptions.map(role => (
-                            <option key={role} value={role}>{role}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden lg:table-cell text-xs md:text-sm">{new Date(item.created_at).toLocaleDateString()}</td>
+                  {pagedUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-xs text-gray-500">No users found.</td>
                     </tr>
-                  ))}
+                  ) : pagedUsers.map(item => {
+                    const isActive = item.is_active !== false;
+                    const isToggling = togglingStatusId === item.id;
+                    const isUpdatingRole = updatingRoleId === item.id;
+                    return (
+                      <tr key={item.id} className={`border-b border-gray-800/70 ${!isActive ? 'opacity-60' : ''}`}>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-white font-medium">{item.name}</td>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs md:text-sm">{item.email}</td>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <select
+                              value={item.role}
+                              disabled={isUpdatingRole || roleOptions.length === 0}
+                              onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
+                              className="bg-brand-darker border border-gray-700 text-white px-1.5 md:px-2 py-1 md:py-1.5 rounded-sm text-xs focus:outline-none focus:border-brand-orange disabled:opacity-60"
+                            >
+                              {roleOptions.map(role => (
+                                <option key={role} value={role}>{role}</option>
+                              ))}
+                            </select>
+                            <RoleBadge role={item.role} />
+                          </div>
+                        </td>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4 hidden sm:table-cell">
+                          <StatusBadge isActive={isActive} />
+                        </td>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden lg:table-cell text-xs md:text-sm">{new Date(item.created_at).toLocaleDateString()}</td>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4">
+                          <button
+                            type="button"
+                            disabled={isToggling}
+                            onClick={() => handleToggleUserStatus(item.id, isActive, item.name)}
+                            className={`p-1 md:px-2 md:py-1.5 rounded-sm border text-xs disabled:opacity-60 transition-colors ${
+                              isActive
+                                ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
+                                : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
+                            }`}
+                            title={isActive ? 'Disable account' : 'Enable account'}
+                          >
+                            {isToggling
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : isActive
+                                ? <Ban className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                : <CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" />}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-              {renderPager(usersPage, usersTotalPages, sortedUsers.length, setUsersPage)}
+              {renderPager(usersPage, usersTotalPages, filteredUsers.length, setUsersPage)}
             </div>
           )}
         </section>
@@ -948,15 +1149,27 @@ export default function UserAccessPanel() {
       <section className="rounded-xl border border-gray-800 bg-brand-dark p-3 md:p-5 space-y-3 md:space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" /> Manage Clients
+            <Users className="w-3.5 h-3.5" /> Client Accounts
           </p>
-          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5\">
+          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5 flex-wrap">
             <input
               value={clientSearch}
               onChange={e => setClientSearch(e.target.value)}
               placeholder="Search clients"
               className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange flex-1 xs:flex-none min-w-0 xs:min-w-40"
             />
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <select
+                value={clientStatusFilter}
+                onChange={e => setClientStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                className="bg-brand-darker border border-gray-700 text-white px-2 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Disabled</option>
+              </select>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -974,31 +1187,128 @@ export default function UserAccessPanel() {
           <div className="py-8 md:py-10 flex items-center justify-center"><Loader2 className="w-4 md:w-5 h-4 md:h-5 animate-spin text-brand-orange" /></div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-800 -mx-3 md:mx-0">
-            <table className="w-full text-left text-xs md:text-sm inline-block md:table min-w-full\">
+            <table className="w-full text-left text-xs md:text-sm">
               <thead>
                 <tr className="text-gray-500 text-[10px] md:text-[11px] uppercase tracking-widest border-b border-gray-800">
                   <th className="py-1.5 md:py-2 px-3 md:px-4">Client</th>
-                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden md:table-cell\">Email</th>
-                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden lg:table-cell\">Phone</th>
-                  <th className="py-1.5 md:py-2 px-3 md:px-4\">Bookings</th>
-                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden xl:table-cell\">Last Booking</th>
+                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden md:table-cell">Email</th>
+                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden lg:table-cell">Phone</th>
+                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden sm:table-cell">Status</th>
+                  <th className="py-1.5 md:py-2 px-3 md:px-4">Bookings</th>
+                  <th className="py-1.5 md:py-2 px-3 md:px-4 hidden xl:table-cell">Last Booking</th>
+                  {canManageUsers && <th className="py-1.5 md:py-2 px-3 md:px-4">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {pagedClients.map(item => (
-                  <tr key={item.id} className="border-b border-gray-800/70\">
-                    <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-white font-medium\">{item.name}</td>
-                    <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs md:text-sm\">{item.email}</td>
-                    <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300 hidden lg:table-cell text-xs md:text-sm\">{item.phone || '—'}</td>
-                    <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300\">{item.bookingCount}</td>
-                    <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden xl:table-cell text-xs md:text-sm\">
-                      {item.lastBookingAt ? new Date(item.lastBookingAt).toLocaleDateString() : '—'}
-                    </td>
+                {pagedClients.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManageUsers ? 7 : 6} className="py-8 text-center text-xs text-gray-500">No clients found.</td>
                   </tr>
-                ))}
+                ) : pagedClients.map(item => {
+                  const isClientActive = item.is_active !== false;
+                  const isEditingThis = editingClientId === item.id;
+                  const isSavingThis = savingClientId === item.id;
+                  const isTogglingThis = togglingStatusId === item.id;
+
+                  return (
+                    <tr key={item.id} className={`border-b border-gray-800/70 align-top ${!isClientActive ? 'opacity-60' : ''}`}>
+                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-white font-medium">
+                        {isEditingThis ? (
+                          <input
+                            value={clientEditDraft.name}
+                            onChange={e => setClientEditDraft(prev => ({ ...prev, name: e.target.value }))}
+                            className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-w-28"
+                            placeholder="Name"
+                          />
+                        ) : item.name}
+                      </td>
+                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs md:text-sm">
+                        {isEditingThis ? (
+                          <input
+                            value={clientEditDraft.email}
+                            onChange={e => setClientEditDraft(prev => ({ ...prev, email: e.target.value }))}
+                            type="email"
+                            className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-w-36"
+                            placeholder="Email"
+                          />
+                        ) : item.email}
+                      </td>
+                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300 hidden lg:table-cell text-xs md:text-sm">
+                        {isEditingThis ? (
+                          <input
+                            value={clientEditDraft.phone}
+                            onChange={e => setClientEditDraft(prev => ({ ...prev, phone: e.target.value }))}
+                            className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-w-28"
+                            placeholder="Phone"
+                          />
+                        ) : (item.phone || '—')}
+                      </td>
+                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 hidden sm:table-cell">
+                        <StatusBadge isActive={isClientActive} />
+                      </td>
+                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300">{item.bookingCount}</td>
+                      <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden xl:table-cell text-xs md:text-sm">
+                        {item.lastBookingAt ? new Date(item.lastBookingAt).toLocaleDateString() : '—'}
+                      </td>
+                      {canManageUsers && (
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4">
+                          <div className="flex items-center gap-0.5 md:gap-1.5">
+                            {isEditingThis ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isSavingThis}
+                                  onClick={() => handleSaveClientEdit(item.id, item.name)}
+                                  className="p-1 md:px-2 md:py-1.5 rounded-sm border border-gray-700 text-xs text-gray-200 hover:border-brand-orange hover:text-white disabled:opacity-60"
+                                  title="Save"
+                                >
+                                  {isSavingThis ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 md:w-3.5 md:h-3.5" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelClientEdit}
+                                  className="p-1 md:px-2 md:py-1.5 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-gray-500"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleEditClient(item)}
+                                className="p-1 md:px-2 md:py-1.5 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-brand-orange hover:text-white"
+                                title="Edit client info"
+                              >
+                                <Pencil className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              disabled={isTogglingThis}
+                              onClick={() => handleToggleUserStatus(item.id, isClientActive, item.name)}
+                              className={`p-1 md:px-2 md:py-1.5 rounded-sm border text-xs disabled:opacity-60 transition-colors ${
+                                isClientActive
+                                  ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
+                                  : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
+                              }`}
+                              title={isClientActive ? 'Disable account' : 'Enable account'}
+                            >
+                              {isTogglingThis
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : isClientActive
+                                  ? <Ban className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                  : <CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5" />}
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-            {renderPager(clientsPage, clientsTotalPages, clients.length, setClientsPage)}
+            {renderPager(clientsPage, clientsTotalPages, filteredClients.length, setClientsPage)}
           </div>
         )}
       </section>
