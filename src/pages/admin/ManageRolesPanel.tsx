@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Pencil, Save, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Loader2, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -13,6 +13,8 @@ import {
   TABLE_PAGE_SIZE,
   RoleBadge,
   ConfirmDialog,
+  ModalShell,
+  Breadcrumbs,
   Pager,
 } from './_sharedComponents';
 import {
@@ -48,6 +50,7 @@ export default function ManageRolesPanel() {
 
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmingDialog, setConfirmingDialog] = useState(false);
+  const [showAddRoleModal, setShowAddRoleModal] = useState(false);
 
   const sortedRoles = useMemo(() => [...roles].sort((a, b) => a.name.localeCompare(b.name)), [roles]);
   const roleTotalPages = Math.max(1, Math.ceil(sortedRoles.length / TABLE_PAGE_SIZE));
@@ -113,6 +116,7 @@ export default function ManageRolesPanel() {
       setRoles(nextRoles);
       refreshRoleEditState(nextRoles);
       setNewRole({ key: '', name: '', description: '', permissions: '' });
+      setShowAddRoleModal(false);
       showToast('Role created.', 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to create role.', 'error');
@@ -193,6 +197,9 @@ export default function ManageRolesPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs items={[{ label: 'Admin' }, { label: 'Manage Roles' }]} />
+
       {/* Header */}
       <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand-orange/15 blur-3xl" />
@@ -205,6 +212,16 @@ export default function ManageRolesPanel() {
               Define roles, assign permissions, and view the full role access matrix.
             </p>
           </div>
+          {canManageRoles && activeView === 'manage' && (
+            <button
+              type="button"
+              onClick={() => setShowAddRoleModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add New Role
+            </button>
+          )}
         </div>
       </section>
 
@@ -238,8 +255,14 @@ export default function ManageRolesPanel() {
             <ShieldCheck className="w-3.5 h-3.5" /> Role Access Matrix
           </p>
           {loadingRoles ? (
-            <div className="py-8 flex items-center justify-center">
+            <div className="py-8 flex items-center justify-center gap-2 text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin text-brand-orange" />
+              <span className="text-xs">Loading roles...</span>
+            </div>
+          ) : sortedRoles.length === 0 ? (
+            <div className="py-12 flex flex-col items-center gap-2">
+              <ShieldCheck className="w-8 h-8 text-gray-700" />
+              <p className="text-sm text-gray-500">No roles defined yet.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -271,77 +294,15 @@ export default function ManageRolesPanel() {
       {activeView === 'manage' && canManageRoles && (
         <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5" /> Create Role
+            <ShieldCheck className="w-3.5 h-3.5" /> All Roles
           </p>
-
-          <form className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-3" onSubmit={handleRoleCreate}>
-            <input
-              value={newRole.key}
-              onChange={e => setNewRole(prev => ({ ...prev, key: e.target.value }))}
-              placeholder="Role key"
-              className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange"
-              required
-            />
-            <input
-              value={newRole.name}
-              onChange={e => {
-                const name = e.target.value;
-                setNewRole(prev => ({ ...prev, name, key: prev.key.trim() === '' ? slugifyRoleKey(name) : prev.key }));
-              }}
-              placeholder="Role name"
-              className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange"
-              required
-            />
-            <input
-              value={newRole.description}
-              onChange={e => setNewRole(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Description"
-              className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange"
-            />
-            <div className="col-span-1 md:col-span-2 xl:col-span-1 flex gap-2">
-              <input
-                value={newRole.permissions}
-                onChange={e => setNewRole(prev => ({ ...prev, permissions: e.target.value }))}
-                placeholder="Permissions"
-                className="flex-1 bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange min-w-0"
-              />
-              <button
-                type="submit"
-                disabled={creatingRole}
-                className="px-3 md:px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 whitespace-nowrap"
-              >
-                {creatingRole ? 'Adding...' : 'Add Role'}
-              </button>
-            </div>
-          </form>
-
-          <div className="border border-gray-800 rounded-lg p-3 bg-brand-darker/50">
-            <p className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">Choose Access</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {PERMISSION_CATALOG.map(item => (
-                <label key={item.key} className="flex items-start gap-2 p-2 rounded-md border border-gray-800 hover:border-gray-700 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hasPermissionInRaw(newRole.permissions, item.key)}
-                    onChange={() => setNewRole(prev => ({ ...prev, permissions: togglePermissionInRaw(prev.permissions, item.key) }))}
-                    className="mt-0.5 accent-brand-orange"
-                  />
-                  <span>
-                    <span className="text-sm text-white font-medium">{item.label}</span>
-                    <span className="block text-xs text-gray-500">{item.description}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
 
           {/* Roles table */}
           <div className="overflow-x-auto rounded-lg border border-gray-800">
             <table className="w-full text-left text-xs md:text-sm">
               <thead>
                 <tr className="text-gray-500 text-[10px] md:text-[11px] uppercase tracking-widest border-b border-gray-800">
-                  <th className="py-2 px-3">Key</th>
-                  <th className="py-2 px-3">Name</th>
+                  <th className="py-2 px-3">Role Name</th>
                   <th className="py-2 px-3 hidden md:table-cell">Description</th>
                   <th className="py-2 px-3 hidden lg:table-cell">Permissions</th>
                   <th className="py-2 px-3">Actions</th>
@@ -350,93 +311,59 @@ export default function ManageRolesPanel() {
               <tbody>
                 {loadingRoles ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center">
+                    <td colSpan={4} className="py-8 text-center">
                       <Loader2 className="w-4 h-4 animate-spin text-brand-orange inline" />
                     </td>
                   </tr>
+                ) : pagedRoles.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <ShieldCheck className="w-8 h-8 text-gray-700" />
+                        <p className="text-sm text-gray-500">No roles found.</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddRoleModal(true)}
+                          className="mt-1 text-xs text-brand-orange hover:underline"
+                        >
+                          Add the first role
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ) : pagedRoles.map(role => {
-                  const draft = roleEdits[role.id] ?? {
-                    key: role.key, name: role.name, description: role.description,
-                    permissions: stringifyPermissions(role.permissions),
-                  };
-                  const isEditing = editingRoleId === role.id;
-                  const isSaving  = savingRoleId === role.id;
                   const isDeleting = deletingRoleId === role.id;
                   return (
-                    <tr key={role.id} className="border-b border-gray-800/70 align-top text-xs md:text-sm">
-                      <td className="py-2.5 px-3 text-gray-300">
-                        {isEditing
-                          ? <input value={draft.key} disabled={role.isSystem}
-                              onChange={e => setRoleEdits(prev => ({ ...prev, [role.id]: { ...draft, key: e.target.value } }))}
-                              className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-28 disabled:opacity-60" />
-                          : role.key}
-                      </td>
+                    <tr key={role.id} className="border-b border-gray-800/70 align-middle text-xs md:text-sm">
                       <td className="py-2.5 px-3 text-white">
-                        {isEditing
-                          ? <input value={draft.name}
-                              onChange={e => setRoleEdits(prev => ({ ...prev, [role.id]: { ...draft, name: e.target.value } }))}
-                              className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-36" />
-                          : <div className="flex items-center gap-1.5">{role.name}<RoleBadge role={role.key} /></div>}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {role.name}
+                          <RoleBadge role={role.key} />
+                        </div>
+                        <p className="text-[10px] text-gray-600 mt-0.5 font-mono">{role.key}</p>
                       </td>
                       <td className="py-2.5 px-3 text-gray-300 max-w-xs hidden md:table-cell">
-                        {isEditing
-                          ? <textarea value={draft.description}
-                              onChange={e => setRoleEdits(prev => ({ ...prev, [role.id]: { ...draft, description: e.target.value } }))}
-                              className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-h-[3rem]" />
-                          : (role.description || 'No description')}
+                        {role.description || <span className="text-gray-600">No description</span>}
                       </td>
                       <td className="py-2.5 px-3 text-gray-400 max-w-xs hidden lg:table-cell">
-                        {isEditing ? (
-                          <div className="space-y-2">
-                            <textarea value={draft.permissions}
-                              onChange={e => setRoleEdits(prev => ({ ...prev, [role.id]: { ...draft, permissions: e.target.value } }))}
-                              className="bg-brand-darker border border-gray-700 text-white px-2 py-1 rounded-sm text-xs w-full min-h-[3rem]" />
-                            <div className="grid grid-cols-1 gap-0.5 max-h-36 overflow-auto pr-1">
-                              {PERMISSION_CATALOG.map(item => (
-                                <label key={item.key} className="flex items-center gap-1 text-[10px] text-gray-400">
-                                  <input
-                                    type="checkbox"
-                                    checked={hasPermissionInRaw(draft.permissions, item.key)}
-                                    onChange={() => setRoleEdits(prev => ({
-                                      ...prev, [role.id]: { ...draft, permissions: togglePermissionInRaw(draft.permissions, item.key) },
-                                    }))}
-                                    className="accent-brand-orange"
-                                  />
-                                  <span>{item.label}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (role.permissions.map(p => stringifyPermissionLabel(p)).join(', ') || 'No permissions')}
+                        {role.permissions.map(p => stringifyPermissionLabel(p)).join(', ') || <span className="text-gray-600">No permissions</span>}
                       </td>
                       <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-1">
-                          {isEditing ? (
-                            <>
-                              <button type="button" disabled={isSaving} onClick={() => handleRoleSave(role.id)}
-                                className="p-1.5 rounded-sm border border-gray-700 text-gray-200 hover:border-brand-orange hover:text-white disabled:opacity-60" title="Save">
-                                <Save className="w-3.5 h-3.5" />
-                              </button>
-                              <button type="button"
-                                onClick={() => {
-                                  setEditingRoleId(null);
-                                  setRoleEdits(prev => ({ ...prev, [role.id]: { key: role.key, name: role.name, description: role.description, permissions: stringifyPermissions(role.permissions) } }));
-                                }}
-                                className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-gray-500" title="Cancel">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          ) : (
-                            <button type="button" onClick={() => setEditingRoleId(role.id)}
-                              className="p-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white" title="Edit">
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button type="button" disabled={role.isSystem || isDeleting}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button type="button"
+                            onClick={() => setEditingRoleId(role.id)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap transition-colors">
+                            <Pencil className="w-3.5 h-3.5" />
+                            Edit Role
+                          </button>
+                          <button type="button"
+                            disabled={role.isSystem || isDeleting}
                             onClick={() => handleRoleDelete(role.id, role.name)}
-                            className="p-1.5 rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 disabled:opacity-40"
-                            title={role.isSystem ? 'System role cannot be deleted' : 'Delete role'}>
-                            <Trash2 className="w-3.5 h-3.5" />
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors"
+                            title={role.isSystem ? 'System roles cannot be deleted' : undefined}>
+                            {isDeleting
+                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Deleting...</span></>
+                              : <><Trash2 className="w-3.5 h-3.5" /><span>Delete Role</span></>}
                           </button>
                         </div>
                       </td>
@@ -449,6 +376,213 @@ export default function ManageRolesPanel() {
           </div>
         </section>
       )}
+
+      {/* Add Role Modal */}
+      {showAddRoleModal && (
+        <ModalShell
+          title="Add New Role"
+          description="Create a custom role and choose which permissions it grants."
+          onClose={() => { if (!creatingRole) { setShowAddRoleModal(false); setNewRole({ key: '', name: '', description: '', permissions: '' }); } }}
+        >
+          <form className="space-y-4" onSubmit={handleRoleCreate}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Role Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={newRole.name}
+                  onChange={e => {
+                    const name = e.target.value;
+                    setNewRole(prev => ({ ...prev, name, key: prev.key.trim() === '' ? slugifyRoleKey(name) : prev.key }));
+                  }}
+                  placeholder="e.g. Technician"
+                  required
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Role Key <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={newRole.key}
+                  onChange={e => setNewRole(prev => ({ ...prev, key: e.target.value }))}
+                  placeholder="e.g. technician (auto-filled)"
+                  required
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange font-mono"
+                />
+                <p className="text-[10px] text-gray-600">Unique identifier used internally. Lowercase letters, numbers, and hyphens only.</p>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Description <span className="text-gray-600">(optional)</span>
+                </label>
+                <input
+                  value={newRole.description}
+                  onChange={e => setNewRole(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="What does this role do?"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Permissions</p>
+              <p className="text-xs text-gray-500">Select the actions this role is allowed to perform.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                {PERMISSION_CATALOG.map(item => (
+                  <label key={item.key} className="flex items-start gap-2 p-2.5 rounded-md border border-gray-800 hover:border-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasPermissionInRaw(newRole.permissions, item.key)}
+                      onChange={() => setNewRole(prev => ({ ...prev, permissions: togglePermissionInRaw(prev.permissions, item.key) }))}
+                      className="mt-0.5 accent-brand-orange shrink-0"
+                    />
+                    <span>
+                      <span className="text-sm text-white font-medium">{item.label}</span>
+                      <span className="block text-xs text-gray-500">{item.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => { if (!creatingRole) { setShowAddRoleModal(false); setNewRole({ key: '', name: '', description: '', permissions: '' }); } }}
+                disabled={creatingRole}
+                className="px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={creatingRole}
+                className="flex items-center gap-2 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+              >
+                {creatingRole
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Creating...</>
+                  : <><Plus className="w-3.5 h-3.5" />Create Role</>}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      )}
+
+      {/* Edit Role Modal */}
+      {editingRoleId !== null && (() => {
+        const editingRole = roles.find(r => r.id === editingRoleId);
+        const draft = roleEdits[editingRoleId] ?? (editingRole ? {
+          key: editingRole.key, name: editingRole.name,
+          description: editingRole.description, permissions: stringifyPermissions(editingRole.permissions),
+        } : { key: '', name: '', description: '', permissions: '' });
+        const isSaving = savingRoleId === editingRoleId;
+        return (
+          <ModalShell
+            title="Edit Role"
+            description="Update the role's name, description, and permissions."
+            onClose={() => {
+              if (!isSaving) {
+                setEditingRoleId(null);
+                if (editingRole) {
+                  setRoleEdits(prev => ({ ...prev, [editingRoleId]: { key: editingRole.key, name: editingRole.name, description: editingRole.description, permissions: stringifyPermissions(editingRole.permissions) } }));
+                }
+              }
+            }}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                    Role Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    value={draft.name}
+                    onChange={e => setRoleEdits(prev => ({ ...prev, [editingRoleId]: { ...draft, name: e.target.value } }))}
+                    placeholder="Role name"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                    Role Key
+                  </label>
+                  <input
+                    value={draft.key}
+                    disabled={editingRole?.isSystem}
+                    onChange={e => setRoleEdits(prev => ({ ...prev, [editingRoleId]: { ...draft, key: e.target.value } }))}
+                    placeholder="role-key"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange font-mono disabled:opacity-60"
+                  />
+                  {editingRole?.isSystem && <p className="text-[10px] text-yellow-500">System role keys cannot be changed.</p>}
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">Description</label>
+                  <textarea
+                    value={draft.description}
+                    onChange={e => setRoleEdits(prev => ({ ...prev, [editingRoleId]: { ...draft, description: e.target.value } }))}
+                    placeholder="Describe what this role can do"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange min-h-[3.5rem] resize-y"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Permissions</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {PERMISSION_CATALOG.map(item => (
+                    <label key={item.key} className="flex items-start gap-2 p-2.5 rounded-md border border-gray-800 hover:border-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hasPermissionInRaw(draft.permissions, item.key)}
+                        onChange={() => setRoleEdits(prev => ({
+                          ...prev, [editingRoleId]: { ...draft, permissions: togglePermissionInRaw(draft.permissions, item.key) },
+                        }))}
+                        className="mt-0.5 accent-brand-orange shrink-0"
+                      />
+                      <span>
+                        <span className="text-sm text-white font-medium">{item.label}</span>
+                        <span className="block text-xs text-gray-500">{item.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => {
+                    if (!isSaving) {
+                      setEditingRoleId(null);
+                      if (editingRole) {
+                        setRoleEdits(prev => ({ ...prev, [editingRoleId]: { key: editingRole.key, name: editingRole.name, description: editingRole.description, permissions: stringifyPermissions(editingRole.permissions) } }));
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleRoleSave(editingRoleId)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+                >
+                  {isSaving
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving...</>
+                    : <><Save className="w-3.5 h-3.5" />Save Changes</>}
+                </button>
+              </div>
+            </div>
+          </ModalShell>
+        );
+      })()}
 
       {confirmDialog && (
         <ConfirmDialog

@@ -2,6 +2,8 @@
  * Shared React components for user management panels.
  * Non-component utilities live in _sharedUtils.ts.
  */
+import type { ReactNode } from 'react';
+import { ChevronRight, X } from 'lucide-react';
 import type { ConfirmDialogState } from './_sharedUtils';
 import { TABLE_PAGE_SIZE } from './_sharedUtils';
 export { TABLE_PAGE_SIZE } from './_sharedUtils';
@@ -36,6 +38,71 @@ export function StatusBadge({ isActive }: { isActive: boolean }) {
   );
 }
 
+// ── Modal shell ───────────────────────────────────────────────────────────────
+
+export function ModalShell({
+  title,
+  description,
+  onClose,
+  children,
+}: {
+  title: string;
+  description?: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 px-4 py-6"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full max-w-lg rounded-xl border border-gray-700 bg-brand-dark shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-800 shrink-0">
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white">{title}</h3>
+            {description && <p className="mt-1 text-xs text-gray-400">{description}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-0.5 text-gray-400 hover:text-white transition-colors shrink-0"
+            aria-label="Close dialog"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5 flex-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Breadcrumbs ───────────────────────────────────────────────────────────────
+
+export function Breadcrumbs({ items }: { items: { label: string; onClick?: () => void }[] }) {
+  return (
+    <nav className="flex items-center gap-1 text-xs text-gray-500 flex-wrap" aria-label="Breadcrumb">
+      {items.map((item, i) => (
+        <span key={i} className="flex items-center gap-1">
+          {i > 0 && <ChevronRight className="w-3 h-3 shrink-0" />}
+          {item.onClick ? (
+            <button
+              type="button"
+              onClick={item.onClick}
+              className="hover:text-white transition-colors"
+            >
+              {item.label}
+            </button>
+          ) : (
+            <span className="text-gray-300">{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
 // ── Confirm dialog ────────────────────────────────────────────────────────────
 
 export function ConfirmDialog({
@@ -50,7 +117,7 @@ export function ConfirmDialog({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
         <h3 className="text-sm font-bold uppercase tracking-widest text-white">{dialog.title}</h3>
         <p className="mt-2 text-sm text-gray-300">{dialog.message}</p>

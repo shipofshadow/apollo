@@ -8,7 +8,7 @@ import {
 } from '../../services/api';
 import type { Booking, ClientAdminSummary, ClientVehicle } from '../../types';
 import { formatStatus } from '../../utils/formatStatus';
-import { StatusBadge } from './_sharedComponents';
+import { StatusBadge, Breadcrumbs } from './_sharedComponents';
 
 const BOOKING_STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
@@ -66,7 +66,10 @@ export default function ClientDetailPanel({ client, onBack }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Back + header */}
+      {/* Breadcrumbs */}
+      <Breadcrumbs items={[{ label: 'Admin' }, { label: 'Manage Clients', onClick: onBack }, { label: client.name }]} />
+
+      {/* Back button */}
       <div className="flex items-center gap-3">
         <button
           type="button"
