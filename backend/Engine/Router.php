@@ -262,6 +262,8 @@ class Router
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/status', 'handleAdminUserStatusUpdate');
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/info',   'handleAdminUserInfoUpdate');
             $r->addRoute('GET',  '/api/admin/clients', 'handleAdminClientList');
+            $r->addRoute('GET',  '/api/admin/clients/{id:\d+}/bookings', 'handleAdminClientBookings');
+            $r->addRoute('GET',  '/api/admin/clients/{id:\d+}/vehicles', 'handleAdminClientVehicles');
             $r->addRoute('GET',  '/api/admin/roles',   'handleAdminRoleList');
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit', 'handleAdminSecurityAuditList');
@@ -1783,6 +1785,30 @@ class Router
         $filters = ['search' => (string) ($_GET['search'] ?? '')];
         $clients = (new UserService())->listClients($filters);
         echo json_encode(['clients' => $clients]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminClientBookings(array $vars = []): void
+    {
+        $this->requirePermission('clients:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid client id.', 422);
+        }
+        $bookings = (new BookingService())->getByUserId($id);
+        echo json_encode(['bookings' => $bookings]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminClientVehicles(array $vars = []): void
+    {
+        $this->requirePermission('clients:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid client id.', 422);
+        }
+        $vehicles = (new VehicleCrudService())->getByUserId($id);
+        echo json_encode(['vehicles' => $vehicles]);
     }
 
     /** @param array<string, string> $vars */

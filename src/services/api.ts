@@ -742,6 +742,12 @@ export const fetchAdminClientsApi = (token: string, params?: { search?: string }
   return apiFetch<{ clients: ClientAdminSummary[] }>(path, {}, token);
 };
 
+export const fetchAdminClientBookingsApi = (token: string, clientId: number) =>
+  apiFetch<{ bookings: Booking[] }>(`/api/admin/clients/${clientId}/bookings`, {}, token);
+
+export const fetchAdminClientVehiclesApi = (token: string, clientId: number) =>
+  apiFetch<{ vehicles: ClientVehicle[] }>(`/api/admin/clients/${clientId}/vehicles`, {}, token);
+
 export const fetchAdminRolesApi = (token: string) =>
   apiFetch<{ roles: AdminRole[] }>('/api/admin/roles', {}, token);
 

@@ -4,7 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, GitBranch,
+  Camera, MessageSquare, GitBranch, Users,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -24,10 +24,14 @@ import OffersPanel          from './admin/OffersPanel';
 import BeforeAfterPanel     from './admin/BeforeAfterPanel';
 import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
-import UserAccessPanel      from './admin/UserAccessPanel';
+import ManageUsersPanel     from './admin/ManageUsersPanel';
+import ManageClientsPanel   from './admin/ManageClientsPanel';
+import ManageRolesPanel     from './admin/ManageRolesPanel';
+import ClientDetailPanel    from './admin/ClientDetailPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
 import ConversationsPage    from './chatbot/ConversationsPage';
 import FlowEditorPage       from './chatbot/FlowEditorPage';
+import type { ClientAdminSummary } from '../types';
 
 const TAB_PATHS: Record<string, string> = {
   analytics: '/admin/dashboard',
@@ -45,7 +49,9 @@ const TAB_PATHS: Record<string, string> = {
   content: '/admin/content',
   faq: '/admin/faq',
   'site-settings': '/admin/site-settings',
-  'user-access': '/admin/user-access',
+  'manage-users': '/admin/manage-users',
+  'manage-clients': '/admin/manage-clients',
+  'manage-roles': '/admin/manage-roles',
   'security-audit': '/admin/security-audit',
   settings: '/admin/account',
 };
@@ -70,12 +76,14 @@ export default function AdminPage() {
   const [collapsed,       setCollapsed]       = useState(false);
   const [mobileOpen,      setMobileOpen]      = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+  const [activeClient,    setActiveClient]    = useState<ClientAdminSummary | null>(null);
   
   // Track which dropdown groups are open
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     chatbot: true,
     shop: true,
     content: true,
+    people: true,
     settings: false,
   });
 
@@ -99,6 +107,9 @@ export default function AdminPage() {
     if (nextTab !== 'appointments') {
       setActiveBookingId(null);
     }
+    if (nextTab !== 'manage-clients') {
+      setActiveClient(null);
+    }
     const state = location.state as { openBookingId?: string } | null;
     if ((location.pathname === '/admin' || location.pathname === '/admin/') && !state?.openBookingId) {
       navigate(TAB_PATHS.analytics, { replace: true });
@@ -109,6 +120,7 @@ export default function AdminPage() {
     const nextPath = TAB_PATHS[key] || TAB_PATHS.analytics;
     setActiveTab(key);
     setActiveBookingId(null);
+    setActiveClient(null);
     setMobileOpen(false);
     navigate(nextPath);
   };
@@ -153,15 +165,15 @@ export default function AdminPage() {
     if (isAdmin) return true;
 
     if (role === 'manager') {
-      return ['analytics', 'appointments', 'calendar', 'user-access', 'security-audit', 'settings'].includes(key);
+      return ['analytics', 'appointments', 'calendar', 'manage-clients', 'manage-roles', 'security-audit', 'settings'].includes(key);
     }
 
     if (role === 'staff') {
-      return ['appointments', 'calendar', 'user-access', 'settings'].includes(key);
+      return ['appointments', 'calendar', 'manage-clients', 'settings'].includes(key);
     }
 
     // Unknown non-client roles get the safest minimum surface.
-    return ['user-access', 'settings'].includes(key);
+    return ['manage-clients', 'settings'].includes(key);
   };
 
   // Grouped Navigation Structure
@@ -196,10 +208,17 @@ export default function AdminPage() {
       ]
     },
     {
+      isGroup: true, key: 'people', label: 'People', icon: Users,
+      children: [
+        { key: 'manage-clients', label: 'Manage Clients', icon: Users },
+        { key: 'manage-users',   label: 'Manage Users',   icon: UserCog },
+        { key: 'manage-roles',   label: 'Manage Roles',   icon: ShieldCheck },
+      ]
+    },
+    {
       isGroup: true, key: 'settings', label: 'Settings', icon: SlidersHorizontal,
       children: [
         { key: 'site-settings', label: 'Site Config', icon: SlidersHorizontal },
-        { key: 'user-access',   label: 'User Access', icon: ShieldCheck },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
         { key: 'settings',      label: 'Account',     icon: UserCog },
       ]
@@ -209,7 +228,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user) return;
     if (canAccessTab(activeTab)) return;
-    const fallback = role === 'staff' ? 'appointments' : (role === 'manager' ? 'analytics' : 'user-access');
+    const fallback = role === 'staff' ? 'appointments' : (role === 'manager' ? 'analytics' : 'manage-clients');
     setActiveTab(fallback);
     setActiveBookingId(null);
     navigate(TAB_PATHS[fallback] || TAB_PATHS.analytics, { replace: true });
@@ -249,7 +268,25 @@ export default function AdminPage() {
       case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;
       case 'site-settings': return <SiteSettingsPanel />;
-      case 'user-access':   return <UserAccessPanel />;
+      case 'manage-users':  return <ManageUsersPanel />;
+      case 'manage-roles':  return <ManageRolesPanel />;
+      case 'manage-clients':
+        if (activeClient) {
+          return (
+            <ClientDetailPanel
+              client={activeClient}
+              onBack={() => { setActiveClient(null); navigate(TAB_PATHS['manage-clients']); }}
+            />
+          );
+        }
+        return (
+          <ManageClientsPanel
+            onView={client => {
+              setActiveClient(client);
+              navigate(TAB_PATHS['manage-clients']);
+            }}
+          />
+        );
       case 'security-audit': return <SecurityAuditPanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;
