@@ -99,7 +99,7 @@ export default function Header() {
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center hover:opacity-80 transition-opacity z-50">
           <img src={LOGO_URL} alt="1625 Autolab Logo"
-            className="h-10 md:h-12 w-auto object-contain transition-all duration-300"
+            className="h-8 md:h-10 w-auto object-contain transition-all duration-300"
             referrerPolicy="no-referrer" />
         </Link>
 
