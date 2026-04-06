@@ -1,6 +1,6 @@
 // ── Auth ───────────────────────────────────────────────────────────────────
 
-export type UserRole = string;
+export type UserRole = 'admin' | 'manager' | 'staff' | 'client';
 
 export interface User {
   id: number;

@@ -19,6 +19,11 @@ import {
 import type { ClientAdminSummary, UserRole } from '../../types';
 
 const TABLE_PAGE_SIZE = 8;
+const USER_ROLES: readonly UserRole[] = ['admin', 'manager', 'staff', 'client'];
+
+function isUserRole(value: string): value is UserRole {
+  return USER_ROLES.includes(value as UserRole);
+}
 
 const PERMISSION_CATALOG = [
   { key: 'analytics:view', label: 'View Analytics', description: 'Can view dashboard charts and reports.' },
@@ -155,7 +160,7 @@ export default function UserAccessPanel() {
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [clientStatusFilter, setClientStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
-  const [newUser, setNewUser] = useState({
+  const [newUser, setNewUser] = useState<{ name: string; email: string; phone: string; password: string; role: UserRole }>({
     name: '',
     email: '',
     phone: '',
@@ -194,7 +199,7 @@ export default function UserAccessPanel() {
   }, [clients, clientStatusFilter]);
 
   const roleOptions = useMemo<UserRole[]>(() => {
-    const dynamic = roles.map(r => r.key).filter(Boolean);
+    const dynamic = roles.map(r => r.key).filter(isUserRole);
     return dynamic;
   }, [roles]);
 

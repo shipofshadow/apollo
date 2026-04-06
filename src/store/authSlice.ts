@@ -31,6 +31,19 @@ function clearStorage(): void {
   } catch { /* ignore */ }
 }
 
+function decodeJwtPayload(token: string): { exp?: number } {
+  const parts = token.split('.');
+  if (parts.length < 2) throw new Error('Invalid token');
+
+  const payloadPart = parts[1]
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  // JWT payload uses base64url; pad to valid base64 length before decoding.
+  const paddedPayload = payloadPart + '='.repeat((4 - (payloadPart.length % 4)) % 4);
+  return JSON.parse(atob(paddedPayload)) as { exp?: number };
+}
+
 function loadFromStorage(): { token: string | null; refreshToken: string | null; user: User | null } {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -39,8 +52,7 @@ function loadFromStorage(): { token: string | null; refreshToken: string | null;
     if (!token || !refreshToken || !raw) return { token: null, refreshToken: null, user: null };
 
     // Decode the JWT payload (middle segment) to check expiry without a lib
-    const parts = token.split('.');
-    const payload = JSON.parse(atob(parts[1]));
+    const payload = decodeJwtPayload(token);
     if ((payload.exp ?? 0) * 1000 < Date.now()) {
       // Token expired but we have refresh token
       return { token: null, refreshToken, user: null };

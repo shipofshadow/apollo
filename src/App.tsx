@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Provider } from 'react-redux';
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { store } from './store';
@@ -8,48 +9,47 @@ import ToastContainer from './components/ToastContainer';
 import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import WebsiteChatWidget from './components/chatbot/WebsiteChatWidget';
 import { useNotificationPoller } from './hooks/useNotificationPoller';
 
-// Public pages
-import Home from './pages/Home';
-import ServicesPage from './pages/ServicesPage';
-import ServiceDetail from './pages/ServiceDetail';
-import Products from './pages/Products';
-import ProductDetail from './pages/ProductDetail';
-import CartPage from './pages/CartPage';
-import CheckoutPage from './pages/CheckoutPage';
-import Portfolio from './pages/Portfolio';
-import About from './pages/About';
-import BookingPage from './pages/BookingPage';
-import Blog from './pages/Blog';
-import BlogPostDetail from './pages/BlogPostDetail';
-import FaqPage from './pages/Faq';
-import ContactPage from './pages/Contact';
-import NotFoundPage from './pages/NotFoundPage';
+const Home = lazy(() => import('./pages/Home'));
+const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const ServiceDetail = lazy(() => import('./pages/ServiceDetail'));
+const Products = lazy(() => import('./pages/Products'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const CartPage = lazy(() => import('./pages/CartPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const Portfolio = lazy(() => import('./pages/Portfolio'));
+const About = lazy(() => import('./pages/About'));
+const BookingPage = lazy(() => import('./pages/BookingPage'));
+const Blog = lazy(() => import('./pages/Blog'));
+const BlogPostDetail = lazy(() => import('./pages/BlogPostDetail'));
+const FaqPage = lazy(() => import('./pages/Faq'));
+const ContactPage = lazy(() => import('./pages/Contact'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const ClientLayout = lazy(() => import('./pages/client/ClientLayout'));
+const ClientDashboard = lazy(() => import('./pages/client/ClientDashboard'));
+const MyBookings = lazy(() => import('./pages/client/MyBookings'));
+const BookingDetail = lazy(() => import('./pages/client/BookingDetail'));
+const MyGarage = lazy(() => import('./pages/client/MyGarage'));
+const Profile = lazy(() => import('./pages/client/Profile'));
+const MyOrders = lazy(() => import('./pages/client/MyOrders'));
+const OrderReceiptPage = lazy(() => import('./pages/OrderReceiptPage'));
+const Admin = lazy(() => import('./pages/Admin'));
+const BuildShowcase = lazy(() => import('./pages/BuildShowcase'));
 
-// Auth pages
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-
-// Client portal
-import ClientLayout from './pages/client/ClientLayout';
-import ClientDashboard from './pages/client/ClientDashboard';
-import MyBookings from './pages/client/MyBookings';
-import BookingDetail from './pages/client/BookingDetail';
-import MyGarage from './pages/client/MyGarage';
-import Profile from './pages/client/Profile';
-import MyOrders from './pages/client/MyOrders';
-import OrderReceiptPage from './pages/OrderReceiptPage';
-
-
-// Admin
-import Admin from './pages/Admin';
-
-// Build Showcase (public build mini-site)
-import BuildShowcase from './pages/BuildShowcase';
+function RouteFallback() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center text-gray-400">
+      Loading page...
+    </div>
+  );
+}
 
 /** Wraps public-facing routes with the site Header and Footer. */
 function PublicLayout() {
@@ -70,7 +70,9 @@ function AppInner() {
   useNotificationPoller();
 
   return (
-    <Routes>
+    <AppErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
 
       {/* ── Public website — has Header + Footer ────────────── */}
       <Route element={<PublicLayout />}>
@@ -144,7 +146,9 @@ function AppInner() {
         }
       />
 
-    </Routes>
+        </Routes>
+      </Suspense>
+    </AppErrorBoundary>
   );
 }
 

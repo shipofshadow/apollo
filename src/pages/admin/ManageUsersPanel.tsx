@@ -23,6 +23,12 @@ import {
 } from './_sharedComponents';
 import { type ConfirmDialogState } from './_sharedUtils';
 
+const USER_ROLES: readonly UserRole[] = ['admin', 'manager', 'staff', 'client'];
+
+function isUserRole(value: string): value is UserRole {
+  return USER_ROLES.includes(value as UserRole);
+}
+
 export default function ManageUsersPanel() {
   const { token, user } = useAuth();
   const { showToast } = useToast();
@@ -40,13 +46,19 @@ export default function ManageUsersPanel() {
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
 
-  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', password: '', role: 'staff' });
+  const [newUser, setNewUser] = useState<{ name: string; email: string; phone: string; password: string; role: UserRole }>({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'staff',
+  });
 
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmingDialog, setConfirmingDialog] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const roleOptions = useMemo<UserRole[]>(() => roles.map(r => r.key).filter(Boolean), [roles]);
+  const roleOptions = useMemo<UserRole[]>(() => roles.map(r => r.key).filter(isUserRole), [roles]);
   const nonClientRoleOptions = useMemo<UserRole[]>(() => roleOptions.filter(r => r !== 'client'), [roleOptions]);
 
   const nonClientUsers = useMemo(() => users.filter(u => u.role !== 'client'), [users]);
