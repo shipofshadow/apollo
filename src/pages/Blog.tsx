@@ -1,7 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { BookOpen, Calendar, Search } from 'lucide-react';
+import { ArrowRight, BookOpen, Calendar, Search } from 'lucide-react';
+
+function stripHtml(html: string): string {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent ?? tmp.innerText ?? '';
+}
 import { fetchBlogPostsAsync } from '../store/contentSlice';
 import type { AppDispatch, RootState } from '../store';
 import { SkeletonBlogCard } from '../components/Skeleton';
@@ -79,8 +85,11 @@ export default function Blog() {
         {status !== 'loading' && filteredPosts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPosts.map(post => (
-              <article key={post.id}
-                className="bg-brand-dark border border-gray-800 rounded-sm flex flex-col hover:border-brand-orange/50 transition-colors group">
+              <Link
+                key={post.id}
+                to={`/blog/${post.id}`}
+                className="bg-brand-dark border border-gray-800 rounded-sm flex flex-col hover:border-brand-orange/50 transition-colors group"
+              >
                 {post.coverImage && (
                   <div className="h-48 w-full overflow-hidden rounded-t-sm">
                     <img
@@ -104,10 +113,13 @@ export default function Blog() {
                     {post.title}
                   </h2>
                   <p className="text-gray-400 text-sm leading-relaxed flex-grow line-clamp-4">
-                    {post.content}
+                    {stripHtml(post.content)}
                   </p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs text-brand-orange font-bold uppercase tracking-widest">
+                    Read more <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         )}

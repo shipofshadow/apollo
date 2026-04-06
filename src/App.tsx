@@ -23,6 +23,7 @@ import Portfolio from './pages/Portfolio';
 import About from './pages/About';
 import BookingPage from './pages/BookingPage';
 import Blog from './pages/Blog';
+import BlogPostDetail from './pages/BlogPostDetail';
 import FaqPage from './pages/Faq';
 import ContactPage from './pages/Contact';
 import NotFoundPage from './pages/NotFoundPage';
@@ -83,6 +84,7 @@ function AppInner() {
         <Route path="/portfolio"    element={<Portfolio />} />
         <Route path="/builds/:slug" element={<BuildShowcase />} />
         <Route path="/blog"         element={<Blog />} />
+        <Route path="/blog/:id"     element={<BlogPostDetail />} />
         <Route path="/faq"          element={<FaqPage />} />
         <Route path="/contact"      element={<ContactPage />} />
         <Route path="/about"        element={<About />} />
