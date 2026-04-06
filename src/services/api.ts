@@ -6,6 +6,9 @@ import { BACKEND_URL } from '../config';
 export const API_OFFLINE_EVENT = 'apollo:api-offline';
 export const AUTH_EXPIRED_EVENT = 'apollo:auth-expired';
 
+const API_TIMEOUT_MS = 20_000;
+const MAX_RETRIES = 2;
+
 function notifyApiOffline(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(API_OFFLINE_EVENT));
@@ -15,6 +18,14 @@ function notifyApiOffline(): void {
 function notifyAuthExpired(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  }
+}
+
+async function safeJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
   }
 }
 
@@ -29,23 +40,56 @@ async function apiFetch<T>(
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  let response: Response;
-  try {
-    response = await fetch(`${BACKEND_URL}${path}`, { ...options, headers });
-  } catch {
-    notifyApiOffline();
-    throw new Error('API is offline.');
+  const method = (options.method ?? 'GET').toUpperCase();
+  const isReadOnly = method === 'GET' || method === 'HEAD';
+
+  let lastError: Error = new Error('API is offline.');
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(`${BACKEND_URL}${path}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      lastError = isAbort
+        ? new Error('Request timed out. Please try again.')
+        : new Error('API is offline.');
+
+      if (isReadOnly && attempt < MAX_RETRIES) continue;
+
+      if (!isAbort) notifyApiOffline();
+      throw lastError;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    // Retry on 5xx for read-only requests
+    if (response.status >= 500 && isReadOnly && attempt < MAX_RETRIES) {
+      lastError = new Error(`Request failed (${response.status})`);
+      continue;
+    }
+
+    const data = await safeJson(response);
+    if (!response.ok) {
+      if (response.status === 401) notifyAuthExpired();
+      throw new Error((data as { detail?: string } | null)?.detail ?? `Request failed (${response.status})`);
+    }
+    return data as T;
   }
 
-  const data = await response.json();
-  if (!response.ok) {
-    // Auto-logout on token expiry
-    if (response.status === 401) {
-      notifyAuthExpired();
-    }
-    throw new Error(data?.detail ?? `Request failed (${response.status})`);
-  }
-  return data as T;
+  throw lastError;
 }
 
 // ── Auth API ─────────────────────────────────────────────────────────────────
@@ -91,11 +135,9 @@ export const uploadProfileAvatarApi = async (token: string, file: File): Promise
     notifyApiOffline();
     throw new Error('API is offline.');
   }
-  const data = await response.json();
+  const data = await safeJson(response) as { url?: string; detail?: string } | null;
   if (!response.ok) {
-    if (response.status === 401) {
-      notifyAuthExpired();
-    }
+    if (response.status === 401) notifyAuthExpired();
     throw new Error(data?.detail ?? `Upload failed (${response.status})`);
   }
   return (data as { url: string }).url;
@@ -177,12 +219,8 @@ export const exportSecurityAuditCsvApi = async (token: string, limit = 1000): Pr
   }
 
   if (!response.ok) {
-    try {
-      const data = await response.json();
-      throw new Error(data?.detail ?? `Request failed (${response.status})`);
-    } catch (e: unknown) {
-      throw new Error((e as Error).message ?? `Request failed (${response.status})`);
-    }
+    const data = await safeJson(response) as { detail?: string } | null;
+    throw new Error(data?.detail ?? `Request failed (${response.status})`);
   }
 
   return response.blob();
@@ -281,7 +319,7 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
     notifyApiOffline();
     throw new Error('API is offline.');
   }
-  const data = await response.json();
+  const data = await safeJson(response) as { urls?: string[]; detail?: string } | null;
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
   return (data as { urls: string[] }).urls;
 };
@@ -306,7 +344,7 @@ export const uploadAdminImageApi = async (
     notifyApiOffline();
     throw new Error('API is offline.');
   }
-  const data = await response.json();
+  const data = await safeJson(response) as { url?: string; detail?: string } | null;
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
   return (data as { url: string }).url;
 };
@@ -432,7 +470,7 @@ export const uploadBuildUpdateMediaApi = async (
     notifyApiOffline();
     throw new Error('API is offline.');
   }
-  const data = await response.json();
+  const data = await safeJson(response) as { urls?: string[]; detail?: string } | null;
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
   return (data as { urls: string[] }).urls;
 };
@@ -994,8 +1032,8 @@ export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<F
     throw new Error('API is offline.');
   }
 
-  const data = await response.json();
-  if (!response.ok) throw new Error(data?.detail ?? 'Failed to fetch Facebook posts.');
+  const data = await safeJson(response) as Record<string, unknown> | null;
+  if (!response.ok) throw new Error((data?.detail as string | undefined) ?? 'Failed to fetch Facebook posts.');
 
   const nextCursor: string | null = data?.paging?.cursors?.after ?? null;
   const hasNext: boolean = Boolean(data?.paging?.next);
@@ -1156,7 +1194,7 @@ export const uploadMyVehicleImageApi = async (token: string, file: File): Promis
     throw new Error('API is offline.');
   }
 
-  const data = await response.json();
+  const data = await safeJson(response) as { url?: string; detail?: string } | null;
   if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
   return (data as { url: string }).url;
 };
