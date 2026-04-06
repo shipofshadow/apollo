@@ -1018,6 +1018,17 @@ export interface FacebookPostsPage {
   nextCursor: string | null;
 }
 
+type FacebookPostsResponse = {
+  data?: FacebookPost[];
+  detail?: string;
+  paging?: {
+    next?: string;
+    cursors?: {
+      after?: string;
+    };
+  };
+};
+
 export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<FacebookPostsPage> => {
   const params = new URLSearchParams();
   if (after) params.set('after', after);
@@ -1032,14 +1043,14 @@ export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<F
     throw new Error('API is offline.');
   }
 
-  const data = await safeJson(response) as Record<string, unknown> | null;
-  if (!response.ok) throw new Error((data?.detail as string | undefined) ?? 'Failed to fetch Facebook posts.');
+  const data = await safeJson(response) as FacebookPostsResponse | null;
+  if (!response.ok) throw new Error(data?.detail ?? 'Failed to fetch Facebook posts.');
 
   const nextCursor: string | null = data?.paging?.cursors?.after ?? null;
   const hasNext: boolean = Boolean(data?.paging?.next);
 
   return {
-    posts: (data.data ?? []) as FacebookPost[],
+    posts: data?.data ?? [],
     nextCursor: hasNext ? nextCursor : null,
   };
 };
