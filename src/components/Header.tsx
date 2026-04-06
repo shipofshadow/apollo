@@ -17,11 +17,8 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isChatbotDropdownOpen, setIsChatbotDropdownOpen] = useState(false);
-  const [isMobileChatbotOpen, setIsMobileChatbotOpen] = useState(false);
   const [cartItemsCount, setCartItemsCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const chatbotDropdownRef = useRef<HTMLDivElement>(null);
 
 
 
@@ -31,25 +28,6 @@ export default function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-      if (chatbotDropdownRef.current && !chatbotDropdownRef.current.contains(e.target as Node)) {
-        setIsChatbotDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-    setIsDropdownOpen(false);
-    setIsChatbotDropdownOpen(false);
-    setIsMobileChatbotOpen(false);
-  }, [location.pathname]);
 
   useEffect(() => {
     document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
@@ -66,7 +44,6 @@ export default function Header() {
   const handleLogout = async () => {
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
-    setIsChatbotDropdownOpen(false);
     await logout();
     navigate('/', { replace: true });
   };
@@ -145,33 +122,6 @@ export default function Header() {
               {link.name}
             </Link>
           ))}
-
-          {/* Chatbot dropdown — visible to admin/manager/staff only */}
-          {user && user.role !== 'client' && (
-            <div className="relative" ref={chatbotDropdownRef}>
-              <button
-                onClick={() => setIsChatbotDropdownOpen(v => !v)}
-                className={`flex items-center gap-1.5 text-sm font-bold uppercase tracking-widest transition-colors ${
-                  location.pathname.startsWith('/chatbot') ? 'text-brand-orange' : 'text-gray-300 hover:text-brand-orange'
-                }`}
-              >
-                Chatbot
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isChatbotDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {isChatbotDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-brand-dark border border-gray-700 rounded-sm shadow-2xl py-1 z-50">
-                  <Link to="/chatbot/conversations"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors">
-                    <MessageSquare className="w-4 h-4 text-brand-orange" /> Conversations
-                  </Link>
-                  <Link to="/chatbot/flow-editor"
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition-colors">
-                    <GitBranch className="w-4 h-4 text-brand-orange" /> Flow Editor
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
         </nav>
 
         {/* Desktop Auth/Actions - Shifted to lg breakpoint */}
@@ -274,33 +224,7 @@ export default function Header() {
             </Link>
           ))}
 
-          {/* Chatbot section — mobile */}
-          {user && user.role !== 'client' && (
-            <div className="border-b border-gray-800/50">
-              <button
-                onClick={() => setIsMobileChatbotOpen(v => !v)}
-                className={`w-full flex items-center justify-between py-3 px-2 text-base font-bold uppercase tracking-widest transition-colors ${
-                  location.pathname.startsWith('/chatbot') ? 'text-brand-orange' : 'text-gray-300 hover:text-brand-orange'
-                }`}
-              >
-                <span>Chatbot</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${isMobileChatbotOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {isMobileChatbotOpen && (
-                <div className="pl-4 pb-2 space-y-1">
-                  <Link to="/chatbot/conversations"
-                    className="flex items-center gap-3 py-2 px-2 text-sm text-gray-300 hover:text-brand-orange transition-colors font-semibold uppercase tracking-widest">
-                    <MessageSquare className="w-4 h-4" /> Conversations
-                  </Link>
-                  <Link to="/chatbot/flow-editor"
-                    className="flex items-center gap-3 py-2 px-2 text-sm text-gray-300 hover:text-brand-orange transition-colors font-semibold uppercase tracking-widest">
-                    <GitBranch className="w-4 h-4" /> Flow Editor
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
+    
           {!user ? (
             <div className="flex flex-col gap-3 mt-6">
               <Link to="/login"
