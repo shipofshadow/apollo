@@ -732,6 +732,99 @@ export interface AdminRole {
   updated_at: string | null;
 }
 
+export interface AdminEmailConfig {
+  configured: boolean;
+  fromSet: boolean;
+  adminSet: boolean;
+  fromName: string;
+  fromHint: string;
+  adminHint: string;
+  transport: 'smtp' | 'mail';
+  smtpHost: string;
+  smtpPort: number;
+  mailbox?: {
+    incoming: {
+      imap: { host: string; port: number; encryption: string };
+      pop: { host: string; port: number; encryption: string };
+    };
+    outgoing: {
+      smtp: { host: string; port: number; encryption: string };
+    };
+    usernameHint?: string;
+    defaultFolder?: string;
+    supported?: boolean;
+    configured?: boolean;
+    capabilities: {
+      send: boolean;
+      receive: boolean;
+    };
+    receiveHint?: string;
+  };
+}
+
+export interface AdminEmailTestResult {
+  sent: boolean;
+  recipient: string;
+  reason: string | null;
+}
+
+export interface AdminEmailSendPayload {
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string[];
+  bcc?: string[];
+  isHtml?: boolean;
+  attachments?: Array<{
+    name: string;
+    type: string;
+    data: string;
+  }>;
+}
+
+export interface AdminInboxMessage {
+  uid: number;
+  subject: string;
+  from: string;
+  date: string;
+  seen: boolean;
+  snippet: string;
+  hasAttachments?: boolean;
+  threadKey?: string;
+}
+
+export interface AdminInboxListResponse {
+  supported: boolean;
+  configured: boolean;
+  folder: string;
+  messages: AdminInboxMessage[];
+  reason: string | null;
+}
+
+export interface AdminInboxDetail {
+  uid: number;
+  folder: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  seen: boolean;
+  snippet: string;
+  textBody: string;
+  htmlBody: string;
+  hasAttachments?: boolean;
+  attachments?: Array<{
+    name: string;
+    size: number;
+    mime: string;
+    partNumber: string;
+  }>;
+  threadKey?: string;
+  messageId?: string;
+  references?: string;
+  inReplyTo?: string;
+}
+
 export const fetchAdminUsersApi = (token: string, params?: { search?: string; role?: UserRole | '' }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);
@@ -812,6 +905,114 @@ export const deleteAdminRoleApi = (token: string, id: number) =>
   apiFetch<{ message: string }>(`/api/admin/roles/${id}`, {
     method: 'DELETE',
   }, token);
+
+export const fetchAdminEmailConfigApi = (token: string) =>
+  apiFetch<{ config: AdminEmailConfig }>('/api/admin/email/config', {}, token);
+
+export const sendAdminEmailTestApi = (token: string, recipient?: string) =>
+  apiFetch<{ result: AdminEmailTestResult }>('/api/admin/email/test', {
+    method: 'POST',
+    body: JSON.stringify({ recipient: recipient?.trim() || '' }),
+  }, token);
+
+export const sendAdminEmailApi = (token: string, payload: AdminEmailSendPayload) =>
+  apiFetch<{ result: AdminEmailTestResult }>('/api/admin/email/send', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, token);
+
+export const uploadEmailImageApi = async (token: string, file: File): Promise<{ url: string }> => {
+  const form = new FormData();
+  form.append('image', file);
+  const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
+  const res = await fetch(`${BASE_URL}/api/admin/email/image-upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { message?: string };
+    throw new Error(err.message ?? `Image upload failed (${res.status})`);
+  }
+  return res.json() as Promise<{ url: string }>;
+};
+
+export const fetchAdminEmailFoldersApi = (token: string) =>
+  apiFetch<{
+    folders: {
+      supported: boolean;
+      configured: boolean;
+      folders: string[];
+      reason: string | null;
+    };
+  }>('/api/admin/email/folders', {}, token);
+
+export const fetchAdminEmailInboxApi = (
+  token: string,
+  params?: { folder?: string; limit?: number; q?: string; unread?: boolean; hasAttachments?: boolean }
+) => {
+  const query = new URLSearchParams();
+  if (params?.folder) query.set('folder', params.folder);
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.q) query.set('q', params.q);
+  if (params?.unread) query.set('unread', '1');
+  if (params?.hasAttachments) query.set('hasAttachments', '1');
+  const qs = query.toString();
+  return apiFetch<{ inbox: AdminInboxListResponse }>(`/api/admin/email/inbox${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export const fetchAdminEmailMessageApi = (token: string, uid: number, folder?: string) => {
+  const query = new URLSearchParams();
+  if (folder) query.set('folder', folder);
+  const qs = query.toString();
+  return apiFetch<{
+    supported: boolean;
+    configured: boolean;
+    message: AdminInboxDetail | null;
+    reason: string | null;
+  }>(`/api/admin/email/inbox/${uid}${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export const fetchAdminEmailThreadApi = (token: string, uid: number, folder?: string) => {
+  const query = new URLSearchParams();
+  if (folder) query.set('folder', folder);
+  const qs = query.toString();
+  return apiFetch<{
+    supported: boolean;
+    configured: boolean;
+    thread: AdminInboxMessage[];
+    reason: string | null;
+  }>(`/api/admin/email/inbox/${uid}/thread${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export const setAdminEmailSeenApi = (token: string, uid: number, seen: boolean, folder?: string) => {
+  const query = new URLSearchParams();
+  if (folder) query.set('folder', folder);
+  const qs = query.toString();
+  return apiFetch<{ ok: boolean; reason: string | null }>(`/api/admin/email/inbox/${uid}/seen${qs ? `?${qs}` : ''}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ seen }),
+  }, token);
+};
+
+export const deleteAdminEmailMessageApi = (token: string, uid: number, folder?: string) => {
+  const query = new URLSearchParams();
+  if (folder) query.set('folder', folder);
+  const qs = query.toString();
+  return apiFetch<{ ok: boolean; reason: string | null }>(`/api/admin/email/inbox/${uid}${qs ? `?${qs}` : ''}`, {
+    method: 'DELETE',
+  }, token);
+};
+
+export const moveAdminEmailMessageApi = (token: string, uid: number, targetFolder: string, folder?: string) => {
+  const query = new URLSearchParams();
+  if (folder) query.set('folder', folder);
+  const qs = query.toString();
+  return apiFetch<{ ok: boolean; reason: string | null }>(`/api/admin/email/inbox/${uid}/move${qs ? `?${qs}` : ''}`, {
+    method: 'POST',
+    body: JSON.stringify({ targetFolder }),
+  }, token);
+};
 
 export const fetchAdminStatsApi = (token: string) =>
   apiFetch<AdminStats>('/api/admin/stats', {}, token);

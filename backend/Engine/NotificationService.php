@@ -690,6 +690,89 @@ class NotificationService
     }
 
     /**
+     * Send a custom admin email message.
+     *
+     * @return array<string, mixed>
+     */
+    /**
+     * @param array<int, string> $cc
+     * @param array<int, string> $bcc
+     * @param array<int, array{name:string,type:string,content:string}> $attachments
+     */
+    public function sendCustom(
+        string $recipient,
+        string $subject,
+        string $body,
+        array $cc = [],
+        array $bcc = [],
+        bool $isHtml = false,
+        array $attachments = []
+    ): array
+    {
+        $to = trim($recipient);
+        $cleanSubject = trim($subject);
+        $cleanBody = trim($body);
+        $ccList = $this->normalizeEmailList($cc);
+        $bccList = $this->normalizeEmailList($bcc);
+        $safeAttachments = $this->normalizeAttachments($attachments);
+
+        if (MAIL_FROM === '') {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'MAIL_FROM is not configured in .env',
+            ];
+        }
+
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'A valid recipient email is required.',
+            ];
+        }
+
+        if ($cleanSubject === '') {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'Subject is required.',
+            ];
+        }
+
+        if ($cleanBody === '') {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'Message body is required.',
+            ];
+        }
+
+        if (!$this->smtpConfigured() && count($safeAttachments) > 0) {
+            return [
+                'sent'      => false,
+                'recipient' => $to,
+                'reason'    => 'Attachments require SMTP transport.',
+            ];
+        }
+
+        $htmlBody = $isHtml
+            ? $cleanBody
+            : nl2br(htmlspecialchars($cleanBody, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+        $wrappedBody = $this->render('default', [
+            'body' => $htmlBody,
+        ]);
+
+        $this->send($to, 'Recipient', $cleanSubject, $wrappedBody, $ccList, $bccList, $safeAttachments);
+
+        return [
+            'sent'      => true,
+            'recipient' => $to,
+            'reason'    => null,
+        ];
+    }
+
+    /**
      * Return current mail configuration status (no secrets exposed).
      *
      * @return array<string, mixed>
@@ -697,6 +780,7 @@ class NotificationService
     public function configStatus(): array
     {
         $smtpConfigured = $this->smtpConfigured();
+        $mailboxStatus = (new MailboxService())->configStatus();
 
         return [
             'configured' => MAIL_FROM !== '',
@@ -708,6 +792,21 @@ class NotificationService
             'transport'  => $smtpConfigured ? 'smtp' : 'mail',
             'smtpHost'   => $smtpConfigured ? SMTP_HOST : '',
             'smtpPort'   => $smtpConfigured ? SMTP_PORT : 0,
+            'mailbox'    => [
+                'incoming' => $mailboxStatus['incoming'],
+                'outgoing' => $mailboxStatus['outgoing'],
+                'usernameHint' => $mailboxStatus['usernameHint'],
+                'defaultFolder' => $mailboxStatus['defaultFolder'],
+                'capabilities' => [
+                    'send'    => MAIL_FROM !== '',
+                    'receive' => (bool) ($mailboxStatus['supported'] ?? false) && (bool) ($mailboxStatus['configured'] ?? false),
+                ],
+                'receiveHint' => ((bool) ($mailboxStatus['supported'] ?? false) && (bool) ($mailboxStatus['configured'] ?? false))
+                    ? 'Inbox viewing is available through the admin mailbox panel.'
+                    : 'Inbox viewing requires the PHP IMAP extension plus valid mailbox credentials in backend/.env.',
+                'supported' => (bool) ($mailboxStatus['supported'] ?? false),
+                'configured' => (bool) ($mailboxStatus['configured'] ?? false),
+            ],
         ];
     }
 
@@ -715,23 +814,45 @@ class NotificationService
     // Mailer
     // -------------------------------------------------------------------------
 
-    private function send(string $to, string $toName, string $subject, string $htmlBody): void
+    /**
+     * @param array<int, string> $cc
+     * @param array<int, string> $bcc
+     * @param array<int, array{name:string,type:string,content:string}> $attachments
+     */
+    private function send(
+        string $to,
+        string $toName,
+        string $subject,
+        string $htmlBody,
+        array $cc = [],
+        array $bcc = [],
+        array $attachments = []
+    ): void
     {
         if ($this->smtpConfigured()) {
-            $this->sendViaSmtp($to, $toName, $subject, $htmlBody);
+            $this->sendViaSmtp($to, $toName, $subject, $htmlBody, $cc, $bcc, $attachments);
             return;
         }
 
         $fromName = MAIL_FROM_NAME;
         $from     = MAIL_FROM;
 
-        $headers  = implode("\r\n", [
+        $headerLines = [
             "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>",
             "Reply-To: $from",
             'MIME-Version: 1.0',
             'Content-Type: text/html; charset=UTF-8',
             'X-Mailer: 1625-AutoLab',
-        ]);
+        ];
+
+        if (count($cc) > 0) {
+            $headerLines[] = 'Cc: ' . implode(', ', $cc);
+        }
+        if (count($bcc) > 0) {
+            $headerLines[] = 'Bcc: ' . implode(', ', $bcc);
+        }
+
+        $headers = implode("\r\n", $headerLines);
 
         @mail($to, $subject, $htmlBody, $headers);
     }
@@ -741,7 +862,20 @@ class NotificationService
         return SMTP_HOST !== '';
     }
 
-    private function sendViaSmtp(string $to, string $toName, string $subject, string $htmlBody): void
+    /**
+     * @param array<int, string> $cc
+     * @param array<int, string> $bcc
+     * @param array<int, array{name:string,type:string,content:string}> $attachments
+     */
+    private function sendViaSmtp(
+        string $to,
+        string $toName,
+        string $subject,
+        string $htmlBody,
+        array $cc = [],
+        array $bcc = [],
+        array $attachments = []
+    ): void
     {
         try {
             $mail = new PHPMailer(true);
@@ -765,6 +899,24 @@ class NotificationService
             $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
             $mail->addAddress($to, $toName);
             $mail->addReplyTo(MAIL_FROM, MAIL_FROM_NAME);
+
+            foreach ($cc as $ccEmail) {
+                $mail->addCC($ccEmail);
+            }
+
+            foreach ($bcc as $bccEmail) {
+                $mail->addBCC($bccEmail);
+            }
+
+            foreach ($attachments as $attachment) {
+                $mail->addStringAttachment(
+                    $attachment['content'],
+                    $attachment['name'],
+                    PHPMailer::ENCODING_BASE64,
+                    $attachment['type']
+                );
+            }
+
             $mail->Subject = $subject;
             $mail->isHTML(true);
             $mail->Body    = $htmlBody;
@@ -772,6 +924,62 @@ class NotificationService
         } catch (PHPMailerException $e) {
             error_log('[NotificationService] SMTP send failed for ' . $to . ': ' . $e->getMessage());
         }
+    }
+
+    /**
+     * @param array<int, string> $emails
+     * @return array<int, string>
+     */
+    private function normalizeEmailList(array $emails): array
+    {
+        $out = [];
+        foreach ($emails as $email) {
+            $value = trim((string) $email);
+            if ($value === '') {
+                continue;
+            }
+            if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $out[] = $value;
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param array<int, array{name?:mixed,type?:mixed,data?:mixed}> $attachments
+     * @return array<int, array{name:string,type:string,content:string}>
+     */
+    private function normalizeAttachments(array $attachments): array
+    {
+        $out = [];
+        foreach ($attachments as $attachment) {
+            $name = trim((string) ($attachment['name'] ?? 'attachment.bin'));
+            $type = trim((string) ($attachment['type'] ?? 'application/octet-stream'));
+            $rawData = (string) ($attachment['data'] ?? '');
+
+            if ($rawData === '') {
+                continue;
+            }
+
+            $decoded = base64_decode($rawData, true);
+            if (!is_string($decoded) || $decoded === '') {
+                continue;
+            }
+
+            if (strlen($decoded) > 8 * 1024 * 1024) {
+                continue;
+            }
+
+            $out[] = [
+                'name' => $name !== '' ? $name : 'attachment.bin',
+                'type' => $type !== '' ? $type : 'application/octet-stream',
+                'content' => $decoded,
+            ];
+        }
+
+        return $out;
     }
 
     private function maskEmail(string $email): string

@@ -72,6 +72,22 @@ define('SMTP_ENCRYPTION', strtolower(trim((string) ($_ENV['SMTP_ENCRYPTION'] ?? 
 define('SMTP_AUTH',      filter_var($_ENV['SMTP_AUTH'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
 define('SMTP_TIMEOUT',   (int) ($_ENV['SMTP_TIMEOUT'] ?? 10));
 
+// Incoming/outgoing mailbox profile (for admin visibility and setup guidance)
+define('MAILBOX_IMAP_HOST',       trim((string) ($_ENV['MAILBOX_IMAP_HOST'] ?? 'imap.hostinger.com')));
+define('MAILBOX_IMAP_PORT',       (int) ($_ENV['MAILBOX_IMAP_PORT'] ?? 993));
+define('MAILBOX_IMAP_ENCRYPTION', strtolower(trim((string) ($_ENV['MAILBOX_IMAP_ENCRYPTION'] ?? 'ssl'))));
+define('MAILBOX_POP_HOST',        trim((string) ($_ENV['MAILBOX_POP_HOST'] ?? 'pop.hostinger.com')));
+define('MAILBOX_POP_PORT',        (int) ($_ENV['MAILBOX_POP_PORT'] ?? 995));
+define('MAILBOX_POP_ENCRYPTION',  strtolower(trim((string) ($_ENV['MAILBOX_POP_ENCRYPTION'] ?? 'ssl'))));
+define('MAILBOX_SMTP_HOST',       trim((string) ($_ENV['MAILBOX_SMTP_HOST'] ?? 'smtp.hostinger.com')));
+define('MAILBOX_SMTP_PORT',       (int) ($_ENV['MAILBOX_SMTP_PORT'] ?? 465));
+define('MAILBOX_SMTP_ENCRYPTION', strtolower(trim((string) ($_ENV['MAILBOX_SMTP_ENCRYPTION'] ?? 'ssl'))));
+define('MAILBOX_USERNAME',        trim((string) ($_ENV['MAILBOX_USERNAME'] ?? ($_ENV['SMTP_USERNAME'] ?? ($_ENV['MAIL_FROM'] ?? '')))));
+define('MAILBOX_PASSWORD',        (string) ($_ENV['MAILBOX_PASSWORD'] ?? ($_ENV['SMTP_PASSWORD'] ?? '')));
+define('MAILBOX_FOLDER',          trim((string) ($_ENV['MAILBOX_FOLDER'] ?? 'INBOX')));
+define('MAILBOX_INBOX_CACHE_TTL', max(0, (int) ($_ENV['MAILBOX_INBOX_CACHE_TTL'] ?? 20)));
+define('MAILBOX_MESSAGE_CACHE_TTL', max(0, (int) ($_ENV['MAILBOX_MESSAGE_CACHE_TTL'] ?? 30)));
+
 // ---------------------------------------------------------------------------
 // CarAPI – vehicle make / model / trim data
 // Sign up at https://carapi.app and create an API token/secret pair.

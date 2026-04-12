@@ -36,6 +36,11 @@ class Router
             'settings:manage',
             'shop-hours:manage',
             'media:upload',
+            'email:manage',
+            'email:send',
+            'email:test',
+            'email:inbox:view',
+            'email:delete',
         ],
         'manager' => [
             'analytics:view',
@@ -50,6 +55,9 @@ class Router
             'services:manage',
             'products:manage',
             'media:upload',
+            'email:send',
+            'email:test',
+            'email:inbox:view',
         ],
         'staff' => [
             'bookings:manage',
@@ -268,6 +276,17 @@ class Router
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit', 'handleAdminSecurityAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit/export', 'handleAdminSecurityAuditExport');
+            $r->addRoute('GET',  '/api/admin/email/config', 'handleAdminEmailConfig');
+            $r->addRoute('GET',  '/api/admin/email/folders', 'handleAdminEmailFolders');
+            $r->addRoute('GET',  '/api/admin/email/inbox',  'handleAdminEmailInboxList');
+            $r->addRoute('GET',  '/api/admin/email/inbox/{uid:\d+}', 'handleAdminEmailInboxGet');
+            $r->addRoute('GET',  '/api/admin/email/inbox/{uid:\d+}/thread', 'handleAdminEmailInboxThread');
+            $r->addRoute('PATCH', '/api/admin/email/inbox/{uid:\d+}/seen', 'handleAdminEmailInboxSeen');
+            $r->addRoute('DELETE', '/api/admin/email/inbox/{uid:\d+}', 'handleAdminEmailInboxDelete');
+            $r->addRoute('POST', '/api/admin/email/inbox/{uid:\d+}/move', 'handleAdminEmailInboxMove');
+            $r->addRoute('POST', '/api/admin/email/send',        'handleAdminEmailSend');
+            $r->addRoute('POST', '/api/admin/email/test',        'handleAdminEmailTest');
+            $r->addRoute('POST', '/api/admin/email/image-upload', 'handleAdminEmailImageUpload');
             $r->addRoute('POST', '/api/admin/roles',   'handleAdminRoleCreate');
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
@@ -1903,6 +1922,176 @@ class Router
             ]);
         }
         fclose($out);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailConfig(array $vars = []): void
+    {
+        $this->requirePermission('email:manage');
+        $status = (new NotificationService())->configStatus();
+        echo json_encode(['config' => $status]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailFolders(array $vars = []): void
+    {
+        $this->requirePermission('email:inbox:view');
+        $result = (new MailboxService())->listFolders();
+        echo json_encode(['folders' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailInboxList(array $vars = []): void
+    {
+        $this->requirePermission('email:inbox:view');
+        $folder = trim((string) ($_GET['folder'] ?? MAILBOX_FOLDER));
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 20;
+        $query = trim((string) ($_GET['q'] ?? ''));
+        $unreadOnly = isset($_GET['unread']) && in_array(strtolower((string) $_GET['unread']), ['1', 'true', 'yes'], true);
+        $hasAttachmentsOnly = isset($_GET['hasAttachments'])
+            && in_array(strtolower((string) $_GET['hasAttachments']), ['1', 'true', 'yes'], true);
+        $result = (new MailboxService())->listInbox($folder, $limit, $query, $unreadOnly, $hasAttachmentsOnly);
+        echo json_encode(['inbox' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailInboxGet(array $vars = []): void
+    {
+        $this->requirePermission('email:inbox:view');
+        $uid = (int) ($vars['uid'] ?? 0);
+        $folder = trim((string) ($_GET['folder'] ?? MAILBOX_FOLDER));
+        $result = (new MailboxService())->getMessage($uid, $folder);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailInboxThread(array $vars = []): void
+    {
+        $this->requirePermission('email:inbox:view');
+        $uid = (int) ($vars['uid'] ?? 0);
+        $folder = trim((string) ($_GET['folder'] ?? MAILBOX_FOLDER));
+        $result = (new MailboxService())->getThread($uid, $folder);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailInboxSeen(array $vars = []): void
+    {
+        $this->requirePermission('email:inbox:view');
+        $uid = (int) ($vars['uid'] ?? 0);
+        $folder = trim((string) ($_GET['folder'] ?? MAILBOX_FOLDER));
+        $data = $this->jsonBody();
+        $seen = !isset($data['seen']) || filter_var($data['seen'], FILTER_VALIDATE_BOOLEAN);
+        $result = (new MailboxService())->setSeen($uid, $folder, $seen);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailInboxDelete(array $vars = []): void
+    {
+        $this->requirePermission('email:delete');
+        $uid = (int) ($vars['uid'] ?? 0);
+        $folder = trim((string) ($_GET['folder'] ?? MAILBOX_FOLDER));
+        $result = (new MailboxService())->deleteMessage($uid, $folder);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailInboxMove(array $vars = []): void
+    {
+        $this->requirePermission('email:delete');
+        $uid = (int) ($vars['uid'] ?? 0);
+        $folder = trim((string) ($_GET['folder'] ?? MAILBOX_FOLDER));
+        $data = $this->jsonBody();
+        $targetFolder = trim((string) ($data['targetFolder'] ?? ''));
+        if ($targetFolder === '') {
+            throw new RuntimeException('Target folder is required.', 422);
+        }
+        $result = (new MailboxService())->moveMessage($uid, $folder, $targetFolder);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailTest(array $vars = []): void
+    {
+        $this->requirePermission('email:test');
+        $data = $this->jsonBody();
+        $recipient = trim((string) ($data['recipient'] ?? ''));
+
+        if ($recipient !== '' && !filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid recipient email is required.', 422);
+        }
+
+        $result = (new NotificationService())->sendTest($recipient);
+        echo json_encode(['result' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailSend(array $vars = []): void
+    {
+        $this->requirePermission('email:send');
+        $data = $this->jsonBody();
+
+        $to = trim((string) ($data['to'] ?? ''));
+        $subject = trim((string) ($data['subject'] ?? ''));
+        $body = (string) ($data['body'] ?? '');
+        $cc = isset($data['cc']) && is_array($data['cc']) ? $data['cc'] : [];
+        $bcc = isset($data['bcc']) && is_array($data['bcc']) ? $data['bcc'] : [];
+        $isHtml = isset($data['isHtml']) && filter_var($data['isHtml'], FILTER_VALIDATE_BOOLEAN);
+        $attachments = isset($data['attachments']) && is_array($data['attachments']) ? $data['attachments'] : [];
+
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid recipient email is required.', 422);
+        }
+
+        if ($subject === '') {
+            throw new RuntimeException('Subject is required.', 422);
+        }
+
+        if (trim($body) === '') {
+            throw new RuntimeException('Message body is required.', 422);
+        }
+
+        $result = (new NotificationService())->sendCustom($to, $subject, $body, $cc, $bcc, $isHtml, $attachments);
+        echo json_encode(['result' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminEmailImageUpload(array $vars = []): void
+    {
+        $this->requirePermission('email:send');
+
+        if (empty($_FILES['image'])) {
+            throw new RuntimeException('No image file provided.', 422);
+        }
+
+        $file    = $_FILES['image'];
+        $tmpName = $file['tmp_name'];
+        $mime    = $file['type'];
+        $size    = $file['size'];
+        $error   = $file['error'];
+
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException("File upload error (code $error).", 422);
+        }
+
+        $allowed_mimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!in_array($mime, $allowed_mimes, true) || !@getimagesize($tmpName)) {
+            throw new RuntimeException('Only JPEG, PNG, WebP and GIF images are accepted.', 422);
+        }
+
+        $maxBytes = UPLOAD_MAX_MB * 1024 * 1024;
+        if ($size > $maxBytes) {
+            throw new RuntimeException('File must be under ' . UPLOAD_MAX_MB . ' MB.', 422);
+        }
+
+        $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+
+        $storage = new UploadStorage();
+        $url     = $storage->upload($tmpName, $filename, $mime, 'email/');
+
+        echo json_encode(['url' => $url]);
     }
 
     /** @param array<string, string> $vars */

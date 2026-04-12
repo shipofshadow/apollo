@@ -4,7 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, GitBranch, Users,
+  Camera, MessageSquare, GitBranch, Users, Mail,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +29,7 @@ import ManageClientsPanel   from './admin/ManageClientsPanel';
 import ManageRolesPanel     from './admin/ManageRolesPanel';
 import ClientDetailPanel    from './admin/ClientDetailPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
+import AdminEmailPanel      from './admin/AdminEmailPanel';
 import ConversationsPage    from './chatbot/ConversationsPage';
 import FlowEditorPage       from './chatbot/FlowEditorPage';
 import type { ClientAdminSummary } from '../types';
@@ -53,6 +54,7 @@ const TAB_PATHS: Record<string, string> = {
   'manage-clients': '/admin/manage-clients',
   'manage-roles': '/admin/manage-roles',
   'security-audit': '/admin/security-audit',
+  email: '/admin/email',
   settings: '/admin/account',
 };
 
@@ -158,6 +160,10 @@ export default function AdminPage() {
       return hasPermission('products:manage');
     }
 
+    if (key === 'email') {
+      return hasPermission('email:manage') || hasPermission('email:send') || hasPermission('email:test') || hasPermission('email:inbox:view');
+    }
+
     if (['chatbot', 'chatbot-conversations', 'chatbot-flow'].includes(key)) {
       return hasPermission('chatbot:manage');
     }
@@ -220,6 +226,7 @@ export default function AdminPage() {
       children: [
         { key: 'site-settings', label: 'Site Config', icon: SlidersHorizontal },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
+        { key: 'email',         label: 'Email',         icon: Mail },
         { key: 'settings',      label: 'Account',     icon: UserCog },
       ]
     }
@@ -288,6 +295,7 @@ export default function AdminPage() {
           />
         );
       case 'security-audit': return <SecurityAuditPanel />;
+      case 'email':         return <AdminEmailPanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;
     }

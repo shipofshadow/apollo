@@ -265,6 +265,7 @@ export default function AccountSettingsPanel() {
           </div>
         </form>
       </div>
+
     </div>
   );
 }

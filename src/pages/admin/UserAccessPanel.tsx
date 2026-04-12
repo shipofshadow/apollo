@@ -40,6 +40,11 @@ const PERMISSION_CATALOG = [
   { key: 'reviews:manage', label: 'Manage Reviews', description: 'Can approve, reject, and delete reviews.' },
   { key: 'shop-hours:manage', label: 'Shop Hours', description: 'Can update business hours.' },
   { key: 'media:upload', label: 'Media Uploads', description: 'Can upload service/product/content media.' },
+  { key: 'email:manage', label: 'Manage Email Config', description: 'Can view secure mailbox config and transport status.' },
+  { key: 'email:send', label: 'Send Email', description: 'Can compose and send emails from the admin mailbox panel.' },
+  { key: 'email:test', label: 'Send Email Test', description: 'Can send test emails from the configured mailbox transport.' },
+  { key: 'email:inbox:view', label: 'View Inbox', description: 'Can read recent emails from the configured mailbox inbox.' },
+  { key: 'email:delete', label: 'Delete/Move Email', description: 'Can move or delete mailbox messages.' },
   { key: 'client:self', label: 'Client Portal', description: 'Can use own client account pages only.' },
 ] as const;
 

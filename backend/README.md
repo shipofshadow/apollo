@@ -132,6 +132,18 @@ php -S localhost:8000
 | `SMTP_ENCRYPTION` | ❌ | `tls` | SMTP transport security (`tls`, `ssl`, `none`) |
 | `SMTP_AUTH` | ❌ | `true` | Enable SMTP authentication |
 | `SMTP_TIMEOUT` | ❌ | `10` | SMTP timeout in seconds |
+| `MAILBOX_IMAP_HOST` | ❌ | `imap.hostinger.com` | Incoming IMAP host shown in admin mailbox profile |
+| `MAILBOX_IMAP_PORT` | ❌ | `993` | Incoming IMAP SSL port |
+| `MAILBOX_IMAP_ENCRYPTION` | ❌ | `ssl` | IMAP encryption (`ssl`, `tls`, `none`) |
+| `MAILBOX_POP_HOST` | ❌ | `pop.hostinger.com` | Incoming POP3 host shown in admin mailbox profile |
+| `MAILBOX_POP_PORT` | ❌ | `995` | Incoming POP3 SSL port |
+| `MAILBOX_POP_ENCRYPTION` | ❌ | `ssl` | POP3 encryption (`ssl`, `tls`, `none`) |
+| `MAILBOX_SMTP_HOST` | ❌ | `smtp.hostinger.com` | Outgoing SMTP host shown in admin mailbox profile |
+| `MAILBOX_SMTP_PORT` | ❌ | `465` | Outgoing SMTP SSL port shown in profile |
+| `MAILBOX_SMTP_ENCRYPTION` | ❌ | `ssl` | Outgoing SMTP encryption shown in profile |
+| `MAILBOX_USERNAME` | ❌ | `SMTP_USERNAME` / `MAIL_FROM` | Mailbox login for IMAP inbox access |
+| `MAILBOX_PASSWORD` | ❌ | `SMTP_PASSWORD` | Mailbox password for IMAP inbox access |
+| `MAILBOX_FOLDER` | ❌ | `INBOX` | Default folder opened by the admin inbox viewer |
 | **Vehicle data (CarAPI)** | | | |
 | `CARAPI_TOKEN` | ✅ (for vehicle lookup) | — | CarAPI token |
 | `CARAPI_SECRET` | ✅ (for vehicle lookup) | — | CarAPI secret |
