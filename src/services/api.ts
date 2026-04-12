@@ -1042,6 +1042,67 @@ export interface FacebookPostsPage {
   nextCursor: string | null;
 }
 
+type FacebookPostsCacheEntry = {
+  expiresAt: number;
+  value: FacebookPostsPage;
+};
+
+const FB_POSTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const facebookPostsMemoryCache = new Map<string, FacebookPostsCacheEntry>();
+
+function facebookPostsCacheKey(after?: string, limit = 100): string {
+  return `apollo:fb:posts:${after ?? 'first'}:${limit}`;
+}
+
+function readFacebookPostsCache(key: string): FacebookPostsPage | null {
+  const now = Date.now();
+  const memoryEntry = facebookPostsMemoryCache.get(key);
+  if (memoryEntry && memoryEntry.expiresAt > now) {
+    return memoryEntry.value;
+  }
+
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as FacebookPostsCacheEntry;
+    if (!parsed || typeof parsed.expiresAt !== 'number' || !parsed.value) {
+      return null;
+    }
+    if (parsed.expiresAt <= now) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+
+    facebookPostsMemoryCache.set(key, parsed);
+    return parsed.value;
+  } catch {
+    return null;
+  }
+}
+
+function writeFacebookPostsCache(key: string, value: FacebookPostsPage): void {
+  const entry: FacebookPostsCacheEntry = {
+    expiresAt: Date.now() + FB_POSTS_CACHE_TTL_MS,
+    value,
+  };
+
+  facebookPostsMemoryCache.set(key, entry);
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    // Ignore storage failures; in-memory cache is enough.
+  }
+}
+
 type FacebookPostsResponse = {
   data?: FacebookPost[];
   detail?: string;
@@ -1054,6 +1115,12 @@ type FacebookPostsResponse = {
 };
 
 export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<FacebookPostsPage> => {
+  const cacheKey = facebookPostsCacheKey(after, limit);
+  const cached = readFacebookPostsCache(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const params = new URLSearchParams();
   if (after) params.set('after', after);
   params.set('limit', String(limit));
@@ -1073,10 +1140,13 @@ export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<F
   const nextCursor: string | null = data?.paging?.cursors?.after ?? null;
   const hasNext: boolean = Boolean(data?.paging?.next);
 
-  return {
+  const page = {
     posts: data?.data ?? [],
     nextCursor: hasNext ? nextCursor : null,
   };
+
+  writeFacebookPostsCache(cacheKey, page);
+  return page;
 };
 
 export const fetchAllFacebookPosts = async (): Promise<FacebookPost[]> => {

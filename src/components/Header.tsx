@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut, ShoppingCart, Package } from 'lucide-react';
+import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut, ShoppingCart, Package, Search } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -18,6 +18,7 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [cartItemsCount, setCartItemsCount] = useState(0);
+  const [buildSearch, setBuildSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
 
@@ -40,6 +41,26 @@ export default function Header() {
     window.addEventListener('apollo:cart-updated', syncCart as EventListener);
     return () => window.removeEventListener('apollo:cart-updated', syncCart as EventListener);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setBuildSearch(params.get('portfolioSearch') ?? '');
+  }, [location.search]);
+
+  const handleBuildSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = buildSearch.trim();
+    const params = new URLSearchParams();
+    if (query !== '') {
+      params.set('portfolioSearch', query);
+    }
+
+    navigate({
+      pathname: '/portfolio',
+      search: params.toString() ? `?${params.toString()}` : '',
+    });
+    setIsMobileMenuOpen(false);
+  };
 
   const handleLogout = async () => {
     setIsMobileMenuOpen(false);
@@ -126,6 +147,18 @@ export default function Header() {
 
         {/* Desktop Auth/Actions - Shifted to lg breakpoint */}
         <div className="hidden lg:flex items-center gap-4">
+          <form onSubmit={handleBuildSearchSubmit} className="hidden xl:flex items-center gap-2">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={buildSearch}
+                onChange={e => setBuildSearch(e.target.value)}
+                placeholder="Search your car make and model"
+                className="w-72 bg-brand-dark border border-gray-700 text-white pl-9 pr-3 py-2.5 rounded-sm text-xs focus:outline-none focus:border-brand-orange"
+              />
+            </div>
+          </form>
+
           <Link
             to="/cart"
             className={`relative inline-flex items-center justify-center w-10 h-10 rounded-sm border transition-colors ${
@@ -215,6 +248,18 @@ export default function Header() {
         isMobileMenuOpen ? 'max-h-[calc(100vh-60px)] opacity-100' : 'max-h-0 opacity-0'
       }`}>
         <div className="px-4 py-6 flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-60px)]">
+          <form onSubmit={handleBuildSearchSubmit} className="mb-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={buildSearch}
+                onChange={e => setBuildSearch(e.target.value)}
+                placeholder="Search your car make and model"
+                className="w-full bg-brand-dark border border-gray-700 text-white pl-9 pr-3 py-3 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+              />
+            </div>
+          </form>
+
           {navLinks.map(link => (
             <Link key={link.name} to={link.href}
               className={`text-base font-bold uppercase tracking-widest transition-colors py-3 px-2 border-b border-gray-800/50 ${

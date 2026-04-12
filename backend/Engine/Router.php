@@ -615,8 +615,10 @@ class Router
         $limit = max(1, min(100, (int) ($_GET['limit'] ?? 10)));
         $after = (isset($_GET['after']) && $_GET['after'] !== '') ? (string) $_GET['after'] : null;
 
-        $cacheKey = 'apollo_posts_' . $limit;
-        if ($after === null && CACHE_TTL_SECONDS > 0) {
+        $cursorKey = $after !== null ? hash('sha256', $after) : 'first';
+        $cacheKey = 'apollo_posts_' . $limit . '_' . $cursorKey;
+
+        if (CACHE_TTL_SECONDS > 0) {
             $cached = Cache::get($cacheKey);
             if ($cached !== null) {
                 echo json_encode($cached);
@@ -627,7 +629,7 @@ class Router
         $service = new FacebookService();
         $result  = $service->getPosts($limit, $after);
 
-        if ($after === null && CACHE_TTL_SECONDS > 0) {
+        if (CACHE_TTL_SECONDS > 0) {
             Cache::set($cacheKey, $result, CACHE_TTL_SECONDS);
         }
 

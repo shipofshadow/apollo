@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Calendar, Loader2, AlertCircle, ImageIcon, ChevronDown } from 'lucide-react';
 import { fetchAllFacebookPosts } from '../services/api';
 import type { FacebookPost } from '../types';
@@ -8,11 +8,24 @@ import PageSEO from '../components/PageSEO';
 
 const PAGE_SIZE = 6;
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 export default function Portfolio() {
+  const location = useLocation();
   const [allPosts, setAllPosts] = useState<FacebookPost[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const portfolioSearch = new URLSearchParams(location.search).get('portfolioSearch')?.trim() ?? '';
 
   useEffect(() => {
     let cancelled = false;
@@ -34,8 +47,19 @@ export default function Portfolio() {
     return () => { cancelled = true; };
   }, []);
 
-  const visiblePosts = allPosts.slice(0, visibleCount);
-  const hasMore = visibleCount < allPosts.length;
+  const filteredPosts = allPosts.filter((post) => {
+    if (portfolioSearch === '') return true;
+    const haystack = normalizeSearchText(`${post.message ?? ''} ${getPostTitle(post, 160)}`);
+    const needle = normalizeSearchText(portfolioSearch);
+    return haystack.includes(needle);
+  });
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [portfolioSearch]);
+
+  const visiblePosts = filteredPosts.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredPosts.length;
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
@@ -77,6 +101,13 @@ export default function Portfolio() {
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <ImageIcon className="w-12 h-12 text-gray-700" />
             <p className="text-gray-400">No portfolio posts available yet. Check back soon!</p>
+          </div>
+        )}
+
+        {!loading && !error && allPosts.length > 0 && filteredPosts.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <ImageIcon className="w-12 h-12 text-gray-700" />
+            <p className="text-gray-400">No matching builds for "{portfolioSearch}".</p>
           </div>
         )}
 
@@ -150,7 +181,7 @@ export default function Portfolio() {
                   Load More
                 </button>
                 <p className="text-gray-500 text-sm">
-                  Showing {Math.min(visibleCount, allPosts.length)} of {allPosts.length} builds
+                  Showing {Math.min(visibleCount, filteredPosts.length)} of {filteredPosts.length} builds
                 </p>
               </div>
             )}

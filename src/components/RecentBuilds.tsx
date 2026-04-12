@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
 import { fetchFacebookPosts } from '../services/api';
 import type { FacebookPost } from '../types';
 import { getPostImages, getPostTitle, getPostUrl, isPortfolioPost } from '../utils/facebookPostHelpers';
@@ -9,7 +9,8 @@ export default function RecentBuilds() {
   const [posts, setPosts] = useState<FacebookPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoPaused, setAutoPaused] = useState(false);
-  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const autoTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,45 +25,42 @@ export default function RecentBuilds() {
     return () => { cancelled = true; };
   }, []);
 
-  const loopPosts = posts.length > 1 ? [...posts, ...posts] : posts;
+  const visiblePosts = posts;
 
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track || loading || loopPosts.length <= 1 || autoPaused) return;
+    if (visiblePosts.length === 0) {
+      setActiveIndex(0);
+      return;
+    }
+    if (activeIndex >= visiblePosts.length) {
+      setActiveIndex(0);
+    }
+  }, [visiblePosts.length, activeIndex]);
 
-    let rafId = 0;
-    let lastTs = 0;
-    const pxPerSecond = 36;
+  useEffect(() => {
+    if (loading || visiblePosts.length <= 1 || autoPaused) return;
 
-    const animate = (ts: number) => {
-      if (!trackRef.current) return;
-      if (lastTs === 0) {
-        lastTs = ts;
-      }
-
-      const dt = (ts - lastTs) / 1000;
-      lastTs = ts;
-
-      const el = trackRef.current;
-      const half = el.scrollWidth / 2;
-      el.scrollLeft += pxPerSecond * dt;
-
-      // Seamless loop: once the first copy is traversed, jump back by half.
-      if (el.scrollLeft >= half) {
-        el.scrollLeft -= half;
-      }
-
-      rafId = window.requestAnimationFrame(animate);
-    };
-
-    rafId = window.requestAnimationFrame(animate);
+    autoTimerRef.current = window.setInterval(() => {
+      setActiveIndex(prev => (prev + 1) % visiblePosts.length);
+    }, 4200);
 
     return () => {
-      if (rafId) {
-        window.cancelAnimationFrame(rafId);
+      if (autoTimerRef.current !== null) {
+        window.clearInterval(autoTimerRef.current);
+        autoTimerRef.current = null;
       }
     };
-  }, [loading, loopPosts.length, autoPaused]);
+  }, [loading, visiblePosts.length, autoPaused]);
+
+  const goPrev = () => {
+    if (visiblePosts.length === 0) return;
+    setActiveIndex(prev => (prev - 1 + visiblePosts.length) % visiblePosts.length);
+  };
+
+  const goNext = () => {
+    if (visiblePosts.length === 0) return;
+    setActiveIndex(prev => (prev + 1) % visiblePosts.length);
+  };
 
   return (
     <section id="builds" className="py-24 bg-brand-dark">
@@ -102,54 +100,88 @@ export default function RecentBuilds() {
           <p className="text-gray-500 text-center py-16">No portfolio items yet — check back soon!</p>
         )}
 
-        {posts.length > 0 && (
-          <div className="relative">
-            <div
-              ref={trackRef}
-              className="recent-builds-track flex gap-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]"
-              onMouseEnter={() => setAutoPaused(true)}
-              onMouseLeave={() => setAutoPaused(false)}
-              onTouchStart={() => setAutoPaused(true)}
-              onTouchEnd={() => setAutoPaused(false)}
-            >
-            {loopPosts.map((post, index) => {
-              const images = getPostImages(post);
-              const title = getPostTitle(post, 60);
-              const postUrl = getPostUrl(post.id);
-              return (
-                <a
-                  key={`${post.id}-${index}`}
-                  href={postUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative overflow-hidden rounded-sm bg-brand-gray aspect-[4/3] cursor-pointer block shrink-0 w-[72vw] sm:w-[38vw] lg:w-[24vw] xl:w-[20vw] min-w-[220px] max-w-[360px]"
-                >
-                  <img
-                    src={images[0]}
-                    alt={title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                  />
+        {visiblePosts.length > 0 && (
+          <div
+            className="relative"
+            onMouseEnter={() => setAutoPaused(true)}
+            onMouseLeave={() => setAutoPaused(false)}
+            onTouchStart={() => setAutoPaused(true)}
+            onTouchEnd={() => setAutoPaused(false)}
+          >
+            <div className="relative h-[420px] md:h-[520px] overflow-hidden rounded-sm border border-gray-800 bg-brand-gray">
+              {visiblePosts.map((post, index) => {
+                const images = getPostImages(post);
+                const title = getPostTitle(post, 90);
+                const postUrl = getPostUrl(post.id);
+                const active = index === activeIndex;
 
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-brand-darker via-brand-darker/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-8">
+                return (
+                  <a
+                    key={post.id}
+                    href={postUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`absolute inset-0 block transition-opacity duration-700 ${active ? 'opacity-100 z-20' : 'opacity-0 z-10 pointer-events-none'}`}
+                  >
+                    <img
+                      src={images[0]}
+                      alt={title}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                      loading={active ? 'eager' : 'lazy'}
+                    />
 
-                    {/* View Icon */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-brand-orange rounded-full flex items-center justify-center opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100 transition-all duration-500 delay-100 shadow-[0_0_30px_rgba(255,106,0,0.5)]">
-                      <Eye className="w-6 h-6 text-white" />
-                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
 
-                    <div className="translate-y-8 group-hover:translate-y-0 transition-transform duration-500">
-                      <h3 className="text-2xl font-display font-bold text-white uppercase tracking-wide">
+                    <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
+                      <div className="inline-flex items-center gap-2 bg-brand-orange/90 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm mb-4">
+                        <Eye className="w-3.5 h-3.5" /> Featured Build
+                      </div>
+
+                      <h3 className="text-2xl md:text-4xl font-display font-bold text-white uppercase tracking-wide max-w-4xl leading-tight">
                         {title}
                       </h3>
                     </div>
-                  </div>
-                </a>
-              );
-            })}
+                  </a>
+                );
+              })}
+
+              {visiblePosts.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/45 border border-white/25 text-white hover:border-brand-orange hover:text-brand-orange transition-colors inline-flex items-center justify-center"
+                    aria-label="Previous slide"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className="absolute right-4 md:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/45 border border-white/25 text-white hover:border-brand-orange hover:text-brand-orange transition-colors inline-flex items-center justify-center"
+                    aria-label="Next slide"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
             </div>
+
+            {visiblePosts.length > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {visiblePosts.map((post, index) => (
+                  <button
+                    key={`${post.id}-dot`}
+                    type="button"
+                    onClick={() => setActiveIndex(index)}
+                    className={`h-2.5 rounded-full transition-all ${index === activeIndex ? 'w-8 bg-brand-orange' : 'w-2.5 bg-gray-600 hover:bg-gray-400'}`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
