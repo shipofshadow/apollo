@@ -30,19 +30,38 @@ export default function RecentBuilds() {
     const track = trackRef.current;
     if (!track || loading || loopPosts.length <= 1 || autoPaused) return;
 
-    const id = window.setInterval(() => {
-      const step = Math.max(220, Math.floor(track.clientWidth * 0.5));
-      const next = track.scrollLeft + step;
-      const maxLeft = track.scrollWidth - track.clientWidth;
+    let rafId = 0;
+    let lastTs = 0;
+    const pxPerSecond = 36;
 
-      if (next >= maxLeft - 2) {
-        track.scrollTo({ left: 0, behavior: 'smooth' });
-      } else {
-        track.scrollTo({ left: next, behavior: 'smooth' });
+    const animate = (ts: number) => {
+      if (!trackRef.current) return;
+      if (lastTs === 0) {
+        lastTs = ts;
       }
-    }, 2600);
 
-    return () => window.clearInterval(id);
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+
+      const el = trackRef.current;
+      const half = el.scrollWidth / 2;
+      el.scrollLeft += pxPerSecond * dt;
+
+      // Seamless loop: once the first copy is traversed, jump back by half.
+      if (el.scrollLeft >= half) {
+        el.scrollLeft -= half;
+      }
+
+      rafId = window.requestAnimationFrame(animate);
+    };
+
+    rafId = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
   }, [loading, loopPosts.length, autoPaused]);
 
   return (
@@ -87,7 +106,7 @@ export default function RecentBuilds() {
           <div className="relative">
             <div
               ref={trackRef}
-              className="recent-builds-track flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none]"
+              className="recent-builds-track flex gap-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]"
               onMouseEnter={() => setAutoPaused(true)}
               onMouseLeave={() => setAutoPaused(false)}
               onTouchStart={() => setAutoPaused(true)}
@@ -103,7 +122,7 @@ export default function RecentBuilds() {
                   href={postUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative overflow-hidden rounded-sm bg-brand-gray aspect-[4/3] cursor-pointer block shrink-0 snap-start w-[72vw] sm:w-[38vw] lg:w-[24vw] xl:w-[20vw] min-w-[220px] max-w-[360px]"
+                  className="group relative overflow-hidden rounded-sm bg-brand-gray aspect-[4/3] cursor-pointer block shrink-0 w-[72vw] sm:w-[38vw] lg:w-[24vw] xl:w-[20vw] min-w-[220px] max-w-[360px]"
                 >
                   <img
                     src={images[0]}
