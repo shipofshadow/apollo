@@ -153,7 +153,7 @@ export default function Header() {
                 value={buildSearch}
                 onChange={e => setBuildSearch(e.target.value)}
                 placeholder="Search your car make and model"
-                className="w-72 bg-brand-dark border border-gray-700 text-white pl-9 pr-3 py-2.5 rounded-sm text-xs focus:outline-none focus:border-brand-orange"
+                className="w-72 bg-brand-dark border border-gray-700 text-white pl-9 pr-3 py-2.5 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
               />
             </div>
           </form>
@@ -239,7 +239,7 @@ export default function Header() {
                 value={buildSearch}
                 onChange={e => setBuildSearch(e.target.value)}
                 placeholder="Search car"
-                className="w-full bg-brand-dark/95 border border-gray-700 text-white pl-8 pr-2.5 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange"
+                className="w-full bg-brand-dark/95 border border-gray-700 text-white pl-8 pr-2.5 py-2 rounded-sm text-[16px] focus:outline-none focus:border-brand-orange"
               />
             </div>
           </form>
