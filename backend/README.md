@@ -141,10 +141,10 @@ php -S localhost:8000
 | `FILESYSTEM_DISK` | ❌ | `local` | Upload disk driver: `local` or `s3` (Cloudflare R2) |
 | `UPLOAD_MAX_MB` | ❌ | `10` | Max upload size in MB |
 | `UPLOAD_BASE_URL` | ❌ | _(empty)_ | Public base URL for local uploads |
-| **SMS (Twilio, optional)** | | | |
-| `TWILIO_ACCOUNT_SID` | ❌ | _(empty)_ | Twilio Account SID (backend only) |
-| `TWILIO_AUTH_TOKEN` | ❌ | _(empty)_ | Twilio Auth Token – **keep private** |
-| `TWILIO_FROM` | ❌ | _(empty)_ | Twilio sender number in E.164 format (e.g. `+15551234567`) |
+| **SMS (Semaphore, optional)** | | | |
+| `SEMAPHORE_API_KEY` | ❌ | _(empty)_ | Semaphore API key – **keep private** |
+| `SEMAPHORE_SENDER_NAME` | ❌ | `1625AutoLab` | Approved sender name in your Semaphore account |
+| `SEMAPHORE_ADMIN_PHONE` | ❌ | _(empty)_ | Philippine mobile number to receive new-booking alerts |
 | **Cloudflare R2 / S3 (used when `FILESYSTEM_DISK=s3`)** | | | |
 | `R2_ACCOUNT_ID` | ❌ | _(empty)_ | Cloudflare account ID (enables R2 uploads) |
 | `R2_ACCESS_KEY_ID` | ❌ | _(empty)_ | R2 API token key |
