@@ -6,7 +6,8 @@
  * Configuration (set in .env / Configuration.php):
  *   SEMAPHORE_API_KEY     - Semaphore API key
  *   SEMAPHORE_SENDER_NAME - Approved sender name (default: "1625AutoLab")
- *   SEMAPHORE_ADMIN_PHONE - Admin phone number to receive booking alerts
+ *   Booking alert recipients are active owner/admin users from DB
+ *   (filtered by SMS notification preferences).
  *
  * All methods fail silently when Semaphore credentials are not configured, so
  * the booking flow is never interrupted by missing SMS setup.
