@@ -81,14 +81,14 @@ export default function VariationGallery({
   return (
     <div className="space-y-5">
       {/* ── Variation selector tabs ─────────────────────────────────────── */}
-     <div className="flex flex-wrap gap-2">
+     <div className="grid grid-cols-2 gap-2">
         {variations.map((v, idx) => {
           const isActive = idx === activeIdx;
           return (
             <button
               key={v.id}
               onClick={() => selectVariation(idx)}
-              className={`flex flex-col items-start min-w-[140px] p-3 border rounded transition-colors text-left shrink-0 ${
+              className={`flex flex-col items-start w-full p-3 border rounded transition-colors text-left ${
                 isActive
                   ? 'border-brand-orange bg-[#181818]'
                   : 'border-gray-800 bg-[#121212] hover:border-gray-600'
