@@ -24,6 +24,15 @@ define(
 define('FB_ACCESS_TOKEN', $_ENV['FB_ACCESS_TOKEN'] ?? '');
 
 define('CACHE_TTL_SECONDS', (int)($_ENV['CACHE_TTL_SECONDS'] ?? 60));
+define('REDIS_CACHE_ENABLED', filter_var($_ENV['REDIS_CACHE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
+define('REDIS_HOST', $_ENV['REDIS_HOST'] ?? '127.0.0.1');
+define('REDIS_PORT', (int) ($_ENV['REDIS_PORT'] ?? 6379));
+define('REDIS_DATABASE', max(0, (int) ($_ENV['REDIS_DATABASE'] ?? 0)));
+define('REDIS_USERNAME', (string) ($_ENV['REDIS_USERNAME'] ?? ''));
+define('REDIS_PASSWORD', (string) ($_ENV['REDIS_PASSWORD'] ?? ''));
+define('REDIS_TIMEOUT', (float) ($_ENV['REDIS_TIMEOUT'] ?? 1.5));
+define('REDIS_PERSISTENT', filter_var($_ENV['REDIS_PERSISTENT'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
+define('REDIS_CACHE_PREFIX', (string) ($_ENV['REDIS_CACHE_PREFIX'] ?? 'apollo_cache:'));
 
 define('CORS_ORIGINS',
     array_values(

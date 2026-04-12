@@ -8,11 +8,58 @@ export const AUTH_EXPIRED_EVENT = 'apollo:auth-expired';
 
 const API_TIMEOUT_MS = 20_000;
 const MAX_RETRIES = 2;
+const OFFLINE_CHECK_TIMEOUT_MS = 3_500;
+
+let lastApiSuccessAt = 0;
+let lastOfflineEventAt = 0;
+let offlineCheckInFlight: Promise<void> | null = null;
+
+async function probeBackendOnline(): Promise<boolean> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OFFLINE_CHECK_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/health`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function notifyApiOffline(): void {
-  if (typeof window !== 'undefined') {
+  if (typeof window === 'undefined') return;
+
+  const now = Date.now();
+
+  // If the API recently replied successfully, avoid false offline toasts.
+  if (now - lastApiSuccessAt < 10_000) return;
+
+  if (offlineCheckInFlight) return;
+
+  offlineCheckInFlight = (async () => {
+    const online = await probeBackendOnline();
+    if (online) {
+      lastApiSuccessAt = Date.now();
+      return;
+    }
+
+    if (Date.now() - lastOfflineEventAt < 5_000) return;
+
+    lastOfflineEventAt = Date.now();
     window.dispatchEvent(new CustomEvent(API_OFFLINE_EVENT));
-  }
+  })().finally(() => {
+    offlineCheckInFlight = null;
+  });
+}
+
+function markApiOnline(): void {
+  lastApiSuccessAt = Date.now();
 }
 
 function notifyAuthExpired(): void {
@@ -86,6 +133,8 @@ async function apiFetch<T>(
       if (response.status === 401) notifyAuthExpired();
       throw new Error((data as { detail?: string } | null)?.detail ?? `Request failed (${response.status})`);
     }
+
+    markApiOnline();
     return data as T;
   }
 

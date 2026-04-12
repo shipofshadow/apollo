@@ -104,7 +104,7 @@ php -S localhost:8000
 |----------|----------|---------|-------------|
 | **Facebook feed** | | | |
 | `FB_ACCESS_TOKEN` | ✅ | — | Static page access token for `/api/posts` |
-| `CACHE_TTL_SECONDS` | ❌ | `60` | Seconds to cache first-page `/api/posts` results |
+| `CACHE_TTL_SECONDS` | ❌ | `3600` | Seconds to cache first-page `/api/posts` results |
 | **Facebook Page management (admin OAuth)** | | | |
 | `FB_APP_ID` | ✅ (for Connect Page) | — | Facebook App ID |
 | `FB_APP_SECRET` | ✅ (for Connect Page) | — | Facebook App Secret – **keep private** |
