@@ -236,6 +236,19 @@ export default function Header() {
               </span>
             )}
           </Link>
+
+          <form onSubmit={handleBuildSearchSubmit} className="flex-1 max-w-[180px] sm:max-w-[220px]">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                value={buildSearch}
+                onChange={e => setBuildSearch(e.target.value)}
+                placeholder="Search car"
+                className="w-full bg-brand-dark/95 border border-gray-700 text-white pl-8 pr-2.5 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange"
+              />
+            </div>
+          </form>
+
           {user && <NotificationBell />}
           <button className="text-white p-1" onClick={() => setIsMobileMenuOpen(v => !v)} aria-label="Toggle menu" aria-expanded={isMobileMenuOpen}>
             {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
@@ -248,18 +261,6 @@ export default function Header() {
         isMobileMenuOpen ? 'max-h-[calc(100vh-60px)] opacity-100' : 'max-h-0 opacity-0'
       }`}>
         <div className="px-4 py-6 flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-60px)]">
-          <form onSubmit={handleBuildSearchSubmit} className="mb-3">
-            <div className="relative">
-              <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                value={buildSearch}
-                onChange={e => setBuildSearch(e.target.value)}
-                placeholder="Search your car make and model"
-                className="w-full bg-brand-dark border border-gray-700 text-white pl-9 pr-3 py-3 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
-              />
-            </div>
-          </form>
-
           {navLinks.map(link => (
             <Link key={link.name} to={link.href}
               className={`text-base font-bold uppercase tracking-widest transition-colors py-3 px-2 border-b border-gray-800/50 ${
