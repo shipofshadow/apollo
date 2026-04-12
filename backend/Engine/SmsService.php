@@ -1,35 +1,86 @@
-use Twilio\Rest\Client;
 <?php
 
 /**
- * Sends SMS notifications via the Twilio REST API.
+ * Sends SMS notifications via the Semaphore REST API.
  *
  * Configuration (set in .env / Configuration.php):
- *   TWILIO_ACCOUNT_SID  - Twilio Account SID
- *   TWILIO_AUTH_TOKEN   - Twilio Auth Token
- *   TWILIO_FROM         - Twilio phone number in E.164 format, e.g. +15551234567
+ *   SEMAPHORE_API_KEY     - Semaphore API key
+ *   SEMAPHORE_SENDER_NAME - Approved sender name (default: "1625AutoLab")
+ *   SEMAPHORE_ADMIN_PHONE - Admin phone number to receive booking alerts
  *
- * All methods fail silently when Twilio credentials are not configured, so the
- * booking flow is never interrupted by missing SMS setup.
+ * All methods fail silently when Semaphore credentials are not configured, so
+ * the booking flow is never interrupted by missing SMS setup.
+ *
+ * API reference: https://www.semaphore.co/docs
  */
 class SmsService
 {
-    private string $accountSid;
-    private string $authToken;
-    private string $from;
+    private const API_URL = 'https://api.semaphore.co/api/v4/messages';
+
+    private string $apiKey;
+    private string $senderName;
+    private string $adminPhone;
     private bool   $enabled;
 
     public function __construct()
     {
-        $this->accountSid = defined('TWILIO_ACCOUNT_SID') ? (string) TWILIO_ACCOUNT_SID : '';
-        $this->authToken  = defined('TWILIO_AUTH_TOKEN')  ? (string) TWILIO_AUTH_TOKEN  : '';
-        $this->from       = defined('TWILIO_FROM')        ? (string) TWILIO_FROM        : '';
-        $this->enabled    = $this->accountSid !== '' && $this->authToken !== '' && $this->from !== '';
+        $this->apiKey     = defined('SEMAPHORE_API_KEY')     ? (string) SEMAPHORE_API_KEY     : '';
+        $this->senderName = defined('SEMAPHORE_SENDER_NAME') ? (string) SEMAPHORE_SENDER_NAME : '1625AutoLab';
+        $this->adminPhone = defined('SEMAPHORE_ADMIN_PHONE') ? (string) SEMAPHORE_ADMIN_PHONE : '';
+        $this->enabled    = $this->apiKey !== '';
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public methods
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Send a new-booking SMS to the client.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function bookingCreated(array $booking): void
+    {
+        $phone = $this->normalisePhone((string) ($booking['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $name    = (string) ($booking['name']            ?? 'there');
+        $service = (string) ($booking['serviceName']     ?? 'your service');
+        $date    = (string) ($booking['appointmentDate'] ?? '');
+        $time    = (string) ($booking['appointmentTime'] ?? '');
+        $refNumber = (string) ($booking['referenceNumber'] ?? '');
+
+        $this->send(
+            $phone,
+            "Hi {$name}! Your booking for {$service} on {$date} at {$time} has been received."
+          . ($refNumber !== '' ? " Reference: {$refNumber}." : '')
+          . " We will confirm your appointment shortly. - 1625 Auto Lab"
+        );
+    }
+
+    /**
+     * Send a new-booking alert SMS to the admin.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function bookingCreatedAdmin(array $booking): void
+    {
+        $phone = $this->normalisePhone($this->adminPhone);
+        if ($phone === '') return;
+
+        $name    = (string) ($booking['name']            ?? 'Unknown');
+        $service = (string) ($booking['serviceName']     ?? 'Unknown service');
+        $date    = (string) ($booking['appointmentDate'] ?? '');
+        $time    = (string) ($booking['appointmentTime'] ?? '');
+        $refNumber = (string) ($booking['referenceNumber'] ?? '');
+
+        $this->send(
+            $phone,
+            "New booking received!"
+          . ($refNumber !== '' ? " Ref: {$refNumber}." : '')
+          . " Client: {$name}. Service: {$service}. Date: {$date} at {$time}. - 1625 Auto Lab"
+        );
+    }
 
     /**
      * Send a booking confirmation SMS to the client.
@@ -49,7 +100,7 @@ class SmsService
         $this->send(
             $phone,
             "Hi {$name}! Your booking for {$service} on {$date} at {$time} has been CONFIRMED. "
-          . "Reply STOP to unsubscribe. - 1625 Auto Lab"
+          . "- 1625 Auto Lab"
         );
     }
 
@@ -69,13 +120,12 @@ class SmsService
 
         $this->send(
             $phone,
-            "Hi {$name}! Your {$service} booking status is now: {$status}. "
-          . "Reply STOP to unsubscribe. - 1625 Auto Lab"
+            "Hi {$name}! Your {$service} booking status is now: {$status}. - 1625 Auto Lab"
         );
     }
 
     /**
-     * Send an appointment reminder SMS 24 h before (in Filipino/Tagalog).
+     * Send an appointment reminder SMS 24 h before.
      *
      * @param array<string, mixed> $booking
      */
@@ -89,10 +139,10 @@ class SmsService
         $time    = (string) ($booking['appointmentTime'] ?? $booking['appointment_time'] ?? '');
 
         $this->send(
-                $phone,
-                "Hello {$name}! 🔧 Just a reminder - your appointment for {$service}" .
-                ($time !== '' ? " at {$time}" : '') .
-                " is tomorrow. Please don't forget to come to 1625 Auto Lab. Reply STOP to unsubscribe."
+            $phone,
+            "Hello {$name}! Just a reminder - your appointment for {$service}"
+          . ($time !== '' ? " at {$time}" : '')
+          . " is tomorrow. Please don't forget to come to 1625 Auto Lab."
         );
     }
 
@@ -114,8 +164,35 @@ class SmsService
             $phone,
             "Hi {$name}! Magandang balita - may bakanteng slot na sa {$date}"
           . ($time !== '' ? " at {$time}" : '') . ". "
-          . "I-book na agad bago maubusan! - 1625 Auto Lab. "
-          . "Reply STOP para mag-unsubscribe."
+          . "I-book na agad bago maubusan! - 1625 Auto Lab"
+        );
+    }
+
+    /**
+     * Notify a staff member (technician) that a booking has been assigned to them.
+     *
+     * @param array<string, mixed> $booking   The booking record
+     * @param string               $techPhone The technician's phone number
+     * @param string               $techName  The technician's name
+     */
+    public function staffAssigned(array $booking, string $techPhone, string $techName): void
+    {
+        $phone = $this->normalisePhone($techPhone);
+        if ($phone === '') return;
+
+        $client  = (string) ($booking['name']            ?? 'a client');
+        $service = (string) ($booking['serviceName']     ?? 'a service');
+        $date    = (string) ($booking['appointmentDate'] ?? '');
+        $time    = (string) ($booking['appointmentTime'] ?? '');
+        $refNumber = (string) ($booking['referenceNumber'] ?? '');
+
+        $this->send(
+            $phone,
+            "Hi {$techName}! You have been assigned to a booking."
+          . ($refNumber !== '' ? " Ref: {$refNumber}." : '')
+          . " Client: {$client}. Service: {$service}."
+          . ($date !== '' ? " Date: {$date}" . ($time !== '' ? " at {$time}" : '') . '.' : '')
+          . " - 1625 Auto Lab"
         );
     }
 
@@ -124,9 +201,9 @@ class SmsService
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * POST to the Twilio Messages API.
+     * POST to the Semaphore Messages API.
      *
-     * Uses Guzzle (already a project dependency) with a 5-second timeout.
+     * Uses Guzzle (already a project dependency) with a 10-second timeout.
      * Any exception is caught and logged to PHP's error log so the booking
      * flow is never interrupted by an SMS failure.
      */
@@ -135,39 +212,39 @@ class SmsService
         if (!$this->enabled) return;
 
         try {
-            $twilio = new Client($this->accountSid, $this->authToken);
-            $twilio->messages->create(
-                $to,
-                [
-                    'from' => $this->from,
-                    'body' => $body,
-                ]
-            );
+            $client = new \GuzzleHttp\Client(['timeout' => 10]);
+            $client->post(self::API_URL, [
+                'form_params' => [
+                    'apikey'     => $this->apiKey,
+                    'number'     => $to,
+                    'message'    => $body,
+                    'sendername' => $this->senderName,
+                ],
+            ]);
         } catch (\Throwable $e) {
             error_log('[SmsService] Failed to send SMS to ' . substr($to, 0, 4) . '****' . ': ' . $e->getMessage());
         }
     }
 
     /**
-     * Normalise a phone number to E.164 format for Philippine numbers.
+     * Normalise a phone number to the format accepted by Semaphore (no leading +).
      *
-     * Accepts:  09171234567 → +639171234567
-     *           +639171234567 → +639171234567 (unchanged)
-     *           (02) 1234-5678 → stripped, returned as-is if already has +
+     * Accepts:  09171234567  → 639171234567
+     *           +639171234567 → 639171234567
+     *           639171234567  → 639171234567 (unchanged)
      *
      * Returns '' if normalisation is not possible.
      */
     private function normalisePhone(string $phone): string
     {
-        $digits = preg_replace('/[^\d+]/', '', $phone);
+        $digits = preg_replace('/\D/', '', $phone);
         if ($digits === null || $digits === '') return '';
 
-        if (str_starts_with($digits, '+')) return $digits;    // already E.164
-        if (str_starts_with($digits, '09') && strlen($digits) === 11) {
-            return '+63' . substr($digits, 1);                // PH mobile
+        if (str_starts_with($digits, '0') && strlen($digits) === 11) {
+            return '63' . substr($digits, 1);       // 09XXXXXXXXX → 639XXXXXXXXX
         }
-        if (str_starts_with($digits, '639') && strlen($digits) === 12) {
-            return '+' . $digits;
+        if (str_starts_with($digits, '63') && strlen($digits) === 12) {
+            return $digits;                          // already 639XXXXXXXXX
         }
         return '';
     }
