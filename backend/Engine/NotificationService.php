@@ -89,10 +89,10 @@ class NotificationService
             $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        if (MAIL_ADMIN !== '') {
+        if ($this->hasAdminRecipients()) {
             $subject = "New Booking: {$booking['serviceName']} | {$booking['name']}";
             $body    = $this->buildAdminNotificationBody($booking);
-            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+            $this->sendToAdmins($subject, $body);
         }
     }
 
@@ -119,13 +119,13 @@ class NotificationService
             $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        if (MAIL_ADMIN !== '') {
+        if ($this->hasAdminRecipients()) {
             $status  = ucfirst((string) ($booking['status'] ?? ''));
             $service = (string) ($booking['serviceName'] ?? 'Service');
             $name    = (string) ($booking['name'] ?? 'Customer');
             $subject = "Booking Status Updated: {$service} | {$name} ({$status})";
             $body    = $this->buildAdminStatusChangedBody($booking);
-            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+            $this->sendToAdmins($subject, $body);
         }
     }
 
@@ -151,12 +151,12 @@ class NotificationService
             $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        if (MAIL_ADMIN !== '') {
+        if ($this->hasAdminRecipients()) {
             $service = (string) ($booking['serviceName'] ?? 'Service');
             $name    = (string) ($booking['name'] ?? 'Customer');
             $subject = "Booking Awaiting Parts: {$service} | {$name}";
             $body    = $this->buildAdminAwaitingPartsBody($booking);
-            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+            $this->sendToAdmins($subject, $body);
         }
     }
 
@@ -183,13 +183,29 @@ class NotificationService
             $this->send($customerEmail, $customerName, $subject, $body);
         }
 
-        if (MAIL_ADMIN !== '') {
+        if ($this->hasAdminRecipients()) {
             $service = (string) ($booking['serviceName'] ?? 'Service');
             $name    = (string) ($booking['name'] ?? 'Customer');
             $subject = "Build Progress Update Posted: {$service} | {$name}";
             $body    = $this->buildAdminBuildUpdateBody($booking, $update);
-            $this->send(MAIL_ADMIN, 'Admin', $subject, $body);
+            $this->sendToAdmins($subject, $body);
         }
+    }
+
+    /**
+     * Notify an assigned staff member about a new booking assignment.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function staffAssigned(array $booking, string $staffEmail, string $staffName): void
+    {
+        if (MAIL_FROM === '' || trim($staffEmail) === '') {
+            return;
+        }
+
+        $subject = 'Booking Assigned To You | 1625 Auto Lab';
+        $body = $this->buildStaffAssignedBody($booking, $staffName);
+        $this->send($staffEmail, $staffName !== '' ? $staffName : 'Staff', $subject, $body);
     }
 
     /**
@@ -530,6 +546,46 @@ class NotificationService
         ]);
     }
 
+    /** @param array<string, mixed> $b */
+    private function buildStaffAssignedBody(array $b, string $staffName): string
+    {
+        $name = htmlspecialchars($staffName !== '' ? $staffName : 'Team Member');
+        $clientName = htmlspecialchars((string) ($b['name'] ?? 'Customer'));
+        $service = htmlspecialchars((string) ($b['serviceName'] ?? 'Service'));
+        $date = htmlspecialchars((string) ($b['appointmentDate'] ?? ''));
+        $time = htmlspecialchars((string) ($b['appointmentTime'] ?? ''));
+        $vehicle = htmlspecialchars((string) ($b['vehicleInfo'] ?? ''));
+        $refNum = htmlspecialchars((string) ($b['referenceNumber'] ?? ''));
+        $notes = nl2br(htmlspecialchars((string) ($b['notes'] ?? '')));
+
+        $vehicleHtml = $vehicle !== ''
+            ? '<tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Vehicle</td>'
+              . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $vehicle . '</td></tr>'
+            : '';
+
+        $notesHtml = trim((string) ($b['notes'] ?? '')) !== ''
+            ? '<div style="background:#162032;border-left:3px solid #f97316;padding:12px 16px;margin:20px 0;border-radius:0 4px 4px 0">'
+              . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#f97316;text-transform:uppercase">Booking Notes</p>'
+              . '<p style="margin:0;color:#cbd5e1;font-size:14px">' . $notes . '</p></div>'
+            : '';
+
+        return '
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#0f172a;color:#e2e8f0;padding:24px;border-radius:12px">
+          <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700">1625 Auto Lab</p>
+          <h2 style="margin:0 0 16px;font-size:24px;color:#ffffff">New Booking Assignment</h2>
+          <p style="margin:0 0 16px;color:#cbd5e1">Hi ' . $name . ', you have been assigned to a booking.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#111827">
+            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:140px">Client</td><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $clientName . '</td></tr>
+            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Service</td><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $service . '</td></tr>
+            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Schedule</td><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $date . ($time !== '' ? ' at ' . $time : '') . '</td></tr>
+            ' . $vehicleHtml . '
+            <tr><td style="padding:10px 16px;color:#64748b;font-size:13px">Reference #</td><td style="padding:10px 16px;color:#f97316;font-weight:700">' . $refNum . '</td></tr>
+          </table>
+          ' . $notesHtml . '
+          <p style="margin:20px 0 0;color:#94a3b8;font-size:13px">Please review the booking details in the admin panel before the scheduled appointment.</p>
+        </div>';
+    }
+
     /**
      * @param array<string, mixed> $b
      * @param array<string, mixed> $u
@@ -734,6 +790,34 @@ class NotificationService
         ]);
 
         @mail($to, $subject, $htmlBody, $headers);
+    }
+
+    private function sendToAdmins(string $subject, string $htmlBody): void
+    {
+        foreach ($this->adminRecipients() as $recipient) {
+            $this->send($recipient, 'Admin', $subject, $htmlBody);
+        }
+    }
+
+    private function hasAdminRecipients(): bool
+    {
+        return count($this->adminRecipients()) > 0;
+    }
+
+    /** @return string[] */
+    private function adminRecipients(): array
+    {
+        $parts = preg_split('/\s*,\s*/', (string) MAIL_ADMIN) ?: [];
+        $emails = [];
+        foreach ($parts as $part) {
+            $email = trim($part);
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $emails[] = strtolower($email);
+        }
+
+        return array_values(array_unique($emails));
     }
 
     private function smtpConfigured(): bool

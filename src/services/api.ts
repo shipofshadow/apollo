@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -741,6 +741,9 @@ export const fetchAdminUsersApi = (token: string, params?: { search?: string; ro
   return apiFetch<{ users: AdminManagedUser[] }>(path, {}, token);
 };
 
+export const fetchAssignableUsersApi = (token: string) =>
+  apiFetch<{ users: AdminManagedUser[] }>('/api/admin/users/assignable', {}, token);
+
 export const createAdminUserApi = (
   token: string,
   data: { name: string; email: string; phone?: string; password: string; role: UserRole }
@@ -815,6 +818,27 @@ export const deleteAdminRoleApi = (token: string, id: number) =>
 
 export const fetchAdminStatsApi = (token: string) =>
   apiFetch<AdminStats>('/api/admin/stats', {}, token);
+
+export const fetchSemaphoreAccountApi = (token: string, refresh = false) => {
+  const qs = refresh ? '?refresh=true' : '';
+  return apiFetch<SemaphoreAccountResponse>(`/api/admin/semaphore/account${qs}`, {}, token);
+};
+
+export const fetchSemaphoreMessagesApi = (
+  token: string,
+  params: { page?: number; limit?: number; status?: string; network?: string; startDate?: string; endDate?: string; refresh?: boolean } = {}
+) => {
+  const query = new URLSearchParams();
+  if (params.page) query.set('page', String(params.page));
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.status) query.set('status', params.status);
+  if (params.network) query.set('network', params.network);
+  if (params.startDate) query.set('startDate', params.startDate);
+  if (params.endDate) query.set('endDate', params.endDate);
+  if (params.refresh) query.set('refresh', 'true');
+  const qs = query.toString();
+  return apiFetch<SemaphoreMessagesResponse>(`/api/admin/semaphore/messages${qs ? `?${qs}` : ''}`, {}, token);
+};
 
 export interface MigrationEntry {
   name: string;

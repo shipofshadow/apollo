@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Mail, Phone, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Upload, Trash2, Loader2 } from 'lucide-react';
+import { Bell, Mail, MessageSquare, Phone, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Upload, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
 import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
-import { uploadProfileAvatarApi } from '../../services/api';
+import { uploadProfileAvatarApi, getNotificationPrefsApi, saveNotificationPrefsApi } from '../../services/api';
+import type { NotificationPreferences } from '../../types';
 
 const UPLOAD_MAX_MB = 10;
 
@@ -28,11 +29,42 @@ export default function AccountSettingsPanel() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [removingAvatar, setRemovingAvatar] = useState(false);
 
+  // Notification preferences
+  const [prefs,      setPrefs]      = useState<NotificationPreferences | null>(null);
+  const [prefsBusy,  setPrefsBusy]  = useState(false);
+  const [prefsSaved, setPrefsSaved] = useState(false);
   useEffect(() => {
     if (user) setInfo({ name: user.name, phone: user.phone ?? '' });
   }, [user]);
 
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
+
+  useEffect(() => {
+    if (!token) return;
+    getNotificationPrefsApi(token)
+      .then(data => { if (data.preferences) setPrefs(data.preferences); })
+      .catch(() => {});
+  }, [token]);
+
+  const handlePrefsToggle = (key: keyof NotificationPreferences) => {
+    setPrefs(prev => prev ? { ...prev, [key]: !prev[key] } : prev);
+    setPrefsSaved(false);
+  };
+
+  const handlePrefsSave = async () => {
+    if (!token || !prefs) return;
+    setPrefsBusy(true);
+    setPrefsSaved(false);
+    try {
+      const updated = await saveNotificationPrefsApi(token, prefs);
+      setPrefs(updated.preferences);
+      setPrefsSaved(true);
+    } catch {
+      // non-critical
+    } finally {
+      setPrefsBusy(false);
+    }
+  };
 
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,6 +297,120 @@ export default function AccountSettingsPanel() {
           </div>
         </form>
       </div>
+
+      {/* Notification Preferences */}
+      {prefs && (() => {
+        const role = user?.role;
+        const isAdminType = role === 'admin' || role === 'owner' || role === 'manager';
+        const isStaffType = role === 'staff' || role === 'manager';
+
+        const emailPrefs: [keyof NotificationPreferences, string][] = [
+          ...(isAdminType ? [['emailNewBooking', 'New booking alerts'] as [keyof NotificationPreferences, string]] : []),
+          ['emailStatusChanged', 'Booking status changes'],
+          ['emailBuildUpdate',   'Build progress updates'],
+          ['emailPartsUpdate',   'Parts availability updates'],
+        ];
+
+        const inappPrefs: [keyof NotificationPreferences, string][] = [
+          ['inappStatusChanged', 'Booking status changes'],
+          ['inappBuildUpdate',   'Build progress updates'],
+          ['inappPartsUpdate',   'Parts availability updates'],
+        ];
+
+        const smsPrefs: [keyof NotificationPreferences, string][] = [
+          ...(isAdminType ? [['smsNewBooking', 'New booking alerts'] as [keyof NotificationPreferences, string]] : []),
+          ...(isStaffType ? [['smsAssignment', 'Assignment to booking'] as [keyof NotificationPreferences, string]] : []),
+        ];
+
+        const ToggleRow = ({ prefKey, label }: { prefKey: keyof NotificationPreferences; label: string }) => (
+          <label className="flex items-center justify-between cursor-pointer group">
+            <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{label}</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={prefs[prefKey] as boolean}
+              onClick={() => handlePrefsToggle(prefKey)}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${prefs[prefKey] ? 'bg-brand-orange' : 'bg-gray-700'}`}
+            >
+              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${prefs[prefKey] ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </label>
+        );
+
+        return (
+          <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-800">
+              <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                <Bell className="w-3.5 h-3.5 text-brand-orange" /> Notification Preferences
+              </h3>
+            </div>
+            <div className="p-6 space-y-6">
+              {prefsSaved && (
+                <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-2 rounded-sm">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" /> Preferences saved!
+                </div>
+              )}
+
+              {/* Email */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                  <Mail className="w-3 h-3" /> Email Notifications
+                </p>
+                <div className="space-y-3">
+                  {emailPrefs.map(([key, label]) => (
+                    <ToggleRow key={key} prefKey={key} label={label} />
+                  ))}
+                </div>
+              </div>
+
+              {/* In-app */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                  <Bell className="w-3 h-3" /> In-App Notifications
+                </p>
+                <div className="space-y-3">
+                  {inappPrefs.map(([key, label]) => (
+                    <ToggleRow key={key} prefKey={key} label={label} />
+                  ))}
+                </div>
+              </div>
+
+              {/* SMS — only if role has relevant prefs */}
+              {smsPrefs.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                    <MessageSquare className="w-3 h-3" /> SMS Notifications
+                  </p>
+                  {!user?.phone && (
+                    <p className="text-xs text-yellow-500/80 mb-3 flex items-center gap-1.5">
+                      <Phone className="w-3 h-3 shrink-0" />
+                      Add a phone number above to receive SMS alerts.
+                    </p>
+                  )}
+                  <div className="space-y-3">
+                    {smsPrefs.map(([key, label]) => (
+                      <ToggleRow key={key} prefKey={key} label={label} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void handlePrefsSave()}
+                  disabled={prefsBusy}
+                  className="flex items-center gap-2 bg-brand-orange text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
+                >
+                  {prefsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  Save Preferences
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }

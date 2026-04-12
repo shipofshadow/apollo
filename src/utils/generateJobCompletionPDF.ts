@@ -1,11 +1,12 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoUrl from '../assets/logo.png';
-import type { Booking, BuildUpdate } from '../types';
+import type { Booking, BuildUpdate, SiteSettings } from '../types';
 
 type GenerateJobCompletionPDFOptions = {
   buildUpdates?: BuildUpdate[];
   includeAdminExtras?: boolean;
+  settings?: SiteSettings;
 };
 
 type PhotoTile = {
@@ -77,7 +78,7 @@ async function resolvePhotoTiles(urls: string[]): Promise<PhotoTile[]> {
   return loaded.filter((item): item is PhotoTile => item !== null);
 }
 
-function drawHeader(doc: jsPDF, logoDataUrl: string | null): number {
+function drawHeader(doc: jsPDF, logoDataUrl: string | null, businessName: string, tagline: string): number {
   doc.setFillColor(...BRAND.slate);
   doc.rect(0, 0, 210, 32, 'F');
 
@@ -92,12 +93,12 @@ function drawHeader(doc: jsPDF, logoDataUrl: string | null): number {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('1625 AUTO LAB', 36, 14);
+  doc.text(businessName, 36, 14);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(226, 232, 240);
-  doc.text('Premium Automotive Lighting', 36, 20);
+  doc.text(tagline, 36, 20);
 
   doc.setTextColor(...BRAND.orange);
   doc.setFont('helvetica', 'bold');
@@ -122,8 +123,14 @@ export async function generateJobCompletionPDF(
   const signatureData = normalizeSignatureData(booking.signatureData);
 
   const buildUpdates = options.buildUpdates ?? [];
+  const settings = options.settings ?? {};
 
-  let y = drawHeader(doc, logoDataUrl);
+  const businessName = (settings.business_name ?? settings.footer_name ?? '').trim() || '1625 AUTO LAB';
+  const tagline = (settings.footer_tagline ?? '').trim() || 'Premium Automotive Lighting';
+  const footerAddress = (settings.footer_address ?? '').trim() || '1625 Auto Lab';
+  const footerPhone = (settings.footer_phone ?? '').trim();
+
+  let y = drawHeader(doc, logoDataUrl, businessName, tagline);
 
   const createdDate = booking.createdAt
     ? new Date(booking.createdAt).toLocaleString('en-PH', {
@@ -374,7 +381,8 @@ export async function generateJobCompletionPDF(
     12,
     y + 8,
   );
-  doc.text('1625 Auto Lab - NKKS Arcade, Brgy. Alasas, San Fernando, Pampanga', 12, y + 13);
+  const footerLine = footerPhone ? `${footerAddress}  •  ${footerPhone}` : footerAddress;
+  doc.text(footerLine, 12, y + 13);
 
   const safeRef = valueOrDash(booking.referenceNumber).replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`job-sheet-${safeRef}.pdf`);

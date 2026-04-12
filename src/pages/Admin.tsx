@@ -17,6 +17,7 @@ import ContentPanel         from './admin/ContentPanel';
 import ProductsPanel        from './admin/ProductsPanel';
 import OrdersPanel          from './admin/OrdersPanel';
 import AccountSettingsPanel from './admin/AccountSettingsPanel';
+import SemaphorePanel       from './admin/SemaphorePanel';
 import ShopHoursPanel       from './admin/ShopHoursPanel';
 import SiteSettingsPanel    from './admin/SiteSettingsPanel';
 import FaqPanel             from './admin/FaqPanel';
@@ -53,6 +54,7 @@ const TAB_PATHS: Record<string, string> = {
   'manage-clients': '/admin/manage-clients',
   'manage-roles': '/admin/manage-roles',
   'security-audit': '/admin/security-audit',
+  'semaphore': '/admin/semaphore',
   settings: '/admin/account',
 };
 
@@ -151,7 +153,7 @@ export default function AdminPage() {
   }, []);
 
   const role = (user?.role) ?? '';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'owner';
 
   const canAccessTab = (key: string) => {
     if (['products', 'orders'].includes(key)) {
@@ -160,6 +162,10 @@ export default function AdminPage() {
 
     if (['chatbot', 'chatbot-conversations', 'chatbot-flow'].includes(key)) {
       return hasPermission('chatbot:manage');
+    }
+
+    if (key === 'semaphore') {
+      return hasPermission('settings:manage');
     }
 
     if (isAdmin) return true;
@@ -218,9 +224,10 @@ export default function AdminPage() {
     {
       isGroup: true, key: 'settings', label: 'Settings', icon: SlidersHorizontal,
       children: [
-        { key: 'site-settings', label: 'Site Config', icon: SlidersHorizontal },
+        { key: 'site-settings', label: 'Site Config',     icon: SlidersHorizontal },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
-        { key: 'settings',      label: 'Account',     icon: UserCog },
+        { key: 'semaphore',     label: 'Semaphore SMS',   icon: MessageSquare },
+        { key: 'settings',      label: 'Account',         icon: UserCog },
       ]
     }
   ];
@@ -288,6 +295,7 @@ export default function AdminPage() {
           />
         );
       case 'security-audit': return <SecurityAuditPanel />;
+      case 'semaphore':     return <SemaphorePanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;
     }

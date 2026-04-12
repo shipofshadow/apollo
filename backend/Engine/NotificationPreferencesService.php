@@ -56,6 +56,9 @@ class NotificationPreferencesService
             'inapp_status_changed',
             'inapp_build_update',
             'inapp_parts_update',
+            'sms_new_booking',
+            'sms_assignment',
+            'sms_status_changed',
         ];
 
         $sets   = [];
@@ -92,6 +95,12 @@ class NotificationPreferencesService
         return $this->getColumnValue($userId, $col);
     }
 
+    public function smsEnabled(int $userId, string $type): bool
+    {
+        $col = 'sms_' . $type;
+        return $this->getColumnValue($userId, $col);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
@@ -101,6 +110,7 @@ class NotificationPreferencesService
         $allowed = [
             'email_new_booking', 'email_status_changed', 'email_build_update', 'email_parts_update',
             'inapp_status_changed', 'inapp_build_update', 'inapp_parts_update',
+            'sms_new_booking', 'sms_assignment', 'sms_status_changed',
         ];
         if (!in_array($col, $allowed, true)) {
             return true; // default on for unknown types
@@ -139,6 +149,9 @@ class NotificationPreferencesService
             'inappStatusChanged' => (bool) ($row['inapp_status_changed'] ?? 1),
             'inappBuildUpdate'   => (bool) ($row['inapp_build_update']   ?? 1),
             'inappPartsUpdate'   => (bool) ($row['inapp_parts_update']   ?? 1),
+            'smsNewBooking'      => (bool) ($row['sms_new_booking']      ?? 1),
+            'smsAssignment'      => (bool) ($row['sms_assignment']       ?? 1),
+            'smsStatusChanged'   => (bool) ($row['sms_status_changed']   ?? 1),
         ];
     }
 }

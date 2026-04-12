@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoUrl from '../assets/logo.png';
-import type { Booking } from '../types';
+import type { Booking, SiteSettings } from '../types';
 
 const BRAND = {
   orange: [249, 115, 22] as [number, number, number],
@@ -41,9 +41,13 @@ function drawLineField(doc: jsPDF, label: string, y: number): number {
   return y + 8;
 }
 
-export async function generateTechnicianJobSheetPDF(booking: Booking): Promise<void> {
+export async function generateTechnicianJobSheetPDF(booking: Booking, settings: SiteSettings = {}): Promise<void> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const logoDataUrl = await toDataUrlFromAsset(logoUrl);
+
+  const businessName = (settings.business_name ?? settings.footer_name ?? '').trim() || '1625 AUTO LAB';
+  const footerAddress = (settings.footer_address ?? '').trim() || '1625 Auto Lab';
+  const footerPhone = (settings.footer_phone ?? '').trim();
 
   doc.setFillColor(...BRAND.slate);
   doc.rect(0, 0, 210, 32, 'F');
@@ -59,7 +63,7 @@ export async function generateTechnicianJobSheetPDF(booking: Booking): Promise<v
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('1625 AUTO LAB', 36, 14);
+  doc.text(businessName, 36, 14);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(226, 232, 240);
@@ -140,6 +144,8 @@ export async function generateTechnicianJobSheetPDF(booking: Booking): Promise<v
   doc.setFontSize(8);
   doc.setTextColor(...BRAND.gray);
   doc.text('Use this sheet for pre-job and on-vehicle validation. Keep with booking records after completion.', 12, y + 6);
+  const footerLine = footerPhone ? `${footerAddress}  •  ${footerPhone}` : footerAddress;
+  doc.text(footerLine, 12, y + 11);
 
   const safeRef = valueOrDash(booking.referenceNumber).replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`technician-job-sheet-${safeRef}.pdf`);

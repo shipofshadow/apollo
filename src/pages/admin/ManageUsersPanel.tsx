@@ -23,7 +23,7 @@ import {
 } from './_sharedComponents';
 import { type ConfirmDialogState } from './_sharedUtils';
 
-const USER_ROLES: readonly UserRole[] = ['admin', 'manager', 'staff', 'client'];
+const USER_ROLES: readonly UserRole[] = ['owner', 'admin', 'manager', 'staff', 'client'];
 
 function isUserRole(value: string): value is UserRole {
   return USER_ROLES.includes(value as UserRole);
@@ -33,7 +33,8 @@ export default function ManageUsersPanel() {
   const { token, user } = useAuth();
   const { showToast } = useToast();
 
-  const canManageUsers = user?.role === 'admin';
+  const canManageUsers = user?.role === 'admin' || user?.role === 'owner';
+  const isOwner = user?.role === 'owner';
 
   const [users, setUsers] = useState<AdminManagedUser[]>([]);
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -302,6 +303,8 @@ export default function ManageUsersPanel() {
                     </tr>
                   ) : pagedUsers.map(item => {
                     const isActive = item.is_active !== false;
+                    // Admins cannot edit other admin or owner accounts — only owners can.
+                    const isProtected = !isOwner && (item.role === 'admin' || item.role === 'owner');
                     return (
                       <tr key={item.id} className={`border-b border-gray-800/70 ${!isActive ? 'opacity-60' : ''}`}>
                         <td className="py-2.5 px-3 md:px-4 text-white font-medium">{item.name}</td>
@@ -310,12 +313,15 @@ export default function ManageUsersPanel() {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <label className="sr-only" htmlFor={`role-select-${item.id}`}>Change role for {item.name}</label>
                             <select id={`role-select-${item.id}`} value={item.role}
-                              disabled={updatingRoleId === item.id || !roleOptions.length}
+                              disabled={isProtected || updatingRoleId === item.id || !roleOptions.length}
                               onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
                               className="bg-brand-darker border border-gray-700 text-white px-1.5 py-1 rounded-sm text-xs focus:outline-none focus:border-brand-orange disabled:opacity-60">
                               {roleOptions.map(role => <option key={role} value={role}>{role}</option>)}
                             </select>
                             <RoleBadge role={item.role} />
+                            {isProtected && (
+                              <span title="Only the owner can edit admin and owner accounts" className="text-[10px] text-gray-600 select-none">🔒 protected</span>
+                            )}
                           </div>
                         </td>
                         <td className="py-2.5 px-3 md:px-4 hidden sm:table-cell">
@@ -326,9 +332,10 @@ export default function ManageUsersPanel() {
                         </td>
                         <td className="py-2.5 px-3 md:px-4">
                           <button type="button"
-                            disabled={togglingStatusId === item.id}
+                            disabled={isProtected || togglingStatusId === item.id}
                             onClick={() => handleToggleStatus(item.id, isActive, item.name)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-60 transition-colors ${
+                            title={isProtected ? 'Only the owner can change status of admin/owner accounts' : undefined}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors ${
                               isActive
                                 ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
                                 : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'

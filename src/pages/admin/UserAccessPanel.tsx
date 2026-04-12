@@ -19,7 +19,7 @@ import {
 import type { ClientAdminSummary, UserRole } from '../../types';
 
 const TABLE_PAGE_SIZE = 8;
-const USER_ROLES: readonly UserRole[] = ['admin', 'manager', 'staff', 'client'];
+const USER_ROLES: readonly UserRole[] = ['owner', 'admin', 'manager', 'staff', 'client'];
 
 function isUserRole(value: string): value is UserRole {
   return USER_ROLES.includes(value as UserRole);
@@ -131,7 +131,7 @@ export default function UserAccessPanel() {
   const { token, user } = useAuth();
   const { showToast } = useToast();
 
-  const canManageUsers = user?.role === 'admin';
+  const canManageUsers = user?.role === 'admin' || user?.role === 'owner';
 
   const [users, setUsers] = useState<AdminManagedUser[]>([]);
   const [clients, setClients] = useState<ClientAdminSummary[]>([]);

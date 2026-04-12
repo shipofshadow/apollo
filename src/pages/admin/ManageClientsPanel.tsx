@@ -26,7 +26,7 @@ export default function ManageClientsPanel({ onView }: Props) {
   const { token, user } = useAuth();
   const { showToast } = useToast();
 
-  const canManageUsers = user?.role === 'admin';
+  const canManageUsers = user?.role === 'admin' || user?.role === 'owner';
 
   const [clients, setClients] = useState<ClientAdminSummary[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);

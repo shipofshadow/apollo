@@ -110,12 +110,15 @@ define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));
 // SMS (Semaphore)
 // Set SEMAPHORE_API_KEY to enable SMS notifications via semaphore.co.
 // SEMAPHORE_SENDER_NAME: approved sender name (default: "1625AutoLab").
-// SEMAPHORE_ADMIN_PHONE: Philippine mobile number to receive booking alerts.
+// SEMAPHORE_ADMIN_PHONE: comma-separated Philippine mobile numbers for owner booking alerts.
+// SEMAPHORE_ACCOUNT_CACHE_TTL / SEMAPHORE_MESSAGES_CACHE_TTL: admin API cache TTLs in seconds.
 // ---------------------------------------------------------------------------
 
 define('SEMAPHORE_API_KEY',     $_ENV['SEMAPHORE_API_KEY']     ?? '');
 define('SEMAPHORE_SENDER_NAME', $_ENV['SEMAPHORE_SENDER_NAME'] ?? '1625AutoLab');
 define('SEMAPHORE_ADMIN_PHONE', $_ENV['SEMAPHORE_ADMIN_PHONE'] ?? '');
+define('SEMAPHORE_ACCOUNT_CACHE_TTL', max(0, (int) ($_ENV['SEMAPHORE_ACCOUNT_CACHE_TTL'] ?? 60)));
+define('SEMAPHORE_MESSAGES_CACHE_TTL', max(0, (int) ($_ENV['SEMAPHORE_MESSAGES_CACHE_TTL'] ?? 30)));
 
 // ---------------------------------------------------------------------------
 // Cloudflare Turnstile

@@ -27,13 +27,12 @@ import {
   updateBookingQaPhotosApi,
   deleteBookingApi,
   fetchCustomerStatsApi,
-  fetchTeamMembersApi,
-  fetchAdminUsersApi,
+  fetchAssignableUsersApi,
   assignBookingTechnicianApi,
   type AdminManagedUser,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog, TeamMember } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -343,9 +342,10 @@ type ConfirmDialogState = {
 
 export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const dispatch = useDispatch<AppDispatch>();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
   const { showToast } = useToast();
   const appointments = useSelector((s: RootState) => s.booking.appointments);
+  const siteSettings  = useSelector((s: RootState) => s.siteSettings.settings);
 
   const booking = appointments.find(b => b.id === bookingId) ?? null;
 
@@ -357,9 +357,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
   const [deleteBusy,    setDeleteBusy]    = useState(false);
   const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
-  const [teamMembers,   setTeamMembers]   = useState<TeamMember[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AdminManagedUser[]>([]);
-  const [selectedTechUserId, setSelectedTechUserId] = useState('');
+  const [selectedTechValue, setSelectedTechValue] = useState('');
   const [assignTechBusy, setAssignTechBusy] = useState(false);
 
   // Internal notes state
@@ -409,12 +408,11 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     setBeforePhotos(booking.beforePhotos ?? []);
     setAfterPhotos(booking.afterPhotos ?? []);
     if (booking.assignedTech?.userId != null) {
-      setSelectedTechUserId(String(booking.assignedTech.userId));
+      setSelectedTechValue(`user:${booking.assignedTech.userId}`);
     } else if (booking.assignedTechId != null) {
-      const linked = teamMembers.find(member => member.id === booking.assignedTechId);
-      setSelectedTechUserId(linked?.userId != null ? String(linked.userId) : '');
+      setSelectedTechValue(`tech:${booking.assignedTechId}`);
     } else {
-      setSelectedTechUserId('');
+      setSelectedTechValue('');
     }
 
     if (token && booking.userId) {
@@ -422,21 +420,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
         .then(r => setCustomerStats(r.stats))
         .catch(() => {});
     }
-  }, [booking, token, teamMembers]);
+  }, [booking, token]);
 
   useEffect(() => {
-    if (!token) return;
-    fetchTeamMembersApi(token)
-      .then(({ members }) => setTeamMembers(members))
-      .catch(() => setTeamMembers([]));
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    fetchAdminUsersApi(token)
+    if (!token || !hasPermission('bookings:assign-tech')) return;
+    fetchAssignableUsersApi(token)
       .then(({ users }) => setAssignableUsers(users.filter(user => user.role !== 'client')))
       .catch(() => setAssignableUsers([]));
-  }, [token]);
+  }, [token, hasPermission]);
 
   useEffect(() => {
     if (!token || !bookingId) return;
@@ -528,18 +519,35 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
   const handleAssignTechnician = async () => {
     if (!token || !booking) return;
-    const assignedUserId = selectedTechUserId === '' ? null : Number(selectedTechUserId);
-    if (assignedUserId !== null && (!Number.isInteger(assignedUserId) || assignedUserId <= 0)) {
-      showToast('Please select a valid technician.', 'error');
-      return;
+    const selected = selectedTechValue.trim();
+    let assignedUserId: number | null = null;
+    let assignedTechId: number | null = null;
+
+    if (selected !== '') {
+      if (selected.startsWith('user:')) {
+        assignedUserId = Number(selected.slice(5));
+        if (!Number.isInteger(assignedUserId) || assignedUserId <= 0) {
+          showToast('Please select a valid technician.', 'error');
+          return;
+        }
+      } else if (selected.startsWith('tech:')) {
+        assignedTechId = Number(selected.slice(5));
+        if (!Number.isInteger(assignedTechId) || assignedTechId <= 0) {
+          showToast('Please select a valid technician.', 'error');
+          return;
+        }
+      } else {
+        showToast('Please select a valid technician.', 'error');
+        return;
+      }
     }
 
     setAssignTechBusy(true);
     try {
-      await assignBookingTechnicianApi(token, booking.id, { assignedUserId });
+      await assignBookingTechnicianApi(token, booking.id, { assignedUserId, assignedTechId });
       await dispatch(fetchAllBookingsAsync(token)).unwrap();
       await reloadActivity();
-      showToast(assignedUserId ? 'Technician assigned.' : 'Technician unassigned.', 'success');
+      showToast(selected ? 'Technician assigned.' : 'Technician unassigned.', 'success');
     } catch (e: unknown) {
       showToast((e as Error).message ?? 'Failed to assign technician.', 'error');
     } finally {
@@ -703,15 +711,18 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const canComplete = booking.status === 'confirmed';
   const canResume   = booking.status === 'awaiting_parts';
   const canCancel   = canModify;
+  const canAssignTechnician = hasPermission('bookings:assign-tech');
   const isFinalized = booking.status === 'completed' || booking.status === 'cancelled';
   const hasBeforePhotos = beforePhotos.length > 0;
   const hasAfterPhotos = (booking.afterPhotos?.length ?? 0) > 0;
+  const assignedTechnicianLabel = booking.assignedTech?.name?.trim() || (booking.assignedTechId != null ? `Technician #${booking.assignedTechId}` : 'Not assigned');
 
   const handleDownloadJobSheet = async () => {
     try {
       await generateJobCompletionPDF(booking, {
         buildUpdates,
         includeAdminExtras: true,
+        settings: siteSettings,
       });
     } catch {
       showToast('Failed to generate admin job sheet PDF.', 'error');
@@ -720,7 +731,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
   const handleDownloadTechnicianSheet = async () => {
     try {
-      await generateTechnicianJobSheetPDF(booking);
+      await generateTechnicianJobSheetPDF(booking, siteSettings);
     } catch {
       showToast('Failed to generate technician job sheet PDF.', 'error');
     }
@@ -920,41 +931,54 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
                   <Wrench className="w-3.5 h-3.5 text-gray-400" /> Assigned Technician
                 </p>
-                
-                <div className="space-y-3">
-                  <select
-                    value={selectedTechUserId}
-                    onChange={e => setSelectedTechUserId(e.target.value)}
-                    disabled={isFinalized || assignTechBusy}
-                    className="w-full bg-[#181818] border border-gray-800 text-white px-3 py-3 rounded focus:outline-none focus:border-brand-orange transition-colors text-sm font-semibold"
-                  >
-                    <option value="">[ Not Assigned ]</option>
-                    {assignableUsers.map(member => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}{member.role ? ` — ${member.role}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  
-                  <button
-                    type="button"
-                    onClick={() => requestConfirmation(
-                      {
-                        title: 'Update Operator?',
-                        message: selectedTechUserId
-                          ? 'Locking in operator assignment for this payload.'
-                          : 'Clearing current operator assignment.',
-                        confirmLabel: 'Execute',
-                      },
-                      handleAssignTechnician,
-                    )}
-                    disabled={assignTechBusy || !token || isFinalized}
-                    className="w-full py-2.5 bg-brand-darker border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {assignTechBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                    Save Technician
-                  </button>
-                </div>
+
+                {canAssignTechnician ? (
+                  <div className="space-y-3">
+                    <select
+                      value={selectedTechValue}
+                      onChange={e => setSelectedTechValue(e.target.value)}
+                      disabled={isFinalized || assignTechBusy}
+                      className="w-full bg-[#181818] border border-gray-800 text-white px-3 py-3 rounded focus:outline-none focus:border-brand-orange transition-colors text-sm font-semibold"
+                    >
+                      <option value="">[ Not Assigned ]</option>
+                      {selectedTechValue.startsWith('tech:') && booking.assignedTech ? (
+                        <option value={selectedTechValue}>
+                          {booking.assignedTech.name || `Technician #${booking.assignedTech.id}`}
+                          {booking.assignedTech.role ? ` — ${booking.assignedTech.role}` : ''}
+                        </option>
+                      ) : null}
+                      {assignableUsers.map(member => (
+                        <option key={member.id} value={`user:${member.id}`}>
+                          {member.name}{member.role ? ` — ${member.role}` : ''}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => requestConfirmation(
+                        {
+                          title: 'Update Operator?',
+                          message: selectedTechValue
+                            ? 'Locking in operator assignment for this payload.'
+                            : 'Clearing current operator assignment.',
+                          confirmLabel: 'Execute',
+                        },
+                        handleAssignTechnician,
+                      )}
+                      disabled={assignTechBusy || !token || isFinalized}
+                      className="w-full py-2.5 bg-brand-darker border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {assignTechBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      Save Technician
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-[#181818] border border-gray-800 rounded p-3 flex justify-between items-center">
+                    <span className="text-xs text-gray-500 font-mono">Technician</span>
+                    <span className="text-sm font-bold text-gray-200">{assignedTechnicianLabel}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Clock, CheckCircle, ArrowLeft, ArrowRight, Loader2,
@@ -105,7 +105,7 @@ export default function BookingPage() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, token } = useAuth();
+  const { user, token, hasPermission } = useAuth();
   const { showToast } = useToast();
   const { status: bookStatus, error: bookError, appointments } = useSelector((s: RootState) => s.booking);
   const services = useSelector((s: RootState) => s.services.items.filter(sv => sv.isActive));
@@ -432,6 +432,11 @@ export default function BookingPage() {
 
   // Shared generic input style
   const inputClass = "w-full bg-black/20 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all rounded-sm text-sm";
+
+  // Non-client internal roles cannot submit bookings through the public form.
+  if (user && !hasPermission('client:self')) {
+    return <Navigate to="/admin" replace />;
+  }
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker">

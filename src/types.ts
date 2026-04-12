@@ -1,6 +1,6 @@
 // ── Auth ───────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'manager' | 'staff' | 'client';
+export type UserRole = 'owner' | 'admin' | 'manager' | 'staff' | 'client';
 
 export interface User {
   id: number;
@@ -600,6 +600,9 @@ export interface NotificationPreferences {
   inappStatusChanged: boolean;
   inappBuildUpdate:   boolean;
   inappPartsUpdate:   boolean;
+  smsNewBooking:      boolean;
+  smsAssignment:      boolean;
+  smsStatusChanged:   boolean;
 }
 
 // ── Customer Loyalty Stats ─────────────────────────────────────────────────────
@@ -608,6 +611,39 @@ export interface CustomerStats {
   totalVisits:     number;
   completedVisits: number;
   memberSince:     string | null;
+}
+
+export interface SemaphoreAccountDetails {
+  account_id: number;
+  account_name: string;
+  status: string;
+  credit_balance: number;
+}
+
+export interface SemaphoreAccountResponse {
+  configured: boolean;
+  sender_name: string;
+  account: SemaphoreAccountDetails | null;
+}
+
+export interface SemaphoreMessage {
+  message_id: number;
+  recipient: string;
+  message: string;
+  sender_name: string;
+  network: string;
+  status: string;
+  type: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SemaphoreMessagesResponse {
+  configured: boolean;
+  messages: SemaphoreMessage[];
+  page: number;
+  limit: number;
 }
 
 // ── Extended Admin Stats ───────────────────────────────────────────────────────

@@ -34,7 +34,7 @@ export default function ManageRolesPanel() {
   const { token, user } = useAuth();
   const { showToast } = useToast();
 
-  const canManageRoles = user?.role === 'admin';
+  const canManageRoles = user?.role === 'admin' || user?.role === 'owner';
 
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);

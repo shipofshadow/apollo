@@ -43,7 +43,7 @@ export function useNotificationPoller(): void {
     // Fetch immediately on login
     poll();
 
-    const isBackoffice = user.role === 'admin' || user.role === 'manager' || user.role === 'staff';
+    const isBackoffice = user.role === 'admin' || user.role === 'owner' || user.role === 'manager' || user.role === 'staff';
     const intervalMs = isBackoffice ? ADMIN_INTERVAL_MS : CLIENT_INTERVAL_MS;
     intervalRef.current = setInterval(poll, intervalMs);
 

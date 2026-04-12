@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
-    if (user.role === 'admin') return true;
+    if (user.role === 'admin' || user.role === 'owner') return true;
     return Array.isArray(user.permissions) && user.permissions.includes(permission);
   };
 
@@ -176,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       token,
       isAuthenticated: user !== null,
-      isAdmin: user?.role === 'admin',
+      isAdmin: user?.role === 'admin' || user?.role === 'owner',
       isClient: user?.role === 'client',
       status,
       error,

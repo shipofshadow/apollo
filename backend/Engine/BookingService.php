@@ -476,11 +476,14 @@ class BookingService
             throw new RuntimeException('Booking not found.', 404);
         }
 
-        $techName  = null;
-        $techPhone = '';
+        $techName   = null;
+        $techPhone  = '';
+        $techEmail  = '';
+        $techUserId = null;
         if ($assignedTechId !== null) {
+            $userIdSelect = $this->hasTeamMemberUserIdColumn() ? ', user_id' : '';
             $techStmt = Database::getInstance()->prepare(
-                'SELECT id, name, phone FROM team_members WHERE id = :id LIMIT 1'
+                'SELECT id, name, phone, email' . $userIdSelect . ' FROM team_members WHERE id = :id LIMIT 1'
             );
             $techStmt->execute([':id' => $assignedTechId]);
             $tech = $techStmt->fetch(\PDO::FETCH_ASSOC);
@@ -489,6 +492,10 @@ class BookingService
             }
             $techName  = (string) ($tech['name']  ?? '');
             $techPhone = (string) ($tech['phone'] ?? '');
+            $techEmail = (string) ($tech['email'] ?? '');
+            if (isset($tech['user_id']) && $tech['user_id'] !== null) {
+                $techUserId = (int) $tech['user_id'];
+            }
         }
 
         Database::getInstance()->prepare(
@@ -506,7 +513,16 @@ class BookingService
         $beforeId = isset($before['assignedTechId']) && $before['assignedTechId'] !== null
             ? (int) $before['assignedTechId']
             : null;
+        $beforeTechUserId = null;
+        if (isset($before['assignedTech']) && is_array($before['assignedTech'])) {
+            $rawBeforeTechUserId = $before['assignedTech']['userId'] ?? null;
+            if ($rawBeforeTechUserId !== null) {
+                $beforeTechUserId = (int) $rawBeforeTechUserId;
+            }
+        }
         if ($beforeId !== $assignedTechId) {
+            $reference = (string) ($updated['referenceNumber'] ?? $updated['id'] ?? $id);
+
             if ($assignedTechId === null) {
                 $this->addActivity(
                     $id,
@@ -514,6 +530,16 @@ class BookingService
                     'Technician unassigned',
                     null
                 );
+
+                if ($beforeTechUserId !== null) {
+                    (new UserNotificationService())->createForUser(
+                        $beforeTechUserId,
+                        'assignment',
+                        'Booking Unassigned',
+                        'You were unassigned from booking ' . $reference . '.',
+                        ['bookingId' => $id]
+                    );
+                }
             } else {
                 $this->addActivity(
                     $id,
@@ -522,9 +548,33 @@ class BookingService
                     $techName !== '' ? $techName : ('ID ' . $assignedTechId)
                 );
 
+                if ($beforeTechUserId !== null && $beforeTechUserId !== $techUserId) {
+                    (new UserNotificationService())->createForUser(
+                        $beforeTechUserId,
+                        'assignment',
+                        'Booking Reassigned',
+                        'Booking ' . $reference . ' was reassigned to another technician.',
+                        ['bookingId' => $id]
+                    );
+                }
+
+                if ($techUserId !== null) {
+                    (new UserNotificationService())->createForUser(
+                        $techUserId,
+                        'assignment',
+                        'New Booking Assignment',
+                        'You were assigned to booking ' . $reference . '.',
+                        ['bookingId' => $id]
+                    );
+                }
+
                 // SMS notification to the assigned technician
                 if ($techPhone !== '') {
-                    (new SmsService())->staffAssigned($updated, $techPhone, $techName ?? '');
+                    (new SmsService())->staffAssigned($updated, $techPhone, $techName ?? '', $techUserId);
+                }
+
+                if ($techEmail !== '') {
+                    (new NotificationService())->staffAssigned($updated, $techEmail, $techName ?? '');
                 }
             }
         }

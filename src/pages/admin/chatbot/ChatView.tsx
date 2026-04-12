@@ -187,7 +187,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     return () => clearInterval(interval)
   }, [sessionId, fetchConversation, fetchAppointmentActions, settings.pollingInterval, syncPresenceAndProfile])
 
-  const effectiveAgentName = user?.role === 'admin' ? user.name : null
+  const effectiveAgentName = (user?.role === 'admin' || user?.role === 'owner') ? user.name : null
 
   useEffect(() => {
     return () => {

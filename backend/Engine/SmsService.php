@@ -19,14 +19,12 @@ class SmsService
 
     private string $apiKey;
     private string $senderName;
-    private string $adminPhone;
     private bool   $enabled;
 
     public function __construct()
     {
         $this->apiKey     = defined('SEMAPHORE_API_KEY')     ? (string) SEMAPHORE_API_KEY     : '';
         $this->senderName = defined('SEMAPHORE_SENDER_NAME') ? (string) SEMAPHORE_SENDER_NAME : '1625AutoLab';
-        $this->adminPhone = defined('SEMAPHORE_ADMIN_PHONE') ? (string) SEMAPHORE_ADMIN_PHONE : '';
         $this->enabled    = $this->apiKey !== '';
     }
 
@@ -65,21 +63,19 @@ class SmsService
      */
     public function bookingCreatedAdmin(array $booking): void
     {
-        $phone = $this->normalisePhone($this->adminPhone);
-        if ($phone === '') return;
-
         $name    = (string) ($booking['name']            ?? 'Unknown');
         $service = (string) ($booking['serviceName']     ?? 'Unknown service');
         $date    = (string) ($booking['appointmentDate'] ?? '');
         $time    = (string) ($booking['appointmentTime'] ?? '');
         $refNumber = (string) ($booking['referenceNumber'] ?? '');
 
-        $this->send(
-            $phone,
-            "New booking received!"
-          . ($refNumber !== '' ? " Ref: {$refNumber}." : '')
-          . " Client: {$name}. Service: {$service}. Date: {$date} at {$time}. - 1625 Auto Lab"
-        );
+        $message = "New booking received!"
+            . ($refNumber !== '' ? " Ref: {$refNumber}." : '')
+            . " Client: {$name}. Service: {$service}. Date: {$date} at {$time}. - 1625 Auto Lab";
+
+        foreach ($this->fetchAlertRecipients('new_booking') as $phone) {
+            $this->send($phone, $message);
+        }
     }
 
     /**
@@ -175,10 +171,22 @@ class SmsService
      * @param string               $techPhone The technician's phone number
      * @param string               $techName  The technician's name
      */
-    public function staffAssigned(array $booking, string $techPhone, string $techName): void
+    public function staffAssigned(array $booking, string $techPhone, string $techName, ?int $techUserId = null): void
     {
         $phone = $this->normalisePhone($techPhone);
         if ($phone === '') return;
+
+        // Respect the technician's SMS assignment preference when we have their user ID.
+        if ($techUserId !== null) {
+            try {
+                $prefs = new NotificationPreferencesService();
+                if (!$prefs->smsEnabled($techUserId, 'assignment')) {
+                    return;
+                }
+            } catch (\Throwable) {
+                // Preferences unavailable – send anyway.
+            }
+        }
 
         $client  = (string) ($booking['name']            ?? 'a client');
         $service = (string) ($booking['serviceName']     ?? 'a service');
@@ -199,6 +207,52 @@ class SmsService
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Return normalised phone numbers for all admin/owner users who have opted
+     * in to the given SMS alert type.
+     *
+     * @return string[]
+     */
+    private function fetchAlertRecipients(string $smsType): array
+    {
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->query(
+                "SELECT u.id, u.phone
+                 FROM users u
+                 WHERE u.role IN ('admin', 'owner')
+                   AND u.phone IS NOT NULL
+                   AND u.phone <> ''
+                   AND (u.is_active IS NULL OR u.is_active = 1)"
+            );
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable) {
+            return [];
+        }
+
+        try {
+            $prefs = new NotificationPreferencesService();
+        } catch (\Throwable) {
+            $prefs = null;
+        }
+
+        $phones = [];
+        foreach ($rows as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            $phone  = $this->normalisePhone((string) ($row['phone'] ?? ''));
+            if ($phone === '') {
+                continue;
+            }
+            // Check preference – default true when preferences unavailable.
+            $allowed = ($prefs === null) || $prefs->smsEnabled($userId, $smsType);
+            if ($allowed) {
+                $phones[] = $phone;
+            }
+        }
+
+        return array_values(array_unique($phones));
+    }
 
     /**
      * POST to the Semaphore Messages API.

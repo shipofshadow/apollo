@@ -18,6 +18,26 @@ class Router
 
     /** @var array<string, string[]> */
     private const FALLBACK_ROLE_PERMISSIONS = [
+        'owner' => [
+            'analytics:view',
+            'bookings:manage',
+            'bookings:assign-tech',
+            'bookings:notes',
+            'chatbot:manage',
+            'build-updates:manage',
+            'clients:manage',
+            'users:manage',
+            'roles:view',
+            'roles:manage',
+            'security:audit:view',
+            'reviews:manage',
+            'services:manage',
+            'products:manage',
+            'content:manage',
+            'settings:manage',
+            'shop-hours:manage',
+            'media:upload',
+        ],
         'admin' => [
             'analytics:view',
             'bookings:manage',
@@ -256,8 +276,9 @@ class Router
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
-            $r->addRoute('GET',    '/api/admin/users',   'handleAdminUserList');
-            $r->addRoute('POST',   '/api/admin/users',   'handleAdminUserCreate');
+            $r->addRoute('GET',    '/api/admin/users',            'handleAdminUserList');
+            $r->addRoute('GET',    '/api/admin/users/assignable',  'handleAdminAssignableUsers');
+            $r->addRoute('POST',   '/api/admin/users',            'handleAdminUserCreate');
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/role',   'handleAdminUserRoleUpdate');
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/status', 'handleAdminUserStatusUpdate');
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/info',   'handleAdminUserInfoUpdate');
@@ -268,6 +289,8 @@ class Router
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit', 'handleAdminSecurityAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit/export', 'handleAdminSecurityAuditExport');
+            $r->addRoute('GET',  '/api/admin/semaphore/account', 'handleAdminSemaphoreAccount');
+            $r->addRoute('GET',  '/api/admin/semaphore/messages', 'handleAdminSemaphoreMessages');
             $r->addRoute('POST', '/api/admin/roles',   'handleAdminRoleCreate');
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
@@ -517,7 +540,7 @@ class Router
         }
 
         $permissions = $this->getPermissionMap()[$role] ?? [];
-        if ($role === 'admin') {
+        if ($role === 'admin' || $role === 'owner') {
             return true;
         }
 
@@ -533,7 +556,7 @@ class Router
         }
 
         $permissions = $this->getPermissionMap()[$role] ?? [];
-        if ($role === 'admin') {
+        if ($role === 'admin' || $role === 'owner') {
             $permissions = array_values(array_unique(array_merge($permissions, ['chatbot:manage'])));
         }
 
@@ -950,12 +973,23 @@ class Router
         $this->validateTurnstile($data);
 
         // Allow both guest and authenticated booking submission.
+        // However, authenticated non-client roles (manager, staff, etc.) without
+        // the client:self permission cannot submit bookings through the public form.
         $userId = null;
         try {
             $payload = Auth::user();
             $userId = (int) ($payload['sub'] ?? 0);
             if ($userId <= 0) {
                 $userId = null;
+            } else {
+                $role = strtolower(trim((string) ($payload['role'] ?? '')));
+                // admin and owner bypass all permission checks; everyone else
+                // must have the client:self permission to submit a booking.
+                if ($role !== 'admin' && $role !== 'owner') {
+                    if (!$this->hasPermissionByRole($role, 'client:self')) {
+                        throw new RuntimeException('Only client accounts may submit bookings through this form.', 403);
+                    }
+                }
             }
         } catch (RuntimeException $e) {
             if ((int) $e->getCode() !== 401) {
@@ -1721,6 +1755,15 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleAdminAssignableUsers(array $vars = []): void
+    {
+        $this->requirePermission('bookings:assign-tech');
+        $users = (new UserService())->listUsers(['search' => '', 'role' => '']);
+        $assignable = array_values(array_filter($users, static fn (array $u): bool => ($u['role'] ?? '') !== 'client'));
+        echo json_encode(['users' => $assignable]);
+    }
+
+    /** @param array<string, string> $vars */
     private function handleAdminUserCreate(array $vars = []): void
     {
         $this->requirePermission('users:manage');
@@ -1745,8 +1788,25 @@ class Router
             throw new RuntimeException('role is required.', 422);
         }
 
-        $actorId = (int) ($payload['sub'] ?? 0);
+        $actorRole = strtolower(trim((string) ($payload['role'] ?? '')));
+        $actorId   = (int) ($payload['sub'] ?? 0);
         $actorName = (string) ($payload['name'] ?? '');
+
+        // Admins can only manage users who are NOT admin or owner.
+        // Only owners can manage admin/owner accounts.
+        if ($actorRole !== 'owner') {
+            $target = (new UserService())->findById($id);
+            $targetRole = strtolower(trim((string) ($target['role'] ?? '')));
+            if ($targetRole === 'admin' || $targetRole === 'owner') {
+                throw new RuntimeException('You do not have permission to change the role of an admin or owner account.', 403);
+            }
+            // Also block promoting someone TO admin or owner.
+            $newRole = strtolower(trim($role));
+            if ($newRole === 'admin' || $newRole === 'owner') {
+                throw new RuntimeException('You do not have permission to assign the admin or owner role.', 403);
+            }
+        }
+
         $user = (new UserService())->updateRole($id, $role, $actorId > 0 ? $actorId : null, $actorName);
         echo json_encode(['user' => $user]);
     }
@@ -1754,11 +1814,22 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminUserStatusUpdate(array $vars = []): void
     {
-        $this->requirePermission('users:manage');
+        $payload = $this->requirePermission('users:manage');
         $id = (int) ($vars['id'] ?? 0);
         if ($id <= 0) {
             throw new RuntimeException('Invalid user id.', 422);
         }
+
+        $actorRole = strtolower(trim((string) ($payload['role'] ?? '')));
+
+        if ($actorRole !== 'owner') {
+            $target = (new UserService())->findById($id);
+            $targetRole = strtolower(trim((string) ($target['role'] ?? '')));
+            if ($targetRole === 'admin' || $targetRole === 'owner') {
+                throw new RuntimeException('You do not have permission to change the status of an admin or owner account.', 403);
+            }
+        }
+
         $data     = $this->jsonBody();
         $isActive = (bool) ($data['is_active'] ?? true);
         $user     = (new UserService())->updateUserStatus($id, $isActive);
@@ -1768,11 +1839,21 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminUserInfoUpdate(array $vars = []): void
     {
-        $this->requirePermission('users:manage');
+        $payload = $this->requirePermission('users:manage');
         $id = (int) ($vars['id'] ?? 0);
         if ($id <= 0) {
             throw new RuntimeException('Invalid user id.', 422);
         }
+
+        $actorRole = strtolower(trim((string) ($payload['role'] ?? '')));
+        if ($actorRole !== 'owner') {
+            $target = (new UserService())->findById($id);
+            $targetRole = strtolower(trim((string) ($target['role'] ?? '')));
+            if ($targetRole === 'admin' || $targetRole === 'owner') {
+                throw new RuntimeException('You do not have permission to edit an admin or owner account.', 403);
+            }
+        }
+
         $data = $this->jsonBody();
         $user = (new UserService())->updateUserInfo($id, $data);
         echo json_encode(['user' => $user]);
@@ -1903,6 +1984,31 @@ class Router
             ]);
         }
         fclose($out);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminSemaphoreAccount(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $refresh = filter_var($_GET['refresh'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
+        echo json_encode((new SemaphoreService())->getAccount($refresh));
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminSemaphoreMessages(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $refresh = filter_var($_GET['refresh'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
+        $filters = [
+            'page' => isset($_GET['page']) ? (int) $_GET['page'] : 1,
+            'limit' => isset($_GET['limit']) ? (int) $_GET['limit'] : 20,
+            'status' => (string) ($_GET['status'] ?? ''),
+            'network' => (string) ($_GET['network'] ?? ''),
+            'startDate' => (string) ($_GET['startDate'] ?? ''),
+            'endDate' => (string) ($_GET['endDate'] ?? ''),
+        ];
+
+        echo json_encode((new SemaphoreService())->getMessages($filters, $refresh));
     }
 
     /** @param array<string, string> $vars */

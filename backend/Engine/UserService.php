@@ -26,9 +26,6 @@ class UserService
 {
     private PDO $db;
 
-    /** @var string[] */
-    private const DEFAULT_ROLES = ['client', 'staff', 'manager', 'admin'];
-
     public function __construct()
     {
         if (DB_NAME === '') {
@@ -290,21 +287,6 @@ class UserService
      */
     public function listRoles(): array
     {
-        if (!$this->rolesTableExists()) {
-            return array_map(function (string $key): array {
-                return [
-                    'id' => 0,
-                    'key' => $key,
-                    'name' => ucfirst($key),
-                    'description' => '',
-                    'permissions' => [],
-                    'isSystem' => true,
-                    'created_at' => null,
-                    'updated_at' => null,
-                ];
-            }, self::DEFAULT_ROLES);
-        }
-
         $stmt = $this->db->query(
             'SELECT id, role_key, name, description, permissions_json, is_system, created_at, updated_at
              FROM roles
@@ -339,8 +321,6 @@ class UserService
      */
     public function createRole(array $data, ?int $actorUserId = null, ?string $actorName = null): array
     {
-        $this->assertRolesTable();
-
         $key = $this->normalizeRoleKey((string) ($data['key'] ?? ''));
         $name = trim((string) ($data['name'] ?? ''));
         $description = trim((string) ($data['description'] ?? ''));
@@ -399,8 +379,6 @@ class UserService
      */
     public function updateRoleDefinition(int $id, array $data, ?int $actorUserId = null, ?string $actorName = null): array
     {
-        $this->assertRolesTable();
-
         $current = $this->getRoleById($id);
         $nextKey = $this->normalizeRoleKey((string) ($data['key'] ?? $current['key']));
         $nextName = trim((string) ($data['name'] ?? $current['name']));
@@ -485,7 +463,6 @@ class UserService
 
     public function deleteRole(int $id, ?int $actorUserId = null, ?string $actorName = null): void
     {
-        $this->assertRolesTable();
         $role = $this->getRoleById($id);
 
         if ((bool) ($role['isSystem'] ?? false)) {
@@ -699,23 +676,6 @@ class UserService
         }
     }
 
-    private function rolesTableExists(): bool
-    {
-        try {
-            $this->db->query('SELECT 1 FROM roles LIMIT 1');
-            return true;
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    private function assertRolesTable(): void
-    {
-        if (!$this->rolesTableExists()) {
-            throw new RuntimeException('Roles table is missing. Run migrations first.', 503);
-        }
-    }
-
     private function roleExists(string $role): bool
     {
         $role = $this->normalizeRoleKey($role);
@@ -723,13 +683,9 @@ class UserService
             return false;
         }
 
-        if ($this->rolesTableExists()) {
-            $stmt = $this->db->prepare('SELECT 1 FROM roles WHERE role_key = :role LIMIT 1');
-            $stmt->execute([':role' => $role]);
-            return (bool) $stmt->fetchColumn();
-        }
-
-        return in_array($role, self::DEFAULT_ROLES, true);
+        $stmt = $this->db->prepare('SELECT 1 FROM roles WHERE role_key = :role LIMIT 1');
+        $stmt->execute([':role' => $role]);
+        return (bool) $stmt->fetchColumn();
     }
 
     /**
