@@ -45,8 +45,9 @@ const BuildShowcase = lazy(() => import('./pages/BuildShowcase'));
 
 function RouteFallback() {
   return (
-    <div className="min-h-[50vh] flex items-center justify-center text-gray-400">
-      Loading page...
+    <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3">
+      <div className="w-9 h-9 rounded-full border-2 border-gray-700 border-t-brand-orange animate-spin" />
+      <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Loading…</span>
     </div>
   );
 }
