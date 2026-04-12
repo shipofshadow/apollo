@@ -1371,7 +1371,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 </button>
               )}
 
-              {booking.status === 'completed' && booking.calibrationData && (
+              {booking.status === 'completed' && (
                 <button
                   onClick={() => void handleDownloadJobSheet()}
                   className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors"

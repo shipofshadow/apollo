@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Calendar, Loader2, AlertCircle, ImageIcon, ChevronDown } from 'lucide-react';
 import { fetchAllFacebookPosts } from '../services/api';
@@ -24,6 +24,8 @@ export default function Portfolio() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [zoomedPostId, setZoomedPostId] = useState<string | null>(null);
+  const firstResultRef = useRef<HTMLDivElement | null>(null);
 
   const portfolioSearch = new URLSearchParams(location.search).get('portfolioSearch')?.trim() ?? '';
 
@@ -57,6 +59,25 @@ export default function Portfolio() {
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [portfolioSearch]);
+
+  useEffect(() => {
+    if (portfolioSearch === '' || filteredPosts.length === 0) {
+      setZoomedPostId(null);
+      return;
+    }
+
+    const firstMatchId = filteredPosts[0].id;
+    setZoomedPostId(firstMatchId);
+    firstResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const timer = window.setTimeout(() => {
+      setZoomedPostId((current) => (current === firstMatchId ? null : current));
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [portfolioSearch, filteredPosts]);
 
   const visiblePosts = filteredPosts.slice(0, visibleCount);
   const hasMore = visibleCount < filteredPosts.length;
@@ -119,10 +140,12 @@ export default function Portfolio() {
                 const images = getPostImages(post);
                 const title = getPostTitle(post);
                 const postUrl = getPostUrl(post.id);
+                const isZoomed = zoomedPostId === post.id;
                 return (
                   <div
                     key={post.id}
-                    className={`flex flex-col lg:flex-row gap-8 lg:gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}
+                    ref={index === 0 ? firstResultRef : null}
+                    className={`flex flex-col lg:flex-row gap-8 lg:gap-12 items-center transition-all duration-500 ${isZoomed ? 'scale-[1.03]' : 'scale-100'} ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}
                   >
                     {/* Image */}
                     <div className="w-full lg:w-1/2">

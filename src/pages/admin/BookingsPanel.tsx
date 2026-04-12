@@ -79,11 +79,6 @@ export default function BookingsPanel({ onView }: Props) {
         fetchBuildUpdatesApi(token, rowBooking.id).catch(() => ({ updates: [] })),
       ]);
 
-      if (!booking.calibrationData) {
-        showToast('Calibration data is required to generate the PDF.', 'error');
-        return;
-      }
-
       await generateJobCompletionPDF(booking, {
         buildUpdates: updates,
         includeAdminExtras: true,

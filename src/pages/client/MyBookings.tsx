@@ -77,12 +77,10 @@ export default function MyBookings() {
     if (!token) return;
 
     try {
-      const fullBooking = booking.calibrationData
-        ? booking
-        : (await fetchBookingByIdApi(token, booking.id)).booking;
+      const fullBooking = (await fetchBookingByIdApi(token, booking.id)).booking;
 
-      if (fullBooking.status !== 'completed' || !fullBooking.calibrationData) {
-        showToast('Job sheet is available only for completed calibrated bookings.', 'error');
+      if (fullBooking.status !== 'completed') {
+        showToast('Job sheet is available only for completed bookings.', 'error');
         return;
       }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Calendar, Car, Loader2, Mail, Phone, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -8,7 +8,7 @@ import {
 } from '../../services/api';
 import type { Booking, ClientAdminSummary, ClientVehicle } from '../../types';
 import { formatStatus } from '../../utils/formatStatus';
-import { StatusBadge, Breadcrumbs } from './_sharedComponents';
+import { StatusBadge, Breadcrumbs, Pager, TABLE_PAGE_SIZE } from './_sharedComponents';
 
 const BOOKING_STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
@@ -21,9 +21,10 @@ const BOOKING_STATUS_STYLES: Record<Booking['status'], string> = {
 type Props = {
   client: ClientAdminSummary;
   onBack: () => void;
+  onViewBooking: (bookingId: string) => void;
 };
 
-export default function ClientDetailPanel({ client, onBack }: Props) {
+export default function ClientDetailPanel({ client, onBack, onViewBooking }: Props) {
   const { token } = useAuth();
   const { showToast } = useToast();
 
@@ -31,6 +32,13 @@ export default function ClientDetailPanel({ client, onBack }: Props) {
   const [vehicles, setVehicles] = useState<ClientVehicle[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [bookingsPage, setBookingsPage] = useState(1);
+
+  const bookingTotalPages = Math.max(1, Math.ceil(bookings.length / TABLE_PAGE_SIZE));
+  const pagedBookings = useMemo(() => {
+    const start = (bookingsPage - 1) * TABLE_PAGE_SIZE;
+    return bookings.slice(start, start + TABLE_PAGE_SIZE);
+  }, [bookings, bookingsPage]);
 
   useEffect(() => {
     if (!token) return;
@@ -61,6 +69,14 @@ export default function ClientDetailPanel({ client, onBack }: Props) {
       }
     })();
   }, [token, client.id]);
+
+  useEffect(() => {
+    setBookingsPage(1);
+  }, [client.id]);
+
+  useEffect(() => {
+    setBookingsPage(prev => Math.min(prev, bookingTotalPages));
+  }, [bookingTotalPages]);
 
   const isActive = client.is_active !== false;
 
@@ -186,35 +202,48 @@ export default function ClientDetailPanel({ client, onBack }: Props) {
         ) : bookings.length === 0 ? (
           <p className="text-xs text-gray-500 py-4 text-center">No bookings found.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-800">
-            <table className="w-full text-left text-xs md:text-sm">
-              <thead>
-                <tr className="text-gray-500 text-[10px] md:text-[11px] uppercase tracking-widest border-b border-gray-800">
-                  <th className="py-2 px-3">Ref #</th>
-                  <th className="py-2 px-3">Service</th>
-                  <th className="py-2 px-3 hidden sm:table-cell">Vehicle</th>
-                  <th className="py-2 px-3">Date</th>
-                  <th className="py-2 px-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map(b => (
-                  <tr key={b.id} className="border-b border-gray-800/70">
-                    <td className="py-2.5 px-3 text-gray-400 font-mono text-xs">{b.referenceNumber || b.id}</td>
-                    <td className="py-2.5 px-3 text-white">{b.serviceName}</td>
-                    <td className="py-2.5 px-3 text-gray-300 hidden sm:table-cell text-xs">{b.vehicleInfo || '—'}</td>
-                    <td className="py-2.5 px-3 text-gray-300 text-xs whitespace-nowrap">
-                      {new Date(b.appointmentDate).toLocaleDateString()} {b.appointmentTime}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded border ${BOOKING_STATUS_STYLES[b.status]}`}>
-                        {formatStatus(b.status)}
-                      </span>
-                    </td>
+          <div className="rounded-lg border border-gray-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs md:text-sm">
+                <thead>
+                  <tr className="text-gray-500 text-[10px] md:text-[11px] uppercase tracking-widest border-b border-gray-800">
+                    <th className="py-2 px-3">Ref #</th>
+                    <th className="py-2 px-3">Service</th>
+                    <th className="py-2 px-3 hidden sm:table-cell">Vehicle</th>
+                    <th className="py-2 px-3">Date</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3 text-right">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pagedBookings.map(b => (
+                    <tr key={b.id} className="border-b border-gray-800/70">
+                      <td className="py-2.5 px-3 text-gray-400 font-mono text-xs">{b.referenceNumber || b.id}</td>
+                      <td className="py-2.5 px-3 text-white">{b.serviceName}</td>
+                      <td className="py-2.5 px-3 text-gray-300 hidden sm:table-cell text-xs">{b.vehicleInfo || '—'}</td>
+                      <td className="py-2.5 px-3 text-gray-300 text-xs whitespace-nowrap">
+                        {new Date(b.appointmentDate).toLocaleDateString()} {b.appointmentTime}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded border ${BOOKING_STATUS_STYLES[b.status]}`}>
+                          {formatStatus(b.status)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onViewBooking(b.id)}
+                          className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-brand-orange hover:text-orange-300 transition-colors"
+                        >
+                          View Booking
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pager page={bookingsPage} totalPages={bookingTotalPages} totalItems={bookings.length} onPageChange={setBookingsPage} />
           </div>
         )}
       </section>

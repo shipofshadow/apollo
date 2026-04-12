@@ -1,23 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
-import { fetchFacebookPosts } from '../services/api';
+import { fetchAllFacebookPosts } from '../services/api';
 import type { FacebookPost } from '../types';
 import { getPostImages, getPostTitle, getPostUrl, isPortfolioPost } from '../utils/facebookPostHelpers';
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 export default function RecentBuilds() {
+  const location = useLocation();
   const [posts, setPosts] = useState<FacebookPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoPaused, setAutoPaused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [zoomActive, setZoomActive] = useState(false);
   const autoTimerRef = useRef<number | null>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
+
+  const buildSearch = new URLSearchParams(location.search).get('buildSearch')?.trim()
+    ?? new URLSearchParams(location.search).get('portfolioSearch')?.trim()
+    ?? '';
 
   useEffect(() => {
     let cancelled = false;
-    fetchFacebookPosts()
-      .then(({ posts: fetched }) => {
+    fetchAllFacebookPosts()
+      .then((fetched) => {
         if (!cancelled) {
-          setPosts(fetched.filter(isPortfolioPost).slice(0, 6));
+          setPosts(fetched.filter(isPortfolioPost));
         }
       })
       .catch((err: unknown) => { console.error('[RecentBuilds] Failed to load Facebook posts:', err); })
@@ -25,7 +42,12 @@ export default function RecentBuilds() {
     return () => { cancelled = true; };
   }, []);
 
-  const visiblePosts = posts;
+  const visiblePosts = posts.filter((post) => {
+    if (buildSearch === '') return true;
+    const haystack = normalizeSearchText(`${post.message ?? ''} ${getPostTitle(post, 160)}`);
+    const needle = normalizeSearchText(buildSearch);
+    return haystack.includes(needle);
+  });
 
   useEffect(() => {
     if (visiblePosts.length === 0) {
@@ -52,6 +74,31 @@ export default function RecentBuilds() {
     };
   }, [loading, visiblePosts.length, autoPaused]);
 
+  useEffect(() => {
+    if (buildSearch === '' || visiblePosts.length === 0) {
+      setZoomActive(false);
+      return;
+    }
+
+    setActiveIndex(0);
+
+    // Small delay so the page finishes rendering/navigating before we scroll
+    const scrollTimer = window.setTimeout(() => {
+      sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+
+    setZoomActive(true);
+
+    const zoomTimer = window.setTimeout(() => {
+      setZoomActive(false);
+    }, 1400);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(zoomTimer);
+    };
+  }, [buildSearch, visiblePosts.length]);
+
   const goPrev = () => {
     if (visiblePosts.length === 0) return;
     setActiveIndex(prev => (prev - 1 + visiblePosts.length) % visiblePosts.length);
@@ -63,10 +110,19 @@ export default function RecentBuilds() {
   };
 
   return (
-    <section id="builds" className="py-24 bg-brand-dark">
+    <section id="builds" ref={sectionRef} className="py-24 bg-brand-dark">
       <style>{`
         .recent-builds-track::-webkit-scrollbar {
           display: none;
+        }
+        @keyframes rb-popout {
+          0%   { box-shadow: 0 0 0 0 rgba(249,115,22,0);   transform: scale(1);     }
+          25%  { box-shadow: 0 0 0 8px rgba(249,115,22,0.55); transform: scale(1.018); }
+          60%  { box-shadow: 0 0 0 4px rgba(249,115,22,0.25); transform: scale(1.012); }
+          100% { box-shadow: 0 0 0 0 rgba(249,115,22,0);   transform: scale(1);     }
+        }
+        .rb-popout-active {
+          animation: rb-popout 1.4s cubic-bezier(0.22,1,0.36,1) forwards;
         }
       `}</style>
       <div className="container mx-auto px-4 md:px-6">
@@ -100,6 +156,10 @@ export default function RecentBuilds() {
           <p className="text-gray-500 text-center py-16">No portfolio items yet — check back soon!</p>
         )}
 
+        {!loading && posts.length > 0 && buildSearch !== '' && visiblePosts.length === 0 && (
+          <p className="text-gray-500 text-center py-16">No matching recent builds for "{buildSearch}".</p>
+        )}
+
         {visiblePosts.length > 0 && (
           <div
             className="relative"
@@ -108,7 +168,7 @@ export default function RecentBuilds() {
             onTouchStart={() => setAutoPaused(true)}
             onTouchEnd={() => setAutoPaused(false)}
           >
-            <div className="relative h-[420px] md:h-[520px] overflow-hidden rounded-sm border border-gray-800 bg-brand-gray">
+            <div className={`relative h-[420px] md:h-[520px] overflow-hidden rounded-sm border bg-brand-gray transition-colors duration-300 ${zoomActive ? 'border-brand-orange rb-popout-active' : 'border-gray-800'}`}>
               {visiblePosts.map((post, index) => {
                 const images = getPostImages(post);
                 const title = getPostTitle(post, 90);

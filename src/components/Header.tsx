@@ -44,7 +44,7 @@ export default function Header() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    setBuildSearch(params.get('portfolioSearch') ?? '');
+    setBuildSearch(params.get('buildSearch') ?? params.get('portfolioSearch') ?? '');
   }, [location.search]);
 
   const handleBuildSearchSubmit = (e: React.FormEvent) => {
@@ -52,11 +52,11 @@ export default function Header() {
     const query = buildSearch.trim();
     const params = new URLSearchParams();
     if (query !== '') {
-      params.set('portfolioSearch', query);
+      params.set('buildSearch', query);
     }
 
     navigate({
-      pathname: '/portfolio',
+      pathname: '/',
       search: params.toString() ? `?${params.toString()}` : '',
     });
     setIsMobileMenuOpen(false);

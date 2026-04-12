@@ -283,6 +283,12 @@ export default function AdminPage() {
             <ClientDetailPanel
               client={activeClient}
               onBack={() => { setActiveClient(null); navigate(TAB_PATHS['manage-clients']); }}
+              onViewBooking={(id) => {
+                setActiveBookingId(id);
+                setActiveClient(null);
+                setActiveTab('appointments');
+                navigate(TAB_PATHS.appointments, { state: { openBookingId: id } });
+              }}
             />
           );
         }

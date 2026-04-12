@@ -1073,7 +1073,7 @@ export default function BookingDetail() {
       )}
 
       {/* Print Receipt */}
-      {booking.status === 'completed' && booking.calibrationData && (
+      {booking.status === 'completed' && (
         <div className="bg-gradient-to-br from-brand-dark to-[#191919] border border-gray-800 rounded-xl px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-white text-sm font-semibold">Receipt / Summary</p>
