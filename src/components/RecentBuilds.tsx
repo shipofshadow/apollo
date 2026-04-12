@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, Loader2 } from 'lucide-react';
 import { fetchFacebookPosts } from '../services/api';
@@ -8,6 +8,8 @@ import { getPostImages, getPostTitle, getPostUrl, isPortfolioPost } from '../uti
 export default function RecentBuilds() {
   const [posts, setPosts] = useState<FacebookPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoPaused, setAutoPaused] = useState(false);
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,8 +24,34 @@ export default function RecentBuilds() {
     return () => { cancelled = true; };
   }, []);
 
+  const loopPosts = posts.length > 1 ? [...posts, ...posts] : posts;
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || loading || loopPosts.length <= 1 || autoPaused) return;
+
+    const id = window.setInterval(() => {
+      const step = Math.max(220, Math.floor(track.clientWidth * 0.5));
+      const next = track.scrollLeft + step;
+      const maxLeft = track.scrollWidth - track.clientWidth;
+
+      if (next >= maxLeft - 2) {
+        track.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        track.scrollTo({ left: next, behavior: 'smooth' });
+      }
+    }, 2600);
+
+    return () => window.clearInterval(id);
+  }, [loading, loopPosts.length, autoPaused]);
+
   return (
     <section id="builds" className="py-24 bg-brand-dark">
+      <style>{`
+        .recent-builds-track::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
           <div className="space-y-4 max-w-2xl">
@@ -56,18 +84,26 @@ export default function RecentBuilds() {
         )}
 
         {posts.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.map((post) => {
+          <div className="relative">
+            <div
+              ref={trackRef}
+              className="recent-builds-track flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none]"
+              onMouseEnter={() => setAutoPaused(true)}
+              onMouseLeave={() => setAutoPaused(false)}
+              onTouchStart={() => setAutoPaused(true)}
+              onTouchEnd={() => setAutoPaused(false)}
+            >
+            {loopPosts.map((post, index) => {
               const images = getPostImages(post);
               const title = getPostTitle(post, 60);
               const postUrl = getPostUrl(post.id);
               return (
                 <a
-                  key={post.id}
+                  key={`${post.id}-${index}`}
                   href={postUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative overflow-hidden rounded-sm bg-brand-gray aspect-[4/3] cursor-pointer block"
+                  className="group relative overflow-hidden rounded-sm bg-brand-gray aspect-[4/3] cursor-pointer block shrink-0 snap-start w-[72vw] sm:w-[38vw] lg:w-[24vw] xl:w-[20vw] min-w-[220px] max-w-[360px]"
                 >
                   <img
                     src={images[0]}
@@ -94,6 +130,7 @@ export default function RecentBuilds() {
                 </a>
               );
             })}
+            </div>
           </div>
         )}
       </div>
