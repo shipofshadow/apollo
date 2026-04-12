@@ -107,13 +107,15 @@ define('R2_KEY_PREFIX',       rtrim($_ENV['R2_KEY_PREFIX']   ?? '1625autolab', '
 define('R2_PUBLIC_URL',       rtrim($_ENV['R2_PUBLIC_URL']   ?? '', '/'));
 
 // ---------------------------------------------------------------------------
-// SMS (Twilio)
-// Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM to enable SMS.
+// SMS (Semaphore)
+// Set SEMAPHORE_API_KEY to enable SMS notifications via semaphore.co.
+// SEMAPHORE_SENDER_NAME: approved sender name (default: "1625AutoLab").
+// SEMAPHORE_ADMIN_PHONE: Philippine mobile number to receive booking alerts.
 // ---------------------------------------------------------------------------
 
-define('TWILIO_ACCOUNT_SID', $_ENV['TWILIO_ACCOUNT_SID'] ?? '');
-define('TWILIO_AUTH_TOKEN',  $_ENV['TWILIO_AUTH_TOKEN']  ?? '');
-define('TWILIO_FROM',        $_ENV['TWILIO_FROM']        ?? '');
+define('SEMAPHORE_API_KEY',     $_ENV['SEMAPHORE_API_KEY']     ?? '');
+define('SEMAPHORE_SENDER_NAME', $_ENV['SEMAPHORE_SENDER_NAME'] ?? '1625AutoLab');
+define('SEMAPHORE_ADMIN_PHONE', $_ENV['SEMAPHORE_ADMIN_PHONE'] ?? '');
 
 // ---------------------------------------------------------------------------
 // Cloudflare Turnstile

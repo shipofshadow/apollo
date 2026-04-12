@@ -152,6 +152,11 @@ class BookingService
 
         (new NotificationService())->bookingCreated($booking);
 
+        // SMS notifications for new booking
+        $sms = new SmsService();
+        $sms->bookingCreated($booking);
+        $sms->bookingCreatedAdmin($booking);
+
         if ($waitlistClaimToken !== '') {
             try {
                 (new WaitlistService())->markBookedByClaimToken($waitlistClaimToken, (string) $booking['id']);
@@ -471,17 +476,19 @@ class BookingService
             throw new RuntimeException('Booking not found.', 404);
         }
 
-        $techName = null;
+        $techName  = null;
+        $techPhone = '';
         if ($assignedTechId !== null) {
             $techStmt = Database::getInstance()->prepare(
-                'SELECT id, name FROM team_members WHERE id = :id LIMIT 1'
+                'SELECT id, name, phone FROM team_members WHERE id = :id LIMIT 1'
             );
             $techStmt->execute([':id' => $assignedTechId]);
             $tech = $techStmt->fetch(\PDO::FETCH_ASSOC);
             if (!$tech) {
                 throw new RuntimeException('Technician not found.', 404);
             }
-            $techName = (string) ($tech['name'] ?? '');
+            $techName  = (string) ($tech['name']  ?? '');
+            $techPhone = (string) ($tech['phone'] ?? '');
         }
 
         Database::getInstance()->prepare(
@@ -514,6 +521,11 @@ class BookingService
                     'Technician assigned',
                     $techName !== '' ? $techName : ('ID ' . $assignedTechId)
                 );
+
+                // SMS notification to the assigned technician
+                if ($techPhone !== '') {
+                    (new SmsService())->staffAssigned($updated, $techPhone, $techName ?? '');
+                }
             }
         }
 
