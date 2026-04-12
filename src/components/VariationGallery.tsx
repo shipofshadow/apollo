@@ -81,7 +81,7 @@ export default function VariationGallery({
   return (
     <div className="space-y-5">
       {/* ── Variation selector tabs ─────────────────────────────────────── */}
-     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+     <div className="flex flex-wrap gap-2">
         {variations.map((v, idx) => {
           const isActive = idx === activeIdx;
           return (
@@ -94,12 +94,12 @@ export default function VariationGallery({
                   : 'border-gray-800 bg-[#121212] hover:border-gray-600'
               }`}
             >
-              <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
+              <span className={`text-[0.90rem] font-bold uppercase tracking-widest mb-1 ${
                 isActive ? 'text-brand-orange' : 'text-gray-500'
               }`}>
                 {v.name}
               </span>
-              <span className="text-gray-200 font-mono text-xs">
+              <span className="text-gray-200 font-mono text-sm">
                 {v.price ? formatPrice(v.price) : 'CONTACT'}
               </span>
             </button>

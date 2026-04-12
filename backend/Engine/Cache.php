@@ -10,6 +10,10 @@ declare(strict_types=1);
  */
 class Cache
 {
+    private const FILE_PREFIX = 'apollo_';
+    private const FILE_SUFFIX = '.cache';
+    private const DEFAULT_REDIS_PREFIX = 'apollo_cache:';
+
     private static bool $redisBootstrapped = false;
     private static ?\Redis $redisClient = null;
 
@@ -27,10 +31,9 @@ class Cache
                 if (!is_string($raw)) {
                     return null;
                 }
-                /** @var array<string, mixed>|false $decoded */
-                $decoded = @unserialize($raw);
-                return is_array($decoded) ? $decoded : null;
-            } catch (\Throwable $e) {
+
+                return self::decodeArray($raw);
+            } catch (\Throwable) {
                 // Fall through to APCu/file fallback.
             }
         }
@@ -51,14 +54,21 @@ class Cache
             return null;
         }
 
-        /** @var array{expires: int, data: array<string, mixed>}|false $entry */
-        $entry = unserialize($raw);
-        if (!is_array($entry) || time() > $entry['expires']) {
+        $entry = self::decodeArray($raw);
+        if ($entry === null) {
             @unlink($file);
             return null;
         }
 
-        return $entry['data'];
+        $expires = $entry['expires'] ?? null;
+        $data = $entry['data'] ?? null;
+
+        if (!is_int($expires) || !is_array($data) || time() > $expires) {
+            @unlink($file);
+            return null;
+        }
+
+        return $data;
     }
 
     /**
@@ -77,7 +87,7 @@ class Cache
             try {
                 $redis->setex(self::redisKey($key), $ttl, serialize($data));
                 return;
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
                 // Fall through to APCu/file fallback.
             }
         }
@@ -96,13 +106,34 @@ class Cache
 
     private static function filePath(string $key): string
     {
-        return sys_get_temp_dir() . '/apollo_' . md5($key) . '.cache';
+        return sys_get_temp_dir() . '/' . self::FILE_PREFIX . md5($key) . self::FILE_SUFFIX;
     }
 
     private static function redisKey(string $key): string
     {
-        $prefix = defined('REDIS_CACHE_PREFIX') ? (string) REDIS_CACHE_PREFIX : 'apollo_cache:';
+        $prefix = defined('REDIS_CACHE_PREFIX') ? (string) REDIS_CACHE_PREFIX : self::DEFAULT_REDIS_PREFIX;
         return $prefix . $key;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function decodeArray(string $raw): ?array
+    {
+        set_error_handler(static function (int $severity, string $message): never {
+            throw new \ErrorException($message, 0, $severity);
+        });
+
+        try {
+            /** @var mixed $decoded */
+            $decoded = unserialize($raw, ['allowed_classes' => false]);
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            restore_error_handler();
+        }
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     private static function redis(): ?\Redis
@@ -148,7 +179,7 @@ class Cache
             }
 
             self::$redisClient = $redis;
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             self::$redisClient = null;
         }
 
