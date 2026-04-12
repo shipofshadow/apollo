@@ -70,7 +70,28 @@ class TeamMemberService
             );
             $stmt->execute([':user_id' => $userId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $row ? $this->mapRow($row) : null;
+            if ($row) {
+                return $this->mapRow($row);
+            }
+
+            // Legacy fallback: attempt to link an existing row by normalized
+            // identity so old team_members records connect to users.
+            $user = $this->getUserIdentity($userId);
+            $legacy = $this->findUnlinkedByNormalizedIdentity($user);
+            if ($legacy) {
+                $update = Database::getInstance()->prepare(
+                    'UPDATE team_members SET user_id = :user_id WHERE id = :id'
+                );
+                $update->execute([
+                    ':user_id' => $userId,
+                    ':id' => (int) ($legacy['id'] ?? 0),
+                ]);
+
+                $linked = $this->dbGetById((int) ($legacy['id'] ?? 0));
+                return $linked;
+            }
+
+            return null;
         }
 
         $user = $this->getUserIdentity($userId);
@@ -87,6 +108,63 @@ class TeamMemberService
         return $row ? $this->mapRow($row) : null;
     }
 
+    /** @param array<string, mixed> $user @return array<string, mixed>|null */
+    private function findUnlinkedByNormalizedIdentity(array $user): ?array
+    {
+        $email = strtolower(trim((string) ($user['email'] ?? '')));
+        $phone = $this->normalizePhoneForMatch((string) ($user['phone'] ?? ''));
+
+        if ($email !== '') {
+            $stmt = Database::getInstance()->prepare(
+                'SELECT * FROM team_members
+                 WHERE user_id IS NULL
+                   AND email IS NOT NULL
+                   AND LOWER(TRIM(email)) = :email
+                 LIMIT 1'
+            );
+            $stmt->execute([':email' => $email]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                return $row;
+            }
+        }
+
+        if ($phone !== '') {
+            $stmt = Database::getInstance()->query(
+                'SELECT * FROM team_members WHERE user_id IS NULL AND phone IS NOT NULL AND phone <> ""'
+            );
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                $candidate = $this->normalizePhoneForMatch((string) ($row['phone'] ?? ''));
+                if ($candidate !== '' && $candidate === $phone) {
+                    return $row;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizePhoneForMatch(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if ($digits === null || $digits === '') {
+            return '';
+        }
+
+        if (str_starts_with($digits, '63') && strlen($digits) === 12) {
+            return '0' . substr($digits, 2);
+        }
+        if (str_starts_with($digits, '9') && strlen($digits) === 10) {
+            return '0' . $digits;
+        }
+        if (str_starts_with($digits, '0') && strlen($digits) === 11) {
+            return $digits;
+        }
+
+        return $digits;
+    }
+
     // -------------------------------------------------------------------------
     // DB
     // -------------------------------------------------------------------------
@@ -94,9 +172,34 @@ class TeamMemberService
     /** @return array<int, array<string, mixed>> */
     private function dbGetAll(bool $activeOnly): array
     {
-        $where = $activeOnly ? 'WHERE is_active = 1 ' : '';
+        $whereParts = [];
+        if ($activeOnly) {
+            $whereParts[] = 'tm.is_active = 1';
+        }
+        $whereParts[] = "LOWER(TRIM(COALESCE(tm.role, ''))) <> 'client'";
+        $whereParts[] = "(u.role IS NULL OR LOWER(TRIM(u.role)) <> 'client')";
+        $whereSql = 'WHERE ' . implode(' AND ', $whereParts);
+
         $stmt  = Database::getInstance()->query(
-            "SELECT * FROM team_members {$where}ORDER BY sort_order ASC, id ASC"
+            "SELECT tm.id,
+                    tm.user_id,
+                    COALESCE(NULLIF(TRIM(u.name), ''), tm.name) AS name,
+                    COALESCE(NULLIF(TRIM(u.role), ''), tm.role) AS role,
+                    tm.image_url,
+                    tm.bio,
+                    tm.full_bio,
+                    COALESCE(NULLIF(TRIM(u.email), ''), tm.email) AS email,
+                    COALESCE(NULLIF(TRIM(u.phone), ''), tm.phone) AS phone,
+                    tm.facebook,
+                    tm.instagram,
+                    tm.sort_order,
+                    tm.is_active,
+                    tm.created_at,
+                    tm.updated_at
+             FROM team_members tm
+             LEFT JOIN users u ON u.id = tm.user_id
+             {$whereSql}
+             ORDER BY tm.sort_order ASC, tm.id ASC"
         );
         return array_map([$this, 'mapRow'], $stmt->fetchAll());
     }
@@ -105,7 +208,27 @@ class TeamMemberService
     private function dbGetById(int $id): array
     {
         $stmt = Database::getInstance()->prepare(
-            'SELECT * FROM team_members WHERE id = :id LIMIT 1'
+                        "SELECT tm.id,
+                                        tm.user_id,
+                                        COALESCE(NULLIF(TRIM(u.name), ''), tm.name) AS name,
+                                        COALESCE(NULLIF(TRIM(u.role), ''), tm.role) AS role,
+                                        tm.image_url,
+                                        tm.bio,
+                                        tm.full_bio,
+                                        COALESCE(NULLIF(TRIM(u.email), ''), tm.email) AS email,
+                                        COALESCE(NULLIF(TRIM(u.phone), ''), tm.phone) AS phone,
+                                        tm.facebook,
+                                        tm.instagram,
+                                        tm.sort_order,
+                                        tm.is_active,
+                                        tm.created_at,
+                                        tm.updated_at
+                         FROM team_members tm
+                         LEFT JOIN users u ON u.id = tm.user_id
+                         WHERE tm.id = :id
+                             AND LOWER(TRIM(COALESCE(tm.role, ''))) <> 'client'
+                             AND (u.role IS NULL OR LOWER(TRIM(u.role)) <> 'client')
+                         LIMIT 1"
         );
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
@@ -145,6 +268,7 @@ class TeamMemberService
     {
         $current = $this->dbGetById($id);
         $merged  = $this->withUserIdentity(array_merge($current, $data));
+        $this->validatePayload($merged);
 
         if ($this->hasUserIdColumn()) {
             $stmt = Database::getInstance()->prepare(
@@ -246,7 +370,9 @@ class TeamMemberService
         foreach ($all as &$m) {
             if ((int) ($m['id'] ?? 0) === $id) {
                 $oldImage = (string) ($m['imageUrl'] ?? '');
-                $m      = $this->buildRecord($id, $this->withUserIdentity(array_merge($m, $data)));
+                $merged = $this->withUserIdentity(array_merge($m, $data));
+                $this->validatePayload($merged);
+                $m      = $this->buildRecord($id, $merged);
                 $result = $m;
                 $found  = true;
                 break;
@@ -380,6 +506,11 @@ class TeamMemberService
 
     private function validatePayload(array $data): void
     {
+        $role = strtolower(trim((string) ($data['role'] ?? '')));
+        if ($role === 'client') {
+            throw new RuntimeException('Client accounts cannot be saved as team members.', 422);
+        }
+
         $hasUser = (int) ($data['userId'] ?? 0) > 0 || (int) ($data['user_id'] ?? 0) > 0;
         if ($this->useDb && $this->hasUserIdColumn() && !$hasUser) {
             throw new RuntimeException('Team member must be linked to an existing user.', 422);
