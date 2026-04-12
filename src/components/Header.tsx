@@ -74,7 +74,6 @@ export default function Header() {
     { name: 'Services', href: '/services' },
     { name: 'Products', href: '/products' },
     { name: 'Portfolio', href: '/portfolio' },
-    { name: 'Blog', href: '/blog' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
   ];
@@ -179,10 +178,6 @@ export default function Header() {
                 className="text-sm font-bold uppercase tracking-widest text-gray-300 hover:text-brand-orange transition-colors">
                 Login
               </Link>
-              <Link to="/booking"
-                className="bg-brand-orange hover:bg-orange-600 text-white font-display uppercase tracking-wider px-6 py-2.5 rounded-sm transition-all transform hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(243,111,33,0.3)]">
-                Book Appointment
-              </Link>
             </>
           ) : (
             <div className="flex items-center gap-3">
@@ -276,10 +271,6 @@ export default function Header() {
               <Link to="/login"
                 className="text-center border border-gray-700 text-white font-bold uppercase tracking-widest px-6 py-3 rounded-sm hover:border-brand-orange transition-colors">
                 Login
-              </Link>
-              <Link to="/booking"
-                className="bg-brand-orange text-center text-white font-display uppercase tracking-wider px-6 py-3 rounded-sm">
-                Book Appointment
               </Link>
             </div>
           ) : (
