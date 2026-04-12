@@ -65,7 +65,7 @@ class UserNotificationService
     /**
      * Return notifications for the current viewer.
      *
-     * @param  bool   $adminMode  true → return notifications where user_id IS NULL
+    * @param  bool   $adminMode  true → return broadcast rows + rows targeted to this user
      * @param  int    $userId     Ignored when adminMode is true
      * @param  int    $limit
      * @return array<int, array<string, mixed>>
@@ -90,10 +90,11 @@ class UserNotificationService
         if ($adminMode) {
             $stmt = $this->db->prepare(
                 'SELECT * FROM notifications
-                  WHERE user_id IS NULL
+                  WHERE user_id IS NULL OR user_id = :uid
                   ORDER BY created_at DESC
                   LIMIT :lim'
             );
+            $stmt->bindValue(':uid', $userId, \PDO::PARAM_INT);
         } else {
             $stmt = $this->db->prepare(
                 'SELECT * FROM notifications
@@ -128,8 +129,12 @@ class UserNotificationService
 
         if ($adminMode) {
             $stmt = $this->db->prepare(
-                'SELECT COUNT(*) FROM notifications WHERE user_id IS NULL AND is_read = 0'
+                'SELECT COUNT(*)
+                   FROM notifications
+                  WHERE (user_id IS NULL OR user_id = :uid)
+                    AND is_read = 0'
             );
+            $stmt->bindValue(':uid', $userId, \PDO::PARAM_INT);
         } else {
             $stmt = $this->db->prepare(
                 'SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND is_read = 0'
@@ -166,9 +171,9 @@ class UserNotificationService
         if ($adminMode) {
             $stmt = $this->db->prepare(
                 'UPDATE notifications SET is_read = 1
-                  WHERE id = :id AND user_id IS NULL'
+                  WHERE id = :id AND (user_id IS NULL OR user_id = :uid)'
             );
-            $stmt->execute([':id' => $id]);
+            $stmt->execute([':id' => $id, ':uid' => $userId]);
         } else {
             $stmt = $this->db->prepare(
                 'UPDATE notifications SET is_read = 1
@@ -195,9 +200,12 @@ class UserNotificationService
         }
 
         if ($adminMode) {
-            $this->db->exec(
-                'UPDATE notifications SET is_read = 1 WHERE user_id IS NULL AND is_read = 0'
+            $stmt = $this->db->prepare(
+                'UPDATE notifications SET is_read = 1
+                  WHERE (user_id IS NULL OR user_id = :uid)
+                    AND is_read = 0'
             );
+            $stmt->execute([':uid' => $userId]);
         } else {
             $stmt = $this->db->prepare(
                 'UPDATE notifications SET is_read = 1
@@ -226,9 +234,11 @@ class UserNotificationService
 
         if ($adminMode) {
             $stmt = $this->db->prepare(
-                'DELETE FROM notifications WHERE id = :id AND user_id IS NULL'
+                'DELETE FROM notifications
+                  WHERE id = :id
+                    AND (user_id IS NULL OR user_id = :uid)'
             );
-            $stmt->execute([':id' => $id]);
+            $stmt->execute([':id' => $id, ':uid' => $userId]);
         } else {
             $stmt = $this->db->prepare(
                 'DELETE FROM notifications WHERE id = :id AND user_id = :uid'

@@ -56,10 +56,37 @@ class NotificationPreferencesService
             'inapp_status_changed',
             'inapp_build_update',
             'inapp_parts_update',
+            'inapp_new_booking',
+            'inapp_assignment',
+            'inapp_security_alert',
+            'inapp_slot_available',
             'sms_new_booking',
             'sms_assignment',
             'sms_status_changed',
         ];
+
+        $aliases = [
+            'emailNewBooking' => 'email_new_booking',
+            'emailStatusChanged' => 'email_status_changed',
+            'emailBuildUpdate' => 'email_build_update',
+            'emailPartsUpdate' => 'email_parts_update',
+            'inappStatusChanged' => 'inapp_status_changed',
+            'inappBuildUpdate' => 'inapp_build_update',
+            'inappPartsUpdate' => 'inapp_parts_update',
+            'inappNewBooking' => 'inapp_new_booking',
+            'inappAssignment' => 'inapp_assignment',
+            'inappSecurityAlert' => 'inapp_security_alert',
+            'inappSlotAvailable' => 'inapp_slot_available',
+            'smsNewBooking' => 'sms_new_booking',
+            'smsAssignment' => 'sms_assignment',
+            'smsStatusChanged' => 'sms_status_changed',
+        ];
+
+        foreach ($aliases as $from => $to) {
+            if (array_key_exists($from, $data) && !array_key_exists($to, $data)) {
+                $data[$to] = $data[$from];
+            }
+        }
 
         $sets   = [];
         $params = [':uid' => $userId];
@@ -110,6 +137,7 @@ class NotificationPreferencesService
         $allowed = [
             'email_new_booking', 'email_status_changed', 'email_build_update', 'email_parts_update',
             'inapp_status_changed', 'inapp_build_update', 'inapp_parts_update',
+            'inapp_new_booking', 'inapp_assignment', 'inapp_security_alert', 'inapp_slot_available',
             'sms_new_booking', 'sms_assignment', 'sms_status_changed',
         ];
         if (!in_array($col, $allowed, true)) {
@@ -149,6 +177,10 @@ class NotificationPreferencesService
             'inappStatusChanged' => (bool) ($row['inapp_status_changed'] ?? 1),
             'inappBuildUpdate'   => (bool) ($row['inapp_build_update']   ?? 1),
             'inappPartsUpdate'   => (bool) ($row['inapp_parts_update']   ?? 1),
+            'inappNewBooking'    => (bool) ($row['inapp_new_booking']    ?? 1),
+            'inappAssignment'    => (bool) ($row['inapp_assignment']     ?? 1),
+            'inappSecurityAlert' => (bool) ($row['inapp_security_alert'] ?? 1),
+            'inappSlotAvailable' => (bool) ($row['inapp_slot_available'] ?? 1),
             'smsNewBooking'      => (bool) ($row['sms_new_booking']      ?? 1),
             'smsAssignment'      => (bool) ($row['sms_assignment']       ?? 1),
             'smsStatusChanged'   => (bool) ($row['sms_status_changed']   ?? 1),

@@ -150,12 +150,9 @@ class BookingService
             (string) $booking['createdAt']
         );
 
-        (new NotificationService())->bookingCreated($booking);
-
-        // SMS notifications for new booking
-        $sms = new SmsService();
-        $sms->bookingCreated($booking);
-        $sms->bookingCreatedAdmin($booking);
+        (new NotificationJobQueueService())->dispatch('booking_created', [
+            'booking' => $booking,
+        ]);
 
         if ($waitlistClaimToken !== '') {
             try {
@@ -165,17 +162,7 @@ class BookingService
             }
         }
 
-        // In-app notification for admin
-        if ($this->useDb) {
-            $vehicle = trim((string) ($booking['vehicleInfo'] ?? ''));
-            $svcName = (string) ($booking['serviceName'] ?? '');
-            (new UserNotificationService())->createForAdmin(
-                'new_booking',
-                'New Booking Received',
-                "{$booking['name']} booked {$svcName}" . ($vehicle !== '' ? " · {$vehicle}" : ''),
-                ['bookingId' => $booking['id']]
-            );
-        }
+        // In-app notifications are also dispatched by the queue worker.
 
         return $booking;
     }
@@ -289,14 +276,9 @@ class BookingService
             'From: ' . str_replace('_', ' ', $fromStatus) . ' -> ' . str_replace('_', ' ', $toStatus)
         );
 
-        (new NotificationService())->bookingStatusChanged($booking);
-
-        // SMS notification for status changes
-        if ($status === 'confirmed') {
-            (new SmsService())->bookingConfirmed($booking);
-        } else {
-            (new SmsService())->bookingStatusChanged($booking);
-        }
+        (new NotificationJobQueueService())->dispatch('booking_status_changed', [
+            'booking' => $booking,
+        ]);
 
         // When a booking is cancelled, check if anyone is waiting for the freed slot
         if ($status === 'cancelled') {
@@ -311,24 +293,7 @@ class BookingService
             }
         }
 
-        // In-app notification for the client who made the booking
-        if ($this->useDb) {
-            $uid = (int) ($booking['userId'] ?? 0);
-            if ($uid > 0) {
-                $label   = ucwords(str_replace('_', ' ', $status));
-                $svcName = (string) ($booking['serviceName'] ?? 'your service');
-                $prefSvc = new NotificationPreferencesService();
-                if ($prefSvc->inappEnabled($uid, 'status_changed')) {
-                    (new UserNotificationService())->createForUser(
-                        $uid,
-                        'status_changed',
-                        "Booking Status: {$label}",
-                        "Your booking for {$svcName} is now {$label}.",
-                        ['bookingId' => $booking['id'], 'status' => $status]
-                    );
-                }
-            }
-        }
+        // In-app notifications are also dispatched by the queue worker.
 
         return $booking;
     }
@@ -394,25 +359,9 @@ class BookingService
         );
 
         if ($awaitingParts) {
-            (new NotificationService())->bookingAwaitingParts($booking);
-
-            // In-app notification for the client
-            if ($this->useDb) {
-                $uid = (int) ($booking['userId'] ?? 0);
-                if ($uid > 0) {
-                    $svcName = (string) ($booking['serviceName'] ?? 'your service');
-                    $prefSvc = new NotificationPreferencesService();
-                    if ($prefSvc->inappEnabled($uid, 'parts_update')) {
-                        (new UserNotificationService())->createForUser(
-                            $uid,
-                            'parts_update',
-                            'Job On Hold – Awaiting Parts',
-                            "Your {$svcName} job is on hold while we wait for parts to arrive.",
-                            ['bookingId' => $booking['id']]
-                        );
-                    }
-                }
-            }
+            (new NotificationJobQueueService())->dispatch('booking_awaiting_parts', [
+                'booking' => $booking,
+            ]);
         }
 
         return $booking;
@@ -522,6 +471,7 @@ class BookingService
         }
         if ($beforeId !== $assignedTechId) {
             $reference = (string) ($updated['referenceNumber'] ?? $updated['id'] ?? $id);
+            $prefSvc = new NotificationPreferencesService();
 
             if ($assignedTechId === null) {
                 $this->addActivity(
@@ -532,13 +482,15 @@ class BookingService
                 );
 
                 if ($beforeTechUserId !== null) {
-                    (new UserNotificationService())->createForUser(
-                        $beforeTechUserId,
-                        'assignment',
-                        'Booking Unassigned',
-                        'You were unassigned from booking ' . $reference . '.',
-                        ['bookingId' => $id]
-                    );
+                    if ($prefSvc->inappEnabled($beforeTechUserId, 'assignment')) {
+                        (new UserNotificationService())->createForUser(
+                            $beforeTechUserId,
+                            'assignment',
+                            'Booking Unassigned',
+                            'You were unassigned from booking ' . $reference . '.',
+                            ['bookingId' => $id]
+                        );
+                    }
                 }
             } else {
                 $this->addActivity(
@@ -549,32 +501,37 @@ class BookingService
                 );
 
                 if ($beforeTechUserId !== null && $beforeTechUserId !== $techUserId) {
-                    (new UserNotificationService())->createForUser(
-                        $beforeTechUserId,
-                        'assignment',
-                        'Booking Reassigned',
-                        'Booking ' . $reference . ' was reassigned to another technician.',
-                        ['bookingId' => $id]
-                    );
+                    if ($prefSvc->inappEnabled($beforeTechUserId, 'assignment')) {
+                        (new UserNotificationService())->createForUser(
+                            $beforeTechUserId,
+                            'assignment',
+                            'Booking Reassigned',
+                            'Booking ' . $reference . ' was reassigned to another technician.',
+                            ['bookingId' => $id]
+                        );
+                    }
                 }
 
                 if ($techUserId !== null) {
-                    (new UserNotificationService())->createForUser(
-                        $techUserId,
-                        'assignment',
-                        'New Booking Assignment',
-                        'You were assigned to booking ' . $reference . '.',
-                        ['bookingId' => $id]
-                    );
+                    if ($prefSvc->inappEnabled($techUserId, 'assignment')) {
+                        (new UserNotificationService())->createForUser(
+                            $techUserId,
+                            'assignment',
+                            'New Booking Assignment',
+                            'You were assigned to booking ' . $reference . '.',
+                            ['bookingId' => $id]
+                        );
+                    }
                 }
 
-                // SMS notification to the assigned technician
-                if ($techPhone !== '') {
-                    (new SmsService())->staffAssigned($updated, $techPhone, $techName ?? '', $techUserId);
-                }
-
-                if ($techEmail !== '') {
-                    (new NotificationService())->staffAssigned($updated, $techEmail, $techName ?? '');
+                if ($techPhone !== '' || $techEmail !== '') {
+                    (new NotificationJobQueueService())->dispatch('staff_assignment_sms_email', [
+                        'booking' => $updated,
+                        'techPhone' => $techPhone,
+                        'techEmail' => $techEmail,
+                        'techName' => $techName ?? '',
+                        'techUserId' => $techUserId,
+                    ]);
                 }
             }
         }

@@ -554,7 +554,10 @@ export type NotificationType =
   | 'new_booking'
   | 'status_changed'
   | 'build_update'
-  | 'parts_update';
+  | 'parts_update'
+  | 'assignment'
+  | 'slot_available'
+  | 'security_alert';
 
 export interface AppNotification {
   id: number;
@@ -600,6 +603,10 @@ export interface NotificationPreferences {
   inappStatusChanged: boolean;
   inappBuildUpdate:   boolean;
   inappPartsUpdate:   boolean;
+  inappNewBooking:    boolean;
+  inappAssignment:    boolean;
+  inappSecurityAlert: boolean;
+  inappSlotAvailable: boolean;
   smsNewBooking:      boolean;
   smsAssignment:      boolean;
   smsStatusChanged:   boolean;
@@ -644,6 +651,52 @@ export interface SemaphoreMessagesResponse {
   messages: SemaphoreMessage[];
   page: number;
   limit: number;
+}
+
+export interface NotificationQueueJob {
+  id: number;
+  event: string;
+  status: 'queued' | 'processing' | 'retry' | 'done' | 'failed' | string;
+  attempts: number;
+  maxAttempts: number;
+  runAfter: string;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  processedAt: string | null;
+  payload: Record<string, unknown>;
+}
+
+export interface NotificationQueueSummary {
+  counts: {
+    queued: number;
+    processing: number;
+    retry: number;
+    failed: number;
+    done: number;
+  };
+  lastProcessedAt: string | null;
+  oldestPendingAt: string | null;
+  lastFailure: {
+    id: number;
+    event: string;
+    lastError: string | null;
+    updatedAt: string;
+  } | null;
+}
+
+export interface NotificationQueueHealth {
+  warning: boolean;
+  message: string;
+  warnAfterSeconds: number;
+  secondsSinceLastProcessed: number | null;
+  pendingCount: number;
+  summary: NotificationQueueSummary;
+}
+
+export interface NotificationQueueResponse {
+  summary: NotificationQueueSummary;
+  jobs: NotificationQueueJob[];
 }
 
 // ── Extended Admin Stats ───────────────────────────────────────────────────────

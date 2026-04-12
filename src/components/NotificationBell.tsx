@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BellRing, X, CheckCheck, Package, CalendarCheck2, Wrench, AlertCircle } from 'lucide-react';
+import { Bell, BellRing, X, CheckCheck, Package, CalendarCheck2, Wrench, AlertCircle, ShieldAlert, UserCheck, Clock3 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 import {
@@ -17,6 +17,9 @@ const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   status_changed: CheckCheck,
   build_update:   Wrench,
   parts_update:   Package,
+  assignment:     UserCheck,
+  slot_available: Clock3,
+  security_alert: ShieldAlert,
 };
 
 const TYPE_COLOR: Record<NotificationType, string> = {
@@ -24,6 +27,9 @@ const TYPE_COLOR: Record<NotificationType, string> = {
   status_changed: 'text-green-400',
   build_update:   'text-blue-400',
   parts_update:   'text-yellow-400',
+  assignment:     'text-cyan-400',
+  slot_available: 'text-lime-400',
+  security_alert: 'text-red-400',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -16,6 +16,9 @@ import {
   fetchAdminRolesApi,
   type AdminManagedUser,
   fetchMigrationStatusApi, runMigrationsApi,
+  runNotificationQueueWorkerApi,
+  runWaitlistAutoFillWorkerApi,
+  runAppointmentRemindersWorkerApi,
   type AdminRole,
   type MigrationEntry,
 } from '../../services/api';
@@ -1228,21 +1231,32 @@ function SystemPanel() {
   const { token } = useAuth();
 
   const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
+  const [migrTotal,     setMigrTotal]     = useState(0);
+  const [migrPage,      setMigrPage]      = useState(1);
+  const [migrPageSize,  setMigrPageSize]  = useState(5);
+  const [migrCounts,    setMigrCounts]    = useState<{ ran: number; pending: number; total: number }>({ ran: 0, pending: 0, total: 0 });
   const [migrLoading,   setMigrLoading]   = useState(true);
   const [migrError,     setMigrError]     = useState<string | null>(null);
   const [running,       setRunning]       = useState(false);
   const [runResult,     setRunResult]     = useState<{ ran: string[]; skipped: string[]; total: number } | null>(null);
   const [runError,      setRunError]      = useState<string | null>(null);
+  const [cronBusy,      setCronBusy]      = useState<'queue' | 'waitlist' | 'reminders' | null>(null);
+  const [cronResult,    setCronResult]    = useState<string | null>(null);
+  const [cronError,     setCronError]     = useState<string | null>(null);
 
   const loadStatus = useCallback(() => {
     if (!token) return;
     setMigrLoading(true);
     setMigrError(null);
-    fetchMigrationStatusApi(token)
-      .then(res => setMigrations(res.migrations))
+    fetchMigrationStatusApi(token, { page: migrPage, pageSize: migrPageSize })
+      .then(res => {
+        setMigrations(res.migrations);
+        setMigrTotal(res.total);
+        setMigrCounts(res.counts);
+      })
       .catch(e  => setMigrError((e as Error).message))
       .finally(() => setMigrLoading(false));
-  }, [token]);
+  }, [token, migrPage, migrPageSize]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
 
@@ -1263,8 +1277,57 @@ function SystemPanel() {
     }
   };
 
-  const pendingCount = migrations.filter(m => m.status === 'pending').length;
-  const ranCount     = migrations.filter(m => m.status === 'ran').length;
+  const pendingCount = migrCounts.pending;
+  const ranCount     = migrCounts.ran;
+  const totalPages   = Math.max(1, Math.ceil(migrTotal / migrPageSize));
+
+  const handleRunQueueWorker = async () => {
+    if (!token || cronBusy) return;
+    setCronBusy('queue');
+    setCronResult(null);
+    setCronError(null);
+    try {
+      const res = await runNotificationQueueWorkerApi(token);
+      const s = res.stats;
+      setCronResult(`Notification queue worker ran: processed ${s.processed}, retried ${s.retried}, failed ${s.failed}.`);
+    } catch (e: unknown) {
+      setCronError((e as Error).message ?? 'Failed to run notification queue worker.');
+    } finally {
+      setCronBusy(null);
+    }
+  };
+
+  const handleRunWaitlistWorker = async () => {
+    if (!token || cronBusy) return;
+    setCronBusy('waitlist');
+    setCronResult(null);
+    setCronError(null);
+    try {
+      const res = await runWaitlistAutoFillWorkerApi(token);
+      const s = res.stats;
+      setCronResult(`Waitlist auto-fill worker ran: checked ${s.slotsChecked} slot(s), notified ${s.notified} user(s).`);
+    } catch (e: unknown) {
+      setCronError((e as Error).message ?? 'Failed to run waitlist auto-fill worker.');
+    } finally {
+      setCronBusy(null);
+    }
+  };
+
+  const handleRunReminderWorker = async () => {
+    if (!token || cronBusy) return;
+    setCronBusy('reminders');
+    setCronResult(null);
+    setCronError(null);
+    try {
+      const res = await runAppointmentRemindersWorkerApi(token);
+      const s = res.stats;
+      setCronResult(`Appointment reminders ran for ${s.date}: attempted ${s.attempted}, skipped ${s.skipped}, errors ${s.errors}.`);
+    } catch (e: unknown) {
+      setCronError((e as Error).message ?? 'Failed to run appointment reminders worker.');
+    } finally {
+      setCronBusy(null);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -1416,6 +1479,41 @@ function SystemPanel() {
                 ))}
               </tbody>
             </table>
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-800 text-xs text-gray-400">
+              <span>
+                Page {migrPage} of {totalPages} · {migrTotal} total migration(s)
+              </span>
+              <div className="flex items-center gap-2">
+                <label className="text-gray-500">Per page</label>
+                <select
+                  value={String(migrPageSize)}
+                  onChange={(e) => {
+                    const size = Number(e.target.value) || 25;
+                    setMigrPage(1);
+                    setMigrPageSize(size);
+                  }}
+                  className="bg-brand-darker border border-gray-700 text-xs text-white px-2 py-1 rounded-sm"
+                >
+                  {[10, 25, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setMigrPage(p => Math.max(1, p - 1))}
+                  disabled={migrPage <= 1}
+                  className="px-2 py-1 border border-gray-700 rounded-sm text-gray-300 hover:text-white disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMigrPage(p => Math.min(totalPages, p + 1))}
+                  disabled={migrPage >= totalPages}
+                  className="px-2 py-1 border border-gray-700 rounded-sm text-gray-300 hover:text-white disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1425,6 +1523,72 @@ function SystemPanel() {
             <p>No migration files found.</p>
           </div>
         )}
+      </div>
+
+      {/* Cron Jobs */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
+            <ServerCog className="w-5 h-5 text-brand-orange" />
+            Cron Jobs (Run Now)
+          </h3>
+        </div>
+
+        {cronResult && (
+          <div className="mb-4 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
+            {cronResult}
+          </div>
+        )}
+
+        {cronError && (
+          <div className="mb-4 flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {cronError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Notification Queue Worker</p>
+            <p className="text-sm text-gray-300 mb-4">Process queued/retry notification jobs immediately.</p>
+            <button
+              type="button"
+              onClick={handleRunQueueWorker}
+              disabled={cronBusy !== null}
+              className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
+            >
+              {cronBusy === 'queue' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Run Queue Worker
+            </button>
+          </div>
+
+          <div className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Waitlist Auto-Fill Worker</p>
+            <p className="text-sm text-gray-300 mb-4">Expire stale claims and notify the next eligible waiting user.</p>
+            <button
+              type="button"
+              onClick={handleRunWaitlistWorker}
+              disabled={cronBusy !== null}
+              className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
+            >
+              {cronBusy === 'waitlist' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Run Waitlist Worker
+            </button>
+          </div>
+
+          <div className="bg-brand-dark border border-gray-800 rounded-sm p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Appointment Reminders Worker</p>
+            <p className="text-sm text-gray-300 mb-4">Send reminder SMS for tomorrow's confirmed/pending bookings.</p>
+            <button
+              type="button"
+              onClick={handleRunReminderWorker}
+              disabled={cronBusy !== null}
+              className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
+            >
+              {cronBusy === 'reminders' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Run Reminders Worker
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1437,7 +1601,7 @@ type Tab = 'company' | 'contact' | 'footer' | 'team' | 'testimonials' | 'system'
 export default function SiteSettingsPanel() {
   const [activeTab, setActiveTab] = useState<Tab>('company');
 
-  const tabs: { key: Tab; label: string; hint: string; icon: React.ReactNode }[] = [
+  const tabs: { key: Tab; label: string; hint: string; icon: React.ReactNode }[] = useMemo(() => [
     {
       key: 'company',
       label: 'Company Info',
@@ -1474,7 +1638,7 @@ export default function SiteSettingsPanel() {
       hint: 'Environment checks and migrations',
       icon: <ServerCog className="w-4 h-4" />,
     },
-  ];
+  ], []);
 
   const activeTabMeta = useMemo(() => tabs.find(tab => tab.key === activeTab), [tabs, activeTab]);
 

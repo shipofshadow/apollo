@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2, Upload, Trash2, Monitor, RefreshCw, Shield } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, Eye, EyeOff, Bell, Loader2, CheckCircle2, Upload, Trash2, Monitor, RefreshCw, Shield, MessageSquare } from 'lucide-react';
 import { updateProfileAsync, clearAuthError } from '../../store/authSlice';
 import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
@@ -114,6 +114,8 @@ export default function Profile() {
         inapp_status_changed: prefs.inappStatusChanged,
         inapp_build_update:   prefs.inappBuildUpdate,
         inapp_parts_update:   prefs.inappPartsUpdate,
+        inapp_slot_available: prefs.inappSlotAvailable,
+        sms_status_changed:   prefs.smsStatusChanged,
       };
       const r = await saveNotificationPrefsApi(token, payload);
       setPrefs(r.preferences);
@@ -419,6 +421,38 @@ export default function Profile() {
                     ['inappStatusChanged', 'Booking status changes'],
                     ['inappBuildUpdate',   'Build progress updates'],
                     ['inappPartsUpdate',   'Parts availability updates'],
+                    ['inappSlotAvailable', 'Waitlist slot available'],
+                  ] as [keyof NotificationPreferences, string][]).map(([key, label]) => (
+                    <label key={key} className="flex items-center justify-between cursor-pointer group">
+                      <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{label}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={prefs[key] as boolean}
+                        onClick={() => handlePrefsToggle(key)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${prefs[key] ? 'bg-brand-orange' : 'bg-gray-700'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* SMS channel */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-1.5">
+                  <MessageSquare className="w-3 h-3" /> SMS Notifications
+                </p>
+                {!user?.phone && (
+                  <p className="text-xs text-yellow-500/80 mb-3 flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 shrink-0" />
+                    Add a phone number above to receive SMS alerts.
+                  </p>
+                )}
+                <div className="space-y-3">
+                  {([
+                    ['smsStatusChanged', 'Booking status changes'],
                   ] as [keyof NotificationPreferences, string][]).map(([key, label]) => (
                     <label key={key} className="flex items-center justify-between cursor-pointer group">
                       <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{label}</span>

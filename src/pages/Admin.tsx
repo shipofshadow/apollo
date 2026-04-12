@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, GitBranch, Users,
+  Camera, MessageSquare, GitBranch, Users, Workflow,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,7 @@ import ManageClientsPanel   from './admin/ManageClientsPanel';
 import ManageRolesPanel     from './admin/ManageRolesPanel';
 import ClientDetailPanel    from './admin/ClientDetailPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
+import NotificationQueuePanel from './admin/NotificationQueuePanel';
 import ConversationsPage    from './chatbot/ConversationsPage';
 import FlowEditorPage       from './chatbot/FlowEditorPage';
 import type { ClientAdminSummary } from '../types';
@@ -40,7 +41,7 @@ const TAB_PATHS: Record<string, string> = {
   calendar: '/admin/calendar',
   reviews: '/admin/reviews',
   'chatbot-conversations': '/chatbot/conversations',
-  'chatbot-flow': '/chatbot/flow-editor',
+  'chatbot-flow': '/chatbot/flo w-editor',
   services: '/admin/services',
   products: '/admin/products',
   orders: '/admin/orders',
@@ -54,6 +55,7 @@ const TAB_PATHS: Record<string, string> = {
   'manage-clients': '/admin/manage-clients',
   'manage-roles': '/admin/manage-roles',
   'security-audit': '/admin/security-audit',
+  'notification-queue': '/admin/notification-queue',
   'semaphore': '/admin/semaphore',
   settings: '/admin/account',
 };
@@ -74,11 +76,14 @@ export default function AdminPage() {
   const { user, logout, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeTab,       setActiveTab]       = useState(() => getAdminTabFromPath(location.pathname));
+  const activeTab = getAdminTabFromPath(location.pathname);
   const [collapsed,       setCollapsed]       = useState(false);
   const [mobileOpen,      setMobileOpen]      = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [activeClient,    setActiveClient]    = useState<ClientAdminSummary | null>(null);
+  const routeState = location.state as { openBookingId?: string } | null;
+  const routeBookingId = routeState?.openBookingId ?? null;
+  const selectedBookingId = activeBookingId ?? routeBookingId;
   
   // Track which dropdown groups are open
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
@@ -91,36 +96,23 @@ export default function AdminPage() {
 
   // When navigated here from a notification click, auto-open the booking
   useEffect(() => {
-    const state = location.state as { openBookingId?: string } | null;
-    if (state?.openBookingId) {
-      setActiveTab('appointments');
-      setActiveBookingId(state.openBookingId);
+    if (routeBookingId) {
       if (!location.pathname.startsWith(TAB_PATHS.appointments)) {
         navigate(TAB_PATHS.appointments, { replace: true });
       }
       // Clear the state so a back-navigation doesn't re-trigger it
       window.history.replaceState({}, '');
     }
-  }, [location.state, location.pathname, navigate]);
+  }, [routeBookingId, location.pathname, navigate]);
 
   useEffect(() => {
-    const nextTab = getAdminTabFromPath(location.pathname);
-    setActiveTab(nextTab);
-    if (nextTab !== 'appointments') {
-      setActiveBookingId(null);
-    }
-    if (nextTab !== 'manage-clients') {
-      setActiveClient(null);
-    }
-    const state = location.state as { openBookingId?: string } | null;
-    if ((location.pathname === '/admin' || location.pathname === '/admin/') && !state?.openBookingId) {
+    if ((location.pathname === '/admin' || location.pathname === '/admin/') && !routeBookingId) {
       navigate(TAB_PATHS.analytics, { replace: true });
     }
-  }, [location.pathname, location.state, navigate]);
+  }, [location.pathname, routeBookingId, navigate]);
 
   const handleTabChange = (key: string) => {
     const nextPath = TAB_PATHS[key] || TAB_PATHS.analytics;
-    setActiveTab(key);
     setActiveBookingId(null);
     setActiveClient(null);
     setMobileOpen(false);
@@ -139,11 +131,6 @@ export default function AdminPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    // Prevent stale mobile overlay state from persisting across logout/login transitions.
-    setMobileOpen(false);
-  }, [user?.id]);
-
   const MD_BREAKPOINT = 768;
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`);
@@ -155,7 +142,7 @@ export default function AdminPage() {
   const role = (user?.role) ?? '';
   const isAdmin = role === 'admin' || role === 'owner';
 
-  const canAccessTab = (key: string) => {
+  const canAccessTab = useCallback((key: string) => {
     if (['products', 'orders'].includes(key)) {
       return hasPermission('products:manage');
     }
@@ -165,6 +152,10 @@ export default function AdminPage() {
     }
 
     if (key === 'semaphore') {
+      return hasPermission('settings:manage');
+    }
+
+    if (key === 'notification-queue') {
       return hasPermission('settings:manage');
     }
 
@@ -180,7 +171,7 @@ export default function AdminPage() {
 
     // Unknown non-client roles get the safest minimum surface.
     return ['manage-clients', 'settings'].includes(key);
-  };
+  }, [hasPermission, isAdmin, role]);
 
   // Grouped Navigation Structure
   const navItems = [
@@ -226,6 +217,7 @@ export default function AdminPage() {
       children: [
         { key: 'site-settings', label: 'Site Config',     icon: SlidersHorizontal },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
+        { key: 'notification-queue', label: 'Queue Monitor', icon: Workflow },
         { key: 'semaphore',     label: 'Semaphore SMS',   icon: MessageSquare },
         { key: 'settings',      label: 'Account',         icon: UserCog },
       ]
@@ -236,10 +228,8 @@ export default function AdminPage() {
     if (!user) return;
     if (canAccessTab(activeTab)) return;
     const fallback = role === 'staff' ? 'appointments' : (role === 'manager' ? 'analytics' : 'manage-clients');
-    setActiveTab(fallback);
-    setActiveBookingId(null);
     navigate(TAB_PATHS[fallback] || TAB_PATHS.analytics, { replace: true });
-  }, [activeTab, role, user, navigate]);
+  }, [activeTab, role, user, navigate, canAccessTab]);
 
   const handleLogout = async () => {
     await logout();
@@ -256,15 +246,15 @@ export default function AdminPage() {
       case 'offers':        return <OffersPanel />;
       case 'before-after':  return <BeforeAfterPanel />;
       case 'content':       return <ContentPanel />;
-      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); setActiveTab('appointments'); navigate(TAB_PATHS.appointments); }} />;
+      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.appointments); }} />;
       case 'reviews':       return <ReviewsPanel />;
       case 'chatbot-conversations': return <ConversationsPage />;
       case 'chatbot-flow':  return <FlowEditorPage />;
       case 'appointments':
-        if (activeBookingId) {
+        if (selectedBookingId) {
           return (
             <AdminBookingDetail
-              bookingId={activeBookingId}
+              bookingId={selectedBookingId}
               onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
             />
           );
@@ -286,7 +276,6 @@ export default function AdminPage() {
               onViewBooking={(id) => {
                 setActiveBookingId(id);
                 setActiveClient(null);
-                setActiveTab('appointments');
                 navigate(TAB_PATHS.appointments, { state: { openBookingId: id } });
               }}
             />
@@ -301,6 +290,7 @@ export default function AdminPage() {
           />
         );
       case 'security-audit': return <SecurityAuditPanel />;
+      case 'notification-queue': return <NotificationQueuePanel />;
       case 'semaphore':     return <SemaphorePanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;

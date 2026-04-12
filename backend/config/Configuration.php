@@ -130,6 +130,14 @@ define('SEMAPHORE_ACCOUNT_CACHE_TTL', max(0, (int) ($_ENV['SEMAPHORE_ACCOUNT_CAC
 define('SEMAPHORE_MESSAGES_CACHE_TTL', max(0, (int) ($_ENV['SEMAPHORE_MESSAGES_CACHE_TTL'] ?? 30)));
 
 // ---------------------------------------------------------------------------
+// Background notification queue
+// ---------------------------------------------------------------------------
+
+define('NOTIFICATION_QUEUE_ENABLED', filter_var($_ENV['NOTIFICATION_QUEUE_ENABLED'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
+define('NOTIFICATION_QUEUE_BATCH_SIZE', max(1, (int) ($_ENV['NOTIFICATION_QUEUE_BATCH_SIZE'] ?? 25)));
+define('NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS', max(15, (int) ($_ENV['NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS'] ?? 60)));
+
+// ---------------------------------------------------------------------------
 // Cloudflare Turnstile
 // TURNSTILE_SECRET_KEY: server-side secret from the Turnstile dashboard.
 // Leave empty to skip validation (development only).

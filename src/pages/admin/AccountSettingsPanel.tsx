@@ -312,9 +312,12 @@ export default function AccountSettingsPanel() {
         ];
 
         const inappPrefs: [keyof NotificationPreferences, string][] = [
+          ...(isAdminType ? [['inappNewBooking', 'New booking alerts'] as [keyof NotificationPreferences, string]] : []),
           ['inappStatusChanged', 'Booking status changes'],
           ['inappBuildUpdate',   'Build progress updates'],
           ['inappPartsUpdate',   'Parts availability updates'],
+          ...(isStaffType ? [['inappAssignment', 'Assignment updates'] as [keyof NotificationPreferences, string]] : []),
+          ...(isAdminType ? [['inappSecurityAlert', 'Security alerts'] as [keyof NotificationPreferences, string]] : []),
         ];
 
         const smsPrefs: [keyof NotificationPreferences, string][] = [

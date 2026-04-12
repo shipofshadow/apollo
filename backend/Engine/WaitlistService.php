@@ -274,53 +274,21 @@ class WaitlistService
             ':claim_expires_at' => $claimExpiresAt,
         ]);
 
-        // In-app notification for logged-in users
-        $userId = isset($entry['userId']) && $entry['userId'] ? (int) $entry['userId'] : null;
-        if ($userId !== null) {
-            try {
-                $ns = new UserNotificationService();
-                $ns->create([
-                    'user_id' => $userId,
-                    'type'    => 'slot_available',
-                    'title'   => 'Slot Available!',
-                    'message' => "A slot has opened on {$date} at {$time}. Book now before it's taken!",
-                    'data'    => json_encode(['slotDate' => $date, 'slotTime' => $time]),
-                ]);
-            } catch (\Throwable) {
-                // fail silently
-            }
-        }
+        $userId = isset($entry['userId']) && $entry['userId'] ? (int) $entry['userId'] : 0;
 
-        // SMS notification
-        if ($phone !== '') {
-            try {
-                $sms = new SmsService();
-                $sms->waitlistSlotAvailable([
-                    'name'  => $name,
-                    'phone' => $phone,
-                    'date'  => $date,
-                    'time'  => $time,
-                ]);
-            } catch (\Throwable) {
-                // fail silently
-            }
-        }
-
-        // Email notification
-        if ($email !== '') {
-            try {
-                $ns = new NotificationService();
-                $ns->sendWaitlistSlotAvailable(
-                    $name,
-                    $email,
-                    $date,
-                    $time,
-                    $claimUrl,
-                    $this->claimTtlMinutes
-                );
-            } catch (\Throwable) {
-                // fail silently
-            }
+        try {
+            (new NotificationJobQueueService())->dispatch('waitlist_slot_available', [
+                'userId' => $userId,
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone,
+                'date' => $date,
+                'time' => $time,
+                'claimUrl' => $claimUrl,
+                'claimWindowMinutes' => $this->claimTtlMinutes,
+            ]);
+        } catch (\Throwable) {
+            // fail silently
         }
     }
 
@@ -337,6 +305,66 @@ class WaitlistService
         }
         // Notify only the first person; others remain waiting
         $this->notifyEntry($waiting[0]);
+    }
+
+    /**
+     * Auto-fill processor:
+     * - expires stale claim links,
+     * - for each waitlist slot with no active claim and available capacity,
+     *   notifies the next waiting user.
+     *
+     * @return array<string, int>
+     */
+    public function processAutoFill(): array
+    {
+        if (!$this->useDb) {
+            return ['slotsChecked' => 0, 'notified' => 0];
+        }
+
+        $this->expireStaleClaims();
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT DISTINCT slot_date, slot_time
+               FROM booking_waitlist
+              WHERE status IN ("waiting", "notified")
+              ORDER BY slot_date ASC, slot_time ASC'
+        );
+        $stmt->execute();
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $slotsChecked = 0;
+        $notified = 0;
+
+        foreach ($rows as $row) {
+            $slotDate = (string) ($row['slot_date'] ?? '');
+            $slotTime = (string) ($row['slot_time'] ?? '');
+            if ($slotDate === '' || $slotTime === '') {
+                continue;
+            }
+
+            $slotsChecked++;
+
+            if ($this->hasActiveNotifiedClaim($slotDate, $slotTime)) {
+                continue;
+            }
+
+            if (!$this->isSlotAvailableForWaitlist($slotDate, $slotTime)) {
+                continue;
+            }
+
+            $waiting = $this->getForSlot($slotDate, $slotTime, 'waiting');
+            if (empty($waiting)) {
+                continue;
+            }
+
+            $this->notifyEntry($waiting[0]);
+            $notified++;
+        }
+
+        return [
+            'slotsChecked' => $slotsChecked,
+            'notified' => $notified,
+        ];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -410,6 +438,46 @@ class WaitlistService
                AND claim_expires_at < NOW()'
         );
         $stmt->execute();
+    }
+
+    private function hasActiveNotifiedClaim(string $slotDate, string $slotTime): bool
+    {
+        $stmt = Database::getInstance()->prepare(
+            'SELECT id
+               FROM booking_waitlist
+              WHERE slot_date = :date
+                AND slot_time = :time
+                AND status = "notified"
+                AND (claim_expires_at IS NULL OR claim_expires_at >= NOW())
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':date' => $slotDate,
+            ':time' => $slotTime,
+        ]);
+        return (bool) $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+
+    private function isSlotAvailableForWaitlist(string $slotDate, string $slotTime): bool
+    {
+        $bookingSvc = new BookingService();
+        $capacity = max(1, $bookingSvc->getSlotCapacity());
+
+        // "any" means the customer accepts any slot for the date.
+        if ($slotTime === 'any') {
+            $counts = $bookingSvc->getSlotCounts($slotDate);
+            foreach ($counts as $count) {
+                if ((int) $count < $capacity) {
+                    return true;
+                }
+            }
+            // If no active bookings are recorded yet, the date is considered available.
+            return empty($counts);
+        }
+
+        $counts = $bookingSvc->getSlotCounts($slotDate);
+        $activeForSlot = (int) ($counts[$slotTime] ?? 0);
+        return $activeForSlot < $capacity;
     }
 
     private function markExpired(int $id): void

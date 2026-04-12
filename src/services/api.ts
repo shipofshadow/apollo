@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse, NotificationQueueResponse, NotificationQueueHealth } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -889,6 +889,43 @@ export const fetchSemaphoreMessagesApi = (
   return apiFetch<SemaphoreMessagesResponse>(`/api/admin/semaphore/messages${qs ? `?${qs}` : ''}`, {}, token);
 };
 
+export const fetchNotificationQueueApi = (
+  token: string,
+  params: { status?: string; limit?: number } = {}
+) => {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.limit) query.set('limit', String(params.limit));
+  const qs = query.toString();
+  return apiFetch<NotificationQueueResponse>(`/api/admin/notification-queue${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export const fetchNotificationQueueHealthApi = (
+  token: string,
+  warnAfterSeconds?: number
+) => {
+  const query = new URLSearchParams();
+  if (warnAfterSeconds && warnAfterSeconds > 0) {
+    query.set('warnAfterSeconds', String(warnAfterSeconds));
+  }
+  const qs = query.toString();
+  return apiFetch<{ health: NotificationQueueHealth }>(`/api/admin/notification-queue/health${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export const replayFailedNotificationJobsApi = (
+  token: string,
+  limit = 50
+) =>
+  apiFetch<{ replayed: number; ids: number[] }>('/api/admin/notification-queue/replay-failed', {
+    method: 'POST',
+    body: JSON.stringify({ limit }),
+  }, token);
+
+export const replayNotificationJobApi = (token: string, id: number) =>
+  apiFetch<{ replayed: number; ids: number[] }>(`/api/admin/notification-queue/${id}/replay`, {
+    method: 'POST',
+  }, token);
+
 export interface MigrationEntry {
   name: string;
   status: 'ran' | 'pending';
@@ -897,6 +934,15 @@ export interface MigrationEntry {
 
 export interface MigrationStatusResponse {
   migrations: MigrationEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: {
+    ran: number;
+    pending: number;
+    total: number;
+  };
 }
 
 export interface MigrationRunResponse {
@@ -905,11 +951,39 @@ export interface MigrationRunResponse {
   total: number;
 }
 
-export const fetchMigrationStatusApi = (token: string) =>
-  apiFetch<MigrationStatusResponse>('/api/admin/migrate', {}, token);
+export const fetchMigrationStatusApi = (
+  token: string,
+  params: { page?: number; pageSize?: number } = {}
+) => {
+  const query = new URLSearchParams();
+  if (params.page) query.set('page', String(params.page));
+  if (params.pageSize) query.set('pageSize', String(params.pageSize));
+  const qs = query.toString();
+  return apiFetch<MigrationStatusResponse>(`/api/admin/migrate${qs ? `?${qs}` : ''}`, {}, token);
+};
 
 export const runMigrationsApi = (token: string) =>
   apiFetch<MigrationRunResponse>('/api/admin/migrate', { method: 'POST' }, token);
+
+export const runNotificationQueueWorkerApi = (token: string, limit?: number) =>
+  apiFetch<{ stats: { processed: number; failed: number; retried: number } }>('/api/admin/cron/notification-queue', {
+    method: 'POST',
+    body: JSON.stringify(limit ? { limit } : {}),
+  }, token);
+
+export const runWaitlistAutoFillWorkerApi = (token: string) =>
+  apiFetch<{ stats: { slotsChecked: number; notified: number } }>('/api/admin/cron/waitlist-autofill', {
+    method: 'POST',
+  }, token);
+
+export const runAppointmentRemindersWorkerApi = (
+  token: string,
+  payload: { date?: string; dryRun?: boolean } = {}
+) =>
+  apiFetch<{ stats: { date: string; dryRun: boolean; totalBookings: number; attempted: number; skipped: number; errors: number } }>('/api/admin/cron/appointment-reminders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, token);
 
 // ── Site Settings API ─────────────────────────────────────────────────────────
 

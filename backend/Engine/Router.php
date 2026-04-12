@@ -274,6 +274,9 @@ class Router
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
+            $r->addRoute('POST', '/api/admin/cron/notification-queue', 'handleAdminCronNotificationQueue');
+            $r->addRoute('POST', '/api/admin/cron/waitlist-autofill', 'handleAdminCronWaitlistAutofill');
+            $r->addRoute('POST', '/api/admin/cron/appointment-reminders', 'handleAdminCronAppointmentReminders');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
             $r->addRoute('GET',    '/api/admin/users',            'handleAdminUserList');
@@ -291,6 +294,10 @@ class Router
             $r->addRoute('GET',  '/api/admin/security/audit/export', 'handleAdminSecurityAuditExport');
             $r->addRoute('GET',  '/api/admin/semaphore/account', 'handleAdminSemaphoreAccount');
             $r->addRoute('GET',  '/api/admin/semaphore/messages', 'handleAdminSemaphoreMessages');
+            $r->addRoute('GET',  '/api/admin/notification-queue', 'handleAdminNotificationQueue');
+            $r->addRoute('GET',  '/api/admin/notification-queue/health', 'handleAdminNotificationQueueHealth');
+            $r->addRoute('POST', '/api/admin/notification-queue/replay-failed', 'handleAdminNotificationQueueReplayFailed');
+            $r->addRoute('POST', '/api/admin/notification-queue/{id:\d+}/replay', 'handleAdminNotificationQueueReplayOne');
             $r->addRoute('POST', '/api/admin/roles',   'handleAdminRoleCreate');
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
@@ -685,12 +692,10 @@ class Router
                 );
 
                 if ($security->isSuspiciousLogin($email, $ip) && $security->shouldSendSuspiciousAlert($email, $ip)) {
-                    (new UserNotificationService())->createForAdmin(
-                        'status_changed',
-                        'Suspicious Login Pattern',
-                        'Repeated login failures detected for ' . strtolower(trim($email)) . ' from IP ' . ($ip !== '' ? $ip : 'unknown') . '.',
-                        ['email' => strtolower(trim($email)), 'ipAddress' => $ip]
-                    );
+                    (new NotificationJobQueueService())->dispatch('admin_security_alert', [
+                        'email' => strtolower(trim($email)),
+                        'ipAddress' => $ip,
+                    ]);
                     $security->markSuspiciousAlertSent($email, $ip, $ua, 'Admin suspicious login alert sent.');
                 }
 
@@ -715,12 +720,10 @@ class Router
                 }
 
                 if ($security->isSuspiciousLogin($email, $ip) && $security->shouldSendSuspiciousAlert($email, $ip)) {
-                    (new UserNotificationService())->createForAdmin(
-                        'status_changed',
-                        'Suspicious Login Pattern',
-                        'Repeated login failures detected for ' . strtolower(trim($email)) . ' from IP ' . ($ip !== '' ? $ip : 'unknown') . '.',
-                        ['email' => strtolower(trim($email)), 'ipAddress' => $ip]
-                    );
+                    (new NotificationJobQueueService())->dispatch('admin_security_alert', [
+                        'email' => strtolower(trim($email)),
+                        'ipAddress' => $ip,
+                    ]);
                     $security->markSuspiciousAlertSent($email, $ip, $ua, 'Admin suspicious login alert sent.');
                 }
             }
@@ -736,12 +739,10 @@ class Router
                 }
 
                 if ($security->isSuspiciousLogin($email, $ip) && $security->shouldSendSuspiciousAlert($email, $ip)) {
-                    (new UserNotificationService())->createForAdmin(
-                        'status_changed',
-                        'Suspicious Login Pattern',
-                        'Repeated login failures detected for ' . strtolower(trim($email)) . ' from IP ' . ($ip !== '' ? $ip : 'unknown') . '.',
-                        ['email' => strtolower(trim($email)), 'ipAddress' => $ip]
-                    );
+                    (new NotificationJobQueueService())->dispatch('admin_security_alert', [
+                        'email' => strtolower(trim($email)),
+                        'ipAddress' => $ip,
+                    ]);
                     $security->markSuspiciousAlertSent($email, $ip, $ua, 'Admin suspicious login alert sent.');
                 }
             }
@@ -937,7 +938,10 @@ class Router
 
         if ($token !== null) {
             $resetUrl = APP_URL . '/reset-password?token=' . urlencode($token);
-            (new NotificationService())->passwordReset($email, $resetUrl);
+            (new NotificationJobQueueService())->dispatch('password_reset', [
+                'email' => $email,
+                'resetUrl' => $resetUrl,
+            ]);
         }
 
         // Always return 200 to prevent email enumeration
@@ -1527,21 +1531,10 @@ class Router
         // Notify the customer that a new build progress update was posted
         $booking = (new BookingService())->adminFindById($id);
         if ($booking !== null) {
-            (new NotificationService())->buildUpdateCreated($booking, $update);
-
-            // In-app notification for the client
-            $uid = (int) ($booking['userId'] ?? 0);
-            if ($uid > 0) {
-                $svcName = (string) ($booking['serviceName'] ?? 'your service');
-                $snippet = $note !== '' ? ': ' . mb_strimwidth($note, 0, 60, '…') : '';
-                (new UserNotificationService())->createForUser(
-                    $uid,
-                    'build_update',
-                    'Build Progress Update',
-                    "New update on your {$svcName} job{$snippet}",
-                    ['bookingId' => $id]
-                );
-            }
+            (new NotificationJobQueueService())->dispatch('build_update_created', [
+                'booking' => $booking,
+                'update' => $update,
+            ]);
         }
 
         http_response_code(201);
@@ -2011,6 +2004,58 @@ class Router
         ];
 
         echo json_encode((new SemaphoreService())->getMessages($filters, $refresh));
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminNotificationQueue(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        $status = trim((string) ($_GET['status'] ?? ''));
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
+        $svc = new NotificationJobQueueService();
+
+        echo json_encode([
+            'summary' => $svc->getSummary(),
+            'jobs' => $svc->listJobs($status, $limit),
+        ]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminNotificationQueueHealth(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        $warnAfterSeconds = isset($_GET['warnAfterSeconds'])
+            ? (int) $_GET['warnAfterSeconds']
+            : null;
+        $health = (new NotificationJobQueueService())->getHealth($warnAfterSeconds);
+        echo json_encode(['health' => $health]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminNotificationQueueReplayFailed(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        $data = $this->jsonBody();
+        $limit = isset($data['limit']) ? (int) $data['limit'] : 50;
+        $result = (new NotificationJobQueueService())->replayFailed(null, $limit);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminNotificationQueueReplayOne(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid job id.', 422);
+        }
+
+        $result = (new NotificationJobQueueService())->replayFailed($id, 1);
+        echo json_encode($result);
     }
 
     /** @param array<string, string> $vars */
@@ -2900,7 +2945,124 @@ class Router
     {
         $this->requirePermission('settings:manage');
         $status = (new MigrationRunner())->status();
-        echo json_encode(['migrations' => $status]);
+
+        $total = count($status);
+        $ranCount = count(array_filter($status, static fn(array $m): bool => (($m['status'] ?? '') === 'ran')));
+        $pendingCount = $total - $ranCount;
+
+        $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+        $pageSize = isset($_GET['pageSize']) ? max(1, min(200, (int) $_GET['pageSize'])) : 25;
+        $offset = ($page - 1) * $pageSize;
+        $rows = array_slice($status, $offset, $pageSize);
+        $totalPages = $total > 0 ? (int) ceil($total / $pageSize) : 1;
+
+        echo json_encode([
+            'migrations' => $rows,
+            'page' => $page,
+            'pageSize' => $pageSize,
+            'total' => $total,
+            'totalPages' => $totalPages,
+            'counts' => [
+                'ran' => $ranCount,
+                'pending' => $pendingCount,
+                'total' => $total,
+            ],
+        ]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCronNotificationQueue(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        if (DB_NAME === '') {
+            throw new RuntimeException('Database is required to process notification queue jobs.', 503);
+        }
+
+        $data = $this->jsonBody();
+        $limit = isset($data['limit']) ? (int) $data['limit'] : null;
+
+        $stats = (new NotificationJobQueueService())->processPending($limit);
+        echo json_encode(['stats' => $stats]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCronWaitlistAutofill(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        if (DB_NAME === '') {
+            throw new RuntimeException('Database is required to process waitlist autofill jobs.', 503);
+        }
+
+        $stats = (new WaitlistService())->processAutoFill();
+        echo json_encode(['stats' => $stats]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCronAppointmentReminders(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+
+        if (DB_NAME === '') {
+            throw new RuntimeException('Database is required to process appointment reminders.', 503);
+        }
+
+        $data = $this->jsonBody();
+        $dryRun = (bool) ($data['dryRun'] ?? false);
+        $date = trim((string) ($data['date'] ?? ''));
+        if ($date === '') {
+            $date = date('Y-m-d', strtotime('+1 day'));
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('date must be in YYYY-MM-DD format.', 422);
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            "SELECT b.id, b.name, b.phone, s.title AS service_name, b.appointment_date, b.appointment_time
+               FROM bookings b
+               JOIN services s ON b.service_id = s.id
+              WHERE b.appointment_date = :date
+                AND b.status IN ('confirmed', 'pending')
+              ORDER BY b.appointment_time ASC"
+        );
+        $stmt->execute([':date' => $date]);
+        $bookings = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $attempted = 0;
+        $skipped = 0;
+        $errors = 0;
+        $sms = new SmsService();
+
+        foreach ($bookings as $booking) {
+            $phone = trim((string) ($booking['phone'] ?? ''));
+            if ($phone === '') {
+                $skipped++;
+                continue;
+            }
+
+            $attempted++;
+            if ($dryRun) {
+                continue;
+            }
+
+            try {
+                $sms->appointmentReminder($booking);
+            } catch (\Throwable) {
+                $errors++;
+            }
+        }
+
+        echo json_encode([
+            'stats' => [
+                'date' => $date,
+                'dryRun' => $dryRun,
+                'totalBookings' => count($bookings),
+                'attempted' => $attempted,
+                'skipped' => $skipped,
+                'errors' => $errors,
+            ],
+        ]);
     }
 
     // -------------------------------------------------------------------------
@@ -3275,12 +3437,14 @@ class Router
             return;
         }
 
-        (new NotificationService())->contactMessage([
-            'name'    => $name,
-            'email'   => $email,
-            'phone'   => $phone,
-            'subject' => $subject,
-            'message' => $message,
+        (new NotificationJobQueueService())->dispatch('contact_message', [
+            'data' => [
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone,
+                'subject' => $subject,
+                'message' => $message,
+            ],
         ]);
 
         echo json_encode(['message' => 'Your message has been sent successfully.']);
