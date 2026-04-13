@@ -191,6 +191,10 @@ class Auth
             throw new RuntimeException('This account has been deactivated. Please contact support.', 403);
         }
 
+        if (array_key_exists('email_verified_at', $row) && $row['email_verified_at'] === null) {
+            throw new RuntimeException('Please verify your email address before signing in.', 403);
+        }
+
         if (self::needsRehash($row['password'])) {
             $db->prepare('UPDATE users SET password = :p WHERE id = :id')
                ->execute([':p' => self::hashPassword($pass), ':id' => $row['id']]);
@@ -245,8 +249,8 @@ class Auth
         }
 
         $db->prepare(
-            'INSERT INTO users (name, email, phone, password, role)
-             VALUES (:name, :email, :phone, :password, :role)'
+            'INSERT INTO users (name, email, email_verified_at, phone, password, role)
+             VALUES (:name, :email, NULL, :phone, :password, :role)'
         )->execute([
             ':name'     => trim((string) $data['name']),
             ':email'    => $email,

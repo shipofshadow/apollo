@@ -83,7 +83,16 @@ export default function RegisterPage() {
       password: form.password,
       cfTurnstileToken: turnstileToken,
       consentGiven: true,
-    } as Parameters<typeof register>[0]).catch(() => setTurnstileKey(k => k + 1));
+    } as Parameters<typeof register>[0])
+      .then(() => {
+        showToast('Registration successful. Verify your email before signing in.', 'success');
+        const q = new URLSearchParams();
+        q.set('verify_notice', '1');
+        q.set('email', form.email);
+        if (redirect) q.set('redirect', redirect);
+        navigate(`/login?${q.toString()}`, { replace: true });
+      })
+      .catch(() => setTurnstileKey(k => k + 1));
   };
 
   const displayError = localErr || error;

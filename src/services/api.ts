@@ -152,7 +152,7 @@ export const loginApi = (email: string, password: string, cfTurnstileToken: stri
 export const registerApi = (data: {
   name: string; email: string; phone: string; password: string; cfTurnstileToken: string;
 }) =>
-  apiFetch<{ token: string; user: User }>('/api/auth/register', {
+  apiFetch<{ message: string; verification_required: boolean; user: User }>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({ ...data, 'cf-turnstile-response': data.cfTurnstileToken }),
   });
@@ -162,12 +162,21 @@ export const fetchMeApi = (token: string) =>
 
 export const updateProfileApi = (
   token: string,
-  data: { name?: string; phone?: string; avatar_url?: string | null; password?: string; password_confirmation?: string }
+  data: { name?: string; email?: string; phone?: string; avatar_url?: string | null; password?: string; password_confirmation?: string }
 ) =>
   apiFetch<{ user: User }>('/api/auth/profile', {
     method: 'PUT',
     body: JSON.stringify(data),
   }, token);
+
+export const verifyEmailApi = (token: string) =>
+  apiFetch<{ message: string; user: User }>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+
+export const resendVerificationApi = (email: string) =>
+  apiFetch<{ message: string }>('/api/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 
 export const uploadProfileAvatarApi = async (token: string, file: File): Promise<string> => {
   const form = new FormData();

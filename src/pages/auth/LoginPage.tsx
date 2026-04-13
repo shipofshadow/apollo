@@ -4,6 +4,7 @@ import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import TurnstileWidget from '../../components/TurnstileWidget';
+import { verifyEmailApi, resendVerificationApi } from '../../services/api';
 
 export default function LoginPage() {
   const navigate   = useNavigate();
@@ -13,11 +14,13 @@ export default function LoginPage() {
   const { user, status, error, login, clearError } = useAuth();
   const { showToast } = useToast();
 
-  const [email,    setEmail]    = useState('');
+  const [email,    setEmail]    = useState(params.get('email') ?? '');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileKey,   setTurnstileKey]   = useState(0);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState('');
   const hasShownToast = useRef(false);
 
   // Redirect if already authenticated
@@ -34,10 +37,42 @@ export default function LoginPage() {
   // Clean error on unmount
   useEffect(() => () => { clearError(); }, []);
 
+  useEffect(() => {
+    const token = params.get('verifyToken') ?? '';
+    if (token === '') return;
+
+    verifyEmailApi(token)
+      .then((res) => {
+        setVerifyMsg(res.message || 'Email verified successfully. You can now sign in.');
+        showToast('Email verified. You can now sign in.', 'success');
+        navigate('/login', { replace: true });
+      })
+      .catch((e: unknown) => {
+        const msg = (e as Error).message || 'Verification link is invalid or has expired.';
+        setVerifyMsg(msg);
+      });
+  }, [params, navigate, showToast]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     login(email, password, turnstileToken)
       .catch(() => setTurnstileKey(k => k + 1));
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim()) {
+      showToast('Enter your email address first.', 'error');
+      return;
+    }
+    setResendBusy(true);
+    try {
+      const res = await resendVerificationApi(email.trim());
+      showToast(res.message, 'success');
+    } catch (e: unknown) {
+      showToast((e as Error).message || 'Failed to resend verification email.', 'error');
+    } finally {
+      setResendBusy(false);
+    }
   };
 
   return (
@@ -52,6 +87,20 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 shadow-2xl">
+          {(verifyMsg || params.get('verify_notice') === '1') && (
+            <div className="flex items-center justify-between gap-3 bg-blue-500/10 border border-blue-500/30 text-blue-300 px-4 py-3 rounded-sm mb-6 text-sm">
+              <span>{verifyMsg || 'Registration complete. Please verify your email before signing in.'}</span>
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendBusy}
+                className="shrink-0 text-xs font-bold uppercase tracking-wider text-brand-orange hover:text-orange-300 disabled:opacity-50"
+              >
+                {resendBusy ? 'Sending...' : 'Resend'}
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm mb-6 text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />

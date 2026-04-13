@@ -21,7 +21,7 @@ export default function AccountSettingsPanel() {
   const { user, token, error } = useAuth();
   const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
 
-  const [info,        setInfo]       = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
+  const [info,        setInfo]       = useState({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '' });
   const [pw,          setPw]         = useState({ newPw: '', confirm: '' });
   const [showPw,      setShowPw]     = useState(false);
   const [localErr,    setLocalErr]   = useState('');
@@ -36,7 +36,7 @@ export default function AccountSettingsPanel() {
   const [prefsBusy,  setPrefsBusy]  = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
   useEffect(() => {
-    if (user) setInfo({ name: user.name, phone: user.phone ?? '' });
+    if (user) setInfo({ name: user.name, email: user.email, phone: user.phone ?? '' });
   }, [user]);
 
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
@@ -74,7 +74,7 @@ export default function AccountSettingsPanel() {
     setSaved(false);
     if (!token) return;
     setSavingInfo(true);
-    dispatch(updateProfileAsync({ token, data: { name: info.name, phone: info.phone } }))
+    dispatch(updateProfileAsync({ token, data: { name: info.name, email: info.email, phone: info.phone } }))
       .unwrap()
       .then(() => setSaved(true))
       .catch(() => {})
@@ -211,10 +211,16 @@ export default function AccountSettingsPanel() {
               <Mail className="w-3 h-3" /> Email Address
             </label>
             <input
-              type="email" value={user?.email ?? ''} disabled
-              className="w-full bg-brand-darker border border-gray-800 text-gray-600 px-4 py-2.5 rounded-sm cursor-not-allowed text-sm"
+              type="email" value={info.email}
+              onChange={e => setInfo(p => ({ ...p, email: e.target.value }))}
+              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-sm text-sm"
             />
-            <p className="text-[11px] text-gray-700">Email cannot be changed.</p>
+            <p className="text-[11px] text-gray-700">
+              {user?.email_verified
+                ? 'Email verified.'
+                : 'Email is not verified yet. Check your inbox for a verification link.'}
+            </p>
+            <p className="text-[11px] text-gray-700">Changing your email will require verification again.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

@@ -46,7 +46,7 @@ export default function Profile() {
   const { showToast }          = useToast();
   const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
 
-  const [info,     setInfo]    = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
+  const [info,     setInfo]    = useState({ name: user?.name ?? '', email: user?.email ?? '', phone: user?.phone ?? '' });
   const [pw,       setPw]      = useState({ newPw: '', confirm: '' });
   const [showPw,   setShowPw]  = useState(false);
   const [localErr, setLocalErr] = useState('');
@@ -68,7 +68,7 @@ export default function Profile() {
   const [revokeOthersBusy, setRevokeOthersBusy] = useState(false);
 
   useEffect(() => {
-    if (user) setInfo({ name: user.name, phone: user.phone });
+    if (user) setInfo({ name: user.name, email: user.email, phone: user.phone });
   }, [user]);
 
   useEffect(() => () => { dispatch(clearAuthError()); }, [dispatch]);
@@ -140,7 +140,7 @@ export default function Profile() {
     e.preventDefault();
     setLocalErr('');
     if (!token) return;
-    dispatch(updateProfileAsync({ token, data: { name: info.name, phone: info.phone } }))
+    dispatch(updateProfileAsync({ token, data: { name: info.name, email: info.email, phone: info.phone } }))
       .unwrap()
       .then(() => showToast('Profile updated successfully.', 'success'))
       .catch(() => {});
@@ -276,16 +276,22 @@ export default function Profile() {
               <h2 className="text-xs font-bold text-white uppercase tracking-widest">Personal Information</h2>
             </div>
             <form onSubmit={handleInfoSubmit} className="p-6 space-y-5">
-              {/* Email – read-only */}
+              {/* Email */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
                   <Mail className="w-3 h-3" /> Email Address
                 </label>
                 <input
-                  type="email" value={user?.email ?? ''} disabled
-                  className="w-full bg-brand-darker border border-gray-800 text-gray-600 px-4 py-2.5 rounded-md cursor-not-allowed text-sm"
+                  type="email" value={info.email}
+                  onChange={e => setInfo(p => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-md text-sm"
                 />
-                <p className="text-[11px] text-gray-700">Email cannot be changed.</p>
+                <p className="text-[11px] text-gray-700">
+                  {user?.email_verified
+                    ? 'Email verified.'
+                    : 'Email is not verified yet. Check your inbox for a verification link.'}
+                </p>
+                <p className="text-[11px] text-gray-700">Changing your email will require verification again.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

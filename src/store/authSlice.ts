@@ -108,7 +108,7 @@ export const updateProfileAsync = createAsyncThunk(
   async (
     arg: {
       token: string;
-      data: { name?: string; phone?: string; avatar_url?: string | null; password?: string; password_confirmation?: string };
+      data: { name?: string; email?: string; phone?: string; avatar_url?: string | null; password?: string; password_confirmation?: string };
     },
     { rejectWithValue }
   ) => {
@@ -192,14 +192,13 @@ const authSlice = createSlice({
       state.status = 'loading';
       state.error  = null;
     });
-    builder.addCase(registerAsync.fulfilled, (state, action) => {
+    builder.addCase(registerAsync.fulfilled, (state) => {
       state.status = 'success';
-      state.token  = action.payload.token;
-      state.refreshToken = (action.payload as any).refresh_token || null;
-      state.user   = action.payload.user;
-      if (state.refreshToken) {
-        saveToStorage(action.payload.token, state.refreshToken, action.payload.user);
-      }
+      state.error = null;
+      state.token = null;
+      state.refreshToken = null;
+      state.user = null;
+      clearStorage();
     });
     builder.addCase(registerAsync.rejected, (state, action) => {
       state.status = 'error';

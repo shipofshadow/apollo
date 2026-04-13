@@ -116,6 +116,8 @@ class Router
             $r->addRoute('POST', '/api/auth/avatar-upload',    'handleAuthAvatarUpload');
             $r->addRoute('POST', '/api/auth/forgot-password',  'handleAuthForgotPassword');
             $r->addRoute('POST', '/api/auth/reset-password',   'handleAuthResetPassword');
+            $r->addRoute('GET',  '/api/auth/verify-email',     'handleAuthVerifyEmail');
+            $r->addRoute('POST', '/api/auth/resend-verification', 'handleAuthResendVerification');
             $r->addRoute('GET',  '/api/auth/sessions',         'handleAuthSessionList');
             $r->addRoute('DELETE', '/api/auth/sessions/revoke-others', 'handleAuthSessionRevokeOthers');
             $r->addRoute('DELETE', '/api/auth/sessions/{id:\d+}', 'handleAuthSessionRevoke');
@@ -1096,6 +1098,46 @@ class Router
 
         Auth::resetPassword($token, $password);
         echo json_encode(['message' => 'Your password has been updated. You can now sign in.']);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthVerifyEmail(array $vars = []): void
+    {
+        $token = trim((string) ($_GET['token'] ?? ''));
+        $user = (new UserService())->verifyEmail($token);
+        $user['permissions'] = $this->getRolePermissions((string) ($user['role'] ?? ''));
+
+        echo json_encode([
+            'message' => 'Email verified successfully. You can now sign in.',
+            'user' => $user,
+        ]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAuthResendVerification(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $email = strtolower(trim((string) ($data['email'] ?? '')));
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('A valid email address is required.', 422);
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+            $stmt->execute([':email' => $email]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($row && isset($row['id'])) {
+                (new UserService())->resendEmailVerification((int) $row['id']);
+            }
+        } catch (Throwable $e) {
+            error_log('[Router] Resend verification failed: ' . $e->getMessage());
+        }
+
+        // Always return success to prevent email enumeration.
+        echo json_encode(['message' => 'If your account exists and is not yet verified, a new verification email has been sent.']);
     }
 
     // -------------------------------------------------------------------------

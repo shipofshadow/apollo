@@ -79,6 +79,7 @@ export interface AuthContextValue {
   logout: () => Promise<void>;
   updateProfile: (data: {
     name?: string;
+    email?: string;
     phone?: string;
     avatar_url?: string | null;
     password?: string;
@@ -132,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = async (data: {
     name?: string;
+    email?: string;
     phone?: string;
     avatar_url?: string | null;
     password?: string;

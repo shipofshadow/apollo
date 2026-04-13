@@ -25,6 +25,7 @@ declare(strict_types=1);
 class UserService
 {
     private PDO $db;
+    private const EMAIL_VERIFICATION_TOKEN_TTL = 86400;
 
     public function __construct()
     {
@@ -39,26 +40,29 @@ class UserService
     // -------------------------------------------------------------------------
 
     /**
-     * Register a new client account and return a signed JWT + user data.
+     * Register a new client account and trigger email verification.
      *
      * @param  array<string, mixed> $data
-     * @return array{ token: string, user: array<string, mixed> }
+     * @return array<string, mixed>
      */
     public function register(array $data): array
     {
         Auth::register($data);
 
-        $user  = $this->findById((int) $this->db->lastInsertId());
-        $token = $this->issueTokenFor($user);
+        $userId = (int) $this->db->lastInsertId();
+        $user = $this->findById($userId);
 
-        // Issue a long-lived refresh token (7 days)
-        $refreshToken = Auth::issueToken(['sub' => $user['id'], 'type' => 'refresh'], 7 * 24 * 60 * 60);
+        $this->issueEmailVerificationForUser($user);
 
         // Claim any anonymous bookings submitted with this email before the
         // account existed (guest bookings have user_id = NULL).
         $this->claimAnonymousBookings((int) $user['id'], strtolower(trim((string) ($data['email'] ?? ''))));
 
-        return ['token' => $token, 'refresh_token' => $refreshToken, 'user' => $user];
+        return [
+            'message' => 'Registration successful. Please verify your email before signing in.',
+            'verification_required' => true,
+            'user' => $user,
+        ];
     }
 
     /**
@@ -109,6 +113,8 @@ class UserService
     {
         $fields = [];
         $params = [':id' => $id];
+        $emailChanged = false;
+        $nextEmail = '';
 
         foreach (['name', 'phone', 'avatar_url'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] !== null) {
@@ -118,6 +124,29 @@ class UserService
                 } else {
                     $params[":$field"] = trim((string) $data[$field]);
                 }
+            }
+        }
+
+        if (array_key_exists('email', $data)) {
+            $email = strtolower(trim((string) $data['email']));
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new RuntimeException('A valid email address is required.', 422);
+            }
+
+            $current = $this->findById($id);
+            $currentEmail = strtolower(trim((string) ($current['email'] ?? '')));
+            if ($email !== $currentEmail) {
+                $dup = $this->db->prepare('SELECT id FROM users WHERE email = :email AND id <> :id LIMIT 1');
+                $dup->execute([':email' => $email, ':id' => $id]);
+                if ($dup->fetch()) {
+                    throw new RuntimeException('That email address is already registered.', 409);
+                }
+
+                $fields[] = 'email = :email';
+                $params[':email'] = $email;
+                $fields[] = 'email_verified_at = NULL';
+                $emailChanged = true;
+                $nextEmail = $email;
             }
         }
 
@@ -153,7 +182,93 @@ class UserService
             $this->deleteManagedImageUrl($oldAvatar);
         }
 
+        if ($emailChanged && $nextEmail !== '') {
+            $this->issueEmailVerificationForUser($updated);
+        }
+
         return $updated;
+    }
+
+    /**
+     * Send a fresh email verification link to an authenticated user.
+     */
+    public function resendEmailVerification(int $userId): void
+    {
+        $user = $this->findById($userId);
+        if ((bool) ($user['email_verified'] ?? false)) {
+            return;
+        }
+
+        $this->issueEmailVerificationForUser($user);
+    }
+
+    /**
+     * Consume a verification token and mark the user email as verified.
+     *
+     * @return array<string, mixed>
+     */
+    public function verifyEmail(string $token): array
+    {
+        $token = trim($token);
+        if ($token === '') {
+            throw new RuntimeException('Verification token is required.', 422);
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT ev.id, ev.user_id, ev.email
+             FROM email_verifications ev
+             WHERE ev.token = :token
+               AND ev.used_at IS NULL
+               AND ev.expires_at > NOW()
+             LIMIT 1'
+        );
+        $stmt->execute([':token' => $token]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            throw new RuntimeException('This verification link is invalid or has expired.', 422);
+        }
+
+        $verificationId = (int) ($row['id'] ?? 0);
+        $userId = (int) ($row['user_id'] ?? 0);
+        $email = strtolower(trim((string) ($row['email'] ?? '')));
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare(
+                'UPDATE users
+                 SET email_verified_at = NOW()
+                 WHERE id = :id AND email = :email'
+            )->execute([':id' => $userId, ':email' => $email]);
+
+            $this->db->prepare('UPDATE email_verifications SET used_at = NOW() WHERE id = :id')
+                ->execute([':id' => $verificationId]);
+
+            $this->db->prepare(
+                'UPDATE email_verifications
+                 SET used_at = NOW()
+                 WHERE user_id = :user_id AND used_at IS NULL AND id <> :id'
+            )->execute([':user_id' => $userId, ':id' => $verificationId]);
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        try {
+            activity()
+                ->performedOn(['type' => 'users', 'id' => $userId])
+                ->causedBy($userId, 'users')
+                ->withProperties(['email' => $email])
+                ->log(ActivityEvents::USER_UPDATED_PROFILE, 'auth');
+        } catch (Throwable $e) {
+            error_log('[UserService] Email verify activity logging failed: ' . $e->getMessage());
+        }
+
+        return $this->findById($userId);
     }
 
     /**
@@ -226,8 +341,8 @@ class UserService
         }
 
         $this->db->prepare(
-            'INSERT INTO users (name, email, phone, password, role)
-             VALUES (:name, :email, :phone, :password, :role)'
+            'INSERT INTO users (name, email, email_verified_at, phone, password, role)
+             VALUES (:name, :email, NOW(), :phone, :password, :role)'
         )->execute([
             ':name'     => $name,
             ':email'    => $email,
@@ -633,6 +748,7 @@ class UserService
                 throw new RuntimeException('That email address is already registered.', 409);
             }
             $fields[]       = 'email = :email';
+            $fields[]       = 'email_verified_at = NOW()';
             $params[':email'] = $email;
         }
 
@@ -705,7 +821,47 @@ class UserService
         unset($row['password']);
         $row['avatar_url'] = $row['avatar_url'] ?? null;
         $row['is_active']  = isset($row['is_active']) ? (bool) $row['is_active'] : true;
+        $row['email_verified'] = isset($row['email_verified_at']) && $row['email_verified_at'] !== null;
         return $row;
+    }
+
+    /**
+     * Issue a single-use verification token and send a verification email.
+     *
+     * @param array<string, mixed> $user
+     */
+    private function issueEmailVerificationForUser(array $user): void
+    {
+        $userId = (int) ($user['id'] ?? 0);
+        $email = strtolower(trim((string) ($user['email'] ?? '')));
+        $name = (string) ($user['name'] ?? '');
+
+        if ($userId <= 0 || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        try {
+            $this->db->prepare('DELETE FROM email_verifications WHERE user_id = :user_id AND used_at IS NULL')
+                ->execute([':user_id' => $userId]);
+
+            $token = bin2hex(random_bytes(32));
+            $expiresAt = date('Y-m-d H:i:s', time() + self::EMAIL_VERIFICATION_TOKEN_TTL);
+
+            $this->db->prepare(
+                'INSERT INTO email_verifications (user_id, email, token, expires_at)
+                 VALUES (:user_id, :email, :token, :expires_at)'
+            )->execute([
+                ':user_id' => $userId,
+                ':email' => $email,
+                ':token' => $token,
+                ':expires_at' => $expiresAt,
+            ]);
+
+            $verifyUrl = APP_URL . '/login?verifyToken=' . urlencode($token);
+            (new NotificationService())->sendEmailVerification($email, $name, $verifyUrl);
+        } catch (Throwable $e) {
+            error_log('[UserService] Email verification dispatch failed: ' . $e->getMessage());
+        }
     }
 
     private function deleteManagedImageUrl(string $url): void

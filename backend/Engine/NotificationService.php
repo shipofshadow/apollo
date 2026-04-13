@@ -269,6 +269,31 @@ class NotificationService
     }
 
     /**
+     * Send an email verification link.
+     */
+    public function sendEmailVerification(string $email, string $name, string $verifyUrl): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $to = strtolower(trim($email));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $safeName = htmlspecialchars(trim($name) !== '' ? $name : 'there');
+        $safeUrl = htmlspecialchars($verifyUrl);
+
+        $body = $this->render('email-verification', [
+            'name' => $safeName,
+            'verify_url' => $safeUrl,
+        ]);
+
+        $this->send($to, trim($name) !== '' ? $name : 'Customer', 'Verify Your Email | 1625 Auto Lab', $body);
+    }
+
+    /**
      * Notify order managers that a new order was placed.
      *
      * @param array<string, mixed> $order
