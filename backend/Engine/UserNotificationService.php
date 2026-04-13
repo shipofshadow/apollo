@@ -21,6 +21,13 @@ declare(strict_types=1);
  */
 class UserNotificationService
 {
+    /** @var string[] */
+    private const ADMIN_BROADCAST_TYPES = [
+        'new_booking',
+        'new_order',
+        'security_alert',
+    ];
+
     private \PDO $db;
     private ?bool $hasUserIdColumnCache = null;
 
@@ -86,9 +93,7 @@ class UserNotificationService
             $stmt->execute();
 
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            if (!$adminMode) {
-                $rows = array_values(array_filter($rows, fn(array $row): bool => $this->legacyRowTargetsUser($row, $userId)));
-            }
+            $rows = array_values(array_filter($rows, fn(array $row): bool => $this->rowVisibleToViewer($row, $adminMode, $userId)));
 
             return array_map([$this, 'formatRow'], $rows);
         }
@@ -113,7 +118,10 @@ class UserNotificationService
         $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
         $stmt->execute();
 
-        return array_map([$this, 'formatRow'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $rows = array_values(array_filter($rows, fn(array $row): bool => $this->rowVisibleToViewer($row, $adminMode, $userId)));
+
+        return array_map([$this, 'formatRow'], $rows);
     }
 
     /**
@@ -125,16 +133,13 @@ class UserNotificationService
             $stmt = $this->db->prepare('SELECT * FROM notifications WHERE is_read = 0');
             $stmt->execute();
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-            if ($adminMode) {
-                return count($rows);
-            }
 
-            return count(array_filter($rows, fn(array $row): bool => $this->legacyRowTargetsUser($row, $userId)));
+            return count(array_filter($rows, fn(array $row): bool => $this->rowVisibleToViewer($row, $adminMode, $userId)));
         }
 
         if ($adminMode) {
             $stmt = $this->db->prepare(
-                'SELECT COUNT(*)
+                'SELECT *
                    FROM notifications
                   WHERE (user_id IS NULL OR user_id = :uid)
                     AND is_read = 0'
@@ -142,12 +147,14 @@ class UserNotificationService
             $stmt->bindValue(':uid', $userId, \PDO::PARAM_INT);
         } else {
             $stmt = $this->db->prepare(
-                'SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND is_read = 0'
+                'SELECT * FROM notifications WHERE user_id = :uid AND is_read = 0'
             );
             $stmt->bindValue(':uid', $userId, \PDO::PARAM_INT);
         }
         $stmt->execute();
-        return (int) $stmt->fetchColumn();
+
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return count(array_filter($rows, fn(array $row): bool => $this->rowVisibleToViewer($row, $adminMode, $userId)));
     }
 
     // -------------------------------------------------------------------------
@@ -160,14 +167,12 @@ class UserNotificationService
      */
     public function markRead(int $id, bool $adminMode, int $userId = 0): void
     {
-        if (!$this->hasUserIdColumn()) {
-            if (!$adminMode) {
-                $row = $this->legacyFindRowById($id);
-                if ($row === null || !$this->legacyRowTargetsUser($row, $userId)) {
-                    return;
-                }
-            }
+        $row = $this->findRowById($id);
+        if ($row === null || !$this->rowVisibleToViewer($row, $adminMode, $userId)) {
+            return;
+        }
 
+        if (!$this->hasUserIdColumn()) {
             $stmt = $this->db->prepare(
                 'UPDATE notifications SET is_read = 1
                   WHERE id = :id'
@@ -197,18 +202,11 @@ class UserNotificationService
     public function markAllRead(bool $adminMode, int $userId = 0): void
     {
         if (!$this->hasUserIdColumn()) {
-            if ($adminMode) {
-                $this->db->exec(
-                    'UPDATE notifications SET is_read = 1 WHERE is_read = 0'
-                );
-                return;
-            }
-
             $stmt = $this->db->query('SELECT id, data FROM notifications WHERE is_read = 0');
             $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
             $ids = [];
             foreach ($rows as $row) {
-                if ($this->legacyRowTargetsUser($row, $userId)) {
+                if ($this->rowVisibleToViewer($row, $adminMode, $userId)) {
                     $ids[] = (int) ($row['id'] ?? 0);
                 }
             }
@@ -221,19 +219,26 @@ class UserNotificationService
             return;
         }
 
-        if ($adminMode) {
-            $stmt = $this->db->prepare(
-                'UPDATE notifications SET is_read = 1
+        $candidateStmt = $adminMode
+            ? $this->db->prepare(
+                'SELECT * FROM notifications
                   WHERE (user_id IS NULL OR user_id = :uid)
                     AND is_read = 0'
-            );
-            $stmt->execute([':uid' => $userId]);
-        } else {
-            $stmt = $this->db->prepare(
-                'UPDATE notifications SET is_read = 1
+            )
+            : $this->db->prepare(
+                'SELECT * FROM notifications
                   WHERE user_id = :uid AND is_read = 0'
             );
-            $stmt->execute([':uid' => $userId]);
+        $candidateStmt->execute([':uid' => $userId]);
+        $rows = $candidateStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $update = $this->db->prepare('UPDATE notifications SET is_read = 1 WHERE id = :id');
+        foreach ($rows as $row) {
+            if (!$this->rowVisibleToViewer($row, $adminMode, $userId)) {
+                continue;
+            }
+
+            $update->execute([':id' => (int) ($row['id'] ?? 0)]);
         }
     }
 
@@ -242,14 +247,12 @@ class UserNotificationService
      */
     public function delete(int $id, bool $adminMode, int $userId = 0): void
     {
-        if (!$this->hasUserIdColumn()) {
-            if (!$adminMode) {
-                $row = $this->legacyFindRowById($id);
-                if ($row === null || !$this->legacyRowTargetsUser($row, $userId)) {
-                    return;
-                }
-            }
+        $row = $this->findRowById($id);
+        if ($row === null || !$this->rowVisibleToViewer($row, $adminMode, $userId)) {
+            return;
+        }
 
+        if (!$this->hasUserIdColumn()) {
             $stmt = $this->db->prepare(
                 'DELETE FROM notifications WHERE id = :id'
             );
@@ -354,27 +357,50 @@ class UserNotificationService
     }
 
     /** @param array<string, mixed> $row */
-    private function legacyRowTargetsUser(array $row, int $userId): bool
+    private function rowVisibleToViewer(array $row, bool $adminMode, int $userId): bool
     {
-        if ($userId <= 0) {
-            return false;
+        $explicitUserId = array_key_exists('user_id', $row) && $row['user_id'] !== null
+            ? (int) $row['user_id']
+            : null;
+
+        if ($explicitUserId !== null) {
+            return $userId > 0 && $explicitUserId === $userId;
         }
 
+        $legacyTargetUserId = $this->extractLegacyTargetUserId($row);
+        if ($legacyTargetUserId !== null) {
+            return $userId > 0 && $legacyTargetUserId === $userId;
+        }
+
+        $type = strtolower(trim((string) ($row['type'] ?? '')));
+        return $adminMode && in_array($type, self::ADMIN_BROADCAST_TYPES, true);
+    }
+
+    /** @param array<string, mixed> $row */
+    private function extractLegacyTargetUserId(array $row): ?int
+    {
         if (empty($row['data'])) {
-            return false;
+            return null;
         }
 
         $decoded = json_decode((string) $row['data'], true);
-        if (!is_array($decoded)) {
-            return false;
+        if (!is_array($decoded) || !isset($decoded['_targetUserId'])) {
+            return null;
         }
 
-        $target = isset($decoded['_targetUserId']) ? (int) $decoded['_targetUserId'] : 0;
-        return $target > 0 && $target === $userId;
+        $target = (int) $decoded['_targetUserId'];
+        return $target > 0 ? $target : null;
+    }
+
+    /** @param array<string, mixed> $row */
+    private function legacyRowTargetsUser(array $row, int $userId): bool
+    {
+        $target = $this->extractLegacyTargetUserId($row);
+        return $userId > 0 && $target !== null && $target === $userId;
     }
 
     /** @return array<string, mixed>|null */
-    private function legacyFindRowById(int $id): ?array
+    private function findRowById(int $id): ?array
     {
         if ($id <= 0) {
             return null;
@@ -385,5 +411,11 @@ class UserNotificationService
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         return is_array($row) ? $row : null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function legacyFindRowById(int $id): ?array
+    {
+        return $this->findRowById($id);
     }
 }
