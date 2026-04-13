@@ -77,10 +77,6 @@ class UserNotificationService
     public function getForViewer(bool $adminMode, int $userId = 0, int $limit = 50): array
     {
         if (!$this->hasUserIdColumn()) {
-            if (!$adminMode) {
-                return [];
-            }
-
             $stmt = $this->db->prepare(
                 'SELECT * FROM notifications
                   ORDER BY created_at DESC
@@ -88,7 +84,13 @@ class UserNotificationService
             );
             $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
             $stmt->execute();
-            return array_map([$this, 'formatRow'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
+
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if (!$adminMode) {
+                $rows = array_values(array_filter($rows, fn(array $row): bool => $this->legacyRowTargetsUser($row, $userId)));
+            }
+
+            return array_map([$this, 'formatRow'], $rows);
         }
 
         if ($adminMode) {
@@ -120,15 +122,14 @@ class UserNotificationService
     public function getUnreadCount(bool $adminMode, int $userId = 0): int
     {
         if (!$this->hasUserIdColumn()) {
-            if (!$adminMode) {
-                return 0;
+            $stmt = $this->db->prepare('SELECT * FROM notifications WHERE is_read = 0');
+            $stmt->execute();
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+            if ($adminMode) {
+                return count($rows);
             }
 
-            $stmt = $this->db->prepare(
-                'SELECT COUNT(*) FROM notifications WHERE is_read = 0'
-            );
-            $stmt->execute();
-            return (int) $stmt->fetchColumn();
+            return count(array_filter($rows, fn(array $row): bool => $this->legacyRowTargetsUser($row, $userId)));
         }
 
         if ($adminMode) {
@@ -161,7 +162,10 @@ class UserNotificationService
     {
         if (!$this->hasUserIdColumn()) {
             if (!$adminMode) {
-                return;
+                $row = $this->legacyFindRowById($id);
+                if ($row === null || !$this->legacyRowTargetsUser($row, $userId)) {
+                    return;
+                }
             }
 
             $stmt = $this->db->prepare(
@@ -193,13 +197,27 @@ class UserNotificationService
     public function markAllRead(bool $adminMode, int $userId = 0): void
     {
         if (!$this->hasUserIdColumn()) {
-            if (!$adminMode) {
+            if ($adminMode) {
+                $this->db->exec(
+                    'UPDATE notifications SET is_read = 1 WHERE is_read = 0'
+                );
                 return;
             }
 
-            $this->db->exec(
-                'UPDATE notifications SET is_read = 1 WHERE is_read = 0'
-            );
+            $stmt = $this->db->query('SELECT id, data FROM notifications WHERE is_read = 0');
+            $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+            $ids = [];
+            foreach ($rows as $row) {
+                if ($this->legacyRowTargetsUser($row, $userId)) {
+                    $ids[] = (int) ($row['id'] ?? 0);
+                }
+            }
+            if (count($ids) > 0) {
+                $upd = $this->db->prepare('UPDATE notifications SET is_read = 1 WHERE id = :id');
+                foreach ($ids as $id) {
+                    $upd->execute([':id' => $id]);
+                }
+            }
             return;
         }
 
@@ -226,7 +244,10 @@ class UserNotificationService
     {
         if (!$this->hasUserIdColumn()) {
             if (!$adminMode) {
-                return;
+                $row = $this->legacyFindRowById($id);
+                if ($row === null || !$this->legacyRowTargetsUser($row, $userId)) {
+                    return;
+                }
             }
 
             $stmt = $this->db->prepare(
@@ -271,6 +292,13 @@ class UserNotificationService
                 ':data'  => $data !== null ? json_encode($data) : null,
             ]);
             return;
+        }
+
+        // Legacy schema fallback: embed target user in payload when user_id column is unavailable.
+        if ($userId !== null) {
+            $payload = is_array($data) ? $data : [];
+            $payload['_targetUserId'] = $userId;
+            $data = $payload;
         }
 
         $stmt = $this->db->prepare(
@@ -323,5 +351,39 @@ class UserNotificationService
         }
 
         return $this->hasUserIdColumnCache;
+    }
+
+    /** @param array<string, mixed> $row */
+    private function legacyRowTargetsUser(array $row, int $userId): bool
+    {
+        if ($userId <= 0) {
+            return false;
+        }
+
+        if (empty($row['data'])) {
+            return false;
+        }
+
+        $decoded = json_decode((string) $row['data'], true);
+        if (!is_array($decoded)) {
+            return false;
+        }
+
+        $target = isset($decoded['_targetUserId']) ? (int) $decoded['_targetUserId'] : 0;
+        return $target > 0 && $target === $userId;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function legacyFindRowById(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+
+        $stmt = $this->db->prepare('SELECT * FROM notifications WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
     }
 }

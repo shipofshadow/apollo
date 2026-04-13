@@ -429,6 +429,7 @@ class BookingService
         $techPhone  = '';
         $techEmail  = '';
         $techUserId = null;
+        $techRow = null;
         if ($assignedTechId !== null) {
             $userIdSelect = $this->hasTeamMemberUserIdColumn() ? ', user_id' : '';
             $techStmt = Database::getInstance()->prepare(
@@ -439,11 +440,15 @@ class BookingService
             if (!$tech) {
                 throw new RuntimeException('Technician not found.', 404);
             }
+            $techRow = $tech;
             $techName  = (string) ($tech['name']  ?? '');
             $techPhone = (string) ($tech['phone'] ?? '');
             $techEmail = (string) ($tech['email'] ?? '');
             if (isset($tech['user_id']) && $tech['user_id'] !== null) {
                 $techUserId = (int) $tech['user_id'];
+            }
+            if ($techUserId === null) {
+                $techUserId = $this->resolveTeamMemberUserId($tech);
             }
         }
 
@@ -467,6 +472,12 @@ class BookingService
             $rawBeforeTechUserId = $before['assignedTech']['userId'] ?? null;
             if ($rawBeforeTechUserId !== null) {
                 $beforeTechUserId = (int) $rawBeforeTechUserId;
+            }
+        }
+        if ($beforeTechUserId === null && $beforeId !== null) {
+            $beforeTechRow = $this->loadTeamMemberById($beforeId);
+            if ($beforeTechRow !== null) {
+                $beforeTechUserId = $this->resolveTeamMemberUserId($beforeTechRow);
             }
         }
         if ($beforeId !== $assignedTechId) {
@@ -537,6 +548,45 @@ class BookingService
         }
 
         return $updated;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function loadTeamMemberById(int $teamMemberId): ?array
+    {
+        if ($teamMemberId <= 0 || !$this->useDb) {
+            return null;
+        }
+
+        $userIdSelect = $this->hasTeamMemberUserIdColumn() ? ', user_id' : '';
+        $stmt = Database::getInstance()->prepare(
+            'SELECT id, name, phone, email' . $userIdSelect . ' FROM team_members WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $teamMemberId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    /** @param array<string, mixed> $teamMember */
+    private function resolveTeamMemberUserId(array $teamMember): ?int
+    {
+        if (isset($teamMember['user_id']) && $teamMember['user_id'] !== null) {
+            $id = (int) $teamMember['user_id'];
+            return $id > 0 ? $id : null;
+        }
+
+        $email = strtolower(trim((string) ($teamMember['email'] ?? '')));
+        if ($email === '') {
+            return null;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT id FROM users WHERE LOWER(email) = :email LIMIT 1'
+        );
+        $stmt->execute([':email' => $email]);
+        $id = (int) ($stmt->fetchColumn() ?: 0);
+
+        return $id > 0 ? $id : null;
     }
 
     /**
