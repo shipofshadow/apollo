@@ -23,6 +23,7 @@ import {
   Pager,
 } from './_sharedComponents';
 import { type ConfirmDialogState } from './_sharedUtils';
+import { getDicebearAvatarDataUri } from '../../utils/avatar';
 
 const USER_ROLES: readonly UserRole[] = ['owner', 'admin', 'manager', 'staff', 'client'];
 
@@ -332,9 +333,31 @@ export default function ManageUsersPanel() {
                     // Admins cannot edit other admin or owner accounts — only owners can.
                     const isProtected = !isOwner && (item.role === 'admin' || item.role === 'owner');
                     const isSelf = user?.id === item.id;
+                    const userAvatarFallback = getDicebearAvatarDataUri({
+                      id: item.id,
+                      name: item.name,
+                      email: item.email,
+                    });
+                    const userAvatar = item.avatar_url ?? item.avatarUrl ?? userAvatarFallback;
                     return (
                       <tr key={item.id} className={`border-b border-gray-800/70 ${!isActive ? 'opacity-60' : ''}`}>
-                        <td className="py-2.5 px-3 md:px-4 text-white font-medium">{item.name}</td>
+                        <td className="py-2.5 px-3 md:px-4 text-white font-medium">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <img
+                              src={userAvatar}
+                              alt={item.name}
+                              className="h-8 w-8 rounded-full border border-gray-700 object-cover shrink-0"
+                              onError={(e) => {
+                                if (e.currentTarget.src !== userAvatarFallback) {
+                                  e.currentTarget.src = userAvatarFallback;
+                                  return;
+                                }
+                                e.currentTarget.onerror = null;
+                              }}
+                            />
+                            <span className="truncate">{item.name}</span>
+                          </div>
+                        </td>
                         <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs">{item.email}</td>
                         <td className="py-2.5 px-3 md:px-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -448,7 +471,7 @@ export default function ManageUsersPanel() {
                 <input
                   value={newUser.phone}
                   onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="e.g. Please enter your phone number."
+                  placeholder="Please enter your phone number."
                   className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
                 />
               </div>

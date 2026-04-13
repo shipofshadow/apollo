@@ -9,6 +9,7 @@ import {
 } from '../../services/api';
 import type { Booking, ClientAdminSummary, ClientVehicle, Customer360Data } from '../../types';
 import { formatStatus } from '../../utils/formatStatus';
+import { getDicebearAvatarDataUri } from '../../utils/avatar';
 import { StatusBadge, Breadcrumbs, Pager, TABLE_PAGE_SIZE } from './_sharedComponents';
 
 const BOOKING_STATUS_STYLES: Record<Booking['status'], string> = {
@@ -98,6 +99,12 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
   }, [bookingTotalPages]);
 
   const isActive = client.is_active !== false;
+  const profileAvatarFallback = getDicebearAvatarDataUri({
+    id: customer360?.profile.id ?? client.id,
+    name: customer360?.profile.name ?? client.name,
+    email: customer360?.profile.email ?? client.email,
+  });
+  const profileAvatarUrl = customer360?.profile.avatar_url ?? customer360?.profile.avatarUrl ?? client.avatar_url ?? client.avatarUrl ?? profileAvatarFallback;
 
   return (
     <div className="space-y-6">
@@ -123,14 +130,21 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
         <div className="relative space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0">
-                <span className="text-brand-orange font-black text-xl uppercase">
-                  {client.name?.[0] ?? 'C'}
-                </span>
-              </div>
+              <img
+                src={profileAvatarUrl}
+                alt={customer360?.profile.name ?? client.name}
+                className="w-14 h-14 rounded-full border-2 border-brand-orange/40 object-cover shrink-0 bg-brand-orange/10"
+                onError={(e) => {
+                  if (e.currentTarget.src !== profileAvatarFallback) {
+                    e.currentTarget.src = profileAvatarFallback;
+                    return;
+                  }
+                  e.currentTarget.onerror = null;
+                }}
+              />
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-display font-bold text-white">{client.name}</h2>
+                  <h2 className="text-xl font-display font-bold text-white">{customer360?.profile.name ?? client.name}</h2>
                   <StatusBadge isActive={isActive} />
                 </div>
                 <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mt-0.5">Client</p>
