@@ -4,16 +4,6 @@ declare(strict_types=1);
 
 /**
  * PDO database connection – singleton.
- *
- * Mirrors the pattern used in bitress/phploginsystem (db/Database.php).
- * Connection credentials are read from the constants defined in
- * config/Configuration.php (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS,
- * DB_CHARSET).
- *
- * Usage:
- *   $db = Database::getInstance();
- *   $stmt = $db->prepare('SELECT * FROM posts WHERE id = :id');
- *   $stmt->execute([':id' => $id]);
  */
 class Database extends PDO
 {

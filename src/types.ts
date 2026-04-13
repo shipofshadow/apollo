@@ -189,7 +189,8 @@ export interface Customer360Data {
 export interface MarketingCampaign {
   id: number;
   name: string;
-  type: 'abandoned_cart' | 'no_booking_90d' | 'win_back';
+  category: string | null;
+  type: 'abandoned_cart' | 'no_booking_90d' | 'win_back' | 'custom';
   status: 'draft' | 'active' | 'paused';
   scheduleEnabled: boolean;
   scheduleType: 'manual' | 'daily' | 'weekly' | 'monthly';
@@ -200,6 +201,7 @@ export interface MarketingCampaign {
   channels: Array<'inapp' | 'email' | 'sms'>;
   title: string;
   message: string;
+  messageHtml: string | null;
   ctaUrl: string | null;
   triggerConfig: Record<string, unknown>;
   lastRunAt: string | null;

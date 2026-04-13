@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, PlayCircle, FlaskConical, Megaphone, Plus, TimerReset, Clock3 } from 'lucide-react';
+import { useRef } from 'react';
+import { Loader2, PlayCircle, FlaskConical, Megaphone, Plus, TimerReset, Clock3, Trash2, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -10,6 +11,7 @@ import {
   runScheduledCampaignsApi,
   fetchCampaignAudienceApi,
   fetchCampaignAnalyticsApi,
+  deleteCampaignApi,
 } from '../../services/api';
 import type { MarketingCampaign, CampaignAudienceRecipient, CampaignAnalyticsData } from '../../types';
 import { Breadcrumbs } from './_sharedComponents';
@@ -18,6 +20,7 @@ const CAMPAIGN_TYPES: Array<{ value: MarketingCampaign['type']; label: string }>
   { value: 'abandoned_cart', label: 'Abandoned Cart' },
   { value: 'no_booking_90d', label: 'No Booking in 90 Days' },
   { value: 'win_back', label: 'Win-back Offer' },
+  { value: 'custom', label: 'Custom Category' },
 ];
 
 export default function MarketingCampaignsPanel() {
@@ -34,8 +37,10 @@ export default function MarketingCampaignsPanel() {
   const [form, setForm] = useState({
     name: '',
     type: 'abandoned_cart' as MarketingCampaign['type'],
+    category: '',
     title: 'Special Offer',
     message: '',
+    messageHtml: '',
     status: 'draft' as MarketingCampaign['status'],
     channels: ['inapp'] as Array<'inapp' | 'email' | 'sms'>,
     ctaUrl: '',
@@ -48,6 +53,7 @@ export default function MarketingCampaignsPanel() {
   });
 
   const selectedId = selected?.id ?? null;
+  const emailEditorRef = useRef<HTMLDivElement | null>(null);
 
   const loadCampaigns = async () => {
     if (!token) return;
@@ -67,6 +73,10 @@ export default function MarketingCampaignsPanel() {
 
   const loadAudience = async (type: MarketingCampaign['type']) => {
     if (!token) return;
+    if (type === 'custom') {
+      setAudiencePreview([]);
+      return;
+    }
     try {
       const res = await fetchCampaignAudienceApi(token, type);
       setAudiencePreview(res.audience ?? []);
@@ -110,8 +120,10 @@ export default function MarketingCampaignsPanel() {
       await createCampaignApi(token, {
         name: form.name,
         type: form.type,
+        category: form.category || null,
         title: form.title,
         message: form.message,
+        messageHtml: form.messageHtml || null,
         status: form.status,
         channels: form.channels,
         ctaUrl: form.ctaUrl || null,
@@ -123,7 +135,10 @@ export default function MarketingCampaignsPanel() {
         scheduleTimezone: form.scheduleTimezone,
       });
       showToast('Campaign created.', 'success');
-      setForm({ ...form, name: '', message: '' });
+      setForm({ ...form, name: '', message: '', messageHtml: '' });
+      if (emailEditorRef.current) {
+        emailEditorRef.current.innerHTML = '';
+      }
       await loadCampaigns();
     } catch (e) {
       showToast((e as Error).message || 'Failed to create campaign.', 'error');
@@ -161,6 +176,47 @@ export default function MarketingCampaignsPanel() {
       showToast((e as Error).message || 'Failed to run campaign.', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (campaignId: number, campaignName: string) => {
+    if (!token) return;
+    const ok = window.confirm(`Delete campaign "${campaignName}"? This cannot be undone.`);
+    if (!ok) return;
+
+    setSubmitting(true);
+    try {
+      await deleteCampaignApi(token, campaignId);
+      showToast('Campaign deleted.', 'success');
+      if (selectedId === campaignId) {
+        setSelected(null);
+        setAnalytics(null);
+      }
+      await loadCampaigns();
+    } catch (e) {
+      showToast((e as Error).message || 'Failed to delete campaign.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const applyEditorCommand = (command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
+    document.execCommand(command, false);
+    if (emailEditorRef.current) {
+      const html = emailEditorRef.current.innerHTML.trim();
+      const text = emailEditorRef.current.textContent?.trim() ?? '';
+      setForm(prev => ({ ...prev, messageHtml: html, message: text !== '' ? text : prev.message }));
+    }
+  };
+
+  const addEditorLink = () => {
+    const url = window.prompt('Enter URL (https://...)');
+    if (!url) return;
+    document.execCommand('createLink', false, url);
+    if (emailEditorRef.current) {
+      const html = emailEditorRef.current.innerHTML.trim();
+      const text = emailEditorRef.current.textContent?.trim() ?? '';
+      setForm(prev => ({ ...prev, messageHtml: html, message: text !== '' ? text : prev.message }));
     }
   };
 
@@ -204,6 +260,13 @@ export default function MarketingCampaignsPanel() {
           </select>
 
           <input
+            value={form.category}
+            onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
+            placeholder="Campaign category (optional)"
+            className="w-full bg-brand-darker border border-gray-700 px-3 py-2 rounded-sm text-sm text-white focus:outline-none focus:border-brand-orange"
+          />
+
+          <input
             value={form.title}
             onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
             placeholder="Campaign title"
@@ -217,6 +280,30 @@ export default function MarketingCampaignsPanel() {
             placeholder="Campaign message"
             className="w-full bg-brand-darker border border-gray-700 px-3 py-2 rounded-sm text-sm text-white focus:outline-none focus:border-brand-orange"
           />
+
+          {form.channels.includes('email') && (
+            <div className="rounded-sm border border-gray-800 bg-brand-darker/50 p-3 space-y-2">
+              <p className="text-[11px] uppercase tracking-widest text-gray-500">Email Message (Rich Text)</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" onClick={() => applyEditorCommand('bold')} className="px-2 py-1 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-brand-orange">Bold</button>
+                <button type="button" onClick={() => applyEditorCommand('italic')} className="px-2 py-1 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-brand-orange">Italic</button>
+                <button type="button" onClick={() => applyEditorCommand('underline')} className="px-2 py-1 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-brand-orange">Underline</button>
+                <button type="button" onClick={() => applyEditorCommand('insertUnorderedList')} className="px-2 py-1 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-brand-orange">Bullet List</button>
+                <button type="button" onClick={addEditorLink} className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-gray-700 text-xs text-gray-300 hover:border-brand-orange"><LinkIcon className="w-3 h-3" /> Link</button>
+              </div>
+              <div
+                ref={emailEditorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(e) => {
+                  const html = (e.currentTarget as HTMLDivElement).innerHTML.trim();
+                  const text = (e.currentTarget as HTMLDivElement).textContent?.trim() ?? '';
+                  setForm(prev => ({ ...prev, messageHtml: html, message: text !== '' ? text : prev.message }));
+                }}
+                className="min-h-[120px] w-full bg-brand-darker border border-gray-700 px-3 py-2 rounded-sm text-sm text-white focus:outline-none focus:border-brand-orange"
+              />
+            </div>
+          )}
 
           <input
             value={form.ctaUrl}
@@ -344,7 +431,7 @@ export default function MarketingCampaignsPanel() {
                   <div className="flex items-center justify-between gap-2">
                     <button type="button" onClick={() => setSelected(c)} className="text-left">
                       <p className="text-white font-semibold text-sm">{c.name}</p>
-                      <p className="text-xs text-gray-400">{c.type} • {c.status} • channels: {c.channels.join(', ')}</p>
+                      <p className="text-xs text-gray-400">{c.category || c.type} • {c.status} • channels: {c.channels.join(', ')}</p>
                       <p className="text-[11px] text-gray-500">
                         {c.scheduleEnabled ? `Scheduled ${c.scheduleType} @ ${c.scheduleTime} (${c.scheduleTimezone})` : 'Manual'}
                         {c.nextRunAt ? ` • next: ${new Date(c.nextRunAt).toLocaleString()}` : ''}
@@ -367,6 +454,14 @@ export default function MarketingCampaignsPanel() {
                       >
                         <span className="inline-flex items-center gap-1"><PlayCircle className="w-3.5 h-3.5" />Run</span>
                       </button>
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => void handleDelete(c.id, c.name)}
+                        className="px-2 py-1 rounded-sm border border-red-700/50 text-red-300 text-xs hover:border-red-500 hover:text-red-200"
+                      >
+                        <span className="inline-flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" />Delete</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -376,9 +471,9 @@ export default function MarketingCampaignsPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="rounded-sm border border-gray-800 bg-brand-darker/50 p-3">
-              <p className="text-[11px] uppercase tracking-widest text-gray-500">Audience Preview ({form.type})</p>
+              <p className="text-[11px] uppercase tracking-widest text-gray-500">Audience Preview ({form.category || form.type})</p>
               <div className="mt-2 space-y-1 max-h-40 overflow-auto">
-                {audiencePreview.length === 0 ? <p className="text-sm text-gray-500">No recipients matched.</p> : audiencePreview.slice(0, 12).map((r, i) => (
+                {form.type === 'custom' ? <p className="text-sm text-gray-500">Custom category campaigns currently use the default audience pipeline. Pick a system type for targeted preview.</p> : audiencePreview.length === 0 ? <p className="text-sm text-gray-500">No recipients matched.</p> : audiencePreview.slice(0, 12).map((r, i) => (
                   <p key={`${r.userId}-${i}`} className="text-xs text-gray-300">{r.name} • {r.email || r.phone || 'No contact'}</p>
                 ))}
               </div>

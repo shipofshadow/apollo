@@ -39,11 +39,12 @@ class MarketingCampaignService
 
         $stmt = $this->db->prepare(
             'INSERT INTO marketing_campaigns
-             (name, type, status, is_scheduled, schedule_type, schedule_time, schedule_weekday, schedule_day, schedule_timezone, channels_json, title, message, cta_url, trigger_config_json, created_by, next_run_at)
-             VALUES (:name, :type, :status, :is_scheduled, :schedule_type, :schedule_time, :schedule_weekday, :schedule_day, :schedule_timezone, :channels_json, :title, :message, :cta_url, :trigger_config_json, :created_by, :next_run_at)'
+             (name, category, type, status, is_scheduled, schedule_type, schedule_time, schedule_weekday, schedule_day, schedule_timezone, channels_json, title, message, message_html, cta_url, trigger_config_json, created_by, next_run_at)
+             VALUES (:name, :category, :type, :status, :is_scheduled, :schedule_type, :schedule_time, :schedule_weekday, :schedule_day, :schedule_timezone, :channels_json, :title, :message, :message_html, :cta_url, :trigger_config_json, :created_by, :next_run_at)'
         );
         $stmt->execute([
             ':name' => $payload['name'],
+            ':category' => $payload['category'],
             ':type' => $payload['type'],
             ':status' => $payload['status'],
             ':is_scheduled' => $payload['scheduleEnabled'] ? 1 : 0,
@@ -55,6 +56,7 @@ class MarketingCampaignService
             ':channels_json' => json_encode($payload['channels'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ':title' => $payload['title'],
             ':message' => $payload['message'],
+            ':message_html' => $payload['messageHtml'],
             ':cta_url' => $payload['ctaUrl'],
             ':trigger_config_json' => json_encode($payload['triggerConfig'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ':created_by' => $actorUserId,
@@ -73,6 +75,7 @@ class MarketingCampaignService
         $stmt = $this->db->prepare(
             'UPDATE marketing_campaigns
                 SET name = :name,
+                    category = :category,
                     type = :type,
                     status = :status,
                     is_scheduled = :is_scheduled,
@@ -85,6 +88,7 @@ class MarketingCampaignService
                     channels_json = :channels_json,
                     title = :title,
                     message = :message,
+                      message_html = :message_html,
                     cta_url = :cta_url,
                     trigger_config_json = :trigger_config_json
               WHERE id = :id'
@@ -92,6 +96,7 @@ class MarketingCampaignService
         $stmt->execute([
             ':id' => $id,
             ':name' => $payload['name'],
+                ':category' => $payload['category'],
             ':type' => $payload['type'],
             ':status' => $payload['status'],
             ':is_scheduled' => $payload['scheduleEnabled'] ? 1 : 0,
@@ -104,6 +109,7 @@ class MarketingCampaignService
             ':channels_json' => json_encode($payload['channels'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ':title' => $payload['title'],
             ':message' => $payload['message'],
+            ':message_html' => $payload['messageHtml'],
             ':cta_url' => $payload['ctaUrl'],
             ':trigger_config_json' => json_encode($payload['triggerConfig'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ]);
@@ -111,11 +117,20 @@ class MarketingCampaignService
         return $this->getCampaign($id);
     }
 
+    public function deleteCampaign(int $id): void
+    {
+        $stmt = $this->db->prepare('DELETE FROM marketing_campaigns WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Campaign not found.', 404);
+        }
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function getAudience(string $type): array
     {
         $type = strtolower(trim($type));
-        if (!in_array($type, ['abandoned_cart', 'no_booking_90d', 'win_back'], true)) {
+        if (!in_array($type, ['abandoned_cart', 'no_booking_90d', 'win_back', 'custom'], true)) {
             throw new RuntimeException('Unsupported audience type.', 422);
         }
 
@@ -124,6 +139,9 @@ class MarketingCampaignService
         }
         if ($type === 'no_booking_90d') {
             return $this->audienceNoBooking90d();
+        }
+        if ($type === 'custom') {
+            return $this->audienceCustom();
         }
 
         return $this->audienceWinBack();
@@ -255,6 +273,7 @@ class MarketingCampaignService
                         'phone' => (string) ($recipient['phone'] ?? ''),
                         'title' => (string) ($campaign['title'] ?? 'Special Offer'),
                         'message' => (string) ($campaign['message'] ?? ''),
+                        'messageHtml' => (string) ($campaign['messageHtml'] ?? ''),
                         'ctaUrl' => (string) ($campaign['ctaUrl'] ?? ''),
                         'type' => (string) ($campaign['type'] ?? ''),
                     ];
@@ -467,6 +486,18 @@ class MarketingCampaignService
         return $this->formatAudienceRows($stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : []);
     }
 
+    /** @return array<int, array<string, mixed>> */
+    private function audienceCustom(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT u.id AS user_id, u.name, u.email, u.phone
+             FROM users u
+             WHERE u.role = "client"
+             ORDER BY u.created_at DESC, u.id DESC'
+        );
+        return $this->formatAudienceRows($stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : []);
+    }
+
     /** @param array<int, array<string, mixed>> $rows
      *  @return array<int, array<string, mixed>>
      */
@@ -493,6 +524,7 @@ class MarketingCampaignService
         return [
             'id' => (int) ($row['id'] ?? 0),
             'name' => (string) ($row['name'] ?? ''),
+            'category' => isset($row['category']) ? (string) $row['category'] : null,
             'type' => (string) ($row['type'] ?? ''),
             'status' => (string) ($row['status'] ?? 'draft'),
             'scheduleEnabled' => ((int) ($row['is_scheduled'] ?? 0)) === 1,
@@ -504,6 +536,7 @@ class MarketingCampaignService
             'channels' => is_array($channels) ? array_values(array_filter(array_map('strval', $channels))) : [],
             'title' => (string) ($row['title'] ?? ''),
             'message' => (string) ($row['message'] ?? ''),
+            'messageHtml' => isset($row['message_html']) ? (string) $row['message_html'] : null,
             'ctaUrl' => isset($row['cta_url']) ? (string) $row['cta_url'] : null,
             'triggerConfig' => is_array($trigger) ? $trigger : [],
             'lastRunAt' => isset($row['last_run_at']) ? (string) $row['last_run_at'] : null,
@@ -520,10 +553,12 @@ class MarketingCampaignService
     private function normalizeCampaignPayload(array $data, bool $isUpdate = false): array
     {
         $name = trim((string) ($data['name'] ?? ''));
+        $category = trim((string) ($data['category'] ?? ''));
         $type = strtolower(trim((string) ($data['type'] ?? '')));
         $status = strtolower(trim((string) ($data['status'] ?? 'draft')));
         $title = trim((string) ($data['title'] ?? ''));
         $message = trim((string) ($data['message'] ?? ''));
+        $messageHtml = trim((string) ($data['messageHtml'] ?? ($data['message_html'] ?? '')));
         $ctaUrl = trim((string) ($data['ctaUrl'] ?? ($data['cta_url'] ?? '')));
         $channelsRaw = $data['channels'] ?? [];
         $scheduleEnabled = (bool) ($data['scheduleEnabled'] ?? $data['is_scheduled'] ?? false);
@@ -546,7 +581,7 @@ class MarketingCampaignService
         if ($name === '') {
             throw new RuntimeException('Campaign name is required.', 422);
         }
-        if (!in_array($type, ['abandoned_cart', 'no_booking_90d', 'win_back'], true)) {
+        if (!in_array($type, ['abandoned_cart', 'no_booking_90d', 'win_back', 'custom'], true)) {
             throw new RuntimeException('Campaign type is invalid.', 422);
         }
         if (!in_array($status, ['draft', 'active', 'paused'], true)) {
@@ -595,6 +630,7 @@ class MarketingCampaignService
 
         return [
             'name' => mb_substr($name, 0, 180),
+            'category' => $category !== '' ? mb_substr($category, 0, 120) : null,
             'type' => $type,
             'status' => $status,
             'scheduleEnabled' => $scheduleEnabled,
@@ -606,6 +642,7 @@ class MarketingCampaignService
             'channels' => $channels,
             'title' => mb_substr($title, 0, 200),
             'message' => mb_substr($message, 0, 2000),
+            'messageHtml' => $messageHtml !== '' ? mb_substr($messageHtml, 0, 20000) : null,
             'ctaUrl' => $ctaUrl !== '' ? mb_substr($ctaUrl, 0, 255) : null,
             'triggerConfig' => $triggerConfig,
             'isUpdate' => $isUpdate,

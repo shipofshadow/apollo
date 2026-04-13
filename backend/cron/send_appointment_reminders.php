@@ -1,4 +1,3 @@
-#!/usr/bin/env php
 <?php
 
 /**
@@ -6,17 +5,10 @@
  *
  * Sends a 24-hour appointment reminder SMS (in Filipino/Tagalog) to every
  * client whose confirmed booking is scheduled for tomorrow.
- *
- * Recommended cron schedule (run once daily, e.g. 8 PM):
- *   0 20 * * * /usr/bin/php /path/to/backend/cron/send_appointment_reminders.php >> /var/log/apollo_reminders.log 2>&1
- *
- * Usage:
- *   php backend/cron/send_appointment_reminders.php [--dry-run]
  */
 
 declare(strict_types=1);
 
-// Bootstrap the application (loads env, DB, autoloader, constants)
 require_once __DIR__ . '/../config/init.php';
 
 $isDryRun = in_array('--dry-run', $argv ?? [], true);
@@ -36,7 +28,6 @@ if (DB_NAME === '') {
 
 $db = Database::getInstance();
 
-// Fetch all confirmed/pending bookings for tomorrow that haven't been cancelled
 $stmt = $db->prepare(
         "SELECT b.id, b.name, b.phone, s.title AS service_name, b.appointment_date, b.appointment_time
              FROM bookings b

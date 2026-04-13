@@ -312,7 +312,8 @@ class NotificationService
         string $name,
         string $title,
         string $message,
-        string $ctaUrl = ''
+        string $ctaUrl = '',
+        ?string $messageHtml = null
     ): void {
         if (MAIL_FROM === '' || trim($email) === '') {
             return;
@@ -321,6 +322,7 @@ class NotificationService
         $safeName = htmlspecialchars($name !== '' ? $name : 'Customer');
         $safeTitle = htmlspecialchars($title !== '' ? $title : 'Special Offer');
         $safeMessage = nl2br(htmlspecialchars($message));
+        $safeMessageHtml = $this->sanitizeCampaignHtml($messageHtml ?? '');
         $safeCta = htmlspecialchars($ctaUrl);
 
         $ctaBlock = $safeCta !== ''
@@ -331,12 +333,26 @@ class NotificationService
         <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:12px">
           <p style="margin:0 0 12px 0;color:#9ca3af">Hi ' . $safeName . ',</p>
           <h2 style="margin:0 0 14px 0;color:#fff">' . $safeTitle . '</h2>
-          <div style="line-height:1.6;color:#d1d5db">' . $safeMessage . '</div>
+                    <div style="line-height:1.6;color:#d1d5db">' . ($safeMessageHtml !== '' ? $safeMessageHtml : $safeMessage) . '</div>
           ' . $ctaBlock . '
           <p style="margin-top:24px;color:#9ca3af;font-size:12px">1625 Auto Lab</p>
         </div>';
 
         $this->send($email, $safeName, $safeTitle . ' | 1625 Auto Lab', $body);
+    }
+
+    private function sanitizeCampaignHtml(string $html): string
+    {
+        $trimmed = trim($html);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $trimmed = preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', '', $trimmed) ?? '';
+        $allowed = '<p><br><strong><b><em><i><u><ul><ol><li><a><h1><h2><h3><h4><blockquote><span><div>';
+        $clean = strip_tags($trimmed, $allowed);
+
+        return $clean;
     }
 
     /**

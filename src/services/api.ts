@@ -887,6 +887,11 @@ export const runScheduledCampaignsApi = (token: string, limit = 20) =>
 export const fetchCampaignAudienceApi = (token: string, type: MarketingCampaign['type']) =>
   apiFetch<{ audience: CampaignAudienceRecipient[] }>(`/api/admin/campaign-audiences/${encodeURIComponent(type)}`, {}, token);
 
+export const deleteCampaignApi = (token: string, id: number) =>
+  apiFetch<{ ok: boolean }>(`/api/admin/campaigns/${id}`, {
+    method: 'DELETE',
+  }, token);
+
 export const fetchCampaignAnalyticsApi = (token: string, id: number) =>
   apiFetch<CampaignAnalyticsData>(`/api/admin/campaigns/${id}/analytics`, {}, token);
 

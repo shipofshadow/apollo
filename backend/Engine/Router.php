@@ -306,6 +306,7 @@ class Router
             $r->addRoute('POST', '/api/admin/campaigns', 'handleAdminCampaignCreate');
             $r->addRoute('GET',  '/api/admin/campaigns/{id:\d+}', 'handleAdminCampaignGet');
             $r->addRoute('PATCH', '/api/admin/campaigns/{id:\d+}', 'handleAdminCampaignUpdate');
+            $r->addRoute('DELETE', '/api/admin/campaigns/{id:\d+}', 'handleAdminCampaignDelete');
             $r->addRoute('POST', '/api/admin/campaigns/{id:\d+}/run', 'handleAdminCampaignRun');
             $r->addRoute('POST', '/api/admin/campaigns/{id:\d+}/dry-run', 'handleAdminCampaignDryRun');
             $r->addRoute('POST', '/api/admin/campaigns/run-scheduled', 'handleAdminCampaignRunScheduled');
@@ -1990,6 +1991,15 @@ class Router
         $data = $this->jsonBody();
         $campaign = (new MarketingCampaignService())->updateCampaign($id, $data);
         echo json_encode(['campaign' => $campaign]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignDelete(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        (new MarketingCampaignService())->deleteCampaign($id);
+        echo json_encode(['ok' => true]);
     }
 
     /** @param array<string, string> $vars */

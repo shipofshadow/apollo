@@ -686,7 +686,14 @@ class NotificationJobQueueService
                     if ($email === '') {
                         throw new RuntimeException('Email campaign message requires an email address.');
                     }
-                    (new NotificationService())->marketingCampaignMessage($email, $name, $title, $message, $ctaUrl);
+                    (new NotificationService())->marketingCampaignMessage(
+                        $email,
+                        $name,
+                        $title,
+                        $message,
+                        $ctaUrl,
+                        isset($payload['messageHtml']) ? (string) $payload['messageHtml'] : null
+                    );
                 } elseif ($channel === 'sms') {
                     if ($phone === '') {
                         throw new RuntimeException('SMS campaign message requires a phone number.');
