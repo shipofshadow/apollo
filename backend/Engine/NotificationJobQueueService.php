@@ -467,6 +467,110 @@ class NotificationJobQueueService
                 }
                 return;
 
+            case 'order_created':
+                $order = is_array($payload['order'] ?? null) ? $payload['order'] : [];
+                $uid = (int) ($order['userId'] ?? 0);
+                $prefSvc = new NotificationPreferencesService();
+                $notificationSvc = new NotificationService();
+
+                if ($uid <= 0 || $prefSvc->emailEnabled($uid, 'order_created')) {
+                    $notificationSvc->orderCreatedCustomer($order);
+                }
+
+                if ($uid > 0 && $prefSvc->inappEnabled($uid, 'order_created')) {
+                    $orderNumber = (string) ($order['orderNumber'] ?? 'your order');
+                    (new UserNotificationService())->createForUser(
+                        $uid,
+                        'order_created',
+                        'Order Received',
+                        'Your order ' . $orderNumber . ' has been received and is now pending confirmation.',
+                        ['orderId' => $order['id'] ?? null, 'orderNumber' => $orderNumber]
+                    );
+                }
+
+                $adminUsers = $this->usersForPermissionOrRoles('products:manage', ['owner', 'admin']);
+                $orderNumber = (string) ($order['orderNumber'] ?? '');
+                $customerName = (string) ($order['customerName'] ?? 'A customer');
+                $message = $customerName . ' placed order ' . $orderNumber . '.';
+                $this->notifyUsersInApp(
+                    $adminUsers,
+                    'new_order',
+                    'new_order',
+                    'New Order Placed',
+                    $message,
+                    ['orderId' => $order['id'] ?? null, 'orderNumber' => $orderNumber]
+                );
+
+                $emailRecipients = [];
+                foreach ($adminUsers as $user) {
+                    $adminUserId = (int) ($user['id'] ?? 0);
+                    $adminEmail = strtolower(trim((string) ($user['email'] ?? '')));
+                    if ($adminUserId <= 0 || $adminEmail === '' || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+                        continue;
+                    }
+                    if (!$prefSvc->emailEnabled($adminUserId, 'new_order')) {
+                        continue;
+                    }
+                    $emailRecipients[] = $adminEmail;
+                }
+
+                $notificationSvc->orderCreatedAdmin($order, $emailRecipients);
+                return;
+
+            case 'order_status_changed':
+                $order = is_array($payload['order'] ?? null) ? $payload['order'] : [];
+                $uid = (int) ($order['userId'] ?? 0);
+                $prefSvc = new NotificationPreferencesService();
+
+                if ($uid <= 0 || $prefSvc->emailEnabled($uid, 'order_status')) {
+                    (new NotificationService())->orderStatusChangedCustomer($order);
+                }
+
+                if ($uid > 0 && $prefSvc->inappEnabled($uid, 'order_status')) {
+                    $status = (string) ($order['status'] ?? 'pending');
+                    $label = $this->labelOrderStatus($status);
+                    $orderNumber = (string) ($order['orderNumber'] ?? 'your order');
+                    (new UserNotificationService())->createForUser(
+                        $uid,
+                        'order_status',
+                        'Order Status: ' . $label,
+                        'Your order ' . $orderNumber . ' is now ' . $label . '.',
+                        ['orderId' => $order['id'] ?? null, 'orderNumber' => $orderNumber, 'status' => $status]
+                    );
+                }
+                return;
+
+            case 'order_tracking_updated':
+                $order = is_array($payload['order'] ?? null) ? $payload['order'] : [];
+                $uid = (int) ($order['userId'] ?? 0);
+                $prefSvc = new NotificationPreferencesService();
+
+                if ($uid <= 0 || $prefSvc->emailEnabled($uid, 'order_tracking')) {
+                    (new NotificationService())->orderTrackingUpdatedCustomer($order);
+                }
+
+                if ($uid > 0 && $prefSvc->inappEnabled($uid, 'order_tracking')) {
+                    $orderNumber = (string) ($order['orderNumber'] ?? 'your order');
+                    $trackingNumber = trim((string) ($order['trackingNumber'] ?? ''));
+                    $courierName = trim((string) ($order['courierName'] ?? 'Courier'));
+                    $message = $trackingNumber !== ''
+                        ? 'Tracking for ' . $orderNumber . ' was updated to ' . $trackingNumber . ' via ' . $courierName . '.'
+                        : 'Delivery details for ' . $orderNumber . ' were updated.';
+                    (new UserNotificationService())->createForUser(
+                        $uid,
+                        'order_tracking',
+                        'Order Tracking Updated',
+                        $message,
+                        [
+                            'orderId' => $order['id'] ?? null,
+                            'orderNumber' => $orderNumber,
+                            'trackingNumber' => $trackingNumber,
+                            'courierName' => $courierName,
+                        ]
+                    );
+                }
+                return;
+
             case 'staff_assignment_sms_email':
                 $booking = is_array($payload['booking'] ?? null) ? $payload['booking'] : [];
                 $techPhone = (string) ($payload['techPhone'] ?? '');
@@ -552,6 +656,93 @@ class NotificationJobQueueService
 
             default:
                 throw new RuntimeException('Unknown notification job event: ' . $event);
+        }
+    }
+
+    private function labelOrderStatus(string $status): string
+    {
+        return ucwords(str_replace('_', ' ', trim($status)));
+    }
+
+    /**
+     * @param string[] $roles
+     * @return array<int, array<string, mixed>>
+     */
+    private function usersForPermissionOrRoles(string $permission, array $roles = []): array
+    {
+        if ($this->db === null) {
+            return [];
+        }
+
+        $normalizedRoles = array_values(array_unique(array_filter(
+            array_map(static fn(string $role): string => strtolower(trim($role)), $roles),
+            static fn(string $role): bool => $role !== ''
+        )));
+
+        $stmt = $this->db->query(
+            'SELECT u.id, u.name, u.email, u.role, r.permissions_json
+               FROM users u
+               LEFT JOIN roles r ON r.role_key = u.role
+              WHERE (u.is_active IS NULL OR u.is_active = 1)'
+        );
+        $rows = $stmt ? ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []) : [];
+
+        $matches = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId <= 0 || isset($seen[$userId])) {
+                continue;
+            }
+
+            $role = strtolower(trim((string) ($row['role'] ?? '')));
+            $decoded = json_decode((string) ($row['permissions_json'] ?? '[]'), true);
+            $permissions = is_array($decoded)
+                ? array_values(array_filter(array_map('strval', $decoded), static fn(string $value): bool => $value !== ''))
+                : [];
+
+            if (!in_array($permission, $permissions, true) && !in_array($role, $normalizedRoles, true)) {
+                continue;
+            }
+
+            $seen[$userId] = true;
+            $matches[] = [
+                'id' => $userId,
+                'name' => (string) ($row['name'] ?? ''),
+                'email' => (string) ($row['email'] ?? ''),
+                'role' => $role,
+            ];
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $users
+     * @param array<string, mixed>|null $data
+     */
+    private function notifyUsersInApp(
+        array $users,
+        string $prefType,
+        string $type,
+        string $title,
+        string $message,
+        ?array $data = null
+    ): void {
+        if (count($users) === 0) {
+            return;
+        }
+
+        $prefs = new NotificationPreferencesService();
+        $notifications = new UserNotificationService();
+
+        foreach ($users as $user) {
+            $uid = (int) ($user['id'] ?? 0);
+            if ($uid <= 0 || !$prefs->inappEnabled($uid, $prefType)) {
+                continue;
+            }
+
+            $notifications->createForUser($uid, $type, $title, $message, $data);
         }
     }
 

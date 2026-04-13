@@ -14,6 +14,10 @@ import type { AppNotification, NotificationType } from '../types';
 
 const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   new_booking:    CalendarCheck2,
+  new_order:      Package,
+  order_created:  Package,
+  order_status:   CheckCheck,
+  order_tracking: Package,
   status_changed: CheckCheck,
   build_update:   Wrench,
   parts_update:   Package,
@@ -24,6 +28,10 @@ const TYPE_ICON: Record<NotificationType, React.ElementType> = {
 
 const TYPE_COLOR: Record<NotificationType, string> = {
   new_booking:    'text-brand-orange',
+  new_order:      'text-brand-orange',
+  order_created:  'text-brand-orange',
+  order_status:   'text-green-400',
+  order_tracking: 'text-cyan-400',
   status_changed: 'text-green-400',
   build_update:   'text-blue-400',
   parts_update:   'text-yellow-400',
@@ -77,6 +85,25 @@ export default function NotificationBell({ className = '' }: Props) {
     return null;
   };
 
+  const resolveOrderId = (payload: Record<string, unknown> | null): string | null => {
+    if (!payload) return null;
+
+    const direct = payload.orderId ?? payload.order_id ?? payload.id;
+    if (direct !== undefined && direct !== null && String(direct).trim() !== '') {
+      return String(direct);
+    }
+
+    const nestedOrder = payload.order as Record<string, unknown> | undefined;
+    if (nestedOrder) {
+      const nestedId = nestedOrder.orderId ?? nestedOrder.order_id ?? nestedOrder.id;
+      if (nestedId !== undefined && nestedId !== null && String(nestedId).trim() !== '') {
+        return String(nestedId);
+      }
+    }
+
+    return null;
+  };
+
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -94,6 +121,20 @@ export default function NotificationBell({ className = '' }: Props) {
       dispatch(markReadAsync({ token, id: n.id }));
     }
     setOpen(false);
+
+    const isOrderNotification = ['new_order', 'order_created', 'order_status', 'order_tracking'].includes(n.type);
+    if (isOrderNotification) {
+      const orderId = resolveOrderId(n.data);
+      if (!orderId) return;
+
+      const canManageOrders = Boolean(user?.permissions?.includes('products:manage')) || user?.role === 'owner' || user?.role === 'admin';
+      if (canManageOrders) {
+        navigate('/admin/orders', { state: { openOrderId: Number(orderId) } });
+      } else {
+        navigate(`/orders/${orderId}/receipt`);
+      }
+      return;
+    }
 
     // Navigate to the related booking
     const bookingId = resolveBookingId(n.data);

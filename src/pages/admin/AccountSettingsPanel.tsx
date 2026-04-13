@@ -303,9 +303,11 @@ export default function AccountSettingsPanel() {
         const role = user?.role;
         const isAdminType = role === 'admin' || role === 'owner' || role === 'manager';
         const isStaffType = role === 'staff' || role === 'manager';
+        const canManageOrders = Boolean(user?.permissions?.includes('products:manage')) || role === 'owner' || role === 'admin';
 
         const emailPrefs: [keyof NotificationPreferences, string][] = [
           ...(isAdminType ? [['emailNewBooking', 'New booking alerts'] as [keyof NotificationPreferences, string]] : []),
+          ...(canManageOrders ? [['emailNewOrder', 'New order alerts'] as [keyof NotificationPreferences, string]] : []),
           ['emailStatusChanged', 'Booking status changes'],
           ['emailBuildUpdate',   'Build progress updates'],
           ['emailPartsUpdate',   'Parts availability updates'],
@@ -313,6 +315,7 @@ export default function AccountSettingsPanel() {
 
         const inappPrefs: [keyof NotificationPreferences, string][] = [
           ...(isAdminType ? [['inappNewBooking', 'New booking alerts'] as [keyof NotificationPreferences, string]] : []),
+          ...(canManageOrders ? [['inappNewOrder', 'New order alerts'] as [keyof NotificationPreferences, string]] : []),
           ['inappStatusChanged', 'Booking status changes'],
           ['inappBuildUpdate',   'Build progress updates'],
           ['inappPartsUpdate',   'Parts availability updates'],

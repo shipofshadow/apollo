@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Download, Loader2, PackageSearch, Printer, RefreshCw, Save, Search, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -129,6 +129,7 @@ export default function OrdersPanel() {
   const { token } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [orders, setOrders] = useState<ProductOrder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -192,6 +193,22 @@ export default function OrdersPanel() {
     }, 260);
     return () => window.clearTimeout(id);
   }, [search]);
+
+  useEffect(() => {
+    const state = location.state as { openOrderId?: number } | null;
+    const openOrderId = state?.openOrderId;
+    if (!openOrderId) {
+      return;
+    }
+
+    const target = orders.find(order => order.id === openOrderId);
+    if (!target) {
+      return;
+    }
+
+    setSelectedOrderId(openOrderId);
+    navigate('/admin/orders', { replace: true });
+  }, [location.state, navigate, orders]);
 
   const visibleOrders = orders;
 

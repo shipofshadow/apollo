@@ -108,9 +108,15 @@ export default function Profile() {
       // Map camelCase → snake_case for the API
       const payload: Record<string, boolean> = {
         email_new_booking:    prefs.emailNewBooking,
+        email_order_created:  prefs.emailOrderCreated,
+        email_order_status:   prefs.emailOrderStatus,
+        email_order_tracking: prefs.emailOrderTracking,
         email_status_changed: prefs.emailStatusChanged,
         email_build_update:   prefs.emailBuildUpdate,
         email_parts_update:   prefs.emailPartsUpdate,
+        inapp_order_created:  prefs.inappOrderCreated,
+        inapp_order_status:   prefs.inappOrderStatus,
+        inapp_order_tracking: prefs.inappOrderTracking,
         inapp_status_changed: prefs.inappStatusChanged,
         inapp_build_update:   prefs.inappBuildUpdate,
         inapp_parts_update:   prefs.inappPartsUpdate,
@@ -391,6 +397,9 @@ export default function Profile() {
                 </p>
                 <div className="space-y-3">
                   {([
+                    ['emailOrderCreated', 'Order received confirmation'],
+                    ['emailOrderStatus',  'Order status changes'],
+                    ['emailOrderTracking','Order tracking updates'],
                     ['emailStatusChanged', 'Booking status changes'],
                     ['emailBuildUpdate',   'Build progress updates'],
                     ['emailPartsUpdate',   'Parts availability updates'],
@@ -418,6 +427,9 @@ export default function Profile() {
                 </p>
                 <div className="space-y-3">
                   {([
+                    ['inappOrderCreated', 'Order received confirmation'],
+                    ['inappOrderStatus',  'Order status changes'],
+                    ['inappOrderTracking','Order tracking updates'],
                     ['inappStatusChanged', 'Booking status changes'],
                     ['inappBuildUpdate',   'Build progress updates'],
                     ['inappPartsUpdate',   'Parts availability updates'],

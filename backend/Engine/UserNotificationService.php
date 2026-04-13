@@ -11,6 +11,10 @@ declare(strict_types=1);
  *
  * Type constants (also used on the frontend):
  *   new_booking    – a new booking was submitted (admin target)
+ *   new_order      – a new product order was submitted (admin target)
+ *   order_created  – order was received (client target)
+ *   order_status   – product order status was updated (client target)
+ *   order_tracking – product order tracking was updated (client target)
  *   status_changed – booking status was updated   (client target)
  *   build_update   – a new build progress update  (client target)
  *   parts_update   – booking set to awaiting_parts (client target)

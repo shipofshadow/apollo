@@ -193,6 +193,102 @@ class NotificationService
     }
 
     /**
+     * Notify a customer that their order was received.
+     *
+     * @param array<string, mixed> $order
+     */
+    public function orderCreatedCustomer(array $order): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = (string) ($order['customerEmail'] ?? '');
+        $customerName = (string) ($order['customerName'] ?? 'Customer');
+        if ($customerEmail === '') {
+            return;
+        }
+
+        $this->send(
+            $customerEmail,
+            $customerName,
+            'Order Received | 1625 Auto Lab',
+            $this->buildOrderCreatedBody($order)
+        );
+    }
+
+    /**
+     * Notify a customer that their order status changed.
+     *
+     * @param array<string, mixed> $order
+     */
+    public function orderStatusChangedCustomer(array $order): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = (string) ($order['customerEmail'] ?? '');
+        $customerName = (string) ($order['customerName'] ?? 'Customer');
+        if ($customerEmail === '') {
+            return;
+        }
+
+        $label = ucwords(str_replace('_', ' ', (string) ($order['status'] ?? 'pending')));
+        $this->send(
+            $customerEmail,
+            $customerName,
+            'Order Status Updated: ' . $label . ' | 1625 Auto Lab',
+            $this->buildOrderStatusBody($order)
+        );
+    }
+
+    /**
+     * Notify a customer that tracking details were updated.
+     *
+     * @param array<string, mixed> $order
+     */
+    public function orderTrackingUpdatedCustomer(array $order): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = (string) ($order['customerEmail'] ?? '');
+        $customerName = (string) ($order['customerName'] ?? 'Customer');
+        if ($customerEmail === '') {
+            return;
+        }
+
+        $this->send(
+            $customerEmail,
+            $customerName,
+            'Order Tracking Updated | 1625 Auto Lab',
+            $this->buildOrderTrackingBody($order)
+        );
+    }
+
+    /**
+     * Notify order managers that a new order was placed.
+     *
+     * @param array<string, mixed> $order
+     * @param string[] $recipients
+     */
+    public function orderCreatedAdmin(array $order, array $recipients): void
+    {
+        if (MAIL_FROM === '' || count($recipients) === 0) {
+            return;
+        }
+
+        $orderNumber = (string) ($order['orderNumber'] ?? '');
+        $customerName = (string) ($order['customerName'] ?? 'Customer');
+        $subject = 'New Order: ' . $orderNumber . ' | ' . $customerName;
+        $body = $this->buildAdminNewOrderBody($order);
+
+        $this->sendToRecipients($recipients, $subject, $body, 'Order Manager');
+    }
+
+    /**
      * Notify an assigned staff member about a new booking assignment.
      *
      * @param array<string, mixed> $booking
@@ -652,12 +748,226 @@ class NotificationService
         ]);
     }
 
+    /** @param array<string, mixed> $order */
+    private function buildOrderCreatedBody(array $order): string
+    {
+        $name = htmlspecialchars((string) ($order['customerName'] ?? 'Customer'));
+        $orderNumber = htmlspecialchars((string) ($order['orderNumber'] ?? ''));
+        $status = (string) ($order['status'] ?? 'pending');
+        $itemsHtml = $this->buildOrderItemsHtml($order, true);
+        $deliveryHtml = $this->buildOrderDeliveryHtml($order);
+        $notesHtml = $this->buildOrderNotesHtml($order, 'Order Notes');
+
+        return $this->render('order-confirmation', [
+            'name' => $name,
+            'order_number' => $orderNumber,
+            'status_badge' => $this->statusBadge($status),
+            'fulfillment' => htmlspecialchars($this->labelOrderFulfillment((string) ($order['fulfillmentType'] ?? 'courier'))),
+            'payment_status' => htmlspecialchars($this->labelOrderPayment((string) ($order['paymentStatus'] ?? 'unpaid'))),
+            'subtotal' => htmlspecialchars($this->formatMoney((float) ($order['subtotal'] ?? 0))),
+            'shipping_fee' => htmlspecialchars($this->formatMoney((float) ($order['shippingFee'] ?? 0))),
+            'total_amount' => htmlspecialchars($this->formatMoney((float) ($order['totalAmount'] ?? 0))),
+            'items_html' => $itemsHtml,
+            'delivery_html' => $deliveryHtml,
+            'notes_html' => $notesHtml,
+        ]);
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildOrderStatusBody(array $order): string
+    {
+        $name = htmlspecialchars((string) ($order['customerName'] ?? 'Customer'));
+        $orderNumber = htmlspecialchars((string) ($order['orderNumber'] ?? ''));
+        $status = (string) ($order['status'] ?? 'pending');
+        $label = ucwords(str_replace('_', ' ', $status));
+
+        $messages = [
+            'pending' => 'We received your order and will review it shortly.',
+            'confirmed' => 'Your order has been confirmed and is moving into processing.',
+            'preparing' => 'We are preparing your order for pickup or delivery.',
+            'ready_for_pickup' => 'Your order is ready for pickup.',
+            'out_for_delivery' => 'Your order is already out for delivery.',
+            'completed' => 'Your order has been completed. Thank you for your purchase.',
+            'cancelled' => 'Your order has been cancelled. Contact us if you need assistance.',
+        ];
+
+        return $this->render('order-status', [
+            'name' => $name,
+            'order_number' => $orderNumber,
+            'status_badge' => $this->statusBadge($status),
+            'status_label' => htmlspecialchars($label),
+            'status_message' => htmlspecialchars($messages[$status] ?? 'Your order status was updated.'),
+            'fulfillment' => htmlspecialchars($this->labelOrderFulfillment((string) ($order['fulfillmentType'] ?? 'courier'))),
+            'payment_status' => htmlspecialchars($this->labelOrderPayment((string) ($order['paymentStatus'] ?? 'unpaid'))),
+            'total_amount' => htmlspecialchars($this->formatMoney((float) ($order['totalAmount'] ?? 0))),
+            'tracking_html' => $this->buildOrderTrackingSummaryHtml($order),
+        ]);
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildOrderTrackingBody(array $order): string
+    {
+        $name = htmlspecialchars((string) ($order['customerName'] ?? 'Customer'));
+        $orderNumber = htmlspecialchars((string) ($order['orderNumber'] ?? ''));
+        $courierName = trim((string) ($order['courierName'] ?? 'Courier'));
+        $trackingNumber = trim((string) ($order['trackingNumber'] ?? ''));
+
+        return $this->render('order-tracking', [
+            'name' => $name,
+            'order_number' => $orderNumber,
+            'courier_name' => htmlspecialchars($courierName !== '' ? $courierName : 'Courier'),
+            'tracking_number' => htmlspecialchars($trackingNumber !== '' ? $trackingNumber : 'To be assigned'),
+            'tracking_message' => htmlspecialchars(
+                $trackingNumber !== ''
+                    ? 'Use the tracking number below to follow your shipment.'
+                    : 'Your order delivery details were updated. Tracking information will appear once assigned.'
+            ),
+            'status_badge' => $this->statusBadge((string) ($order['status'] ?? 'pending')),
+            'delivery_html' => $this->buildOrderDeliveryHtml($order),
+        ]);
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildAdminNewOrderBody(array $order): string
+    {
+        $customerName = htmlspecialchars((string) ($order['customerName'] ?? 'Customer'));
+        $customerEmail = htmlspecialchars((string) ($order['customerEmail'] ?? ''));
+        $customerPhone = htmlspecialchars((string) ($order['customerPhone'] ?? ''));
+        $orderNumber = htmlspecialchars((string) ($order['orderNumber'] ?? ''));
+        $itemsHtml = $this->buildOrderItemsHtml($order, false);
+        $notesHtml = $this->buildOrderNotesHtml($order, 'Customer Notes');
+
+        return $this->render('admin-new-order', [
+            'customer_name' => $customerName,
+            'customer_email' => $customerEmail,
+            'customer_phone' => $customerPhone,
+            'order_number' => $orderNumber,
+            'status_badge' => $this->statusBadge((string) ($order['status'] ?? 'pending')),
+            'fulfillment' => htmlspecialchars($this->labelOrderFulfillment((string) ($order['fulfillmentType'] ?? 'courier'))),
+            'payment_status' => htmlspecialchars($this->labelOrderPayment((string) ($order['paymentStatus'] ?? 'unpaid'))),
+            'subtotal' => htmlspecialchars($this->formatMoney((float) ($order['subtotal'] ?? 0))),
+            'shipping_fee' => htmlspecialchars($this->formatMoney((float) ($order['shippingFee'] ?? 0))),
+            'total_amount' => htmlspecialchars($this->formatMoney((float) ($order['totalAmount'] ?? 0))),
+            'items_html' => $itemsHtml,
+            'delivery_html' => $this->buildOrderDeliveryHtml($order),
+            'notes_html' => $notesHtml,
+        ]);
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildOrderItemsHtml(array $order, bool $withLineTotal): string
+    {
+        $items = is_array($order['items'] ?? null) ? $order['items'] : [];
+        if (count($items) === 0) {
+            return '<p style="margin:0;color:#94a3b8">No line items available.</p>';
+        }
+
+        $rows = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $name = htmlspecialchars((string) ($item['productName'] ?? 'Item'));
+            $variation = trim((string) ($item['variationName'] ?? ''));
+            $qty = (int) ($item['quantity'] ?? 1);
+            $line = $withLineTotal
+                ? '<span style="color:#f8fafc;font-weight:700">' . htmlspecialchars($this->formatMoney((float) ($item['subtotal'] ?? 0))) . '</span>'
+                : '<span style="color:#cbd5e1">' . htmlspecialchars($this->formatMoney((float) ($item['unitPrice'] ?? 0))) . ' each</span>';
+            $rows[] = '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #334155">'
+                . '<div><p style="margin:0;color:#f8fafc;font-weight:600">' . $name . ($variation !== '' ? ' <span style="color:#94a3b8;font-weight:400">(' . htmlspecialchars($variation) . ')</span>' : '') . '</p>'
+                . '<p style="margin:4px 0 0;color:#94a3b8;font-size:13px">Qty: ' . $qty . '</p></div>'
+                . $line
+                . '</div>';
+        }
+
+        return '<div style="background:#111827;border:1px solid #334155;border-radius:8px;padding:0 16px">' . implode('', $rows) . '</div>';
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildOrderDeliveryHtml(array $order): string
+    {
+        $fulfillment = (string) ($order['fulfillmentType'] ?? 'courier');
+        $addressParts = array_values(array_filter([
+            trim((string) ($order['deliveryAddress'] ?? '')),
+            trim((string) ($order['deliveryCity'] ?? '')),
+            trim((string) ($order['deliveryProvince'] ?? '')),
+            trim((string) ($order['deliveryPostalCode'] ?? '')),
+        ], static fn(string $value): bool => $value !== ''));
+
+        if ($fulfillment !== 'courier') {
+            return '<div style="background:#162032;border:1px solid #334155;border-radius:8px;padding:14px 16px;margin-top:20px">'
+                . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">Pickup</p>'
+                . '<p style="margin:0;color:#e2e8f0">Walk-in pickup selected for this order.</p>'
+                . '</div>';
+        }
+
+        if (count($addressParts) === 0) {
+            return '';
+        }
+
+        return '<div style="background:#162032;border:1px solid #334155;border-radius:8px;padding:14px 16px;margin-top:20px">'
+            . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">Delivery Address</p>'
+            . '<p style="margin:0;color:#e2e8f0">' . htmlspecialchars(implode(', ', $addressParts)) . '</p>'
+            . '</div>';
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildOrderNotesHtml(array $order, string $heading): string
+    {
+        $notes = trim((string) ($order['notes'] ?? ''));
+        if ($notes === '') {
+            return '';
+        }
+
+        return '<div style="background:#162032;border-left:3px solid #f97316;padding:12px 16px;margin-top:20px;border-radius:0 4px 4px 0">'
+            . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#f97316;text-transform:uppercase">' . htmlspecialchars($heading) . '</p>'
+            . '<p style="margin:0;color:#cbd5e1;font-size:14px">' . nl2br(htmlspecialchars($notes)) . '</p></div>';
+    }
+
+    /** @param array<string, mixed> $order */
+    private function buildOrderTrackingSummaryHtml(array $order): string
+    {
+        $courierName = trim((string) ($order['courierName'] ?? ''));
+        $trackingNumber = trim((string) ($order['trackingNumber'] ?? ''));
+        if ($courierName === '' && $trackingNumber === '') {
+            return '';
+        }
+
+        $summary = trim($courierName . ($courierName !== '' && $trackingNumber !== '' ? ' · ' : '') . $trackingNumber);
+        return '<div style="background:#162032;border:1px solid #334155;border-radius:8px;padding:14px 16px;margin-top:20px">'
+            . '<p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:#94a3b8;text-transform:uppercase">Tracking</p>'
+            . '<p style="margin:0;color:#e2e8f0">' . htmlspecialchars($summary) . '</p>'
+            . '</div>';
+    }
+
+    private function labelOrderFulfillment(string $type): string
+    {
+        return $type === 'walk_in' ? 'Walk-in Pickup' : 'Courier Delivery';
+    }
+
+    private function labelOrderPayment(string $status): string
+    {
+        if ($status === 'cod') {
+            return 'Cash On Delivery';
+        }
+
+        return strtoupper($status);
+    }
+
+    private function formatMoney(float $amount): string
+    {
+        return 'PHP ' . number_format($amount, 2);
+    }
+
     /** Generates a coloured status badge span for HTML emails. */
     private function statusBadge(string $status): string
     {
         $map = [
             'confirmed'      => ['#052e16', '#4ade80', '#166534'],
             'in_progress'    => ['#172554', '#60a5fa', '#1e40af'],
+            'preparing'      => ['#172554', '#7dd3fc', '#0c4a6e'],
+            'ready_for_pickup' => ['#2e1065', '#c4b5fd', '#6d28d9'],
+            'out_for_delivery' => ['#083344', '#67e8f9', '#0e7490'],
             'completed'      => ['#052e16', '#34d399', '#065f46'],
             'cancelled'      => ['#450a0a', '#f87171', '#7f1d1d'],
             'awaiting_parts' => ['#431407', '#fb923c', '#7c2d12'],
@@ -796,6 +1106,23 @@ class NotificationService
     {
         foreach ($this->adminRecipients() as $recipient) {
             $this->send($recipient, 'Admin', $subject, $htmlBody);
+        }
+    }
+
+    /** @param string[] $recipients */
+    private function sendToRecipients(array $recipients, string $subject, string $htmlBody, string $recipientName = 'Admin'): void
+    {
+        $unique = [];
+        foreach ($recipients as $recipient) {
+            $email = strtolower(trim($recipient));
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $unique[$email] = true;
+        }
+
+        foreach (array_keys($unique) as $email) {
+            $this->send($email, $recipientName, $subject, $htmlBody);
         }
     }
 

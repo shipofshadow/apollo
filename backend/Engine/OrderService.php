@@ -212,7 +212,13 @@ class OrderService
             }
 
             $db->commit();
-            return $this->getById($orderId, $userId, $userId === null ? null : true);
+            $order = $this->getById($orderId, $userId, $userId === null ? null : true);
+
+            (new NotificationJobQueueService())->dispatch('order_created', [
+                'order' => $order,
+            ]);
+
+            return $order;
         } catch (\Throwable $e) {
             if ($db->inTransaction()) {
                 $db->rollBack();
@@ -366,7 +372,14 @@ class OrderService
             throw new RuntimeException('Order not found.', 404);
         }
 
-        return $this->getById($id);
+        $updated = $this->getById($id);
+
+        (new NotificationJobQueueService())->dispatch('order_status_changed', [
+            'order' => $updated,
+            'previousStatus' => $currentStatus,
+        ]);
+
+        return $updated;
     }
 
     /** @return array<string, mixed> */
@@ -386,7 +399,13 @@ class OrderService
             throw new RuntimeException('Order not found.', 404);
         }
 
-        return $this->getById($id);
+        $updated = $this->getById($id);
+
+        (new NotificationJobQueueService())->dispatch('order_tracking_updated', [
+            'order' => $updated,
+        ]);
+
+        return $updated;
     }
 
     /** @return array<string, mixed> */

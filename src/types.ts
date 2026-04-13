@@ -552,6 +552,10 @@ export interface BookingActivityLog {
 
 export type NotificationType =
   | 'new_booking'
+  | 'new_order'
+  | 'order_created'
+  | 'order_status'
+  | 'order_tracking'
   | 'status_changed'
   | 'build_update'
   | 'parts_update'
@@ -597,9 +601,17 @@ export interface BookingReview {
 
 export interface NotificationPreferences {
   emailNewBooking:    boolean;
+  emailNewOrder:      boolean;
+  emailOrderCreated:  boolean;
+  emailOrderStatus:   boolean;
+  emailOrderTracking: boolean;
   emailStatusChanged: boolean;
   emailBuildUpdate:   boolean;
   emailPartsUpdate:   boolean;
+  inappNewOrder:      boolean;
+  inappOrderCreated:  boolean;
+  inappOrderStatus:   boolean;
+  inappOrderTracking: boolean;
   inappStatusChanged: boolean;
   inappBuildUpdate:   boolean;
   inappPartsUpdate:   boolean;

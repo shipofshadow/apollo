@@ -50,9 +50,17 @@ class NotificationPreferencesService
 
         $allowed = [
             'email_new_booking',
+            'email_new_order',
+            'email_order_created',
+            'email_order_status',
+            'email_order_tracking',
             'email_status_changed',
             'email_build_update',
             'email_parts_update',
+            'inapp_new_order',
+            'inapp_order_created',
+            'inapp_order_status',
+            'inapp_order_tracking',
             'inapp_status_changed',
             'inapp_build_update',
             'inapp_parts_update',
@@ -67,9 +75,17 @@ class NotificationPreferencesService
 
         $aliases = [
             'emailNewBooking' => 'email_new_booking',
+            'emailNewOrder' => 'email_new_order',
+            'emailOrderCreated' => 'email_order_created',
+            'emailOrderStatus' => 'email_order_status',
+            'emailOrderTracking' => 'email_order_tracking',
             'emailStatusChanged' => 'email_status_changed',
             'emailBuildUpdate' => 'email_build_update',
             'emailPartsUpdate' => 'email_parts_update',
+            'inappNewOrder' => 'inapp_new_order',
+            'inappOrderCreated' => 'inapp_order_created',
+            'inappOrderStatus' => 'inapp_order_status',
+            'inappOrderTracking' => 'inapp_order_tracking',
             'inappStatusChanged' => 'inapp_status_changed',
             'inappBuildUpdate' => 'inapp_build_update',
             'inappPartsUpdate' => 'inapp_parts_update',
@@ -135,7 +151,9 @@ class NotificationPreferencesService
     private function getColumnValue(int $userId, string $col): bool
     {
         $allowed = [
-            'email_new_booking', 'email_status_changed', 'email_build_update', 'email_parts_update',
+            'email_new_booking', 'email_new_order', 'email_order_created', 'email_order_status', 'email_order_tracking',
+            'email_status_changed', 'email_build_update', 'email_parts_update',
+            'inapp_new_order', 'inapp_order_created', 'inapp_order_status', 'inapp_order_tracking',
             'inapp_status_changed', 'inapp_build_update', 'inapp_parts_update',
             'inapp_new_booking', 'inapp_assignment', 'inapp_security_alert', 'inapp_slot_available',
             'sms_new_booking', 'sms_assignment', 'sms_status_changed',
@@ -171,9 +189,17 @@ class NotificationPreferencesService
     {
         return [
             'emailNewBooking'    => (bool) ($row['email_new_booking']    ?? 1),
+            'emailNewOrder'      => (bool) ($row['email_new_order']      ?? 1),
+            'emailOrderCreated'  => (bool) ($row['email_order_created']  ?? 1),
+            'emailOrderStatus'   => (bool) ($row['email_order_status']   ?? 1),
+            'emailOrderTracking' => (bool) ($row['email_order_tracking'] ?? 1),
             'emailStatusChanged' => (bool) ($row['email_status_changed'] ?? 1),
             'emailBuildUpdate'   => (bool) ($row['email_build_update']   ?? 1),
             'emailPartsUpdate'   => (bool) ($row['email_parts_update']   ?? 1),
+            'inappNewOrder'      => (bool) ($row['inapp_new_order']      ?? 1),
+            'inappOrderCreated'  => (bool) ($row['inapp_order_created']  ?? 1),
+            'inappOrderStatus'   => (bool) ($row['inapp_order_status']   ?? 1),
+            'inappOrderTracking' => (bool) ($row['inapp_order_tracking'] ?? 1),
             'inappStatusChanged' => (bool) ($row['inapp_status_changed'] ?? 1),
             'inappBuildUpdate'   => (bool) ($row['inapp_build_update']   ?? 1),
             'inappPartsUpdate'   => (bool) ($row['inapp_parts_update']   ?? 1),
