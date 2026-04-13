@@ -136,7 +136,7 @@ export default function RegisterPage() {
                 type="tel" value={form.phone} onChange={set('phone')}
                 autoComplete="tel"
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                placeholder="09XXXXXXXXX"
+                placeholder="09123456789, 9123456789, +639123456789"
               />
             </div>
 

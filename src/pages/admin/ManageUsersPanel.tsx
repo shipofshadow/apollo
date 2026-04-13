@@ -448,7 +448,7 @@ export default function ManageUsersPanel() {
                 <input
                   value={newUser.phone}
                   onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="e.g. 555-123-4567"
+                  placeholder="e.g. 09123456789, 9123456789, +639123456789"
                   className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
                 />
               </div>

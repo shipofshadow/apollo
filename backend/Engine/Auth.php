@@ -226,6 +226,7 @@ class Auth
 
         $db    = Database::getInstance();
         $email = strtolower(trim((string) $data['email']));
+        $phone = self::normalizePhoneForStorage((string) ($data['phone'] ?? ''));
 
         $stmt = $db->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
         $stmt->execute([':email' => $email]);
@@ -239,10 +240,38 @@ class Auth
         )->execute([
             ':name'     => trim((string) $data['name']),
             ':email'    => $email,
-            ':phone'    => trim((string) ($data['phone'] ?? '')),
+            ':phone'    => $phone,
             ':password' => self::hashPassword((string) $data['password']),
             ':role'     => 'client',
         ]);
+    }
+
+    /**
+     * Normalize PH mobile formats to local 11-digit form (09XXXXXXXXX).
+     */
+    private static function normalizePhoneForStorage(string $phone): string
+    {
+        $trimmed = trim($phone);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $digits = preg_replace('/\D+/', '', $trimmed);
+        if ($digits === null || $digits === '') {
+            return $trimmed;
+        }
+
+        if (str_starts_with($digits, '63') && strlen($digits) === 12 && ($digits[2] ?? '') === '9') {
+            return '0' . substr($digits, 2);
+        }
+        if (str_starts_with($digits, '9') && strlen($digits) === 10) {
+            return '0' . $digits;
+        }
+        if (str_starts_with($digits, '0') && strlen($digits) === 11 && ($digits[1] ?? '') === '9') {
+            return $digits;
+        }
+
+        return $trimmed;
     }
 
     /**

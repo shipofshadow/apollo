@@ -113,7 +113,11 @@ class UserService
         foreach (['name', 'phone', 'avatar_url'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] !== null) {
                 $fields[]         = "$field = :$field";
-                $params[":$field"] = trim((string) $data[$field]);
+                if ($field === 'phone') {
+                    $params[':phone'] = $this->normalizePhoneForStorage((string) $data[$field]);
+                } else {
+                    $params[":$field"] = trim((string) $data[$field]);
+                }
             }
         }
 
@@ -198,7 +202,7 @@ class UserService
     {
         $name  = trim((string) ($data['name'] ?? ''));
         $email = strtolower(trim((string) ($data['email'] ?? '')));
-        $phone = trim((string) ($data['phone'] ?? ''));
+        $phone = $this->normalizePhoneForStorage((string) ($data['phone'] ?? ''));
         $password = (string) ($data['password'] ?? '');
         $role = strtolower(trim((string) ($data['role'] ?? 'client')));
 
@@ -634,7 +638,7 @@ class UserService
 
         if (array_key_exists('phone', $data)) {
             $fields[]       = 'phone = :phone';
-            $params[':phone'] = trim((string) $data['phone']);
+            $params[':phone'] = $this->normalizePhoneForStorage((string) $data['phone']);
         }
 
         if (empty($fields)) {
@@ -732,6 +736,31 @@ class UserService
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM users WHERE role = :role');
         $stmt->execute([':role' => strtolower(trim($role))]);
         return (int) $stmt->fetchColumn();
+    }
+
+    private function normalizePhoneForStorage(string $phone): string
+    {
+        $trimmed = trim($phone);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $digits = preg_replace('/\D+/', '', $trimmed);
+        if ($digits === null || $digits === '') {
+            return $trimmed;
+        }
+
+        if (str_starts_with($digits, '63') && strlen($digits) === 12 && ($digits[2] ?? '') === '9') {
+            return '0' . substr($digits, 2);
+        }
+        if (str_starts_with($digits, '9') && strlen($digits) === 10) {
+            return '0' . $digits;
+        }
+        if (str_starts_with($digits, '0') && strlen($digits) === 11 && ($digits[1] ?? '') === '9') {
+            return $digits;
+        }
+
+        return $trimmed;
     }
 
     /**
