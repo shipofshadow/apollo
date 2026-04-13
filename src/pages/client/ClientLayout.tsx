@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.png';
 import NotificationBell from '../../components/NotificationBell';
+import { getDicebearAvatarDataUri } from '../../utils/avatar';
 
 const navItems = [
   { label: 'Dashboard',   href: '/client/dashboard', icon: LayoutDashboard },
@@ -20,6 +21,7 @@ export default function ClientLayout() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { user, logout } = useAuth();
+  const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasCustomSidebarPref, setHasCustomSidebarPref] = useState(false);
 
@@ -104,19 +106,18 @@ export default function ClientLayout() {
           <div className="p-4 md:p-5 border-b border-gray-800">
             <div className={`flex items-center ${sidebarCollapsed ? 'md:justify-center' : 'gap-3'}`}>
               <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0 overflow-hidden">
-                {user?.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt="User avatar"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                ) : (
-                  <span className="text-brand-orange font-black text-sm uppercase">
-                    {user?.name?.[0] ?? '?'}
-                  </span>
-                )}
+                <img
+                  src={user?.avatar_url || fallbackAvatar}
+                  alt="User avatar"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={e => {
+                    const img = e.currentTarget;
+                    if (img.src !== fallbackAvatar) {
+                      img.src = fallbackAvatar;
+                    }
+                  }}
+                />
               </div>
               <div className={sidebarCollapsed ? 'hidden' : 'hidden md:block min-w-0'}>
                 <p className="text-white font-bold text-sm truncate leading-tight">{user?.name}</p>

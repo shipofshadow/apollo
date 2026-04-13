@@ -28,6 +28,7 @@ import {
   updateBookingQaPhotosApi,
   deleteBookingApi,
   fetchCustomerStatsApi,
+  fetchAdminCustomer360Api,
   fetchAssignableUsersApi,
   assignBookingTechnicianApi,
   fetchBookingPartRequirementsApi,
@@ -38,12 +39,13 @@ import {
   type AdminManagedUser,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog, BookingPartRequirement, InventoryItem, InventorySupplier } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog, BookingPartRequirement, InventoryItem, InventorySupplier, Customer360Data } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
 import { generateTechnicianJobSheetPDF } from '../../utils/generateTechnicianJobSheetPDF';
+import { getDicebearAvatarDataUri } from '../../utils/avatar';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -388,6 +390,9 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
   // Customer loyalty stats
   const [customerStats,     setCustomerStats]     = useState<CustomerStats | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<Customer360Data | null>(null);
+  const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
+  const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
 
   // Build updates state
   const [buildUpdates,      setBuildUpdates]      = useState<BuildUpdate[]>([]);
@@ -466,6 +471,22 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       fetchCustomerStatsApi(token, booking.userId)
         .then(r => setCustomerStats(r.stats))
         .catch(() => {});
+      setCustomerProfileLoading(true);
+      setCustomerProfileError(null);
+      fetchAdminCustomer360Api(token, booking.userId, 10)
+        .then(r => {
+          setCustomerProfile(r.customer360 ?? null);
+          setCustomerProfileError(null);
+        })
+        .catch((e: unknown) => {
+          setCustomerProfile(null);
+          setCustomerProfileError((e as Error).message ?? 'Unable to load linked client profile.');
+        })
+        .finally(() => setCustomerProfileLoading(false));
+    } else {
+      setCustomerProfile(null);
+      setCustomerProfileError(null);
+      setCustomerProfileLoading(false);
     }
   }, [booking, token]);
 
@@ -835,6 +856,12 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const hasBeforePhotos = beforePhotos.length > 0;
   const hasAfterPhotos = (booking.afterPhotos?.length ?? 0) > 0;
   const assignedTechnicianLabel = booking.assignedTech?.name?.trim() || (booking.assignedTechId != null ? `Technician #${booking.assignedTechId}` : 'Not assigned');
+  const customerAvatarUrl = customerProfile?.profile.avatar_url ?? customerProfile?.profile.avatarUrl ?? null;
+  const customerAvatarFallback = getDicebearAvatarDataUri({
+    id: customerProfile?.profile.id ?? booking.userId ?? booking.id,
+    name: customerProfile?.profile.name ?? booking.name,
+    email: customerProfile?.profile.email ?? booking.email,
+  });
 
   const handleDownloadJobSheet = async () => {
     try {
@@ -1575,6 +1602,109 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
         {/* ── RIGHT COLUMN (Telemetry & Execution Controls) ── */}
         <div className="space-y-6">
+
+          {/* Client Profile Snapshot */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <User className="w-3.5 h-3.5 text-gray-400" /> Client Profile
+              </p>
+              {booking.userId ? (
+                <span className="text-[9px] font-mono uppercase tracking-widest text-gray-600">
+                  User #{booking.userId}
+                </span>
+              ) : null}
+            </div>
+
+            {!booking.userId ? (
+              <div className="rounded border border-gray-800 bg-[#151515] p-4 space-y-2">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={customerAvatarFallback}
+                    alt={booking.name}
+                    className="h-11 w-11 rounded-full border border-gray-700 object-cover"
+                  />
+                  <div>
+                    <p className="text-xs text-gray-300 font-semibold">{booking.name}</p>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-gray-600">Guest Contact</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-300 font-semibold">Guest booking (no linked client account)</p>
+                <p className="text-xs text-gray-500">This booking has contact details only and is not attached to a saved client profile.</p>
+              </div>
+            ) : customerProfileLoading ? (
+              <div className="rounded border border-gray-800 bg-[#151515] p-4 flex items-center justify-center">
+                <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
+              </div>
+            ) : customerProfileError ? (
+              <div className="rounded border border-red-500/30 bg-red-500/10 p-4">
+                <p className="text-xs text-red-300">{customerProfileError}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded border border-gray-800 bg-[#151515] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={customerAvatarUrl || customerAvatarFallback}
+                        alt={customerProfile?.profile.name ?? booking.name}
+                        className="h-12 w-12 rounded-full border border-gray-700 object-cover"
+                        onError={(e) => {
+                          if (e.currentTarget.src !== customerAvatarFallback) {
+                            e.currentTarget.src = customerAvatarFallback;
+                            return;
+                          }
+                          e.currentTarget.onerror = null;
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{customerProfile?.profile.name ?? booking.name}</p>
+                        <p className="text-[8px] font-mono uppercase tracking-widest text-gray-500 mt-1">Linked Client</p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded border text-[5px] font-bold uppercase tracking-widest ${customerProfile?.profile.isActive ? 'border-green-500/40 bg-green-500/10 text-green-400' : 'border-gray-700 bg-black/30 text-gray-500'}`}>
+                      {customerProfile?.profile.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 text-gray-300">
+                      <Mail className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                      <a href={`mailto:${customerProfile?.profile.email ?? booking.email}`} className="truncate hover:text-brand-orange transition-colors">
+                        {customerProfile?.profile.email ?? booking.email}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-300">
+                      <Phone className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                      <a href={`tel:${customerProfile?.profile.phone ?? booking.phone}`} className="truncate hover:text-brand-orange transition-colors">
+                        {customerProfile?.profile.phone ?? booking.phone}
+                      </a>
+                    </div>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-gray-600 pt-1">
+                      Member Since: {customerProfile?.profile.createdAt ? new Date(customerProfile.profile.createdAt).toISOString().split('T')[0] : 'UNKNOWN'}
+                    </p>
+                  </div>
+                </div>
+
+                {customerProfile?.spend ? (
+                  <div className="grid grid-cols-2 gap-px rounded overflow-hidden bg-gray-800/50">
+                    <div className="bg-[#151515] p-3 text-center">
+                      <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Bookings</p>
+                      <p className="text-lg font-black text-white">{customerProfile.spend.totalBookings}</p>
+                    </div>
+                    <div className="bg-[#151515] p-3 text-center">
+                      <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Completed</p>
+                      <p className="text-lg font-black text-blue-400">{customerProfile.spend.completedBookings}</p>
+                    </div>
+                    <div className="bg-[#151515] p-3 text-center col-span-2">
+                      <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Lifetime Spend</p>
+                      <p className="text-lg font-black text-brand-orange">PHP {customerProfile.spend.lifetimeSpend.toFixed(2)}</p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           {/* Quick Actions / Dispatch Controls */}
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6  top-6">

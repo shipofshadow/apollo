@@ -5,6 +5,7 @@ import { Menu, X, ChevronDown, LayoutDashboard, Calendar, User, LogOut, Shopping
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
 import { cartCount, readCart } from '../utils/cart';
+import { getDicebearAvatarDataUri } from '../utils/avatar';
 
 const LOGO_URL = 'https://cdn.1625autolab.com/1625autolab/logos/logo.png';
 
@@ -86,25 +87,26 @@ export default function Header() {
   ];
 
   const renderUserAvatar = (sizeClass = 'w-7 h-7') => {
-    const initials = user?.name?.[0] ?? 'A';
+    const fallbackAvatar = getDicebearAvatarDataUri({
+      id: user?.id,
+      name: user?.name,
+      email: user?.email,
+    });
 
     return (
       <div className={`${sizeClass} rounded-full bg-brand-orange/20 border border-brand-orange/40 flex items-center justify-center overflow-hidden shrink-0`}>
-        {user?.avatar_url ? (
-          <img
-            src={user.avatar_url}
-            alt="User avatar"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-            onError={e => {
-              const img = e.currentTarget;
-              img.style.display = 'none';
-              const fallback = img.nextElementSibling as HTMLElement | null;
-              if (fallback) fallback.style.display = 'inline';
-            }}
-          />
-        ) : null}
-        <span className={`text-brand-orange text-xs font-bold uppercase ${user?.avatar_url ? 'hidden' : ''}`}>{initials}</span>
+        <img
+          src={user?.avatar_url || fallbackAvatar}
+          alt="User avatar"
+          className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+          onError={e => {
+            const img = e.currentTarget;
+            if (img.src !== fallbackAvatar) {
+              img.src = fallbackAvatar;
+            }
+          }}
+        />
       </div>
     );
   };

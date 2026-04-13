@@ -36,6 +36,7 @@ import InventoryPanel from './admin/InventoryPanel';
 import ConversationsPage    from './chatbot/ConversationsPage';
 import FlowEditorPage       from './chatbot/FlowEditorPage';
 import type { ClientAdminSummary } from '../types';
+import { getDicebearAvatarDataUri } from '../utils/avatar';
 
 const TAB_PATHS: Record<string, string> = {
   analytics: '/admin/dashboard',
@@ -78,6 +79,7 @@ function getAdminTabFromPath(pathname: string): string {
 // ── Main Admin page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { user, logout, hasPermission } = useAuth();
+  const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
   const location = useLocation();
   const navigate = useNavigate();
   const activeTab = getAdminTabFromPath(location.pathname);
@@ -346,19 +348,18 @@ export default function AdminPage() {
             title="Open account settings"
             className="w-8 h-8 rounded-full bg-brand-orange/20 border border-brand-orange/40 hover:border-brand-orange flex items-center justify-center overflow-hidden shrink-0 transition-colors"
           >
-            {user.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt="Open account settings"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            ) : (
-              <span className="text-brand-orange font-black text-xs uppercase">
-                {user.name?.[0] ?? 'A'}
-              </span>
-            )}
+            <img
+              src={user.avatar_url || fallbackAvatar}
+              alt="Open account settings"
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={e => {
+                const img = e.currentTarget;
+                if (img.src !== fallbackAvatar) {
+                  img.src = fallbackAvatar;
+                }
+              }}
+            />
           </button>
           <div className="w-px h-5 bg-gray-700" />
           <button onClick={handleLogout}
@@ -391,19 +392,18 @@ export default function AdminPage() {
           <div className={`border-b border-gray-800/80 ${collapsed ? 'p-3' : 'p-4 md:p-5'}`}>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0 overflow-hidden">
-                {user.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt="User avatar"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                ) : (
-                  <span className="text-brand-orange font-black text-sm uppercase">
-                    {user.name?.[0] ?? 'A'}
-                  </span>
-                )}
+                <img
+                  src={user.avatar_url || fallbackAvatar}
+                  alt="User avatar"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={e => {
+                    const img = e.currentTarget;
+                    if (img.src !== fallbackAvatar) {
+                      img.src = fallbackAvatar;
+                    }
+                  }}
+                />
               </div>
               {!collapsed && (
                 <div className="min-w-0">

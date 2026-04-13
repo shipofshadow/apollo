@@ -6,6 +6,7 @@ import type { AppDispatch } from '../../store';
 import { useAuth } from '../../context/AuthContext';
 import { uploadProfileAvatarApi, getNotificationPrefsApi, saveNotificationPrefsApi } from '../../services/api';
 import type { NotificationPreferences } from '../../types';
+import { getDicebearAvatarDataUri } from '../../utils/avatar';
 
 const UPLOAD_MAX_MB = 10;
 
@@ -18,6 +19,7 @@ function validateImageFile(file: File): string | null {
 export default function AccountSettingsPanel() {
   const dispatch                       = useDispatch<AppDispatch>();
   const { user, token, error } = useAuth();
+  const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
 
   const [info,        setInfo]       = useState({ name: user?.name ?? '', phone: user?.phone ?? '' });
   const [pw,          setPw]         = useState({ newPw: '', confirm: '' });
@@ -106,19 +108,18 @@ export default function AccountSettingsPanel() {
       {/* Avatar card */}
       <div className="bg-brand-dark border border-gray-800 rounded-sm px-6 py-5 flex items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0 overflow-hidden">
-          {user?.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt="Profile"
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <span className="text-brand-orange font-black text-xl uppercase">
-              {user?.name?.[0] ?? 'A'}
-            </span>
-          )}
+          <img
+            src={user?.avatar_url || fallbackAvatar}
+            alt="Profile"
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+            onError={e => {
+              const img = e.currentTarget;
+              if (img.src !== fallbackAvatar) {
+                img.src = fallbackAvatar;
+              }
+            }}
+          />
         </div>
         <div className="min-w-0">
           <p className="text-white font-bold text-base truncate">{user?.name}</p>

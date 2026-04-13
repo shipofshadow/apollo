@@ -129,6 +129,8 @@ export interface Customer360Profile {
   name: string;
   email: string;
   phone: string;
+  avatar_url?: string | null;
+  avatarUrl?: string | null;
   role: UserRole;
   isActive: boolean;
   createdAt: string;
