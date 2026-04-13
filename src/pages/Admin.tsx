@@ -4,7 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, GitBranch, Users, Workflow,
+  Camera, MessageSquare, GitBranch, Users, Workflow, Megaphone, Boxes,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +31,8 @@ import ManageRolesPanel     from './admin/ManageRolesPanel';
 import ClientDetailPanel    from './admin/ClientDetailPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
 import NotificationQueuePanel from './admin/NotificationQueuePanel';
+import MarketingCampaignsPanel from './admin/MarketingCampaignsPanel';
+import InventoryPanel from './admin/InventoryPanel';
 import ConversationsPage    from './chatbot/ConversationsPage';
 import FlowEditorPage       from './chatbot/FlowEditorPage';
 import type { ClientAdminSummary } from '../types';
@@ -41,7 +43,7 @@ const TAB_PATHS: Record<string, string> = {
   calendar: '/admin/calendar',
   reviews: '/admin/reviews',
   'chatbot-conversations': '/chatbot/conversations',
-  'chatbot-flow': '/chatbot/flo w-editor',
+  'chatbot-flow': '/chatbot/flow-editor',
   services: '/admin/services',
   products: '/admin/products',
   orders: '/admin/orders',
@@ -54,6 +56,8 @@ const TAB_PATHS: Record<string, string> = {
   'manage-users': '/admin/manage-users',
   'manage-clients': '/admin/manage-clients',
   'manage-roles': '/admin/manage-roles',
+  'marketing-campaigns': '/admin/marketing-campaigns',
+  inventory: '/admin/inventory',
   'security-audit': '/admin/security-audit',
   'notification-queue': '/admin/notification-queue',
   'semaphore': '/admin/semaphore',
@@ -147,6 +151,14 @@ export default function AdminPage() {
       return hasPermission('products:manage');
     }
 
+    if (key === 'inventory') {
+      return hasPermission('products:manage');
+    }
+
+    if (key === 'marketing-campaigns') {
+      return hasPermission('settings:manage');
+    }
+
     if (['chatbot', 'chatbot-conversations', 'chatbot-flow'].includes(key)) {
       return hasPermission('chatbot:manage');
     }
@@ -192,6 +204,7 @@ export default function AdminPage() {
         { key: 'services',   label: 'Services',   icon: Wrench },
         { key: 'products',   label: 'Products',   icon: Package },
         { key: 'orders',     label: 'Orders',     icon: Package },
+        { key: 'inventory',  label: 'Inventory',  icon: Boxes },
         { key: 'shop-hours', label: 'Shop Hours', icon: Clock },
       ]
     },
@@ -215,6 +228,7 @@ export default function AdminPage() {
     {
       isGroup: true, key: 'settings', label: 'Settings', icon: SlidersHorizontal,
       children: [
+        { key: 'marketing-campaigns', label: 'Campaigns', icon: Megaphone },
         { key: 'site-settings', label: 'Site Config',     icon: SlidersHorizontal },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
         { key: 'notification-queue', label: 'Queue Monitor', icon: Workflow },
@@ -262,11 +276,13 @@ export default function AdminPage() {
         return <BookingsPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.appointments); }} />;
       case 'products':      return <ProductsPanel />;
       case 'orders':        return <OrdersPanel />;
+      case 'inventory':     return <InventoryPanel />;
       case 'faq':           return <FaqPanel />;
       case 'shop-hours':    return <ShopHoursPanel />;
       case 'site-settings': return <SiteSettingsPanel />;
       case 'manage-users':  return <ManageUsersPanel />;
       case 'manage-roles':  return <ManageRolesPanel />;
+      case 'marketing-campaigns': return <MarketingCampaignsPanel />;
       case 'manage-clients':
         if (activeClient) {
           return (
@@ -365,14 +381,14 @@ export default function AdminPage() {
         {/* Sidebar */}
         <aside className={`
           absolute md:relative top-0 bottom-0 md:top-auto md:bottom-auto left-0 z-30 md:z-auto
-          flex flex-col bg-brand-dark border-r border-gray-800 flex-shrink-0
+          flex flex-col bg-gradient-to-b from-[#111111] to-[#0b0b0b] border-r border-gray-800/80 flex-shrink-0
           transition-all duration-300 ease-in-out
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           ${collapsed ? 'md:w-16' : 'md:w-60'}
           w-64 h-full md:h-auto
         `}>
           {/* User card */}
-          <div className={`border-b border-gray-800 ${collapsed ? 'p-3' : 'p-4 md:p-5'}`}>
+          <div className={`border-b border-gray-800/80 ${collapsed ? 'p-3' : 'p-4 md:p-5'}`}>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-brand-orange/20 border-2 border-brand-orange/40 flex items-center justify-center shrink-0 overflow-hidden">
                 {user.avatar_url ? (
@@ -399,7 +415,7 @@ export default function AdminPage() {
           </div>
 
           {/* Nav */}
-          <nav className={`${collapsed ? 'p-2' : 'p-2 md:p-3'} space-y-1 flex-grow`}>
+          <nav className={`${collapsed ? 'p-2' : 'p-2 md:p-3'} space-y-1 flex-grow overflow-y-auto`}>
             {navItems.map((item) => {
               if (item.isGroup && item.children) {
                 const visibleChildren = item.children.filter(child => canAccessTab(child.key));
@@ -414,7 +430,7 @@ export default function AdminPage() {
                     <button
                       onClick={() => toggleGroup(item.key)}
                       title={collapsed ? item.label : undefined}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm text-gray-500 hover:text-white hover:bg-gray-800/60 ${collapsed ? 'justify-center' : ''}`}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm border border-transparent text-gray-500 hover:text-white hover:bg-gray-800/60 hover:border-gray-700/70 ${collapsed ? 'justify-center' : ''}`}
                     >
                       <div className="flex items-center gap-3">
                         <GroupIcon className="w-4 h-4 shrink-0" />
@@ -426,7 +442,7 @@ export default function AdminPage() {
                     </button>
 
                     {/* Group Children */}
-                    {isOpen && (
+                    {!collapsed && isOpen && (
                       <div className={`mt-0.5 space-y-0.5 ${collapsed ? '' : 'pl-3 border-l border-gray-800/50 ml-3'}`}>
                         {visibleChildren.map(child => {
                           const ChildIcon = child.icon;
@@ -440,8 +456,8 @@ export default function AdminPage() {
                               title={collapsed ? child.label : undefined}
                               className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm relative ${
                                 isActive
-                                  ? 'text-brand-orange bg-brand-orange/10'
-                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                                  ? 'text-brand-orange bg-brand-orange/10 border border-brand-orange/30'
+                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60 border border-transparent hover:border-gray-700/70'
                               } ${collapsed ? 'justify-center' : ''}`}
                             >
                               <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand-orange rounded-r-full transition-opacity ${isActive ? 'opacity-100' : 'opacity-0'}`} />
@@ -469,8 +485,8 @@ export default function AdminPage() {
                     title={collapsed ? item.label : undefined}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all duration-150 rounded-sm relative ${
                       isActive
-                        ? 'text-brand-orange bg-brand-orange/10'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                        ? 'text-brand-orange bg-brand-orange/10 border border-brand-orange/30'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/60 border border-transparent hover:border-gray-700/70'
                     } ${collapsed ? 'justify-center' : ''}`}
                   >
                     <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-brand-orange rounded-r-full transition-opacity ${isActive ? 'opacity-100' : 'opacity-0'}`} />

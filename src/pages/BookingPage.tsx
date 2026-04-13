@@ -14,6 +14,7 @@ import {
   fetchAvailabilityApi, uploadBookingMediaApi,
   fetchVehicleMakesApi, fetchVehicleModelsApi,
   fetchShopHoursApi, fetchMyVehiclesApi,
+  createMyVehicleApi,
   fetchShopClosedDatesApi,
   joinWaitlistApi,
   fetchWaitlistClaimApi,
@@ -167,6 +168,9 @@ export default function BookingPage() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [mediaUploadBusy, setMediaUploadBusy] = useState(false);
+  const [vehicleSaveBusy, setVehicleSaveBusy] = useState(false);
+  const [showVehicleSaveModal, setShowVehicleSaveModal] = useState(false);
+  const vehicleSaveDecisionResolverRef = useRef<((shouldSave: boolean) => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [signatureData, setSignatureData] = useState('');
@@ -343,6 +347,19 @@ export default function BookingPage() {
     setMediaPreviews(prev => prev.filter((_, idx) => idx !== i));
   };
 
+  const askToSaveVehicle = () => {
+    setShowVehicleSaveModal(true);
+    return new Promise<boolean>(resolve => {
+      vehicleSaveDecisionResolverRef.current = resolve;
+    });
+  };
+
+  const resolveVehicleSaveModal = (shouldSave: boolean) => {
+    setShowVehicleSaveModal(false);
+    vehicleSaveDecisionResolverRef.current?.(shouldSave);
+    vehicleSaveDecisionResolverRef.current = null;
+  };
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(p => ({ ...p, phone: e.target.value }));
     setFormErrors(prev => ({ ...prev, phone: undefined }));
@@ -360,6 +377,35 @@ export default function BookingPage() {
       return;
     }
     setFormErrors({});
+
+    if (user && token && !selectedVehicleId && vehicleYear && vehicleMake && vehicleModel) {
+      const vehicleAlreadySaved = myVehicles.some(v =>
+        v.year.trim() === vehicleYear.trim()
+        && v.make.trim().toLowerCase() === vehicleMake.trim().toLowerCase()
+        && v.model.trim().toLowerCase() === vehicleModel.trim().toLowerCase()
+      );
+
+      if (!vehicleAlreadySaved) {
+        const shouldSaveVehicle = await askToSaveVehicle();
+        if (shouldSaveVehicle) {
+          setVehicleSaveBusy(true);
+          try {
+            const { vehicle } = await createMyVehicleApi(token, {
+              year: vehicleYear,
+              make: vehicleMake,
+              model: vehicleModel,
+            });
+            setMyVehicles(prev => [vehicle, ...prev]);
+            setSelectedVehicleId(String(vehicle.id));
+            showToast('Vehicle saved to your Garage.', 'success');
+          } catch (e) {
+            showToast((e as Error).message ?? 'Could not save vehicle to Garage.', 'error');
+          } finally {
+            setVehicleSaveBusy(false);
+          }
+        }
+      }
+    }
 
     let mediaUrls: string[] = [];
     if (mediaFiles.length && BACKEND_URL) {
@@ -998,11 +1044,11 @@ export default function BookingPage() {
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button type="submit" form="booking-form"
-                  disabled={bookStatus === 'loading' || mediaUploadBusy || !signatureData || !turnstileToken}
+                  disabled={bookStatus === 'loading' || mediaUploadBusy || vehicleSaveBusy || !signatureData || !turnstileToken}
                   title={!signatureData ? 'Please sign the waiver to continue' : !turnstileToken ? 'Please complete the CAPTCHA' : undefined}
                   className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(255,102,0,0.2)]">
-                  {(bookStatus === 'loading' || mediaUploadBusy)
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {mediaUploadBusy ? 'Uploading…' : 'Finalizing…'}</>
+                  {(bookStatus === 'loading' || mediaUploadBusy || vehicleSaveBusy)
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {vehicleSaveBusy ? 'Saving Vehicle…' : mediaUploadBusy ? 'Uploading…' : 'Finalizing…'}</>
                     : <><CheckCircle className="w-4 h-4" /> Confirm Booking</>}
                 </button>
               </div>
@@ -1084,6 +1130,37 @@ export default function BookingPage() {
           )}
         </div>
       </div>
+
+      {showVehicleSaveModal && (
+        <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark shadow-2xl p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-2">Save Vehicle</p>
+            <h3 className="text-xl font-display font-bold text-white mb-2">Save this vehicle to Garage?</h3>
+            <p className="text-sm text-gray-400 mb-5">
+              You can reuse this vehicle next time for faster booking checkout.
+            </p>
+            <div className="rounded-sm border border-gray-800 bg-black/20 px-3 py-2 text-sm text-gray-300 mb-6">
+              {vehicleInfo || 'Selected vehicle'}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => resolveVehicleSaveModal(false)}
+                className="px-4 py-2 rounded-sm border border-gray-700 text-gray-300 text-xs font-bold uppercase tracking-widest hover:border-gray-500 hover:text-white"
+              >
+                Not Now
+              </button>
+              <button
+                type="button"
+                onClick={() => resolveVehicleSaveModal(true)}
+                className="px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600"
+              >
+                Save Vehicle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

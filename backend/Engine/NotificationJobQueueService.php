@@ -111,6 +111,9 @@ class NotificationJobQueueService
                         ':id' => $jobId,
                         ':err' => mb_substr($e->getMessage(), 0, 2000),
                     ]);
+                    if ($event === 'marketing_campaign_message') {
+                        $this->markCampaignRecipientStatus($payload, 'failed', mb_substr($e->getMessage(), 0, 1000));
+                    }
                     $stats['failed']++;
                 } else {
                     $retryDelay = max(15, (defined('NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS') ? (int) NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS : 60));
@@ -654,9 +657,123 @@ class NotificationJobQueueService
                 );
                 return;
 
+            case 'marketing_campaign_message':
+                $channel = strtolower(trim((string) ($payload['channel'] ?? 'inapp')));
+                $userId = (int) ($payload['userId'] ?? 0);
+                $name = trim((string) ($payload['name'] ?? 'Customer'));
+                $email = strtolower(trim((string) ($payload['email'] ?? '')));
+                $phone = trim((string) ($payload['phone'] ?? ''));
+                $title = trim((string) ($payload['title'] ?? 'Special Offer'));
+                $message = trim((string) ($payload['message'] ?? ''));
+                $ctaUrl = trim((string) ($payload['ctaUrl'] ?? ''));
+
+                if ($message === '') {
+                    throw new RuntimeException('Campaign message payload is empty.');
+                }
+
+                if ($channel === 'inapp') {
+                    if ($userId <= 0) {
+                        throw new RuntimeException('In-app campaign message requires a userId.');
+                    }
+                    (new UserNotificationService())->createForUser(
+                        $userId,
+                        'order_created',
+                        $title,
+                        $message,
+                        ['ctaUrl' => $ctaUrl, 'campaignId' => $payload['campaignId'] ?? null]
+                    );
+                } elseif ($channel === 'email') {
+                    if ($email === '') {
+                        throw new RuntimeException('Email campaign message requires an email address.');
+                    }
+                    (new NotificationService())->marketingCampaignMessage($email, $name, $title, $message, $ctaUrl);
+                } elseif ($channel === 'sms') {
+                    if ($phone === '') {
+                        throw new RuntimeException('SMS campaign message requires a phone number.');
+                    }
+                    (new SmsService())->marketingCampaignMessage($phone, $message . ($ctaUrl !== '' ? ' ' . $ctaUrl : ''));
+                } else {
+                    throw new RuntimeException('Unknown campaign channel: ' . $channel);
+                }
+
+                $this->markCampaignRecipientStatus($payload, 'sent', null);
+                return;
+
+            case 'inventory_low_stock':
+                $itemName = (string) ($payload['itemName'] ?? 'Inventory item');
+                $sku = (string) ($payload['sku'] ?? '');
+                $qty = (string) ($payload['qtyOnHand'] ?? '0');
+                $reorderPoint = (string) ($payload['reorderPoint'] ?? '0');
+                $message = (string) ($payload['message'] ?? ($itemName . ' is low on stock.'));
+
+                $this->notifyRolesInApp(
+                    ['owner', 'admin', 'manager'],
+                    'new_order',
+                    'new_order',
+                    'Low Stock Alert',
+                    $message,
+                    [
+                        'itemName' => $itemName,
+                        'sku' => $sku,
+                        'qtyOnHand' => $qty,
+                        'reorderPoint' => $reorderPoint,
+                    ]
+                );
+                return;
+
             default:
+                if ($event === 'marketing_campaign_message') {
+                    $this->markCampaignRecipientStatus($payload, 'failed', 'Unhandled campaign event.');
+                }
                 throw new RuntimeException('Unknown notification job event: ' . $event);
         }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function markCampaignRecipientStatus(array $payload, string $status, ?string $error): void
+    {
+        if ($this->db === null) {
+            return;
+        }
+
+        $runId = isset($payload['runId']) ? (int) $payload['runId'] : 0;
+        $campaignId = isset($payload['campaignId']) ? (int) $payload['campaignId'] : 0;
+        $channel = strtolower(trim((string) ($payload['channel'] ?? '')));
+        $recipient = '';
+
+        if ($channel === 'inapp') {
+            $recipient = (string) ((int) ($payload['userId'] ?? 0));
+        } elseif ($channel === 'email') {
+            $recipient = strtolower(trim((string) ($payload['email'] ?? '')));
+        } elseif ($channel === 'sms') {
+            $recipient = trim((string) ($payload['phone'] ?? ''));
+        }
+
+        if ($runId <= 0 || $campaignId <= 0 || $channel === '' || $recipient === '') {
+            return;
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE marketing_campaign_recipients
+                SET status = :status,
+                    error_text = :error_text,
+                    processed_at = NOW()
+              WHERE run_id = :run_id
+                AND campaign_id = :campaign_id
+                AND channel = :channel
+                AND recipient = :recipient
+                AND status = "queued"
+              ORDER BY id ASC
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':status' => $status,
+            ':error_text' => $error,
+            ':run_id' => $runId,
+            ':campaign_id' => $campaignId,
+            ':channel' => $channel,
+            ':recipient' => $recipient,
+        ]);
     }
 
     private function labelOrderStatus(string $status): string

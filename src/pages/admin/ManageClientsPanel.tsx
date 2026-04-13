@@ -272,7 +272,7 @@ export default function ManageClientsPanel({ onView }: Props) {
                             <button type="button" onClick={() => onView(item)}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap transition-colors">
                               <ExternalLink className="w-3.5 h-3.5" />
-                              View Profile
+                              View Client 360
                             </button>
                             <button type="button" disabled={isTogglingThis}
                               onClick={() => handleToggleStatus(item.id, isClientActive, item.name)}
@@ -294,7 +294,7 @@ export default function ManageClientsPanel({ onView }: Props) {
                           <button type="button" onClick={() => onView(item)}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap transition-colors">
                             <ExternalLink className="w-3.5 h-3.5" />
-                            View Profile
+                            View Client 360
                           </button>
                         </td>
                       )}

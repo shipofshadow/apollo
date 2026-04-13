@@ -138,6 +138,9 @@ class Router
             $r->addRoute('PATCH', '/api/bookings/{id}/reschedule',        'handleBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/admin-reschedule', 'handleAdminBookingReschedule');
             $r->addRoute('PATCH', '/api/bookings/{id}/parts',             'handleBookingPartsUpdate');
+            $r->addRoute('GET',   '/api/bookings/{id}/parts/requirements', 'handleBookingPartRequirementList');
+            $r->addRoute('POST',  '/api/bookings/{id}/parts/requirements', 'handleBookingPartRequirementCreate');
+            $r->addRoute('PATCH', '/api/bookings/{id}/parts/requirements/{rid:\d+}', 'handleBookingPartRequirementUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/qa-photos',         'handleBookingQaPhotosUpdate');
             $r->addRoute('PATCH', '/api/bookings/{id}/notes',             'handleBookingInternalNotes');
             $r->addRoute('PATCH', '/api/bookings/{id}/calibration',       'handleBookingCalibrationUpdate');
@@ -288,6 +291,7 @@ class Router
             $r->addRoute('GET',  '/api/admin/clients', 'handleAdminClientList');
             $r->addRoute('GET',  '/api/admin/clients/{id:\d+}/bookings', 'handleAdminClientBookings');
             $r->addRoute('GET',  '/api/admin/clients/{id:\d+}/vehicles', 'handleAdminClientVehicles');
+            $r->addRoute('GET',  '/api/admin/customers/{id:\d+}/360', 'handleAdminCustomer360');
             $r->addRoute('GET',  '/api/admin/roles',   'handleAdminRoleList');
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit', 'handleAdminSecurityAuditList');
@@ -298,6 +302,26 @@ class Router
             $r->addRoute('GET',  '/api/admin/notification-queue/health', 'handleAdminNotificationQueueHealth');
             $r->addRoute('POST', '/api/admin/notification-queue/replay-failed', 'handleAdminNotificationQueueReplayFailed');
             $r->addRoute('POST', '/api/admin/notification-queue/{id:\d+}/replay', 'handleAdminNotificationQueueReplayOne');
+            $r->addRoute('GET',  '/api/admin/campaigns', 'handleAdminCampaignList');
+            $r->addRoute('POST', '/api/admin/campaigns', 'handleAdminCampaignCreate');
+            $r->addRoute('GET',  '/api/admin/campaigns/{id:\d+}', 'handleAdminCampaignGet');
+            $r->addRoute('PATCH', '/api/admin/campaigns/{id:\d+}', 'handleAdminCampaignUpdate');
+            $r->addRoute('POST', '/api/admin/campaigns/{id:\d+}/run', 'handleAdminCampaignRun');
+            $r->addRoute('POST', '/api/admin/campaigns/{id:\d+}/dry-run', 'handleAdminCampaignDryRun');
+            $r->addRoute('POST', '/api/admin/campaigns/run-scheduled', 'handleAdminCampaignRunScheduled');
+            $r->addRoute('GET',  '/api/admin/campaigns/{id:\d+}/analytics', 'handleAdminCampaignAnalytics');
+            $r->addRoute('GET',  '/api/admin/campaign-audiences/{type:[a-z0-9_-]+}', 'handleAdminCampaignAudience');
+            $r->addRoute('GET',  '/api/admin/inventory/items', 'handleAdminInventoryItemList');
+            $r->addRoute('POST', '/api/admin/inventory/items', 'handleAdminInventoryItemCreate');
+            $r->addRoute('PATCH', '/api/admin/inventory/items/{id:\d+}', 'handleAdminInventoryItemUpdate');
+            $r->addRoute('GET',  '/api/admin/inventory/movements', 'handleAdminInventoryMovementList');
+            $r->addRoute('POST', '/api/admin/inventory/adjust', 'handleAdminInventoryAdjust');
+            $r->addRoute('GET',  '/api/admin/inventory/alerts', 'handleAdminInventoryAlertList');
+            $r->addRoute('GET',  '/api/admin/inventory/suppliers', 'handleAdminInventorySupplierList');
+            $r->addRoute('POST', '/api/admin/inventory/suppliers', 'handleAdminInventorySupplierCreate');
+            $r->addRoute('GET',  '/api/admin/inventory/purchase-orders', 'handleAdminInventoryPurchaseOrderList');
+            $r->addRoute('POST', '/api/admin/inventory/purchase-orders', 'handleAdminInventoryPurchaseOrderCreate');
+            $r->addRoute('PATCH', '/api/admin/inventory/purchase-orders/{id:\d+}/status', 'handleAdminInventoryPurchaseOrderStatus');
             $r->addRoute('POST', '/api/admin/roles',   'handleAdminRoleCreate');
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
@@ -1439,6 +1463,37 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleBookingPartRequirementList(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $bookingId = (string) ($vars['id'] ?? '');
+        $requirements = (new InventoryService())->listBookingPartRequirements($bookingId);
+        echo json_encode(['requirements' => $requirements]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingPartRequirementCreate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('bookings:manage');
+        $bookingId = (string) ($vars['id'] ?? '');
+        $data = $this->jsonBody();
+        $requirement = (new InventoryService())->createBookingPartRequirement($bookingId, $data, (int) ($payload['sub'] ?? 0) ?: null);
+        http_response_code(201);
+        echo json_encode(['requirement' => $requirement]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleBookingPartRequirementUpdate(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $bookingId = (string) ($vars['id'] ?? '');
+        $reqId = (int) ($vars['rid'] ?? 0);
+        $data = $this->jsonBody();
+        $requirement = (new InventoryService())->updateBookingPartRequirement($bookingId, $reqId, $data);
+        echo json_encode(['requirement' => $requirement]);
+    }
+
+    /** @param array<string, string> $vars */
     private function handleBookingQaPhotosUpdate(array $vars = []): void
     {
         $payload = $this->requirePermission('bookings:manage');
@@ -1885,6 +1940,203 @@ class Router
         }
         $vehicles = (new VehicleCrudService())->getByUserId($id);
         echo json_encode(['vehicles' => $vehicles]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCustomer360(array $vars = []): void
+    {
+        $this->requirePermission('clients:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid customer id.', 422);
+        }
+
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 25;
+        $customer360 = (new Customer360Service())->getByUserId($id, $limit);
+        echo json_encode(['customer360' => $customer360]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignList(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        echo json_encode(['campaigns' => (new MarketingCampaignService())->listCampaigns()]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignGet(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $campaign = (new MarketingCampaignService())->getCampaign($id);
+        echo json_encode(['campaign' => $campaign]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignCreate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('settings:manage');
+        $data = $this->jsonBody();
+        $campaign = (new MarketingCampaignService())->createCampaign($data, (int) ($payload['sub'] ?? 0) ?: null);
+        http_response_code(201);
+        echo json_encode(['campaign' => $campaign]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignUpdate(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $campaign = (new MarketingCampaignService())->updateCampaign($id, $data);
+        echo json_encode(['campaign' => $campaign]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignRun(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $result = (new MarketingCampaignService())->runCampaign($id, false);
+        echo json_encode(['result' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignDryRun(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $result = (new MarketingCampaignService())->runCampaign($id, true);
+        echo json_encode(['result' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignRunScheduled(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $body = $this->jsonBody();
+        $limit = isset($body['limit']) ? (int) $body['limit'] : 20;
+        $result = (new MarketingCampaignService())->runScheduledDue($limit);
+        echo json_encode(['result' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignAnalytics(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        echo json_encode((new MarketingCampaignService())->analytics($id));
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminCampaignAudience(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $type = (string) ($vars['type'] ?? '');
+        echo json_encode(['audience' => (new MarketingCampaignService())->getAudience($type)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryItemList(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $filters = [
+            'search' => (string) ($_GET['search'] ?? ''),
+            'lowStockOnly' => ((string) ($_GET['lowStockOnly'] ?? 'false')) === 'true',
+        ];
+        echo json_encode(['items' => (new InventoryService())->listItems($filters)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryItemCreate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('products:manage');
+        $data = $this->jsonBody();
+        $item = (new InventoryService())->createItem($data, (int) ($payload['sub'] ?? 0) ?: null);
+        http_response_code(201);
+        echo json_encode(['item' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryItemUpdate(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $item = (new InventoryService())->updateItem($id, $data);
+        echo json_encode(['item' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryMovementList(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
+        echo json_encode(['movements' => (new InventoryService())->listMovements($limit)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryAdjust(array $vars = []): void
+    {
+        $payload = $this->requirePermission('products:manage');
+        $data = $this->jsonBody();
+        $item = (new InventoryService())->adjustStock($data, (int) ($payload['sub'] ?? 0) ?: null);
+        echo json_encode(['item' => $item]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryAlertList(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $status = (string) ($_GET['status'] ?? 'open');
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
+        echo json_encode(['alerts' => (new InventoryService())->listLowStockAlerts($status, $limit)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventorySupplierList(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        echo json_encode(['suppliers' => (new InventoryService())->listSuppliers()]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventorySupplierCreate(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $data = $this->jsonBody();
+        $supplier = (new InventoryService())->createSupplier($data);
+        http_response_code(201);
+        echo json_encode(['supplier' => $supplier]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryPurchaseOrderList(array $vars = []): void
+    {
+        $this->requirePermission('products:manage');
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
+        echo json_encode(['purchaseOrders' => (new InventoryService())->listPurchaseOrders($limit)]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryPurchaseOrderCreate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('products:manage');
+        $data = $this->jsonBody();
+        $purchaseOrder = (new InventoryService())->createPurchaseOrder($data, (int) ($payload['sub'] ?? 0) ?: null);
+        http_response_code(201);
+        echo json_encode(['purchaseOrder' => $purchaseOrder]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInventoryPurchaseOrderStatus(array $vars = []): void
+    {
+        $payload = $this->requirePermission('products:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $status = (string) ($data['status'] ?? '');
+        $purchaseOrder = (new InventoryService())->updatePurchaseOrderStatus($id, $status, (int) ($payload['sub'] ?? 0) ?: null);
+        echo json_encode(['purchaseOrder' => $purchaseOrder]);
     }
 
     /** @param array<string, string> $vars */

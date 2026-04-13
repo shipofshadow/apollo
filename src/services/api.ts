@@ -1,4 +1,4 @@
-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse, NotificationQueueResponse, NotificationQueueHealth } from '../types';
+import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse, NotificationQueueResponse, NotificationQueueHealth, Customer360Data, MarketingCampaign, MarketingCampaignRunResult, CampaignAudienceRecipient, CampaignAnalyticsData, InventoryItem, InventoryMovement, InventoryAlert, InventorySupplier, PurchaseOrder, BookingPartRequirement } from '../types';
 import { BACKEND_URL } from '../config';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -837,6 +837,163 @@ export const fetchAdminClientBookingsApi = (token: string, clientId: number) =>
 
 export const fetchAdminClientVehiclesApi = (token: string, clientId: number) =>
   apiFetch<{ vehicles: ClientVehicle[] }>(`/api/admin/clients/${clientId}/vehicles`, {}, token);
+
+export const fetchAdminCustomer360Api = (token: string, clientId: number, limit = 25) =>
+  apiFetch<{ customer360: Customer360Data }>(`/api/admin/customers/${clientId}/360?limit=${encodeURIComponent(String(limit))}`, {}, token);
+
+// ── Marketing Campaigns API ────────────────────────────────────────────────
+
+export const fetchCampaignsApi = (token: string) =>
+  apiFetch<{ campaigns: MarketingCampaign[] }>('/api/admin/campaigns', {}, token);
+
+export const fetchCampaignApi = (token: string, id: number) =>
+  apiFetch<{ campaign: MarketingCampaign }>(`/api/admin/campaigns/${id}`, {}, token);
+
+export const createCampaignApi = (
+  token: string,
+  data: Partial<MarketingCampaign> & { name: string; type: MarketingCampaign['type']; message: string; channels: MarketingCampaign['channels'] }
+) =>
+  apiFetch<{ campaign: MarketingCampaign }>('/api/admin/campaigns', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateCampaignApi = (
+  token: string,
+  id: number,
+  data: Partial<MarketingCampaign>
+) =>
+  apiFetch<{ campaign: MarketingCampaign }>(`/api/admin/campaigns/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
+
+export const runCampaignApi = (token: string, id: number) =>
+  apiFetch<{ result: MarketingCampaignRunResult }>(`/api/admin/campaigns/${id}/run`, {
+    method: 'POST',
+  }, token);
+
+export const dryRunCampaignApi = (token: string, id: number) =>
+  apiFetch<{ result: MarketingCampaignRunResult }>(`/api/admin/campaigns/${id}/dry-run`, {
+    method: 'POST',
+  }, token);
+
+export const runScheduledCampaignsApi = (token: string, limit = 20) =>
+  apiFetch<{ result: { processed: number; queuedDeliveries: number; errors: Array<{ campaignId: number; message: string }> } }>('/api/admin/campaigns/run-scheduled', {
+    method: 'POST',
+    body: JSON.stringify({ limit }),
+  }, token);
+
+export const fetchCampaignAudienceApi = (token: string, type: MarketingCampaign['type']) =>
+  apiFetch<{ audience: CampaignAudienceRecipient[] }>(`/api/admin/campaign-audiences/${encodeURIComponent(type)}`, {}, token);
+
+export const fetchCampaignAnalyticsApi = (token: string, id: number) =>
+  apiFetch<CampaignAnalyticsData>(`/api/admin/campaigns/${id}/analytics`, {}, token);
+
+// ── Inventory API ──────────────────────────────────────────────────────────
+
+export const fetchInventoryItemsApi = (token: string, params: { search?: string; lowStockOnly?: boolean } = {}) => {
+  const query = new URLSearchParams();
+  if (params.search) query.set('search', params.search);
+  if (params.lowStockOnly) query.set('lowStockOnly', 'true');
+  const qs = query.toString();
+  return apiFetch<{ items: InventoryItem[] }>(`/api/admin/inventory/items${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export const createInventoryItemApi = (token: string, data: Partial<InventoryItem> & { sku: string; name: string }) =>
+  apiFetch<{ item: InventoryItem }>('/api/admin/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateInventoryItemApi = (token: string, id: number, data: Partial<InventoryItem>) =>
+  apiFetch<{ item: InventoryItem }>(`/api/admin/inventory/items/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
+
+export const adjustInventoryApi = (
+  token: string,
+  data: { itemId: number; quantityDelta: number; note?: string }
+) =>
+  apiFetch<{ item: InventoryItem }>('/api/admin/inventory/adjust', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const fetchInventoryMovementsApi = (token: string, limit = 100) =>
+  apiFetch<{ movements: InventoryMovement[] }>(`/api/admin/inventory/movements?limit=${encodeURIComponent(String(limit))}`, {}, token);
+
+export const fetchInventoryAlertsApi = (token: string, status: 'open' | 'resolved' | 'all' = 'open', limit = 100) =>
+  apiFetch<{ alerts: InventoryAlert[] }>(`/api/admin/inventory/alerts?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(String(limit))}`, {}, token);
+
+export const fetchInventorySuppliersApi = (token: string) =>
+  apiFetch<{ suppliers: InventorySupplier[] }>('/api/admin/inventory/suppliers', {}, token);
+
+export const createInventorySupplierApi = (token: string, data: Partial<InventorySupplier> & { name: string }) =>
+  apiFetch<{ supplier: InventorySupplier }>('/api/admin/inventory/suppliers', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const fetchPurchaseOrdersApi = (token: string, limit = 100) =>
+  apiFetch<{ purchaseOrders: PurchaseOrder[] }>(`/api/admin/inventory/purchase-orders?limit=${encodeURIComponent(String(limit))}`, {}, token);
+
+export const createPurchaseOrderApi = (
+  token: string,
+  data: {
+    supplierId?: number | null;
+    notes?: string;
+    expectedAt?: string;
+    items: Array<{ itemId: number; quantity: number; unitCost: number }>;
+  }
+) =>
+  apiFetch<{ purchaseOrder: PurchaseOrder }>('/api/admin/inventory/purchase-orders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updatePurchaseOrderStatusApi = (
+  token: string,
+  id: number,
+  status: PurchaseOrder['status']
+) =>
+  apiFetch<{ purchaseOrder: PurchaseOrder }>(`/api/admin/inventory/purchase-orders/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }, token);
+
+// ── Booking Part Requirements API ─────────────────────────────────────────
+
+export const fetchBookingPartRequirementsApi = (token: string, bookingId: string) =>
+  apiFetch<{ requirements: BookingPartRequirement[] }>(`/api/bookings/${encodeURIComponent(bookingId)}/parts/requirements`, {}, token);
+
+export const createBookingPartRequirementApi = (
+  token: string,
+  bookingId: string,
+  data: {
+    partName: string;
+    quantity: number;
+    inventoryItemId?: number | null;
+    supplierId?: number | null;
+    note?: string;
+  }
+) =>
+  apiFetch<{ requirement: BookingPartRequirement }>(`/api/bookings/${encodeURIComponent(bookingId)}/parts/requirements`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateBookingPartRequirementApi = (
+  token: string,
+  bookingId: string,
+  requirementId: number,
+  data: Partial<Pick<BookingPartRequirement, 'status' | 'note' | 'supplierId' | 'poItemId'>>
+) =>
+  apiFetch<{ requirement: BookingPartRequirement }>(`/api/bookings/${encodeURIComponent(bookingId)}/parts/requirements/${requirementId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
 
 export const fetchAdminRolesApi = (token: string) =>
   apiFetch<{ roles: AdminRole[] }>('/api/admin/roles', {}, token);

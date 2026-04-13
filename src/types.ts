@@ -124,6 +124,234 @@ export interface ClientAdminSummary {
   lastBookingAt: string | null;
 }
 
+export interface Customer360Profile {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Customer360Booking {
+  id: string;
+  referenceNumber: string | null;
+  serviceName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Customer360Order {
+  id: number;
+  orderNumber: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Customer360Communication {
+  source: 'inapp' | 'queue' | string;
+  event: string;
+  title: string;
+  message: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface Customer360Spend {
+  lifetimeSpend: number;
+  spend30d: number;
+  spend90d: number;
+  avgOrderValue: number;
+  totalOrders: number;
+  totalBookings: number;
+  completedBookings: number;
+  bookings30d: number;
+  bookings90d: number;
+}
+
+export interface Customer360Data {
+  profile: Customer360Profile;
+  vehicles: ClientVehicle[];
+  bookings: Customer360Booking[];
+  orders: Customer360Order[];
+  reviews: BookingReview[];
+  spend: Customer360Spend;
+  communications: Customer360Communication[];
+}
+
+export interface MarketingCampaign {
+  id: number;
+  name: string;
+  type: 'abandoned_cart' | 'no_booking_90d' | 'win_back';
+  status: 'draft' | 'active' | 'paused';
+  scheduleEnabled: boolean;
+  scheduleType: 'manual' | 'daily' | 'weekly' | 'monthly';
+  scheduleTime: string;
+  scheduleWeekday: number | null;
+  scheduleDay: number | null;
+  scheduleTimezone: string;
+  channels: Array<'inapp' | 'email' | 'sms'>;
+  title: string;
+  message: string;
+  ctaUrl: string | null;
+  triggerConfig: Record<string, unknown>;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignAudienceRecipient {
+  userId: number;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface MarketingCampaignRunResult {
+  runId: number;
+  campaign: MarketingCampaign;
+  targetCount: number;
+  queuedCount: number;
+  dryRun: boolean;
+  previewRecipients: CampaignAudienceRecipient[];
+}
+
+export interface CampaignFailureSummary {
+  channel: 'inapp' | 'email' | 'sms' | string;
+  error: string;
+  total: number;
+}
+
+export interface CampaignRecentFailure {
+  runId: number;
+  userId: number | null;
+  channel: 'inapp' | 'email' | 'sms' | string;
+  recipient: string;
+  error: string;
+  processedAt: string | null;
+}
+
+export interface CampaignAnalyticsData {
+  campaign: MarketingCampaign;
+  totals: { total: number; queued: number; sent: number; failed: number };
+  byChannel: Array<{ channel: string; total: number }>;
+  byStatusByChannel: Array<{ channel: string; status: string; total: number }>;
+  failureSummary: CampaignFailureSummary[];
+  recentFailures: CampaignRecentFailure[];
+  runs: Array<{ id: number; runType: string; dryRun: boolean; targetCount: number; queuedCount: number; createdAt: string }>;
+}
+
+export interface InventoryItem {
+  id: number;
+  sku: string;
+  name: string;
+  category: string;
+  unit: string;
+  qtyOnHand: number;
+  reorderPoint: number;
+  unitCost: number;
+  supplierId: number | null;
+  supplierName: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventorySupplier {
+  id: number;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryMovement {
+  id: number;
+  itemId: number;
+  itemSku: string;
+  itemName: string;
+  movementType: string;
+  quantityDelta: number;
+  note: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  actorUserId: number | null;
+  actorName: string | null;
+  createdAt: string;
+}
+
+export interface InventoryAlert {
+  id: number;
+  itemId: number;
+  itemSku: string;
+  itemName: string;
+  status: 'open' | 'resolved';
+  qtySnapshot: number;
+  reorderPointSnapshot: number;
+  message: string;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface PurchaseOrderItem {
+  id: number;
+  itemId: number;
+  itemSku: string;
+  itemName: string;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  receivedQty: number;
+}
+
+export interface PurchaseOrder {
+  id: number;
+  poNumber: string;
+  supplierId: number | null;
+  supplierName: string | null;
+  status: 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled';
+  notes: string | null;
+  orderedAt: string | null;
+  expectedAt: string | null;
+  receivedAt: string | null;
+  createdBy: number | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PurchaseOrderItem[];
+}
+
+export interface BookingPartRequirement {
+  id: number;
+  bookingId: string;
+  inventoryItemId: number | null;
+  inventorySku: string | null;
+  inventoryName: string | null;
+  partName: string;
+  quantity: number;
+  status: 'needed' | 'ordered' | 'arrived' | 'installed' | 'cancelled';
+  supplierId: number | null;
+  supplierName: string | null;
+  poItemId: number | null;
+  note: string;
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ServiceItem {
   id: string;
   title: string;

@@ -29,10 +29,15 @@ import {
   fetchCustomerStatsApi,
   fetchAssignableUsersApi,
   assignBookingTechnicianApi,
+  fetchBookingPartRequirementsApi,
+  createBookingPartRequirementApi,
+  updateBookingPartRequirementApi,
+  fetchInventoryItemsApi,
+  fetchInventorySuppliersApi,
   type AdminManagedUser,
 } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog } from '../../types';
+import type { Booking, BuildUpdate, ShopDayHours, CustomerStats, BookingActivityLog, BookingPartRequirement, InventoryItem, InventorySupplier } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -354,6 +359,18 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [partsOpen,     setPartsOpen]     = useState(false);
   const [partsNotes,    setPartsNotes]    = useState('');
   const [partsBusy,     setPartsBusy]     = useState(false);
+  const [partRequirements, setPartRequirements] = useState<BookingPartRequirement[]>([]);
+  const [partReqLoading, setPartReqLoading] = useState(false);
+  const [partReqSaving, setPartReqSaving] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [suppliers, setSuppliers] = useState<InventorySupplier[]>([]);
+  const [partReqForm, setPartReqForm] = useState({
+    partName: '',
+    quantity: 1,
+    inventoryItemId: 0,
+    supplierId: 0,
+    note: '',
+  });
   const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
   const [deleteBusy,    setDeleteBusy]    = useState(false);
   const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
@@ -436,6 +453,25 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       .catch(() => {});
   }, [token, bookingId]);
 
+  const reloadPartRequirements = async () => {
+    if (!token || !bookingId) return;
+    setPartReqLoading(true);
+    try {
+      const [{ requirements }, itemsRes, suppliersRes] = await Promise.all([
+        fetchBookingPartRequirementsApi(token, bookingId),
+        fetchInventoryItemsApi(token, {}),
+        fetchInventorySuppliersApi(token),
+      ]);
+      setPartRequirements(requirements ?? []);
+      setInventoryItems(itemsRes.items ?? []);
+      setSuppliers(suppliersRes.suppliers ?? []);
+    } catch {
+      setPartRequirements([]);
+    } finally {
+      setPartReqLoading(false);
+    }
+  };
+
   const reloadActivity = async () => {
     if (!token || !bookingId) return;
     try {
@@ -448,6 +484,10 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
   useEffect(() => {
     void reloadActivity();
+  }, [token, bookingId]);
+
+  useEffect(() => {
+    void reloadPartRequirements();
   }, [token, bookingId]);
 
   const requestConfirmation = (dialog: ConfirmDialogState, action: () => Promise<void>) => {
@@ -568,6 +608,48 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       showToast((e as Error).message ?? 'Failed to save parts info.', 'error');
     } finally {
       setPartsBusy(false); }
+  };
+
+  const handleCreatePartRequirement = async () => {
+    if (!token || !booking) return;
+    if (!partReqForm.partName.trim() || partReqForm.quantity <= 0) {
+      showToast('Part name and quantity are required.', 'error');
+      return;
+    }
+
+    setPartReqSaving(true);
+    try {
+      await createBookingPartRequirementApi(token, booking.id, {
+        partName: partReqForm.partName,
+        quantity: Number(partReqForm.quantity),
+        inventoryItemId: partReqForm.inventoryItemId > 0 ? partReqForm.inventoryItemId : null,
+        supplierId: partReqForm.supplierId > 0 ? partReqForm.supplierId : null,
+        note: partReqForm.note,
+      });
+      setPartReqForm({ partName: '', quantity: 1, inventoryItemId: 0, supplierId: 0, note: '' });
+      showToast('Part requirement added.', 'success');
+      await reloadPartRequirements();
+      await reloadActivity();
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to add part requirement.', 'error');
+    } finally {
+      setPartReqSaving(false);
+    }
+  };
+
+  const handleRequirementStatusUpdate = async (requirementId: number, status: BookingPartRequirement['status']) => {
+    if (!token || !booking) return;
+    setPartReqSaving(true);
+    try {
+      await updateBookingPartRequirementApi(token, booking.id, requirementId, { status });
+      await reloadPartRequirements();
+      await reloadActivity();
+      showToast('Part requirement updated.', 'success');
+    } catch (e: unknown) {
+      showToast((e as Error).message ?? 'Failed to update part requirement.', 'error');
+    } finally {
+      setPartReqSaving(false);
+    }
   };
 
   const handleBuildPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1060,6 +1142,109 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-purple-300 flex items-center gap-2">
+                <Package className="w-3.5 h-3.5" /> Structured Part Requirements
+              </p>
+              <button
+                type="button"
+                onClick={() => void reloadPartRequirements()}
+                className="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-white"
+                disabled={partReqLoading || partReqSaving}
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
+              <input
+                value={partReqForm.partName}
+                onChange={e => setPartReqForm(prev => ({ ...prev, partName: e.target.value }))}
+                placeholder="Part name"
+                className="md:col-span-2 bg-[#181818] border border-gray-800 text-white px-3 py-2 rounded text-sm"
+              />
+              <input
+                type="number"
+                min={1}
+                value={partReqForm.quantity}
+                onChange={e => setPartReqForm(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+                placeholder="Qty"
+                className="bg-[#181818] border border-gray-800 text-white px-3 py-2 rounded text-sm"
+              />
+              <select
+                value={partReqForm.inventoryItemId}
+                onChange={e => setPartReqForm(prev => ({ ...prev, inventoryItemId: Number(e.target.value) }))}
+                className="bg-[#181818] border border-gray-800 text-white px-3 py-2 rounded text-sm"
+              >
+                <option value={0}>Link inventory (optional)</option>
+                {inventoryItems.slice(0, 300).map(item => (
+                  <option key={item.id} value={item.id}>{item.sku} - {item.name}</option>
+                ))}
+              </select>
+              <select
+                value={partReqForm.supplierId}
+                onChange={e => setPartReqForm(prev => ({ ...prev, supplierId: Number(e.target.value) }))}
+                className="bg-[#181818] border border-gray-800 text-white px-3 py-2 rounded text-sm"
+              >
+                <option value={0}>Supplier (optional)</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                value={partReqForm.note}
+                onChange={e => setPartReqForm(prev => ({ ...prev, note: e.target.value }))}
+                placeholder="Note (optional)"
+                className="flex-1 bg-[#181818] border border-gray-800 text-white px-3 py-2 rounded text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void handleCreatePartRequirement()}
+                disabled={partReqSaving || !partReqForm.partName.trim()}
+                className="px-4 py-2 bg-purple-600/20 border border-purple-500/50 hover:bg-purple-600/35 text-purple-200 text-[10px] font-bold uppercase tracking-widest rounded disabled:opacity-40"
+              >
+                {partReqSaving ? 'Saving...' : 'Add Part'}
+              </button>
+            </div>
+
+            {partReqLoading ? (
+              <div className="text-sm text-gray-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Loading part requirements...</div>
+            ) : partRequirements.length === 0 ? (
+              <p className="text-sm text-gray-500">No structured part requirements yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-auto">
+                {partRequirements.map(req => (
+                  <div key={req.id} className="border border-gray-800 rounded p-3 bg-[#151515] flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-white font-semibold">{req.partName} <span className="text-gray-500">x{req.quantity}</span></p>
+                      <select
+                        value={req.status}
+                        onChange={e => void handleRequirementStatusUpdate(req.id, e.target.value as BookingPartRequirement['status'])}
+                        className="bg-[#121212] border border-gray-700 text-xs text-white px-2 py-1 rounded"
+                        disabled={partReqSaving}
+                      >
+                        <option value="needed">Needed</option>
+                        <option value="ordered">Ordered</option>
+                        <option value="arrived">Arrived</option>
+                        <option value="installed">Installed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {req.inventorySku ? `${req.inventorySku} • ${req.inventoryName ?? ''}` : 'Not linked to inventory'}
+                      {req.supplierName ? ` • Supplier: ${req.supplierName}` : ''}
+                    </p>
+                    {req.note ? <p className="text-xs text-gray-500">{req.note}</p> : null}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Reference Imagery */}

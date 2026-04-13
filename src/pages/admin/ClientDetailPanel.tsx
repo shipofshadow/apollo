@@ -5,8 +5,9 @@ import { useToast } from '../../context/ToastContext';
 import {
   fetchAdminClientBookingsApi,
   fetchAdminClientVehiclesApi,
+  fetchAdminCustomer360Api,
 } from '../../services/api';
-import type { Booking, ClientAdminSummary, ClientVehicle } from '../../types';
+import type { Booking, ClientAdminSummary, ClientVehicle, Customer360Data } from '../../types';
 import { formatStatus } from '../../utils/formatStatus';
 import { StatusBadge, Breadcrumbs, Pager, TABLE_PAGE_SIZE } from './_sharedComponents';
 
@@ -30,8 +31,10 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [vehicles, setVehicles] = useState<ClientVehicle[]>([]);
+  const [customer360, setCustomer360] = useState<Customer360Data | null>(null);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [loading360, setLoading360] = useState(false);
   const [bookingsPage, setBookingsPage] = useState(1);
 
   const bookingTotalPages = Math.max(1, Math.ceil(bookings.length / TABLE_PAGE_SIZE));
@@ -51,6 +54,22 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
         showToast((e as Error).message ?? 'Failed to load bookings.', 'error');
       } finally {
         setLoadingBookings(false);
+      }
+    })();
+  }, [token, client.id]);
+
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      setLoading360(true);
+      try {
+        const { customer360: data } = await fetchAdminCustomer360Api(token, client.id, 15);
+        setCustomer360(data ?? null);
+      } catch (e) {
+        setCustomer360(null);
+        showToast((e as Error).message ?? 'Failed to load customer 360 insights.', 'error');
+      } finally {
+        setLoading360(false);
       }
     })();
   }, [token, client.id]);
@@ -150,6 +169,53 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
         </div>
       </section>
 
+      {/* Customer 360 Insights */}
+      <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Customer 360 Insights</p>
+          {loading360 ? <Loader2 className="w-4 h-4 animate-spin text-brand-orange" /> : null}
+        </div>
+
+        {!loading360 && customer360 ? (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Metric label="Lifetime Spend" value={`PHP ${customer360.spend.lifetimeSpend.toFixed(2)}`} />
+              <Metric label="Spend 90D" value={`PHP ${customer360.spend.spend90d.toFixed(2)}`} />
+              <Metric label="Orders" value={String(customer360.spend.totalOrders)} />
+              <Metric label="Completed Bookings" value={String(customer360.spend.completedBookings)} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-gray-800 bg-brand-darker/70 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Recent Communications</p>
+                <div className="space-y-1 max-h-40 overflow-auto">
+                  {customer360.communications.length === 0 ? (
+                    <p className="text-xs text-gray-500">No communication history.</p>
+                  ) : customer360.communications.slice(0, 8).map((event, idx) => (
+                    <p key={`${event.createdAt}-${idx}`} className="text-xs text-gray-300">
+                      {event.source.toUpperCase()} • {event.title || event.event} • {new Date(event.createdAt).toLocaleString()}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-800 bg-brand-darker/70 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">Recent Reviews</p>
+                <div className="space-y-1 max-h-40 overflow-auto">
+                  {customer360.reviews.length === 0 ? (
+                    <p className="text-xs text-gray-500">No reviews yet.</p>
+                  ) : customer360.reviews.slice(0, 8).map(review => (
+                    <p key={review.id} className="text-xs text-gray-300">
+                      {review.serviceName} • {review.rating}/5{review.review ? ` • ${review.review}` : ''}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </section>
+
       {/* Vehicles */}
       <section className="rounded-xl border border-gray-800 bg-brand-dark p-5 space-y-4">
         <div className="flex items-center gap-1.5">
@@ -247,6 +313,15 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-800 bg-brand-darker/70 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-widest text-gray-500">{label}</p>
+      <p className="text-sm font-semibold text-white mt-1">{value}</p>
     </div>
   );
 }

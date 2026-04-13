@@ -205,6 +205,24 @@ class SmsService
         );
     }
 
+    /**
+     * Send a generic campaign SMS to a client.
+     */
+    public function marketingCampaignMessage(string $phone, string $message): void
+    {
+        $to = $this->normalisePhone($phone);
+        if ($to === '') {
+            return;
+        }
+
+        $text = trim($message);
+        if ($text === '') {
+            return;
+        }
+
+        $this->send($to, mb_substr($text, 0, 480));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────

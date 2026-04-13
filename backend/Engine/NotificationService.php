@@ -305,6 +305,41 @@ class NotificationService
     }
 
     /**
+     * Send a generic marketing campaign email.
+     */
+    public function marketingCampaignMessage(
+        string $email,
+        string $name,
+        string $title,
+        string $message,
+        string $ctaUrl = ''
+    ): void {
+        if (MAIL_FROM === '' || trim($email) === '') {
+            return;
+        }
+
+        $safeName = htmlspecialchars($name !== '' ? $name : 'Customer');
+        $safeTitle = htmlspecialchars($title !== '' ? $title : 'Special Offer');
+        $safeMessage = nl2br(htmlspecialchars($message));
+        $safeCta = htmlspecialchars($ctaUrl);
+
+        $ctaBlock = $safeCta !== ''
+            ? '<p style="margin-top:24px"><a href="' . $safeCta . '" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:700">Claim Offer</a></p>'
+            : '';
+
+        $body = '
+        <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:12px">
+          <p style="margin:0 0 12px 0;color:#9ca3af">Hi ' . $safeName . ',</p>
+          <h2 style="margin:0 0 14px 0;color:#fff">' . $safeTitle . '</h2>
+          <div style="line-height:1.6;color:#d1d5db">' . $safeMessage . '</div>
+          ' . $ctaBlock . '
+          <p style="margin-top:24px;color:#9ca3af;font-size:12px">1625 Auto Lab</p>
+        </div>';
+
+        $this->send($email, $safeName, $safeTitle . ' | 1625 Auto Lab', $body);
+    }
+
+    /**
      * Send a password-reset link to the given email address.
      *
      * @param string $email     Recipient address (already validated as a known user).
