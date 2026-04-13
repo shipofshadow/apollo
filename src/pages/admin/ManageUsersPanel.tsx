@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, Filter, Loader2, Trash2, UserPlus, Users } from 'lucide-react';
+import { Ban, CheckCircle2, Filter, Loader2, LockIcon, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -347,7 +347,7 @@ export default function ManageUsersPanel() {
                             </select>
                             <RoleBadge role={item.role} />
                             {isProtected && (
-                              <span title="Only the owner can edit admin and owner accounts" className="text-[10px] text-gray-600 select-none">🔒 protected</span>
+                              <span title="Only the owner can edit admin and owner accounts" className="text-[10px] text-gray-600 select-none"><LockIcon className="w-3.5 h-3.5" /></span>
                             )}
                           </div>
                         </td>
