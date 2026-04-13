@@ -173,6 +173,8 @@ class SiteSettingsService
             'map_link_url'     => 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899',
             // Booking settings
             'slot_capacity'    => '3',
+            'staff_can_view_all_bookings' => '0',
+            'staff_can_manage_all_bookings' => '0',
             // Contact page settings
             'contact_heading'  => 'Contact The Lab',
             'contact_tagline'  => 'Ready to upgrade your ride? Reach out and we\'ll get back to you within 24 hours.',

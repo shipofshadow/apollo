@@ -627,6 +627,108 @@ class Router
         return $payload;
     }
 
+    private function getSiteSettingFlag(string $key, bool $default = false): bool
+    {
+        $settings = (new SiteSettingsService())->getAll();
+        $raw = strtolower(trim((string) ($settings[$key] ?? ($default ? '1' : '0'))));
+
+        return in_array($raw, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function isStaffRole(array $payload): bool
+    {
+        return strtolower(trim((string) ($payload['role'] ?? ''))) === 'staff';
+    }
+
+    private function staffCanViewAllBookings(): bool
+    {
+        return $this->getSiteSettingFlag('staff_can_view_all_bookings', false);
+    }
+
+    private function staffCanManageAllBookings(): bool
+    {
+        return $this->getSiteSettingFlag('staff_can_manage_all_bookings', false);
+    }
+
+    /** @param array<string, mixed> $booking */
+    private function bookingAssignedToUser(array $booking, int $userId): bool
+    {
+        if ($userId <= 0) {
+            return false;
+        }
+
+        $assignedTech = $booking['assignedTech'] ?? null;
+        if (!is_array($assignedTech)) {
+            return false;
+        }
+
+        $assignedUserId = isset($assignedTech['userId']) && $assignedTech['userId'] !== null
+            ? (int) $assignedTech['userId']
+            : 0;
+
+        return $assignedUserId > 0 && $assignedUserId === $userId;
+    }
+
+    /** @param array<string, mixed> $payload
+     *  @return array<int, array<string, mixed>>
+     */
+    private function getAccessibleBookingsForPayload(array $payload): array
+    {
+        $bookings = (new BookingService())->getAll();
+        if (!$this->isStaffRole($payload) || $this->staffCanViewAllBookings()) {
+            return $bookings;
+        }
+
+        $userId = (int) ($payload['sub'] ?? 0);
+        return array_values(array_filter(
+            $bookings,
+            fn(array $booking): bool => $this->bookingAssignedToUser($booking, $userId)
+        ));
+    }
+
+    /** @param array<string, mixed> $payload
+     *  @return array<string, mixed>
+     */
+    private function requireBookingVisibilityForPayload(array $payload, string $bookingId): array
+    {
+        $booking = (new BookingService())->adminFindById($bookingId);
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if (!$this->isStaffRole($payload) || $this->staffCanViewAllBookings()) {
+            return $booking;
+        }
+
+        if ($this->bookingAssignedToUser($booking, (int) ($payload['sub'] ?? 0))) {
+            return $booking;
+        }
+
+        throw new RuntimeException('Forbidden. Staff can only view assigned bookings.', 403);
+    }
+
+    /** @param array<string, mixed> $payload
+     *  @return array<string, mixed>
+     */
+    private function requireBookingMutationForPayload(array $payload, string $bookingId): array
+    {
+        $booking = (new BookingService())->adminFindById($bookingId);
+        if ($booking === null) {
+            throw new RuntimeException('Booking not found.', 404);
+        }
+
+        if (!$this->isStaffRole($payload) || $this->staffCanManageAllBookings()) {
+            return $booking;
+        }
+
+        if ($this->bookingAssignedToUser($booking, (int) ($payload['sub'] ?? 0))) {
+            return $booking;
+        }
+
+        throw new RuntimeException('Forbidden. Staff can only manage assigned bookings.', 403);
+    }
+
     // -------------------------------------------------------------------------
     // Public handlers
     // -------------------------------------------------------------------------
@@ -1160,8 +1262,8 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingList(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
-        $bookings = (new BookingService())->getAll();
+        $payload = $this->requirePermission('bookings:manage');
+        $bookings = $this->getAccessibleBookingsForPayload($payload);
         echo json_encode(['bookings' => $bookings]);
     }
 
@@ -1181,10 +1283,7 @@ class Router
         $userId  = (int) ($payload['sub'] ?? 0);
 
         if ($this->hasPermission($payload, 'bookings:manage')) {
-            $booking = (new BookingService())->adminFindById($id);
-            if ($booking === null) {
-                throw new RuntimeException('Booking not found.', 404);
-            }
+            $booking = $this->requireBookingVisibilityForPayload($payload, $id);
             echo json_encode(['booking' => $booking]);
             return;
         }
@@ -1205,7 +1304,9 @@ class Router
         $id      = $vars['id'] ?? '';
         $userId  = (int) ($payload['sub'] ?? 0);
 
-        if (!$this->hasPermission($payload, 'bookings:manage')) {
+        if ($this->hasPermission($payload, 'bookings:manage')) {
+            $this->requireBookingVisibilityForPayload($payload, $id);
+        } else {
             (new BookingService())->getById($id, $userId);
         }
 
@@ -1238,9 +1339,10 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminBookingReschedule(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $id   = $vars['id'] ?? '';
         $data = $this->jsonBody();
+        $this->requireBookingMutationForPayload($payload, $id);
 
         $date = trim((string) ($data['appointmentDate'] ?? ''));
         $time = trim((string) ($data['appointmentTime'] ?? ''));
@@ -1259,10 +1361,12 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingUpdate(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $id     = $vars['id'] ?? '';
         $data   = $this->jsonBody();
         $status = (string) ($data['status'] ?? '');
+
+        $this->requireBookingMutationForPayload($payload, $id);
 
         $booking = (new BookingService())->updateStatus($id, $status);
         echo json_encode(['booking' => $booking]);
@@ -1271,8 +1375,10 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingDelete(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $id = $vars['id'] ?? '';
+
+        $this->requireBookingMutationForPayload($payload, $id);
 
         (new BookingService())->delete($id);
         echo json_encode(['deleted' => true]);
@@ -1281,9 +1387,11 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingAssignTech(array $vars = []): void
     {
-        $this->requirePermission('bookings:assign-tech');
+        $payload = $this->requirePermission('bookings:assign-tech');
         $id   = $vars['id'] ?? '';
         $data = $this->jsonBody();
+
+        $this->requireBookingMutationForPayload($payload, $id);
 
         $rawUserId = $data['assignedUserId'] ?? ($data['assigned_user_id'] ?? null);
         $rawTechId = $data['assignedTechId'] ?? ($data['assigned_tech_id'] ?? null);
@@ -1453,11 +1561,13 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingPartsUpdate(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $id          = $vars['id'] ?? '';
         $data        = $this->jsonBody();
         $waiting     = (bool) ($data['awaitingParts'] ?? false);
         $partsNotes  = trim((string) ($data['partsNotes'] ?? ''));
+
+        $this->requireBookingMutationForPayload($payload, $id);
 
         $booking = (new BookingService())->updatePartsStatus($id, $waiting, $partsNotes);
         echo json_encode(['booking' => $booking]);
@@ -1466,8 +1576,9 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingPartRequirementList(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $bookingId = (string) ($vars['id'] ?? '');
+        $this->requireBookingVisibilityForPayload($payload, $bookingId);
         $requirements = (new InventoryService())->listBookingPartRequirements($bookingId);
         echo json_encode(['requirements' => $requirements]);
     }
@@ -1478,6 +1589,7 @@ class Router
         $payload = $this->requirePermission('bookings:manage');
         $bookingId = (string) ($vars['id'] ?? '');
         $data = $this->jsonBody();
+        $this->requireBookingMutationForPayload($payload, $bookingId);
         $requirement = (new InventoryService())->createBookingPartRequirement($bookingId, $data, (int) ($payload['sub'] ?? 0) ?: null);
         http_response_code(201);
         echo json_encode(['requirement' => $requirement]);
@@ -1486,10 +1598,11 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingPartRequirementUpdate(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $bookingId = (string) ($vars['id'] ?? '');
         $reqId = (int) ($vars['rid'] ?? 0);
         $data = $this->jsonBody();
+        $this->requireBookingMutationForPayload($payload, $bookingId);
         $requirement = (new InventoryService())->updateBookingPartRequirement($bookingId, $reqId, $data);
         echo json_encode(['requirement' => $requirement]);
     }
@@ -1500,6 +1613,8 @@ class Router
         $payload = $this->requirePermission('bookings:manage');
         $id      = $vars['id'] ?? '';
         $data    = $this->jsonBody();
+
+        $this->requireBookingMutationForPayload($payload, $id);
 
         $stage = trim((string) ($data['stage'] ?? ''));
         $photoUrls = array_values(array_filter(
@@ -1540,7 +1655,9 @@ class Router
         $userId  = (int) ($payload['sub'] ?? 0);
 
         // Users with build update permission see any booking; clients only their own.
-        if (!$this->hasAnyPermission($payload, ['build-updates:manage', 'bookings:manage'])) {
+        if ($this->hasAnyPermission($payload, ['build-updates:manage', 'bookings:manage'])) {
+            $this->requireBookingVisibilityForPayload($payload, $id);
+        } else {
             // Verify this booking belongs to the authenticated user
             (new BookingService())->getById($id, $userId);
         }
@@ -1556,6 +1673,7 @@ class Router
         $actorId   = (int) ($payload['sub'] ?? 0);
         $id        = $vars['id'] ?? '';
         $data      = $this->jsonBody();
+        $this->requireBookingMutationForPayload($payload, $id);
         $note      = trim((string) ($data['note'] ?? ''));
         $photoUrls = array_values(array_filter(
             is_array($data['photoUrls'] ?? null) ? $data['photoUrls'] : [],
@@ -1785,10 +1903,11 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingInternalNotes(array $vars = []): void
     {
-        $this->requirePermission('bookings:notes');
+        $payload = $this->requirePermission('bookings:notes');
         $id   = $vars['id'] ?? '';
         $data = json_decode(file_get_contents('php://input') ?: '{}', true) ?? [];
         $notes = mb_substr((string) ($data['internalNotes'] ?? ''), 0, 5000);
+        $this->requireBookingMutationForPayload($payload, $id);
         $booking = (new BookingService())->updateInternalNotes($id, $notes);
         echo json_encode(['booking' => $booking]);
     }
@@ -1922,12 +2041,19 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminClientBookings(array $vars = []): void
     {
-        $this->requirePermission('clients:manage');
+        $payload = $this->requirePermission('clients:manage');
         $id = (int) ($vars['id'] ?? 0);
         if ($id <= 0) {
             throw new RuntimeException('Invalid client id.', 422);
         }
         $bookings = (new BookingService())->getByUserId($id);
+        if ($this->isStaffRole($payload) && !$this->staffCanViewAllBookings()) {
+            $viewerId = (int) ($payload['sub'] ?? 0);
+            $bookings = array_values(array_filter(
+                $bookings,
+                fn(array $booking): bool => $this->bookingAssignedToUser($booking, $viewerId)
+            ));
+        }
         echo json_encode(['bookings' => $bookings]);
     }
 
@@ -1946,10 +2072,14 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAdminCustomer360(array $vars = []): void
     {
-        $this->requirePermission('clients:manage');
+        $payload = $this->requirePermission('clients:manage');
         $id = (int) ($vars['id'] ?? 0);
         if ($id <= 0) {
             throw new RuntimeException('Invalid customer id.', 422);
+        }
+
+        if ($this->isStaffRole($payload) && !$this->staffCanViewAllBookings()) {
+            throw new RuntimeException('Forbidden. Staff cannot open full customer records unless booking visibility is enabled in system settings.', 403);
         }
 
         $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 25;
@@ -3735,9 +3865,10 @@ class Router
     /** @param array<string, string> $vars */
     private function handleBookingCalibrationUpdate(array $vars = []): void
     {
-        $this->requirePermission('bookings:manage');
+        $payload = $this->requirePermission('bookings:manage');
         $id   = $vars['id'] ?? '';
         $data = $this->jsonBody();
+        $this->requireBookingMutationForPayload($payload, $id);
         $svc  = new BookingService();
         $booking = $svc->updateCalibrationData($id, $data);
         echo json_encode(['booking' => $booking]);
