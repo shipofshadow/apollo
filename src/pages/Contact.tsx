@@ -74,6 +74,17 @@ export default function ContactPage() {
   const email   = settings.contact_email   || settings.footer_email   || '';
   const hours   = settings.contact_hours   || "Mon–Fri: 9:00 AM – 6:00 PM\nSat: By Appointment Only\nSun: Closed";
 
+  const parseList = (...values: Array<string | undefined>): string[] => {
+    const entries = values
+      .flatMap(value => (value ?? '').split(/[\n,]/g))
+      .map(value => value.trim())
+      .filter(Boolean);
+    return Array.from(new Set(entries));
+  };
+
+  const phoneList = parseList(settings.contact_phones, phone, settings.footer_phones, settings.footer_phone);
+  const emailList = parseList(settings.contact_emails, email, settings.footer_emails, settings.footer_email);
+
   const DEFAULT_MAP_EMBED = 'https://www.openstreetmap.org/export/embed.html?bbox=120.6699%2C15.0086%2C120.7099%2C15.0486&layer=mapnik&marker=15.0286%2C120.6899';
   const DEFAULT_MAP_LINK  = 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899';
   const mapEmbed = settings.map_embed_url || DEFAULT_MAP_EMBED;
@@ -88,18 +99,6 @@ export default function ContactPage() {
       label: 'Location',
       content: address,
       multiline: true,
-    },
-    {
-      icon: Phone,
-      label: 'Phone',
-      content: phone,
-      href: phone ? `tel:${phone.replace(/\s/g, '')}` : undefined,
-    },
-    {
-      icon: Mail,
-      label: 'Email',
-      content: email,
-      href: email ? `mailto:${email}` : undefined,
     },
     {
       icon: Clock,
@@ -168,6 +167,46 @@ export default function ContactPage() {
                     </div>
                   </div>
                 ))}
+
+                {phoneList.length > 0 && (
+                  <div className="flex items-start gap-5">
+                    <div className="w-12 h-12 bg-brand-darker border border-gray-800 flex items-center justify-center shrink-0 rounded-sm">
+                      <Phone className="w-5 h-5 text-brand-orange" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Phone</p>
+                      <ul className="space-y-1">
+                        {phoneList.map(phoneEntry => (
+                          <li key={`contact-phone-${phoneEntry}`}>
+                            <a href={`tel:${phoneEntry.replace(/\s/g, '')}`} className="text-gray-300 text-sm hover:text-brand-orange transition-colors">
+                              {phoneEntry}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {emailList.length > 0 && (
+                  <div className="flex items-start gap-5">
+                    <div className="w-12 h-12 bg-brand-darker border border-gray-800 flex items-center justify-center shrink-0 rounded-sm">
+                      <Mail className="w-5 h-5 text-brand-orange" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Email</p>
+                      <ul className="space-y-1">
+                        {emailList.map(emailEntry => (
+                          <li key={`contact-email-${emailEntry}`}>
+                            <a href={`mailto:${emailEntry}`} className="text-gray-300 text-sm hover:text-brand-orange transition-colors break-all">
+                              {emailEntry}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Map */}

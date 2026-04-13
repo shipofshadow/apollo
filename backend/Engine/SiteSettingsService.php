@@ -164,7 +164,9 @@ class SiteSettingsService
             'footer_tagline'   => 'The premier automotive retrofitting shop. We turn ordinary vehicles into extraordinary machines.',
             'footer_address'   => "NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000",
             'footer_phone'     => '0939 330 8263',
+            'footer_phones'    => "0939 330 8263\n+639393308263",
             'footer_email'     => '1625autolab@gmail.com',
+            'footer_emails'    => "1625autolab@gmail.com\nservice@1625autolab.com",
             'footer_instagram' => 'https://www.instagram.com/1625autolab',
             'footer_facebook'  => 'https://www.facebook.com/1625autolab/',
             'footer_youtube'   => '',
@@ -180,7 +182,9 @@ class SiteSettingsService
             'contact_tagline'  => 'Ready to upgrade your ride? Reach out and we\'ll get back to you within 24 hours.',
             'contact_address'  => "NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000",
             'contact_phone'    => '0939 330 8263',
+            'contact_phones'   => "0939 330 8263\n+639393308263",
             'contact_email'    => '1625autolab@gmail.com',
+            'contact_emails'   => "1625autolab@gmail.com\nservice@1625autolab.com",
             'contact_hours'    => "Mon–Fri: 9:00 AM – 6:00 PM\nSat: By Appointment Only\nSun: Closed",
         ];
     }

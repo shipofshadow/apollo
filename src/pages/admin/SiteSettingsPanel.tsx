@@ -962,7 +962,9 @@ function FooterSettingsPanel() {
     footer_tagline:   '',
     footer_address:   '',
     footer_phone:     '',
+    footer_phones:    '',
     footer_email:     '',
+    footer_emails:    '',
     footer_instagram: '',
     footer_facebook:  '',
     footer_youtube:   '',
@@ -980,7 +982,9 @@ function FooterSettingsPanel() {
       footer_tagline:   settings.footer_tagline   ?? '',
       footer_address:   settings.footer_address   ?? '',
       footer_phone:     settings.footer_phone     ?? '',
+      footer_phones:    settings.footer_phones    ?? '',
       footer_email:     settings.footer_email     ?? '',
+      footer_emails:    settings.footer_emails    ?? '',
       footer_instagram: settings.footer_instagram ?? '',
       footer_facebook:  settings.footer_facebook  ?? '',
       footer_youtube:   settings.footer_youtube   ?? '',
@@ -1047,16 +1051,35 @@ function FooterSettingsPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Phone</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Phone</label>
               <input value={form.footer_phone}
                 onChange={e => setForm(f => ({ ...f, footer_phone: e.target.value }))}
                 className={inputCls} placeholder="0939 330 8263" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
-              <input type="email" value={form.footer_email}
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Email</label>
+              <input value={form.footer_email}
                 onChange={e => setForm(f => ({ ...f, footer_email: e.target.value }))}
                 className={inputCls} placeholder="info@example.com" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Phones</label>
+              <textarea rows={3} value={form.footer_phones}
+                onChange={e => setForm(f => ({ ...f, footer_phones: e.target.value }))}
+                className={`${inputCls} resize-none`}
+                placeholder={'One per line\n09123456789\n+639123456789'} />
+              <p className="text-xs text-gray-600">Shown in footer contact block. Supports one per line or comma-separated.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Emails</label>
+              <textarea rows={3} value={form.footer_emails}
+                onChange={e => setForm(f => ({ ...f, footer_emails: e.target.value }))}
+                className={`${inputCls} resize-none`}
+                placeholder={'One per line\ninfo@example.com\nservice@example.com'} />
+              <p className="text-xs text-gray-600">Shown in footer contact block. Supports one per line or comma-separated.</p>
             </div>
           </div>
 
@@ -1104,7 +1127,9 @@ function ContactPanel() {
     contact_tagline: '',
     contact_address: '',
     contact_phone:   '',
+    contact_phones:  '',
     contact_email:   '',
+    contact_emails:  '',
     contact_hours:   '',
   });
   const [saving,      setSaving]      = useState(false);
@@ -1119,7 +1144,9 @@ function ContactPanel() {
       contact_tagline: settings.contact_tagline ?? '',
       contact_address: settings.contact_address ?? '',
       contact_phone:   settings.contact_phone   ?? '',
+      contact_phones:  settings.contact_phones  ?? '',
       contact_email:   settings.contact_email   ?? '',
+      contact_emails:  settings.contact_emails  ?? '',
       contact_hours:   settings.contact_hours   ?? '',
     });
   }, [settings]);
@@ -1186,16 +1213,35 @@ function ContactPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Phone</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Phone</label>
               <input value={form.contact_phone}
                 onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))}
                 className={inputCls} placeholder="0939 330 8263" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
-              <input type="email" value={form.contact_email}
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Email</label>
+              <input value={form.contact_email}
                 onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
                 className={inputCls} placeholder="info@example.com" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Phones</label>
+              <textarea rows={3} value={form.contact_phones}
+                onChange={e => setForm(f => ({ ...f, contact_phones: e.target.value }))}
+                className={`${inputCls} resize-none`}
+                placeholder={'One per line\n09123456789\n+639123456789'} />
+              <p className="text-xs text-gray-600">Shown on Contact page. Supports one per line or comma-separated.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Emails</label>
+              <textarea rows={3} value={form.contact_emails}
+                onChange={e => setForm(f => ({ ...f, contact_emails: e.target.value }))}
+                className={`${inputCls} resize-none`}
+                placeholder={'One per line\ninfo@example.com\nservice@example.com'} />
+              <p className="text-xs text-gray-600">Shown on Contact page. Supports one per line or comma-separated.</p>
             </div>
           </div>
 

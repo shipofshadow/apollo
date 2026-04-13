@@ -25,6 +25,17 @@ export default function Footer() {
   const facebook  = settings.footer_facebook  ?? 'https://www.facebook.com/1625autolab/';
   const youtube   = settings.footer_youtube   ?? '';
 
+  const parseList = (...values: Array<string | undefined>): string[] => {
+    const entries = values
+      .flatMap(value => (value ?? '').split(/[\n,]/g))
+      .map(value => value.trim())
+      .filter(Boolean);
+    return Array.from(new Set(entries));
+  };
+
+  const phoneList = parseList(settings.footer_phones, phone);
+  const emailList = parseList(settings.footer_emails, email);
+
   // Show up to 4 active services in the footer
   const footerServices = services.filter(s => s.isActive).slice(0, 4);
 
@@ -128,22 +139,30 @@ export default function Footer() {
                   <span className="text-gray-400 whitespace-pre-line">{address}</span>
                 </li>
               )}
-              {phone && (
-                <li className="flex items-center gap-4">
-                  <Phone className="w-5 h-5 text-brand-orange shrink-0" />
-                  <a href={`tel:${phone.replace(/\s/g, '')}`} className="text-gray-400 hover:text-brand-orange transition-colors">
-                    {phone}
+              {phoneList.map((phoneEntry, idx) => (
+                <li key={`footer-phone-${phoneEntry}`} className="flex items-center gap-4">
+                  {idx === 0 ? (
+                    <Phone className="w-5 h-5 text-brand-orange shrink-0" />
+                  ) : (
+                    <span className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  )}
+                  <a href={`tel:${phoneEntry.replace(/\s/g, '')}`} className="text-gray-400 hover:text-brand-orange transition-colors">
+                    {phoneEntry}
                   </a>
                 </li>
-              )}
-              {email && (
-                <li className="flex items-center gap-4">
-                  <Mail className="w-5 h-5 text-brand-orange shrink-0" />
-                  <a href={`mailto:${email}`} className="text-gray-400 hover:text-brand-orange transition-colors">
-                    {email}
+              ))}
+              {emailList.map((emailEntry, idx) => (
+                <li key={`footer-email-${emailEntry}`} className="flex items-center gap-4">
+                  {idx === 0 ? (
+                    <Mail className="w-5 h-5 text-brand-orange shrink-0" />
+                  ) : (
+                    <span className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  )}
+                  <a href={`mailto:${emailEntry}`} className="text-gray-400 hover:text-brand-orange transition-colors break-all">
+                    {emailEntry}
                   </a>
                 </li>
-              )}
+              ))}
             </ul>
           </div>
 

@@ -582,6 +582,10 @@ export interface SiteSettings {
   company_description_1?: string;
   company_description_2?: string;
   about_image_url?: string;
+  footer_phones?: string;
+  footer_emails?: string;
+  contact_phones?: string;
+  contact_emails?: string;
   staff_can_view_all_bookings?: string;
   staff_can_manage_all_bookings?: string;
   [key: string]: string | undefined;
