@@ -350,6 +350,7 @@ class MarketingCampaignService
              LIMIT 20'
         );
         $runsStmt->execute([':id' => $id]);
+        $runsRows = $runsStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
                 $statusByChannelStmt = $this->db->prepare(
                         'SELECT channel, status, COUNT(*) AS total
@@ -373,6 +374,7 @@ class MarketingCampaignService
                             LIMIT 20'
                 );
                 $failureSummaryStmt->execute([':id' => $id]);
+                        $failureSummaryRows = $failureSummaryStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
                 $recentFailuresStmt = $this->db->prepare(
                         'SELECT run_id, user_id, channel, recipient, error_text, processed_at
@@ -383,6 +385,7 @@ class MarketingCampaignService
                             LIMIT 30'
                 );
                 $recentFailuresStmt->execute([':id' => $id]);
+                $recentFailureRows = $recentFailuresStmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         return [
             'campaign' => $campaign,
@@ -411,7 +414,7 @@ class MarketingCampaignService
                     'error' => (string) ($row['error_text'] ?? 'Unknown error'),
                     'total' => (int) ($row['total'] ?? 0),
                 ];
-            }, $failureSummaryStmt->fetchAll(\PDO::FETCH_ASSOC) ?: []),
+            }, $failureSummaryRows),
             'recentFailures' => array_map(static function (array $row): array {
                 return [
                     'runId' => (int) ($row['run_id'] ?? 0),
@@ -421,7 +424,7 @@ class MarketingCampaignService
                     'error' => (string) ($row['error_text'] ?? 'Unknown error'),
                     'processedAt' => isset($row['processed_at']) ? (string) $row['processed_at'] : null,
                 ];
-            }, $recentFailuresStmt->fetchAll(\PDO::FETCH_ASSOC) ?: []),
+            }, $recentFailureRows),
             'runs' => array_map(static function (array $row): array {
                 return [
                     'id' => (int) ($row['id'] ?? 0),
@@ -431,7 +434,7 @@ class MarketingCampaignService
                     'queuedCount' => (int) ($row['queued_count'] ?? 0),
                     'createdAt' => (string) ($row['created_at'] ?? ''),
                 ];
-            }, $runsStmt->fetchAll(\PDO::FETCH_ASSOC) ?: []),
+            }, $runsRows),
         ];
     }
 

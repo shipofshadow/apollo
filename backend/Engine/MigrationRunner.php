@@ -155,7 +155,18 @@ class MigrationRunner
         $transactionOpen = true;
         try {
             foreach ($statements as $statement) {
-                $this->db->exec($statement);
+                $stmt = $this->db->prepare($statement);
+                $stmt->execute();
+
+                // Fully consume all rowsets so MySQL/PDO does not keep an
+                // unbuffered result open before the next statement.
+                do {
+                    while ($stmt->fetch(PDO::FETCH_ASSOC) !== false) {
+                        // Drain current rowset.
+                    }
+                } while ($stmt->nextRowset());
+                $stmt->closeCursor();
+
                 // DDL statements may trigger an implicit commit on MySQL.
                 // Keep executing remaining statements, but avoid commit/rollback
                 // once the transaction has been auto-closed.
