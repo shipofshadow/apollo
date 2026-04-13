@@ -18,6 +18,7 @@ import {
   Pager,
 } from './_sharedComponents';
 import { type ConfirmDialogState } from './_sharedUtils';
+import { getDicebearAvatarDataUri } from '../../utils/avatar';
 
 type Props = {
   onView: (client: ClientAdminSummary) => void;
@@ -268,6 +269,12 @@ export default function ManageClientsPanel({ onView }: Props) {
                   const isClientActive = item.is_active !== false;
                   const isTogglingThis = togglingStatusId === item.id;
                   const isDeletingThis = deletingClientId === item.id;
+                  const clientAvatarFallback = getDicebearAvatarDataUri({
+                    id: item.id,
+                    name: item.name,
+                    email: item.email,
+                  });
+                  const clientAvatar = item.avatar_url ?? item.avatarUrl ?? clientAvatarFallback;
 
                   return (
                     <tr key={item.id} className={`border-b border-gray-800/70 align-middle ${!isClientActive ? 'opacity-60' : ''}`}>
@@ -275,9 +282,21 @@ export default function ManageClientsPanel({ onView }: Props) {
                         <button
                           type="button"
                           onClick={() => onView(item)}
-                          className="text-left hover:text-brand-orange transition-colors flex items-center gap-1 group"
+                          className="text-left hover:text-brand-orange transition-colors flex items-center gap-2 group"
                         >
-                          {item.name}
+                          <img
+                            src={clientAvatar}
+                            alt={item.name}
+                            className="h-8 w-8 rounded-full border border-gray-700 object-cover shrink-0"
+                            onError={(e) => {
+                              if (e.currentTarget.src !== clientAvatarFallback) {
+                                e.currentTarget.src = clientAvatarFallback;
+                                return;
+                              }
+                              e.currentTarget.onerror = null;
+                            }}
+                          />
+                          <span className="truncate">{item.name}</span>
                           <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                         </button>
                       </td>
