@@ -126,10 +126,10 @@ class PrivacyService
         $db->prepare('DELETE FROM client_vehicles WHERE user_id = :id')
            ->execute([':id' => $userId]);
 
-        // Anonymise reviews (keep rating/service info for public display if approved)
+        // Remove review text while keeping rating/service history.
+        // reviewer_name is derived from users.name via JOIN in current schema.
         $db->prepare(
-            "UPDATE booking_reviews SET reviewer_name = '[Deleted User]', review = NULL
-              WHERE user_id = :id"
+            'UPDATE booking_reviews SET review = NULL WHERE user_id = :id'
         )->execute([':id' => $userId]);
 
         // Remove waitlist entries
