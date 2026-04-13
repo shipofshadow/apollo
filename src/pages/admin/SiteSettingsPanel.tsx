@@ -1228,7 +1228,17 @@ const APP_NAME    = '1625 Auto Lab';
 const TECH_STACK  = 'React 19 · Redux Toolkit · Tailwind CSS · PHP 8 · MySQL';
 
 function SystemPanel() {
+  const dispatch = useDispatch<AppDispatch>();
   const { token } = useAuth();
+  const { settings } = useSelector((s: RootState) => s.siteSettings);
+
+  const [staffBookingSettings, setStaffBookingSettings] = useState({
+    staff_can_view_all_bookings: false,
+    staff_can_manage_all_bookings: false,
+  });
+  const [staffSettingsSaving, setStaffSettingsSaving] = useState(false);
+  const [staffSettingsError, setStaffSettingsError] = useState<string | null>(null);
+  const [staffSettingsSuccess, setStaffSettingsSuccess] = useState(false);
 
   const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
   const [migrTotal,     setMigrTotal]     = useState(0);
@@ -1259,6 +1269,18 @@ function SystemPanel() {
   }, [token, migrPage, migrPageSize]);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  useEffect(() => {
+    dispatch(fetchSiteSettingsAsync());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const toBool = (value?: string) => ['1', 'true', 'yes', 'on'].includes((value ?? '').toLowerCase());
+    setStaffBookingSettings({
+      staff_can_view_all_bookings: toBool(settings.staff_can_view_all_bookings),
+      staff_can_manage_all_bookings: toBool(settings.staff_can_manage_all_bookings),
+    });
+  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings]);
 
   const handleRunMigrations = async () => {
     if (!token || running) return;
@@ -1329,6 +1351,28 @@ function SystemPanel() {
     }
   };
 
+  const handleSaveStaffBookingSettings = async () => {
+    if (!token || staffSettingsSaving) return;
+    setStaffSettingsSaving(true);
+    setStaffSettingsError(null);
+    setStaffSettingsSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({
+        token,
+        data: {
+          staff_can_view_all_bookings: staffBookingSettings.staff_can_view_all_bookings ? '1' : '0',
+          staff_can_manage_all_bookings: staffBookingSettings.staff_can_manage_all_bookings ? '1' : '0',
+        },
+      })).unwrap();
+      setStaffSettingsSuccess(true);
+      setTimeout(() => setStaffSettingsSuccess(false), 3000);
+    } catch (e: unknown) {
+      setStaffSettingsError((e as Error).message ?? 'Failed to save staff booking access settings.');
+    } finally {
+      setStaffSettingsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">
@@ -1379,6 +1423,72 @@ function SystemPanel() {
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Tech Stack</p>
             <p className="text-gray-300 text-sm">{TECH_STACK}</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
+            <Settings className="w-5 h-5 text-brand-orange" />
+            Staff Booking Access
+          </h3>
+        </div>
+
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
+          <p className="text-sm text-gray-300">
+            Control whether staff accounts can see or modify bookings beyond the jobs directly assigned to them.
+          </p>
+
+          {staffSettingsError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {staffSettingsError}
+            </div>
+          )}
+
+          {staffSettingsSuccess && (
+            <div className="flex items-center gap-2 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
+              <CheckCircle2 className="w-4 h-4 shrink-0" /> Staff booking access settings saved.
+            </div>
+          )}
+
+          <label className="flex items-start gap-3 rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-4">
+            <input
+              type="checkbox"
+              checked={staffBookingSettings.staff_can_view_all_bookings}
+              onChange={e => setStaffBookingSettings(prev => ({ ...prev, staff_can_view_all_bookings: e.target.checked }))}
+              className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-white">Staff can view all bookings</span>
+              <span className="block text-xs text-gray-400">When off, staff can only open bookings assigned to them.</span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-4">
+            <input
+              type="checkbox"
+              checked={staffBookingSettings.staff_can_manage_all_bookings}
+              onChange={e => setStaffBookingSettings(prev => ({ ...prev, staff_can_manage_all_bookings: e.target.checked }))}
+              className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-white">Staff can manage all bookings</span>
+              <span className="block text-xs text-gray-400">When off, staff can only update bookings assigned to them.</span>
+            </span>
+          </label>
+
+          <div className="pt-2 border-t border-gray-800 flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">Admins, owners, and managers keep full booking access.</p>
+            <button
+              type="button"
+              onClick={handleSaveStaffBookingSettings}
+              disabled={staffSettingsSaving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
+            >
+              {staffSettingsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Access Rules
+            </button>
           </div>
         </div>
       </div>
