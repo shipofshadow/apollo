@@ -82,8 +82,20 @@ export default function ContactPage() {
     return Array.from(new Set(entries));
   };
 
-  const phoneList = parseList(settings.contact_phones, phone, settings.footer_phones, settings.footer_phone);
-  const emailList = parseList(settings.contact_emails, email, settings.footer_emails, settings.footer_email);
+  const phoneList = parseList(
+    settings.company_phones,
+    settings.contact_phones,
+    phone,
+    settings.footer_phones,
+    settings.footer_phone
+  );
+  const emailList = parseList(
+    settings.company_emails,
+    settings.contact_emails,
+    email,
+    settings.footer_emails,
+    settings.footer_email
+  );
 
   const DEFAULT_MAP_EMBED = 'https://www.openstreetmap.org/export/embed.html?bbox=120.6699%2C15.0086%2C120.7099%2C15.0486&layer=mapnik&marker=15.0286%2C120.6899';
   const DEFAULT_MAP_LINK  = 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899';

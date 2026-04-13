@@ -45,6 +45,8 @@ function CompanyInfoPanel() {
     about_heading:         '',
     company_description_1: '',
     company_description_2: '',
+    company_phones:        '',
+    company_emails:        '',
     about_image_url:       '',
     map_embed_url:         '',
     map_link_url:          '',
@@ -63,11 +65,22 @@ function CompanyInfoPanel() {
       about_heading:         settings.about_heading         ?? '',
       company_description_1: settings.company_description_1 ?? '',
       company_description_2: settings.company_description_2 ?? '',
+      company_phones:        settings.company_phones        ?? settings.footer_phones ?? settings.contact_phones ?? '',
+      company_emails:        settings.company_emails        ?? settings.footer_emails ?? settings.contact_emails ?? '',
       about_image_url:       settings.about_image_url       ?? '',
       map_embed_url:         settings.map_embed_url         ?? '',
       map_link_url:          settings.map_link_url          ?? '',
     });
   }, [settings]);
+
+  const parseList = (value: string): string[] => {
+    return Array.from(new Set(
+      value
+        .split(/[\n,]/g)
+        .map(item => item.trim())
+        .filter(Boolean)
+    ));
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +89,22 @@ function CompanyInfoPanel() {
     setSaveError(null);
     setSaveSuccess(false);
     try {
-      await dispatch(updateSiteSettingsAsync({ token, data: form })).unwrap();
+      const phoneList = parseList(form.company_phones);
+      const emailList = parseList(form.company_emails);
+      await dispatch(updateSiteSettingsAsync({
+        token,
+        data: {
+          ...form,
+          footer_phones: form.company_phones,
+          contact_phones: form.company_phones,
+          footer_emails: form.company_emails,
+          contact_emails: form.company_emails,
+          footer_phone: phoneList[0] ?? '',
+          contact_phone: phoneList[0] ?? '',
+          footer_email: emailList[0] ?? '',
+          contact_email: emailList[0] ?? '',
+        },
+      })).unwrap();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
@@ -128,6 +156,25 @@ function CompanyInfoPanel() {
             <textarea rows={4} value={form.company_description_2}
               onChange={e => setForm(f => ({ ...f, company_description_2: e.target.value }))}
               className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Company Phone Numbers</label>
+              <textarea rows={3} value={form.company_phones}
+                onChange={e => setForm(f => ({ ...f, company_phones: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
+                placeholder={'One per line\n09123456789\n+639123456789'} />
+              <p className="text-xs text-gray-600">Single source used by Contact and Footer sections.</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Company Emails</label>
+              <textarea rows={3} value={form.company_emails}
+                onChange={e => setForm(f => ({ ...f, company_emails: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
+                placeholder={'One per line\ninfo@example.com\nservice@example.com'} />
+              <p className="text-xs text-gray-600">Single source used by Contact and Footer sections.</p>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -961,10 +1008,6 @@ function FooterSettingsPanel() {
   const [form, setForm] = useState({
     footer_tagline:   '',
     footer_address:   '',
-    footer_phone:     '',
-    footer_phones:    '',
-    footer_email:     '',
-    footer_emails:    '',
     footer_instagram: '',
     footer_facebook:  '',
     footer_youtube:   '',
@@ -981,10 +1024,6 @@ function FooterSettingsPanel() {
     setForm({
       footer_tagline:   settings.footer_tagline   ?? '',
       footer_address:   settings.footer_address   ?? '',
-      footer_phone:     settings.footer_phone     ?? '',
-      footer_phones:    settings.footer_phones    ?? '',
-      footer_email:     settings.footer_email     ?? '',
-      footer_emails:    settings.footer_emails    ?? '',
       footer_instagram: settings.footer_instagram ?? '',
       footer_facebook:  settings.footer_facebook  ?? '',
       footer_youtube:   settings.footer_youtube   ?? '',
@@ -1049,38 +1088,8 @@ function FooterSettingsPanel() {
               placeholder="Shop address" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Phone</label>
-              <input value={form.footer_phone}
-                onChange={e => setForm(f => ({ ...f, footer_phone: e.target.value }))}
-                className={inputCls} placeholder="0939 330 8263" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Email</label>
-              <input value={form.footer_email}
-                onChange={e => setForm(f => ({ ...f, footer_email: e.target.value }))}
-                className={inputCls} placeholder="info@example.com" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Phones</label>
-              <textarea rows={3} value={form.footer_phones}
-                onChange={e => setForm(f => ({ ...f, footer_phones: e.target.value }))}
-                className={`${inputCls} resize-none`}
-                placeholder={'One per line\n09123456789\n+639123456789'} />
-              <p className="text-xs text-gray-600">Shown in footer contact block. Supports one per line or comma-separated.</p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Emails</label>
-              <textarea rows={3} value={form.footer_emails}
-                onChange={e => setForm(f => ({ ...f, footer_emails: e.target.value }))}
-                className={`${inputCls} resize-none`}
-                placeholder={'One per line\ninfo@example.com\nservice@example.com'} />
-              <p className="text-xs text-gray-600">Shown in footer contact block. Supports one per line or comma-separated.</p>
-            </div>
+          <div className="rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-3 text-xs text-gray-400">
+            Phone numbers and email addresses are managed in the Company Info tab.
           </div>
 
           <div className="space-y-2">
@@ -1126,10 +1135,6 @@ function ContactPanel() {
     contact_heading: '',
     contact_tagline: '',
     contact_address: '',
-    contact_phone:   '',
-    contact_phones:  '',
-    contact_email:   '',
-    contact_emails:  '',
     contact_hours:   '',
   });
   const [saving,      setSaving]      = useState(false);
@@ -1143,10 +1148,6 @@ function ContactPanel() {
       contact_heading: settings.contact_heading ?? '',
       contact_tagline: settings.contact_tagline ?? '',
       contact_address: settings.contact_address ?? '',
-      contact_phone:   settings.contact_phone   ?? '',
-      contact_phones:  settings.contact_phones  ?? '',
-      contact_email:   settings.contact_email   ?? '',
-      contact_emails:  settings.contact_emails  ?? '',
       contact_hours:   settings.contact_hours   ?? '',
     });
   }, [settings]);
@@ -1211,38 +1212,8 @@ function ContactPanel() {
               placeholder="Full shop address" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Phone</label>
-              <input value={form.contact_phone}
-                onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))}
-                className={inputCls} placeholder="0939 330 8263" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Primary Email</label>
-              <input value={form.contact_email}
-                onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
-                className={inputCls} placeholder="info@example.com" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Phones</label>
-              <textarea rows={3} value={form.contact_phones}
-                onChange={e => setForm(f => ({ ...f, contact_phones: e.target.value }))}
-                className={`${inputCls} resize-none`}
-                placeholder={'One per line\n09123456789\n+639123456789'} />
-              <p className="text-xs text-gray-600">Shown on Contact page. Supports one per line or comma-separated.</p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Additional Emails</label>
-              <textarea rows={3} value={form.contact_emails}
-                onChange={e => setForm(f => ({ ...f, contact_emails: e.target.value }))}
-                className={`${inputCls} resize-none`}
-                placeholder={'One per line\ninfo@example.com\nservice@example.com'} />
-              <p className="text-xs text-gray-600">Shown on Contact page. Supports one per line or comma-separated.</p>
-            </div>
+          <div className="rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-3 text-xs text-gray-400">
+            Phone numbers and email addresses are managed in the Company Info tab.
           </div>
 
           <div className="space-y-2">

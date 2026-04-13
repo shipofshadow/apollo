@@ -581,6 +581,8 @@ export interface SiteSettings {
   about_heading?: string;
   company_description_1?: string;
   company_description_2?: string;
+  company_phones?: string;
+  company_emails?: string;
   about_image_url?: string;
   footer_phones?: string;
   footer_emails?: string;

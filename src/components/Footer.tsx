@@ -33,8 +33,8 @@ export default function Footer() {
     return Array.from(new Set(entries));
   };
 
-  const phoneList = parseList(settings.footer_phones, phone);
-  const emailList = parseList(settings.footer_emails, email);
+  const phoneList = parseList(settings.company_phones, settings.footer_phones, phone);
+  const emailList = parseList(settings.company_emails, settings.footer_emails, email);
 
   // Show up to 4 active services in the footer
   const footerServices = services.filter(s => s.isActive).slice(0, 4);
