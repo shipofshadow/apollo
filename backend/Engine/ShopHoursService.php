@@ -78,6 +78,8 @@ class ShopHoursService
     {
         $this->validateHours($hours);
 
+        $before = $this->getAll();
+
         if (!$this->useDb) {
             // No persistence without DB — return the submitted data as-is.
             return $hours;
@@ -111,7 +113,13 @@ class ShopHoursService
             throw $e;
         }
 
-        return $this->getAll();
+        $updated = $this->getAll();
+        $this->logShopHoursActivity(ActivityEvents::SHOP_HOURS_UPDATED, [
+            'before' => $before,
+            'after' => $updated,
+        ]);
+
+        return $updated;
     }
 
     /**
@@ -202,6 +210,12 @@ class ShopHoursService
              ON DUPLICATE KEY UPDATE reason = VALUES(reason), is_yearly = VALUES(is_yearly)'
         );
         $stmt->execute([':date' => $date, ':reason' => $reason, ':isYearly' => (int)$isYearly]);
+
+        $this->logShopHoursActivity(ActivityEvents::SHOP_CLOSED_DATE_ADDED, [
+            'date' => $date,
+            'reason' => $reason,
+            'isYearly' => $isYearly,
+        ]);
     }
 
     /**
@@ -215,9 +229,18 @@ class ShopHoursService
             return;
         }
 
+        $before = $this->getClosureForDate($date);
+
         Database::getInstance()
             ->prepare('DELETE FROM shop_closed_dates WHERE closed_date = :date')
             ->execute([':date' => $date]);
+
+        if ($before !== null) {
+            $this->logShopHoursActivity(ActivityEvents::SHOP_CLOSED_DATE_REMOVED, [
+                'date' => $date,
+                'before' => $before,
+            ]);
+        }
     }
 
     /**
@@ -308,6 +331,38 @@ class ShopHoursService
             if ($iv < 1 || $iv > 8) {
                 throw new RuntimeException("slotIntervalH must be between 1 and 8.", 422);
             }
+        }
+    }
+
+    /** @param array<string, mixed> $properties */
+    private function logShopHoursActivity(string $event, array $properties = []): void
+    {
+        try {
+            $logger = activity()->forSubject('shop_hours', 0);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($event, 'shop');
+        } catch (\Throwable $e) {
+            error_log('[ShopHoursService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

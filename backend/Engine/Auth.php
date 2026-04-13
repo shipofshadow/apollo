@@ -196,6 +196,16 @@ class Auth
                ->execute([':p' => self::hashPassword($pass), ':id' => $row['id']]);
         }
 
+        self::writeAuthActivity(
+            ActivityEvents::USER_LOGGED_IN,
+            isset($row['id']) ? (int) $row['id'] : null,
+            null,
+            [
+                'email' => (string) ($row['email'] ?? ''),
+                'role' => (string) ($row['role'] ?? ''),
+            ]
+        );
+
         return self::issueToken([
             'sub'  => $row['id'],
             'role' => $row['role'],
@@ -244,6 +254,16 @@ class Auth
             ':password' => self::hashPassword((string) $data['password']),
             ':role'     => 'client',
         ]);
+
+        $createdUserId = (int) $db->lastInsertId();
+        self::writeAuthActivity(
+            ActivityEvents::USER_REGISTERED,
+            $createdUserId > 0 ? $createdUserId : null,
+            $createdUserId > 0 ? ['type' => 'users', 'id' => $createdUserId] : null,
+            [
+                'email' => $email,
+            ]
+        );
     }
 
     /**
@@ -284,6 +304,7 @@ class Auth
      */
     public static function logout(string $token): void
     {
+        $payload = null;
         try {
             $payload = self::decodeToken($token);
             $exp     = (int) ($payload['exp'] ?? (time() + JWT_TTL));
@@ -307,6 +328,15 @@ class Auth
             'INSERT IGNORE INTO token_blocklist (token_hash, expires_at)
              VALUES (:hash, FROM_UNIXTIME(:exp))'
         )->execute([':hash' => $hash, ':exp' => $exp]);
+
+        self::writeAuthActivity(
+            ActivityEvents::USER_LOGGED_OUT,
+            isset($payload['sub']) ? (int) $payload['sub'] : null,
+            isset($payload['sub']) ? ['type' => 'users', 'id' => (int) $payload['sub']] : null,
+            [
+                'role' => (string) ($payload['role'] ?? ''),
+            ]
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -393,6 +423,46 @@ class Auth
         // Delete used token so it cannot be reused
         $db->prepare('DELETE FROM password_resets WHERE token = :token')
            ->execute([':token' => $token]);
+
+        $userStmt = $db->prepare('SELECT id, email FROM users WHERE email = :email LIMIT 1');
+        $userStmt->execute([':email' => $email]);
+        $userRow = $userStmt->fetch();
+
+        self::writeAuthActivity(
+            ActivityEvents::USER_PASSWORD_RESET,
+            isset($userRow['id']) ? (int) $userRow['id'] : null,
+            isset($userRow['id']) ? ['type' => 'users', 'id' => (int) $userRow['id']] : null,
+            [
+                'email' => (string) ($userRow['email'] ?? $email),
+            ]
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $subject
+     * @param array<string, mixed> $properties
+     */
+    private static function writeAuthActivity(
+        string $description,
+        ?int $causerUserId = null,
+        ?array $subject = null,
+        array $properties = []
+    ): void {
+        try {
+            $logger = activity();
+            if ($subject !== null) {
+                $logger->performedOn($subject);
+            }
+            if ($causerUserId !== null && $causerUserId > 0) {
+                $logger->byUser($causerUserId);
+            }
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+            $logger->log($description, 'auth');
+        } catch (Throwable $e) {
+            error_log('[Auth] Activity logging failed: ' . $e->getMessage());
+        }
     }
 
     // -------------------------------------------------------------------------

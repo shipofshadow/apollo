@@ -71,7 +71,11 @@ class WaitlistService
                 ':service_ids' => trim((string) ($data['serviceIds'] ?? '')),
                 ':notes'       => trim((string) ($data['notes']      ?? '')) ?: null,
             ]);
-            return $this->dbGetById((int) $db->lastInsertId());
+            $entry = $this->dbGetById((int) $db->lastInsertId());
+            $this->logWaitlistActivity(ActivityEvents::WAITLIST_JOINED, $entry, [
+                'status' => (string) ($entry['status'] ?? 'waiting'),
+            ]);
+            return $entry;
         }
 
         // File fallback – not implemented for waitlist (DB required for proper use)
@@ -217,6 +221,15 @@ class WaitlistService
             ':booking_id' => $bookingId,
             ':token' => trim($token),
         ]);
+
+        if ($stmt->rowCount() > 0) {
+            $entry = $this->findByClaimToken(trim($token));
+            if ($entry !== null) {
+                $this->logWaitlistActivity(ActivityEvents::WAITLIST_CLAIM_BOOKED, $entry, [
+                    'bookingId' => $bookingId,
+                ]);
+            }
+        }
     }
 
     /** Remove a waitlist entry (admin or self). */
@@ -234,6 +247,10 @@ class WaitlistService
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Waitlist entry not found.', 404);
         }
+
+        $this->logWaitlistActivity(ActivityEvents::WAITLIST_REMOVED, $entry, [
+            'removedByUserId' => $requestingUserId,
+        ]);
     }
 
     /**
@@ -272,6 +289,11 @@ class WaitlistService
             ':id' => $id,
             ':claim_token' => $claimToken,
             ':claim_expires_at' => $claimExpiresAt,
+        ]);
+
+        $this->logWaitlistActivity(ActivityEvents::WAITLIST_NOTIFIED, $entry, [
+            'claimExpiresAt' => $claimExpiresAt,
+            'claimWindowMinutes' => $this->claimTtlMinutes,
         ]);
 
         $userId = isset($entry['userId']) && $entry['userId'] ? (int) $entry['userId'] : 0;
@@ -482,10 +504,15 @@ class WaitlistService
 
     private function markExpired(int $id): void
     {
+        $entry = $this->dbGetById($id);
         $stmt = Database::getInstance()->prepare(
             'UPDATE booking_waitlist SET status = "expired" WHERE id = :id'
         );
         $stmt->execute([':id' => $id]);
+
+        if ($stmt->rowCount() > 0) {
+            $this->logWaitlistActivity(ActivityEvents::WAITLIST_EXPIRED, $entry);
+        }
     }
 
     private function createClaimToken(): string
@@ -501,5 +528,59 @@ class WaitlistService
         }
 
         return $baseUrl . '/booking?waitlist_claim=' . urlencode($claimToken);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function findByClaimToken(string $token): ?array
+    {
+        if (!$this->useDb || $token === '') {
+            return null;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT * FROM booking_waitlist WHERE claim_token = :token LIMIT 1'
+        );
+        $stmt->execute([':token' => $token]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $this->mapRow($row) : null;
+    }
+
+    /** @param array<string, mixed> $entry @param array<string, mixed> $properties */
+    private function logWaitlistActivity(string $description, array $entry, array $properties = []): void
+    {
+        try {
+            $subjectId = (string) ((int) ($entry['id'] ?? 0));
+            $logger = activity()
+                ->forSubject('booking_waitlist', $subjectId)
+                ->withProperties($properties + [
+                    'slotDate' => (string) ($entry['slotDate'] ?? ''),
+                    'slotTime' => (string) ($entry['slotTime'] ?? ''),
+                    'status' => (string) ($entry['status'] ?? ''),
+                    'bookedBookingId' => (string) ($entry['bookedBookingId'] ?? ''),
+                ]);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId === null && isset($entry['userId']) && $entry['userId'] !== null) {
+                $actorUserId = (int) $entry['userId'];
+            }
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            $logger->log($description, 'booking_waitlist');
+        } catch (\Throwable $e) {
+            error_log('[WaitlistService] Failed to write activity log: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

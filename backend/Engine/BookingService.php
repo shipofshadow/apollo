@@ -142,7 +142,7 @@ class BookingService
 
         $this->addActivity(
             (string) $booking['id'],
-            'booking_submitted',
+            ActivityEvents::BOOKING_SUBMITTED,
             'Booking submitted',
             'Status: pending',
             $userId,
@@ -236,7 +236,7 @@ class BookingService
      *
      * @return array<string, mixed>  Updated booking
      */
-    public function updateStatus(string $id, string $status): array
+    public function updateStatus(string $id, string $status, ?int $actorUserId = null, string $actorRole = 'system'): array
     {
         if (!in_array($status, self::VALID_STATUSES, true)) {
             throw new RuntimeException(
@@ -271,9 +271,11 @@ class BookingService
         $toStatus   = (string) ($booking['status'] ?? $status);
         $this->addActivity(
             (string) $booking['id'],
-            'status_changed',
+            ActivityEvents::BOOKING_STATUS_CHANGED,
             'Status changed',
-            'From: ' . str_replace('_', ' ', $fromStatus) . ' -> ' . str_replace('_', ' ', $toStatus)
+            'From: ' . str_replace('_', ' ', $fromStatus) . ' -> ' . str_replace('_', ' ', $toStatus),
+            $actorUserId,
+            $actorRole
         );
 
         (new NotificationJobQueueService())->dispatch('booking_status_changed', [
@@ -329,7 +331,7 @@ class BookingService
 
         $this->addActivity(
             (string) $updated['id'],
-            $stage === 'before' ? 'before_photos_updated' : 'after_photos_updated',
+            $stage === 'before' ? ActivityEvents::BOOKING_BEFORE_PHOTOS_UPDATED : ActivityEvents::BOOKING_AFTER_PHOTOS_UPDATED,
             $stage === 'before' ? 'Before photos updated' : 'After photos updated',
             count($cleanUrls) . ' photo(s)',
             $actorUserId,
@@ -344,7 +346,13 @@ class BookingService
      *
      * @return array<string, mixed>  Updated booking
      */
-    public function updatePartsStatus(string $id, bool $awaitingParts, string $partsNotes): array
+    public function updatePartsStatus(
+        string $id,
+        bool $awaitingParts,
+        string $partsNotes,
+        ?int $actorUserId = null,
+        string $actorRole = 'admin'
+    ): array
     {
         $booking = $this->useDb
             ? $this->dbUpdateParts($id, $awaitingParts, $partsNotes)
@@ -353,9 +361,11 @@ class BookingService
         $partsDetail = trim($partsNotes);
         $this->addActivity(
             (string) $booking['id'],
-            'parts_updated',
+            ActivityEvents::BOOKING_PARTS_UPDATED,
             $awaitingParts ? 'Flagged: Awaiting Parts' : 'Parts status updated',
-            $partsDetail !== '' ? $partsDetail : null
+            $partsDetail !== '' ? $partsDetail : null,
+            $actorUserId,
+            $actorRole
         );
 
         if ($awaitingParts) {
@@ -372,7 +382,7 @@ class BookingService
      *
      * @return array<string, mixed>  Updated booking
      */
-    public function updateInternalNotes(string $id, string $notes): array
+    public function updateInternalNotes(string $id, string $notes, ?int $actorUserId = null, string $actorRole = 'admin'): array
     {
         if (!$this->useDb) {
             throw new RuntimeException('Internal notes require a database.', 501);
@@ -401,9 +411,11 @@ class BookingService
 
         $this->addActivity(
             (string) $booking['id'],
-            'internal_notes_updated',
+            ActivityEvents::BOOKING_INTERNAL_NOTES_UPDATED,
             'Internal notes updated',
-            null
+            null,
+            $actorUserId,
+            $actorRole
         );
 
         return $booking;
@@ -414,7 +426,7 @@ class BookingService
      *
      * @return array<string, mixed>
      */
-    public function assignTechnician(string $id, ?int $assignedTechId): array
+    public function assignTechnician(string $id, ?int $assignedTechId, ?int $actorUserId = null, string $actorRole = 'admin'): array
     {
         if (!$this->useDb) {
             throw new RuntimeException('Technician assignment requires a database.', 501);
@@ -487,9 +499,11 @@ class BookingService
             if ($assignedTechId === null) {
                 $this->addActivity(
                     $id,
-                    'technician_unassigned',
+                    ActivityEvents::BOOKING_TECHNICIAN_UNASSIGNED,
                     'Technician unassigned',
-                    null
+                    null,
+                    $actorUserId,
+                    $actorRole
                 );
 
                 if ($beforeTechUserId !== null) {
@@ -506,9 +520,11 @@ class BookingService
             } else {
                 $this->addActivity(
                     $id,
-                    'technician_assigned',
+                    ActivityEvents::BOOKING_TECHNICIAN_ASSIGNED,
                     'Technician assigned',
-                    $techName !== '' ? $techName : ('ID ' . $assignedTechId)
+                    $techName !== '' ? $techName : ('ID ' . $assignedTechId),
+                    $actorUserId,
+                    $actorRole
                 );
 
                 if ($beforeTechUserId !== null && $beforeTechUserId !== $techUserId) {
@@ -656,7 +672,7 @@ class BookingService
      * @param array<string, mixed> $data  Keys: beamAngle, luxOutput, notes, etc.
      * @return array<string, mixed>  Updated booking
      */
-    public function updateCalibrationData(string $id, array $data): array
+    public function updateCalibrationData(string $id, array $data, ?int $actorUserId = null, string $actorRole = 'admin'): array
     {
         if (!$this->useDb) {
             throw new RuntimeException('Calibration data requires a database connection.', 503);
@@ -672,6 +688,15 @@ class BookingService
             'UPDATE bookings SET calibration_data = :data WHERE id = :id'
         );
         $stmt->execute([':data' => $json, ':id' => $id]);
+
+        $this->addActivity(
+            (string) $booking['id'],
+            ActivityEvents::BOOKING_CALIBRATION_UPDATED,
+            'Calibration data updated',
+            null,
+            $actorUserId,
+            $actorRole
+        );
 
         return $this->dbFindById($id) ?? $booking;
     }
@@ -724,6 +749,19 @@ class BookingService
         }
 
         $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
+
+        if (is_array($existing)) {
+            try {
+                $logger = activity()->forSubject('bookings', (string) ($existing['id'] ?? $id));
+                $actorUserId = $this->resolveActorUserId();
+                if ($actorUserId !== null) {
+                    $logger->byUser($actorUserId);
+                }
+                $logger->logDeleted(['before' => $existing], 'bookings');
+            } catch (\Throwable $e) {
+                error_log('[BookingService] Failed to write booking delete activity log: ' . $e->getMessage());
+            }
+        }
     }
 
     /**
@@ -732,7 +770,13 @@ class BookingService
      *
      * @return array<string, mixed>
      */
-    public function adminReschedule(string $id, string $date, string $time): array
+    public function adminReschedule(
+        string $id,
+        string $date,
+        string $time,
+        ?int $actorUserId = null,
+        string $actorRole = 'admin'
+    ): array
     {
         $booking = $this->useDb
             ? $this->dbFindById($id)
@@ -776,9 +820,11 @@ class BookingService
 
         $this->addActivity(
             (string) $updated['id'],
-            'appointment_rescheduled',
+            ActivityEvents::BOOKING_APPOINTMENT_RESCHEDULED,
             'Rescheduled',
-            sprintf('%s %s -> %s %s', $oldDate, $oldTime, $date, $time)
+            sprintf('%s %s -> %s %s', $oldDate, $oldTime, $date, $time),
+            $actorUserId,
+            $actorRole
         );
 
         if (($oldDate !== '' && $oldTime !== '') && ($oldDate !== $date || $oldTime !== $time)) {
@@ -847,7 +893,7 @@ class BookingService
 
         $this->addActivity(
             (string) $updated['id'],
-            'appointment_rescheduled',
+            ActivityEvents::BOOKING_APPOINTMENT_RESCHEDULED,
             'Rescheduled',
             sprintf('%s %s -> %s %s', $oldDate, $oldTime, $date, $time),
             $userId,
@@ -888,8 +934,35 @@ class BookingService
                 $actorRole,
                 $createdAt
             );
+
+            $logger = activity()
+                ->forSubject('bookings', $bookingId)
+                ->withProperties([
+                    'eventType' => $eventType,
+                    'action' => $action,
+                    'detail' => $detail,
+                    'actorRole' => $actorRole,
+                    'createdAt' => $createdAt,
+                ]);
+
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            $logger->log($eventType, 'bookings');
         } catch (\Throwable $e) {
             error_log('[BookingService] Failed to write booking activity log: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 

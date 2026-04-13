@@ -259,7 +259,9 @@ class ProductService
                 ':is_active'   => $params[':is_active'],
             ]);
         }
-        return $this->dbGetById((int) $db->lastInsertId(), false);
+        $created = $this->dbGetById((int) $db->lastInsertId(), false);
+        $this->logProductCreated($created);
+        return $created;
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
@@ -341,7 +343,9 @@ class ProductService
             $this->deleteManagedImageUrl($oldImage);
         }
 
-        return $this->dbGetById($id, false);
+        $updated = $this->dbGetById($id, false);
+        $this->logProductUpdated($current, $updated);
+        return $updated;
     }
 
     private function dbDelete(int $id): void
@@ -362,6 +366,8 @@ class ProductService
             $urls = array_merge($urls, $this->collectVariationImageUrls($variation));
         }
         $this->deleteManagedImageUrls($urls);
+
+        $this->logProductDeleted($current);
     }
 
     // -------------------------------------------------------------------------
@@ -499,6 +505,98 @@ class ProductService
             self::$storageFile,
             json_encode(array_values($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
         );
+    }
+
+    private function logProductCreated(array $created): void
+    {
+        $this->logProductActivity(static function (ActivityLog $logger) use ($created): void {
+            $logger->logCreated(['after' => $created], 'products');
+        }, $created);
+    }
+
+    private function logProductUpdated(array $before, array $after): void
+    {
+        $this->logProductActivity(static function (ActivityLog $logger) use ($before, $after): void {
+            $logger->logUpdated($after, $before, [], 'products');
+        }, $after);
+    }
+
+    private function logProductDeleted(array $before): void
+    {
+        $this->logProductActivity(static function (ActivityLog $logger) use ($before): void {
+            $logger->logDeleted(['before' => $before], 'products');
+        }, $before);
+    }
+
+    private function logProductVariationCreated(int $productId, array $variation): void
+    {
+        $this->logProductActivity(static function (ActivityLog $logger) use ($variation): void {
+            $logger
+                ->withProperties([
+                    'entity' => 'variation',
+                    'after' => $variation,
+                ])
+                ->log(ActivityEvents::PRODUCT_VARIATION_CREATED, 'products');
+        }, ['id' => $productId]);
+    }
+
+    private function logProductVariationUpdated(int $productId, array $before, array $after): void
+    {
+        $this->logProductActivity(static function (ActivityLog $logger) use ($before, $after): void {
+            $logger
+                ->withProperty('entity', 'variation')
+                ->logUpdated($after, $before, [], 'products');
+        }, ['id' => $productId]);
+    }
+
+    private function logProductVariationDeleted(int $productId, array $before): void
+    {
+        $this->logProductActivity(static function (ActivityLog $logger) use ($before): void {
+            $logger
+                ->withProperties([
+                    'entity' => 'variation',
+                    'before' => $before,
+                ])
+                ->log(ActivityEvents::PRODUCT_VARIATION_DELETED, 'products');
+        }, ['id' => $productId]);
+    }
+
+    /**
+     * @param callable(ActivityLog): void $writer
+     * @param array<string, mixed> $entity
+     */
+    private function logProductActivity(callable $writer, array $entity): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+
+        $subjectId = isset($entity['id']) ? (int) $entity['id'] : 0;
+        if ($subjectId <= 0) {
+            return;
+        }
+
+        try {
+            $logger = activity()->forSubject('products', $subjectId);
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null) {
+                $logger->byUser($actorUserId);
+            }
+            $writer($logger);
+        } catch (Throwable $e) {
+            error_log('[ProductService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -745,7 +843,9 @@ class ProductService
         }
 
         $varId = (int) $db->lastInsertId();
-        return $this->dbFetchVariationById($varId);
+        $created = $this->dbFetchVariationById($varId);
+        $this->logProductVariationCreated($productId, $created);
+        return $created;
     }
 
     /**
@@ -873,7 +973,9 @@ class ProductService
             $this->collectVariationImageUrls($newVariation)
         );
 
-        return $this->dbFetchVariationById($varId);
+        $updated = $this->dbFetchVariationById($varId);
+        $this->logProductVariationUpdated($productId, $current, $updated);
+        return $updated;
     }
 
     /** @param string[] $columns */
@@ -922,6 +1024,7 @@ class ProductService
         }
 
         $this->deleteManagedImageUrls($this->collectVariationImageUrls($current));
+        $this->logProductVariationDeleted($productId, $current);
     }
 
     /** @return array<string, mixed> */

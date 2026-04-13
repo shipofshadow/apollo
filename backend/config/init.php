@@ -16,6 +16,8 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
+require_once __DIR__ . '/../Engine/activity_helpers.php';
+
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->safeLoad();
 

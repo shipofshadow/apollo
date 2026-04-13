@@ -214,6 +214,19 @@ class OrderService
             $db->commit();
             $order = $this->getById($orderId, $userId, $userId === null ? null : true);
 
+            $this->logOrderActivity(
+                $order,
+                ActivityEvents::ORDER_CREATED,
+                [
+                    'fulfillmentType' => $fulfillment,
+                    'itemsCount' => count($lineItems),
+                    'subtotal' => $subtotal,
+                    'shippingFee' => $shippingFee,
+                    'totalAmount' => $total,
+                ],
+                $userId
+            );
+
             (new NotificationJobQueueService())->dispatch('order_created', [
                 'order' => $order,
             ]);
@@ -374,6 +387,15 @@ class OrderService
 
         $updated = $this->getById($id);
 
+        $this->logOrderActivity(
+            $updated,
+            ActivityEvents::ORDER_STATUS_CHANGED,
+            [
+                'previousStatus' => $currentStatus,
+                'nextStatus' => $status,
+            ]
+        );
+
         (new NotificationJobQueueService())->dispatch('order_status_changed', [
             'order' => $updated,
             'previousStatus' => $currentStatus,
@@ -401,6 +423,15 @@ class OrderService
 
         $updated = $this->getById($id);
 
+        $this->logOrderActivity(
+            $updated,
+            ActivityEvents::ORDER_TRACKING_UPDATED,
+            [
+                'courierName' => trim($courierName),
+                'trackingNumber' => trim($trackingNumber),
+            ]
+        );
+
         (new NotificationJobQueueService())->dispatch('order_tracking_updated', [
             'order' => $updated,
         ]);
@@ -427,7 +458,14 @@ class OrderService
             throw new RuntimeException('Order not found.', 404);
         }
 
-        return $this->getById($id);
+        $updated = $this->getById($id);
+        $this->logOrderActivity(
+            $updated,
+            ActivityEvents::ORDER_PAYMENT_STATUS_UPDATED,
+            ['paymentStatus' => $normalized]
+        );
+
+        return $updated;
     }
 
     /** @return array<string, mixed> */
@@ -531,5 +569,51 @@ class OrderService
     private function generateOrderNumber(): string
     {
         return 'ORD-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     * @param array<string, mixed> $properties
+     */
+    private function logOrderActivity(
+        array $order,
+        string $description,
+        array $properties = [],
+        ?int $explicitActorUserId = null
+    ): void {
+        try {
+            $orderId = isset($order['id']) ? (int) $order['id'] : 0;
+            if ($orderId <= 0) {
+                return;
+            }
+
+            $logger = activity()->forSubject('product_orders', $orderId);
+
+            $actorUserId = $explicitActorUserId;
+            if ($actorUserId === null) {
+                $actorUserId = isset($order['userId']) && $order['userId'] !== null ? (int) $order['userId'] : null;
+            }
+            if ($actorUserId === null) {
+                $actorUserId = $this->resolveActorUserId();
+            }
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            $logger->withProperties($properties)->log($description, 'orders');
+        } catch (\Throwable $e) {
+            error_log('[OrderService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

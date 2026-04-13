@@ -132,7 +132,9 @@ class OfferService
               :linked_service_id, :linked_product_id, :sort_order, :is_active)'
         );
         $stmt->execute($this->bindParams($data));
-        return $this->dbGetById((int) $db->lastInsertId(), false);
+        $created = $this->dbGetById((int) $db->lastInsertId(), false);
+        $this->logOfferCreated($created);
+        return $created;
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
@@ -171,11 +173,15 @@ class OfferService
         $params[':id'] = $id;
         $stmt->execute($params);
 
-        return $this->dbGetById($id, false);
+        $updated = $this->dbGetById($id, false);
+        $this->logOfferUpdated($current, $updated);
+        return $updated;
     }
 
     private function dbDelete(int $id): void
     {
+        $current = $this->dbGetById($id, false);
+
         $stmt = Database::getInstance()->prepare(
             'DELETE FROM offers WHERE id = :id'
         );
@@ -183,6 +189,8 @@ class OfferService
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException('Offer not found.', 404);
         }
+
+        $this->logOfferDeleted($current);
     }
 
     // -------------------------------------------------------------------------
@@ -278,6 +286,65 @@ class OfferService
             self::$storageFile,
             json_encode(array_values($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
         );
+    }
+
+    private function logOfferCreated(array $created): void
+    {
+        $this->logOfferActivity(static function (ActivityLog $logger) use ($created): void {
+            $logger->logCreated(['after' => $created], 'offers');
+        }, $created);
+    }
+
+    private function logOfferUpdated(array $before, array $after): void
+    {
+        $this->logOfferActivity(static function (ActivityLog $logger) use ($before, $after): void {
+            $logger->logUpdated($after, $before, [], 'offers');
+        }, $after);
+    }
+
+    private function logOfferDeleted(array $before): void
+    {
+        $this->logOfferActivity(static function (ActivityLog $logger) use ($before): void {
+            $logger->logDeleted(['before' => $before], 'offers');
+        }, $before);
+    }
+
+    /**
+     * @param callable(ActivityLog): void $writer
+     * @param array<string, mixed> $entity
+     */
+    private function logOfferActivity(callable $writer, array $entity): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+
+        $subjectId = isset($entity['id']) ? (int) $entity['id'] : 0;
+        if ($subjectId <= 0) {
+            return;
+        }
+
+        try {
+            $logger = activity()->forSubject('offers', $subjectId);
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null) {
+                $logger->byUser($actorUserId);
+            }
+            $writer($logger);
+        } catch (Throwable $e) {
+            error_log('[OfferService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     // -------------------------------------------------------------------------

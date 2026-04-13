@@ -275,6 +275,49 @@ export const exportSecurityAuditCsvApi = async (token: string, limit = 1000): Pr
   return response.blob();
 };
 
+export interface OwnerActivityUserSummary {
+  userId: number;
+  userName: string;
+  userEmail: string;
+  totalActivities: number;
+  lastActivityAt: string | null;
+}
+
+export interface OwnerActivityLogEntry {
+  id: number;
+  logName: string;
+  description: string;
+  subjectType: string | null;
+  subjectId: string | null;
+  causerType: string | null;
+  causerId: string | null;
+  properties: Record<string, unknown>;
+  attribute_changes: {
+    attributes?: Record<string, unknown>;
+    old?: Record<string, unknown>;
+  } | null;
+  createdAt: string;
+  subject: Record<string, unknown> | null;
+  causer: Record<string, unknown> | null;
+}
+
+export const fetchOwnerActivityUsersApi = (
+  token: string,
+  sort: 'most_recent' | 'most_active' | 'name_asc' | 'name_desc' = 'most_recent'
+) =>
+  apiFetch<{ users: OwnerActivityUserSummary[] }>(`/api/admin/activity-logs/users?sort=${encodeURIComponent(sort)}`, {}, token);
+
+export const fetchOwnerActivityLogsApi = (
+  token: string,
+  params: { userId?: number; limit?: number } = {}
+) => {
+  const q = new URLSearchParams();
+  if (params.userId && params.userId > 0) q.set('userId', String(params.userId));
+  q.set('limit', String(params.limit && params.limit > 0 ? params.limit : 300));
+  const qs = q.toString();
+  return apiFetch<{ logs: OwnerActivityLogEntry[] }>(`/api/admin/activity-logs${qs ? `?${qs}` : ''}`, {}, token);
+};
+
 // ── Services API ─────────────────────────────────────────────────────────────
 
 export const fetchServicesApi = (token?: string | null) =>

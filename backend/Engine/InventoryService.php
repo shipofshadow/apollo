@@ -73,6 +73,14 @@ class InventoryService
         $item = $this->getItemById($id);
         $this->checkLowStockAlert($item);
 
+        $this->logInventoryActivity(
+            ActivityEvents::INVENTORY_ITEM_CREATED,
+            'inventory_items',
+            $id,
+            ['after' => $item],
+            $actorUserId
+        );
+
         return $item;
     }
 
@@ -110,6 +118,14 @@ class InventoryService
 
         $item = $this->getItemById($id);
         $this->checkLowStockAlert($item);
+
+        $this->logInventoryActivity(
+            ActivityEvents::INVENTORY_ITEM_UPDATED,
+            'inventory_items',
+            $id,
+            ['before' => $current, 'after' => $item],
+            $this->resolveActorUserId()
+        );
 
         return $item;
     }
@@ -190,6 +206,18 @@ class InventoryService
         $updated = $this->getItemById($itemId);
         $this->checkLowStockAlert($updated);
 
+        $this->logInventoryActivity(
+            ActivityEvents::INVENTORY_STOCK_ADJUSTED,
+            'inventory_items',
+            $itemId,
+            [
+                'delta' => $delta,
+                'note' => $note,
+                'after' => $updated,
+            ],
+            $actorUserId
+        );
+
         return $updated;
     }
 
@@ -238,6 +266,13 @@ class InventoryService
         $rows = $this->listSuppliers();
         foreach ($rows as $row) {
             if ((int) ($row['id'] ?? 0) === $id) {
+                $this->logInventoryActivity(
+                    ActivityEvents::INVENTORY_SUPPLIER_CREATED,
+                    'suppliers',
+                    $id,
+                    ['after' => $row],
+                    $this->resolveActorUserId()
+                );
                 return $row;
             }
         }
@@ -356,6 +391,13 @@ class InventoryService
         $all = $this->listPurchaseOrders(100);
         foreach ($all as $row) {
             if ((string) ($row['poNumber'] ?? '') === $poNumber) {
+                $this->logInventoryActivity(
+                    ActivityEvents::INVENTORY_PURCHASE_ORDER_CREATED,
+                    'purchase_orders',
+                    (int) ($row['id'] ?? 0),
+                    ['after' => $row],
+                    $actorUserId
+                );
                 return $row;
             }
         }
@@ -409,6 +451,16 @@ class InventoryService
 
         foreach ($this->listPurchaseOrders(100) as $row) {
             if ((int) ($row['id'] ?? 0) === $id) {
+                $this->logInventoryActivity(
+                    ActivityEvents::INVENTORY_PURCHASE_ORDER_STATUS_UPDATED,
+                    'purchase_orders',
+                    $id,
+                    [
+                        'status' => $normalized,
+                        'after' => $row,
+                    ],
+                    $actorUserId
+                );
                 return $row;
             }
         }
@@ -467,6 +519,13 @@ class InventoryService
         $id = (int) $this->db->lastInsertId();
         foreach ($this->listBookingPartRequirements($bookingId) as $req) {
             if ((int) ($req['id'] ?? 0) === $id) {
+                $this->logInventoryActivity(
+                    ActivityEvents::INVENTORY_BOOKING_PART_REQUIREMENT_CREATED,
+                    'bookings',
+                    $bookingId,
+                    ['requirement' => $req],
+                    $actorUserId
+                );
                 return $req;
             }
         }
@@ -479,6 +538,14 @@ class InventoryService
      */
     public function updateBookingPartRequirement(string $bookingId, int $requirementId, array $data): array
     {
+        $before = null;
+        foreach ($this->listBookingPartRequirements($bookingId) as $req) {
+            if ((int) ($req['id'] ?? 0) === $requirementId) {
+                $before = $req;
+                break;
+            }
+        }
+
         $status = strtolower(trim((string) ($data['status'] ?? '')));
         $allowed = ['needed', 'ordered', 'arrived', 'installed', 'cancelled'];
         if ($status !== '' && !in_array($status, $allowed, true)) {
@@ -519,6 +586,16 @@ class InventoryService
 
         foreach ($this->listBookingPartRequirements($bookingId) as $req) {
             if ((int) ($req['id'] ?? 0) === $requirementId) {
+                $this->logInventoryActivity(
+                    ActivityEvents::INVENTORY_BOOKING_PART_REQUIREMENT_UPDATED,
+                    'bookings',
+                    $bookingId,
+                    [
+                        'before' => $before,
+                        'after' => $req,
+                    ],
+                    $this->resolveActorUserId()
+                );
                 return $req;
             }
         }
@@ -800,5 +877,47 @@ class InventoryService
         }
 
         return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @param array<string, mixed> $properties
+     */
+    private function logInventoryActivity(
+        string $description,
+        string $subjectType,
+        int|string $subjectId,
+        array $properties = [],
+        ?int $actorUserId = null
+    ): void {
+        try {
+            $logger = activity()->forSubject($subjectType, $subjectId);
+
+            $resolvedActorUserId = $actorUserId;
+            if ($resolvedActorUserId === null) {
+                $resolvedActorUserId = $this->resolveActorUserId();
+            }
+            if ($resolvedActorUserId !== null && $resolvedActorUserId > 0) {
+                $logger->byUser($resolvedActorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($description, 'inventory');
+        } catch (\Throwable $e) {
+            error_log('[InventoryService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

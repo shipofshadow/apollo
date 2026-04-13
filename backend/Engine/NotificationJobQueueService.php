@@ -368,6 +368,16 @@ class NotificationJobQueueService
             }
         }
 
+        $this->logQueueActivity(
+            ActivityEvents::NOTIFICATION_QUEUE_REPLAY_FAILED,
+            [
+                'requestedJobId' => $jobId,
+                'limit' => $limit,
+                'replayed' => $replayed,
+                'jobIds' => $ids,
+            ]
+        );
+
         return [
             'replayed' => $replayed,
             'ids' => $ids,
@@ -911,6 +921,40 @@ class NotificationJobQueueService
                 continue;
             }
             $notifications->createForUser($uid, $type, $title, $message, $data);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $properties
+     */
+    private function logQueueActivity(string $description, array $properties = []): void
+    {
+        try {
+            $logger = activity()->forSubject('notification_jobs', 0);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null) {
+                $logger->byUser($actorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($description, 'notification_queue');
+        } catch (\Throwable $e) {
+            error_log('[NotificationJobQueueService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

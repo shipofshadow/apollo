@@ -42,18 +42,28 @@ class TestimonialService
     public function create(array $data): array
     {
         $this->validatePayload($data);
-        return $this->useDb ? $this->dbCreate($data) : $this->fileCreate($data);
+        $created = $this->useDb ? $this->dbCreate($data) : $this->fileCreate($data);
+        $this->logTestimonialActivity(ActivityEvents::TESTIMONIAL_CREATED, $created, ['after' => $created]);
+        return $created;
     }
 
     /** @return array<string, mixed> */
     public function update(int $id, array $data): array
     {
-        return $this->useDb ? $this->dbUpdate($id, $data) : $this->fileUpdate($id, $data);
+        $before = $this->getById($id);
+        $updated = $this->useDb ? $this->dbUpdate($id, $data) : $this->fileUpdate($id, $data);
+        $this->logTestimonialActivity(ActivityEvents::TESTIMONIAL_UPDATED, $updated, [
+            'before' => $before,
+            'after' => $updated,
+        ]);
+        return $updated;
     }
 
     public function delete(int $id): void
     {
+        $before = $this->getById($id);
         $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
+        $this->logTestimonialActivity(ActivityEvents::TESTIMONIAL_DELETED, $before, ['before' => $before]);
     }
 
     // -------------------------------------------------------------------------
@@ -319,6 +329,39 @@ class TestimonialService
             (new UploadStorage())->deleteByUrl($url);
         } catch (\Throwable) {
             // Keep CRUD successful even if storage cleanup fails.
+        }
+    }
+
+    /** @param array<string, mixed> $entity @param array<string, mixed> $properties */
+    private function logTestimonialActivity(string $event, array $entity, array $properties = []): void
+    {
+        try {
+            $subjectId = (string) ((int) ($entity['id'] ?? 0));
+            $logger = activity()->forSubject('testimonials', $subjectId);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($event, 'content');
+        } catch (\Throwable $e) {
+            error_log('[TestimonialService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

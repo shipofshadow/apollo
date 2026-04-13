@@ -60,9 +60,11 @@ class BlogPostService
     public function create(array $data): array
     {
         $this->validatePayload($data);
-        return $this->useDb
+        $created = $this->useDb
             ? $this->dbCreate($data)
             : $this->fileCreate($data);
+        $this->logBlogActivity(ActivityEvents::BLOG_POST_CREATED, $created, ['after' => $created]);
+        return $created;
     }
 
     /**
@@ -73,9 +75,15 @@ class BlogPostService
      */
     public function update(int $id, array $data): array
     {
-        return $this->useDb
+        $before = $this->getById($id, false);
+        $updated = $this->useDb
             ? $this->dbUpdate($id, $data)
             : $this->fileUpdate($id, $data);
+        $this->logBlogActivity(ActivityEvents::BLOG_POST_UPDATED, $updated, [
+            'before' => $before,
+            'after' => $updated,
+        ]);
+        return $updated;
     }
 
     /**
@@ -83,7 +91,9 @@ class BlogPostService
      */
     public function delete(int $id): void
     {
+        $before = $this->getById($id, false);
         $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
+        $this->logBlogActivity(ActivityEvents::BLOG_POST_DELETED, $before, ['before' => $before]);
     }
 
     // -------------------------------------------------------------------------
@@ -357,6 +367,42 @@ class BlogPostService
             (new UploadStorage())->deleteByUrl($url);
         } catch (\Throwable) {
             // Keep CRUD successful even if storage cleanup fails.
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $entity
+     * @param array<string, mixed> $properties
+     */
+    private function logBlogActivity(string $event, array $entity, array $properties = []): void
+    {
+        try {
+            $subjectId = (string) ((int) ($entity['id'] ?? 0));
+            $logger = activity()->forSubject('blog_posts', $subjectId);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($event, 'content');
+        } catch (\Throwable $e) {
+            error_log('[BlogPostService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

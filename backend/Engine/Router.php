@@ -297,6 +297,8 @@ class Router
             $r->addRoute('GET',  '/api/admin/roles/audit', 'handleAdminRoleAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit', 'handleAdminSecurityAuditList');
             $r->addRoute('GET',  '/api/admin/security/audit/export', 'handleAdminSecurityAuditExport');
+            $r->addRoute('GET',  '/api/admin/activity-logs/users', 'handleAdminActivityLogUsers');
+            $r->addRoute('GET',  '/api/admin/activity-logs', 'handleAdminActivityLogList');
             $r->addRoute('GET',  '/api/admin/semaphore/account', 'handleAdminSemaphoreAccount');
             $r->addRoute('GET',  '/api/admin/semaphore/messages', 'handleAdminSemaphoreMessages');
             $r->addRoute('GET',  '/api/admin/notification-queue', 'handleAdminNotificationQueue');
@@ -1355,7 +1357,13 @@ class Router
             throw new RuntimeException('appointmentTime is required.', 422);
         }
 
-        $booking = (new BookingService())->adminReschedule($id, $date, $time);
+        $booking = (new BookingService())->adminReschedule(
+            $id,
+            $date,
+            $time,
+            (int) ($payload['sub'] ?? 0) ?: null,
+            'admin'
+        );
         echo json_encode(['booking' => $booking]);
     }
 
@@ -1369,7 +1377,12 @@ class Router
 
         $this->requireBookingMutationForPayload($payload, $id);
 
-        $booking = (new BookingService())->updateStatus($id, $status);
+        $booking = (new BookingService())->updateStatus(
+            $id,
+            $status,
+            (int) ($payload['sub'] ?? 0) ?: null,
+            'admin'
+        );
         echo json_encode(['booking' => $booking]);
     }
 
@@ -1427,7 +1440,12 @@ class Router
             }
         }
 
-        $booking = (new BookingService())->assignTechnician($id, $assignedTechId);
+        $booking = (new BookingService())->assignTechnician(
+            $id,
+            $assignedTechId,
+            (int) ($payload['sub'] ?? 0) ?: null,
+            'admin'
+        );
         echo json_encode(['booking' => $booking]);
     }
 
@@ -1570,7 +1588,13 @@ class Router
 
         $this->requireBookingMutationForPayload($payload, $id);
 
-        $booking = (new BookingService())->updatePartsStatus($id, $waiting, $partsNotes);
+        $booking = (new BookingService())->updatePartsStatus(
+            $id,
+            $waiting,
+            $partsNotes,
+            (int) ($payload['sub'] ?? 0) ?: null,
+            'admin'
+        );
         echo json_encode(['booking' => $booking]);
     }
 
@@ -1695,12 +1719,33 @@ class Router
             }
             (new BookingActivityService())->add(
                 $id,
-                'build_update_posted',
+                ActivityEvents::BOOKING_BUILD_UPDATE_POSTED,
                 'Build update posted',
                 $detail,
                 $actorId > 0 ? $actorId : null,
                 'admin'
             );
+
+            try {
+                $logger = activity()
+                    ->forSubject('bookings', $id)
+                    ->withProperties([
+                        'eventType' => ActivityEvents::BOOKING_BUILD_UPDATE_POSTED,
+                        'action' => 'Build update posted',
+                        'detail' => $detail,
+                        'actorRole' => 'admin',
+                        'photoCount' => $photoCount,
+                        'buildUpdateId' => (string) ($update['id'] ?? ''),
+                    ]);
+
+                if ($actorId > 0) {
+                    $logger->byUser($actorId);
+                }
+
+                $logger->log(ActivityEvents::BOOKING_BUILD_UPDATE_POSTED, 'bookings');
+            } catch (\Throwable $e) {
+                error_log('[Router] Failed to write build update activity log: ' . $e->getMessage());
+            }
         }
 
         // Notify the customer that a new build progress update was posted
@@ -1909,7 +1954,12 @@ class Router
         $data = json_decode(file_get_contents('php://input') ?: '{}', true) ?? [];
         $notes = mb_substr((string) ($data['internalNotes'] ?? ''), 0, 5000);
         $this->requireBookingMutationForPayload($payload, $id);
-        $booking = (new BookingService())->updateInternalNotes($id, $notes);
+        $booking = (new BookingService())->updateInternalNotes(
+            $id,
+            $notes,
+            (int) ($payload['sub'] ?? 0) ?: null,
+            'admin'
+        );
         echo json_encode(['booking' => $booking]);
     }
 
@@ -2401,6 +2451,43 @@ class Router
             ]);
         }
         fclose($out);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminActivityLogUsers(array $vars = []): void
+    {
+        $this->requireRoles(['owner']);
+
+        if (DB_NAME === '') {
+            echo json_encode(['users' => []]);
+            return;
+        }
+
+        $sort = (string) ($_GET['sort'] ?? 'most_recent');
+        $users = Activity::summarizeByUsers($sort);
+        echo json_encode(['users' => $users]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminActivityLogList(array $vars = []): void
+    {
+        $this->requireRoles(['owner']);
+
+        if (DB_NAME === '') {
+            echo json_encode(['logs' => []]);
+            return;
+        }
+
+        $userId = isset($_GET['userId']) ? (int) $_GET['userId'] : null;
+        if ($userId !== null && $userId <= 0) {
+            $userId = null;
+        }
+
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 300;
+        $records = Activity::listByCauserUser($userId, $limit);
+        $logs = array_map(static fn (ActivityRecord $record): array => $record->toArray(), $records);
+
+        echo json_encode(['logs' => $logs]);
     }
 
     /** @param array<string, string> $vars */
@@ -3900,7 +3987,12 @@ class Router
         $data = $this->jsonBody();
         $this->requireBookingMutationForPayload($payload, $id);
         $svc  = new BookingService();
-        $booking = $svc->updateCalibrationData($id, $data);
+        $booking = $svc->updateCalibrationData(
+            $id,
+            $data,
+            (int) ($payload['sub'] ?? 0) ?: null,
+            'admin'
+        );
         echo json_encode(['booking' => $booking]);
     }
 

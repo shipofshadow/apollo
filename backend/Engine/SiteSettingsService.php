@@ -44,7 +44,24 @@ class SiteSettingsService
      */
     public function update(array $data): array
     {
-        return $this->useDb ? $this->dbUpdate($data) : $this->fileUpdate($data);
+        $before = $this->getAll();
+        $after = $this->useDb ? $this->dbUpdate($data) : $this->fileUpdate($data);
+
+        $changedKeys = [];
+        foreach ($after as $key => $value) {
+            $beforeValue = $before[$key] ?? null;
+            if ((string) ($beforeValue ?? '') !== (string) ($value ?? '')) {
+                $changedKeys[] = (string) $key;
+            }
+        }
+
+        if ($changedKeys !== []) {
+            $this->logSiteSettingsActivity(ActivityEvents::SITE_SETTINGS_UPDATED, [
+                'changedKeys' => $changedKeys,
+            ]);
+        }
+
+        return $after;
     }
 
     // -------------------------------------------------------------------------
@@ -189,5 +206,37 @@ class SiteSettingsService
             'contact_emails'   => "1625autolab@gmail.com\nservice@1625autolab.com",
             'contact_hours'    => "Mon–Fri: 9:00 AM – 6:00 PM\nSat: By Appointment Only\nSun: Closed",
         ];
+    }
+
+    /** @param array<string, mixed> $properties */
+    private function logSiteSettingsActivity(string $event, array $properties = []): void
+    {
+        try {
+            $logger = activity()->forSubject('site_settings', 0);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($event, 'site_settings');
+        } catch (\Throwable $e) {
+            error_log('[SiteSettingsService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

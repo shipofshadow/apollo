@@ -42,18 +42,28 @@ class FaqService
     public function create(array $data): array
     {
         $this->validatePayload($data);
-        return $this->useDb ? $this->dbCreate($data) : $this->fileCreate($data);
+        $created = $this->useDb ? $this->dbCreate($data) : $this->fileCreate($data);
+        $this->logFaqActivity(ActivityEvents::FAQ_CREATED, $created, ['after' => $created]);
+        return $created;
     }
 
     /** @return array<string, mixed> */
     public function update(int $id, array $data): array
     {
-        return $this->useDb ? $this->dbUpdate($id, $data) : $this->fileUpdate($id, $data);
+        $before = $this->getById($id);
+        $updated = $this->useDb ? $this->dbUpdate($id, $data) : $this->fileUpdate($id, $data);
+        $this->logFaqActivity(ActivityEvents::FAQ_UPDATED, $updated, [
+            'before' => $before,
+            'after' => $updated,
+        ]);
+        return $updated;
     }
 
     public function delete(int $id): void
     {
+        $before = $this->getById($id);
         $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
+        $this->logFaqActivity(ActivityEvents::FAQ_DELETED, $before, ['before' => $before]);
     }
 
     // -------------------------------------------------------------------------
@@ -299,5 +309,38 @@ class FaqService
              'answer' => 'We accept cash, bank transfer, and major e-wallets (GCash, Maya). Payment details will be confirmed upon booking.',
              'category' => 'Billing', 'sortOrder' => 4, 'isActive' => true, 'createdAt' => $now, 'updatedAt' => $now],
         ];
+    }
+
+    /** @param array<string, mixed> $entity @param array<string, mixed> $properties */
+    private function logFaqActivity(string $event, array $entity, array $properties = []): void
+    {
+        try {
+            $subjectId = (string) ((int) ($entity['id'] ?? 0));
+            $logger = activity()->forSubject('faqs', $subjectId);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            if ($properties !== []) {
+                $logger->withProperties($properties);
+            }
+
+            $logger->log($event, 'content');
+        } catch (\Throwable $e) {
+            error_log('[FaqService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

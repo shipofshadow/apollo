@@ -876,6 +876,23 @@ class UserService
                 ? json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
                 : null,
         ]);
+
+        try {
+            $logger = activity()->forSubject('roles', $roleId ?? ($safeRoleKey ?? 'unknown'));
+
+            if ($actorUserId !== null && $actorUserId > 0) {
+                $logger->byUser($actorUserId);
+            }
+
+            $logger->withProperties([
+                'roleKey' => $safeRoleKey,
+                'targetUserId' => $targetUserId,
+                'actorName' => $safeActorName,
+                'details' => $details,
+            ])->log($action, 'roles');
+        } catch (Throwable $e) {
+            error_log('[UserService] Activity logging failed: ' . $e->getMessage());
+        }
     }
 
     /**

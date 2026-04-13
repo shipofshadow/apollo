@@ -43,18 +43,32 @@ class TeamMemberService
     public function create(array $data): array
     {
         $this->validatePayload($data);
-        return $this->useDb ? $this->dbCreate($data) : $this->fileCreate($data);
+        $created = $this->useDb ? $this->dbCreate($data) : $this->fileCreate($data);
+        $this->logTeamMemberActivity(ActivityEvents::TEAM_MEMBER_CREATED, $created, [
+            'after' => $created,
+        ]);
+        return $created;
     }
 
     /** @return array<string, mixed> */
     public function update(int $id, array $data): array
     {
-        return $this->useDb ? $this->dbUpdate($id, $data) : $this->fileUpdate($id, $data);
+        $before = $this->getById($id);
+        $updated = $this->useDb ? $this->dbUpdate($id, $data) : $this->fileUpdate($id, $data);
+        $this->logTeamMemberActivity(ActivityEvents::TEAM_MEMBER_UPDATED, $updated, [
+            'before' => $before,
+            'after' => $updated,
+        ]);
+        return $updated;
     }
 
     public function delete(int $id): void
     {
+        $before = $this->getById($id);
         $this->useDb ? $this->dbDelete($id) : $this->fileDelete($id);
+        $this->logTeamMemberActivity(ActivityEvents::TEAM_MEMBER_DELETED, $before, [
+            'before' => $before,
+        ]);
     }
 
     /** @return array<string, mixed>|null */
@@ -588,6 +602,37 @@ class TeamMemberService
             (new UploadStorage())->deleteByUrl($url);
         } catch (\Throwable) {
             // Keep CRUD successful even if storage cleanup fails.
+        }
+    }
+
+    /** @param array<string, mixed> $entity @param array<string, mixed> $properties */
+    private function logTeamMemberActivity(string $description, array $entity, array $properties = []): void
+    {
+        try {
+            $subjectId = (string) ((int) ($entity['id'] ?? 0));
+            $logger = activity()
+                ->forSubject('team_members', $subjectId)
+                ->withProperties($properties);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null) {
+                $logger->byUser($actorUserId);
+            }
+
+            $logger->log($description, 'team_members');
+        } catch (\Throwable $e) {
+            error_log('[TeamMemberService] Failed to write activity log: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

@@ -79,8 +79,11 @@ class BuildUpdateService
         );
         $fetch->execute([':id' => $id]);
         $row = $fetch->fetch(\PDO::FETCH_ASSOC);
+        $update = $this->formatRow($row);
 
-        return $this->formatRow($row);
+        $this->logBuildUpdateActivity($update);
+
+        return $update;
     }
 
     // -------------------------------------------------------------------------
@@ -107,5 +110,44 @@ class BuildUpdateService
             'photoUrls' => $urls,
             'createdAt' => (string) $row['created_at'],
         ];
+    }
+
+    /** @param array<string, mixed> $update */
+    private function logBuildUpdateActivity(array $update): void
+    {
+        try {
+            $subjectId = (string) ((int) ($update['id'] ?? 0));
+            $bookingId = (string) ($update['bookingId'] ?? '');
+            $photoCount = is_array($update['photoUrls'] ?? null) ? count($update['photoUrls']) : 0;
+
+            $logger = activity()
+                ->forSubject('build_updates', $subjectId)
+                ->withProperties([
+                    'bookingId' => $bookingId,
+                    'photoCount' => $photoCount,
+                    'note' => (string) ($update['note'] ?? ''),
+                    'createdAt' => (string) ($update['createdAt'] ?? ''),
+                ]);
+
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null) {
+                $logger->byUser($actorUserId);
+            }
+
+            $logger->log(ActivityEvents::BUILD_UPDATE_CREATED, 'build_updates');
+        } catch (\Throwable $e) {
+            error_log('[BuildUpdateService] Failed to write build update activity log: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

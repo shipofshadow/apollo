@@ -4,7 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, GitBranch, Users, Workflow, Megaphone, Boxes,
+  Camera, MessageSquare, GitBranch, Users, Workflow, Megaphone, Boxes, Activity,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,7 @@ import ManageClientsPanel   from './admin/ManageClientsPanel';
 import ManageRolesPanel     from './admin/ManageRolesPanel';
 import ClientDetailPanel    from './admin/ClientDetailPanel';
 import SecurityAuditPanel   from './admin/SecurityAuditPanel';
+import ActivityLogsPanel    from './admin/ActivityLogsPanel';
 import NotificationQueuePanel from './admin/NotificationQueuePanel';
 import MarketingCampaignsPanel from './admin/MarketingCampaignsPanel';
 import InventoryPanel from './admin/InventoryPanel';
@@ -60,6 +61,7 @@ const TAB_PATHS: Record<string, string> = {
   'marketing-campaigns': '/admin/marketing-campaigns',
   inventory: '/admin/inventory',
   'security-audit': '/admin/security-audit',
+  'activity-logs': '/admin/activity-logs',
   'notification-queue': '/admin/notification-queue',
   'semaphore': '/admin/semaphore',
   settings: '/admin/account',
@@ -173,6 +175,10 @@ export default function AdminPage() {
       return hasPermission('settings:manage');
     }
 
+    if (key === 'activity-logs') {
+      return role === 'owner';
+    }
+
     if (isAdmin) return true;
 
     if (role === 'manager') {
@@ -233,6 +239,7 @@ export default function AdminPage() {
         { key: 'marketing-campaigns', label: 'Campaigns', icon: Megaphone },
         { key: 'site-settings', label: 'Site Config',     icon: SlidersHorizontal },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
+        { key: 'activity-logs', label: 'Activity Logs', icon: Activity },
         { key: 'notification-queue', label: 'Queue Monitor', icon: Workflow },
         { key: 'semaphore',     label: 'Semaphore SMS',   icon: MessageSquare },
         { key: 'settings',      label: 'Account',         icon: UserCog },
@@ -308,6 +315,7 @@ export default function AdminPage() {
           />
         );
       case 'security-audit': return <SecurityAuditPanel />;
+      case 'activity-logs': return <ActivityLogsPanel />;
       case 'notification-queue': return <NotificationQueuePanel />;
       case 'semaphore':     return <SemaphorePanel />;
       case 'settings':      return <AccountSettingsPanel />;

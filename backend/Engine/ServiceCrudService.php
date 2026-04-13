@@ -173,7 +173,9 @@ class ServiceCrudService
         $stmt->execute($this->bindParams($data));
         $id = (int) $db->lastInsertId();
         $this->dbReplaceFeatures($id, $data['features'] ?? []);
-        return $this->dbGetById($id, false);
+        $created = $this->dbGetById($id, false);
+        $this->logServiceCreated($created);
+        return $created;
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
@@ -223,7 +225,9 @@ class ServiceCrudService
             $this->deleteManagedImageUrl($oldImage);
         }
 
-        return $this->dbGetById($id, false);
+        $updated = $this->dbGetById($id, false);
+        $this->logServiceUpdated($current, $updated);
+        return $updated;
     }
 
     private function dbDelete(int $id): void
@@ -244,6 +248,8 @@ class ServiceCrudService
             $urls = array_merge($urls, $this->collectVariationImageUrls($variation));
         }
         $this->deleteManagedImageUrls($urls);
+
+        $this->logServiceDeleted($current);
     }
 
     // -------------------------------------------------------------------------
@@ -389,7 +395,9 @@ class ServiceCrudService
         );
         $stmt->execute($this->bindVariationParams($serviceId, $data));
         $varId = (int) $db->lastInsertId();
-        return $this->dbFetchVariationById($varId);
+        $created = $this->dbFetchVariationById($varId);
+        $this->logServiceVariationCreated($serviceId, $created);
+        return $created;
     }
 
     /**
@@ -438,7 +446,9 @@ class ServiceCrudService
             $this->collectVariationImageUrls($newVariation)
         );
 
-        return $this->dbFetchVariationById($varId);
+        $updated = $this->dbFetchVariationById($varId);
+        $this->logServiceVariationUpdated($serviceId, $current, $updated);
+        return $updated;
     }
 
     /**
@@ -457,6 +467,7 @@ class ServiceCrudService
         }
 
         $this->deleteManagedImageUrls($this->collectVariationImageUrls($current));
+        $this->logServiceVariationDeleted($serviceId, $current);
     }
 
     /** @return array<string, mixed> */
@@ -709,6 +720,98 @@ class ServiceCrudService
             ],
         ];
         $this->fileWrite($defaults);
+    }
+
+    private function logServiceCreated(array $created): void
+    {
+        $this->logServiceActivity(static function (ActivityLog $logger) use ($created): void {
+            $logger->logCreated(['after' => $created], 'services');
+        }, $created);
+    }
+
+    private function logServiceUpdated(array $before, array $after): void
+    {
+        $this->logServiceActivity(static function (ActivityLog $logger) use ($before, $after): void {
+            $logger->logUpdated($after, $before, [], 'services');
+        }, $after);
+    }
+
+    private function logServiceDeleted(array $before): void
+    {
+        $this->logServiceActivity(static function (ActivityLog $logger) use ($before): void {
+            $logger->logDeleted(['before' => $before], 'services');
+        }, $before);
+    }
+
+    private function logServiceVariationCreated(int $serviceId, array $variation): void
+    {
+        $this->logServiceActivity(static function (ActivityLog $logger) use ($variation): void {
+            $logger
+                ->withProperties([
+                    'entity' => 'variation',
+                    'after' => $variation,
+                ])
+                ->log(ActivityEvents::PRODUCT_VARIATION_CREATED, 'services');
+        }, ['id' => $serviceId]);
+    }
+
+    private function logServiceVariationUpdated(int $serviceId, array $before, array $after): void
+    {
+        $this->logServiceActivity(static function (ActivityLog $logger) use ($before, $after): void {
+            $logger
+                ->withProperty('entity', 'variation')
+                ->logUpdated($after, $before, [], 'services');
+        }, ['id' => $serviceId]);
+    }
+
+    private function logServiceVariationDeleted(int $serviceId, array $before): void
+    {
+        $this->logServiceActivity(static function (ActivityLog $logger) use ($before): void {
+            $logger
+                ->withProperties([
+                    'entity' => 'variation',
+                    'before' => $before,
+                ])
+                ->log(ActivityEvents::PRODUCT_VARIATION_DELETED, 'services');
+        }, ['id' => $serviceId]);
+    }
+
+    /**
+     * @param callable(ActivityLog): void $writer
+     * @param array<string, mixed> $entity
+     */
+    private function logServiceActivity(callable $writer, array $entity): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+
+        $subjectId = isset($entity['id']) ? (int) $entity['id'] : 0;
+        if ($subjectId <= 0) {
+            return;
+        }
+
+        try {
+            $logger = activity()->forSubject('services', $subjectId);
+            $actorUserId = $this->resolveActorUserId();
+            if ($actorUserId !== null) {
+                $logger->byUser($actorUserId);
+            }
+            $writer($logger);
+        } catch (Throwable $e) {
+            error_log('[ServiceCrudService] Activity logging failed: ' . $e->getMessage());
+        }
+    }
+
+    private function resolveActorUserId(): ?int
+    {
+        try {
+            $payload = Auth::user();
+            $userId = (int) ($payload['sub'] ?? 0);
+            return $userId > 0 ? $userId : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     // -------------------------------------------------------------------------
