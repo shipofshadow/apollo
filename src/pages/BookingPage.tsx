@@ -829,7 +829,7 @@ export default function BookingPage() {
                           <div className="space-y-2">
                             <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Phone Number *</label>
                             <input type="tel" required value={form.phone} onChange={handlePhoneChange}
-                              className={`${inputClass} ${formErrors.phone ? '!border-red-500 focus:!ring-red-500' : ''}`} placeholder="09123456789, 9123456789, +639123456789" />
+                              className={`${inputClass} ${formErrors.phone ? '!border-red-500 focus:!ring-red-500' : ''}`} placeholder="Please enter your phone number." />
                             {formErrors.phone && <p className="text-xs text-red-400 mt-1">{formErrors.phone}</p>}
                           </div>
                           <div className="space-y-2 md:col-span-2">
@@ -968,12 +968,12 @@ export default function BookingPage() {
 
                     {/* Section: Signature */}
                     <div className="space-y-2">
-    <SignaturePad 
-        value={signatureData} 
-        onChange={setSignatureData} 
-        isModal 
-    />
-</div>
+                        <SignaturePad 
+                            value={signatureData} 
+                            onChange={setSignatureData} 
+                            isModal 
+                        />
+                    </div>
 
 
                     <TurnstileWidget

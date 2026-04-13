@@ -307,7 +307,7 @@ export default function Profile() {
                     type="tel" value={info.phone}
                     onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))}
                     className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-2.5 focus:outline-none focus:border-brand-orange transition-colors rounded-md text-sm"
-                    placeholder="09123456789, 9123456789, +639123456789"
+                    placeholder="Please enter your phone number."
                   />
                 </div>
               </div>
