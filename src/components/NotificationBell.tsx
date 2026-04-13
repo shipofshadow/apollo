@@ -8,6 +8,7 @@ import {
   markAllReadAsync,
   deleteNotificationAsync,
 } from '../store/notificationsSlice';
+import { fetchBookingByIdAsync } from '../store/bookingSlice';
 import type { AppNotification, NotificationType } from '../types';
 
 // ── Icon map per notification type ───────────────────────────────────────────
@@ -115,7 +116,7 @@ export default function NotificationBell({ className = '' }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleNotificationClick = useCallback((n: AppNotification) => {
+  const handleNotificationClick = useCallback(async (n: AppNotification) => {
     // Mark as read first
     if (!n.isRead && token) {
       dispatch(markReadAsync({ token, id: n.id }));
@@ -141,6 +142,13 @@ export default function NotificationBell({ className = '' }: Props) {
     if (!bookingId) return;
 
     if (user?.role && user.role !== 'client') {
+      if (token) {
+        try {
+          await dispatch(fetchBookingByIdAsync({ token, id: String(bookingId) })).unwrap();
+        } catch {
+          // Continue navigation; detail page has its own fallback fetch/error handling.
+        }
+      }
       navigate('/admin/bookings', { state: { openBookingId: String(bookingId) } });
     } else {
       navigate(`/client/bookings/${bookingId}`);
@@ -208,7 +216,7 @@ export default function NotificationBell({ className = '' }: Props) {
                 return (
                   <div
                     key={n.id}
-                    onClick={() => handleNotificationClick(n)}
+                    onClick={() => { void handleNotificationClick(n); }}
                     className={`group relative flex gap-3 px-4 py-3 border-b border-gray-800 cursor-pointer transition-colors hover:bg-gray-800/60 ${
                       !n.isRead ? 'bg-brand-orange/5' : ''
                     }`}

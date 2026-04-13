@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import {
   fetchAllBookingsAsync,
+  fetchBookingByIdAsync,
   updateBookingStatusAsync,
   adminRescheduleBookingAsync,
 } from '../../store/bookingSlice';
@@ -409,11 +410,40 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
+  const [bookingLookupLoading, setBookingLookupLoading] = useState(false);
+  const [bookingLookupError, setBookingLookupError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     dispatch(fetchAllBookingsAsync(token));
   }, [token, dispatch]);
+
+  useEffect(() => {
+    if (!token || booking) {
+      setBookingLookupLoading(false);
+      setBookingLookupError(null);
+      return;
+    }
+
+    let active = true;
+    setBookingLookupLoading(true);
+    setBookingLookupError(null);
+
+    dispatch(fetchBookingByIdAsync({ token, id: bookingId }))
+      .unwrap()
+      .catch((e: unknown) => {
+        if (!active) return;
+        setBookingLookupError((e as Error).message ?? 'Unable to load booking details.');
+      })
+      .finally(() => {
+        if (!active) return;
+        setBookingLookupLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, bookingId, booking, dispatch]);
 
   useEffect(() => {
     if (!booking) return;
@@ -780,10 +810,17 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
         <button onClick={onBack} className="inline-flex items-center gap-2 text-gray-500 hover:text-white text-[10px] font-mono uppercase tracking-widest transition-colors">
           <ArrowLeft className="w-3.5 h-3.5" /> Return
         </button>
-        <div className="flex items-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400 px-5 py-4 rounded font-mono text-sm">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <p>Payload dropped. Booking not found in current state.</p>
-        </div>
+        {bookingLookupLoading ? (
+          <div className="flex items-center gap-3 bg-brand-orange/5 border border-brand-orange/20 text-brand-orange px-5 py-4 rounded font-mono text-sm">
+            <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+            <p>Loading booking payload...</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400 px-5 py-4 rounded font-mono text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <p>{bookingLookupError ?? 'Booking not found or you no longer have access to it.'}</p>
+          </div>
+        )}
       </div>
     );
   }
