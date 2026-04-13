@@ -6,6 +6,7 @@ import {
   fetchNotificationQueueHealthApi,
   replayFailedNotificationJobsApi,
   replayNotificationJobApi,
+  runNotificationQueueWorkerApi,
 } from '../../services/api';
 import type { NotificationQueueHealth, NotificationQueueJob, NotificationQueueSummary } from '../../types';
 
@@ -29,8 +30,10 @@ export default function NotificationQueuePanel() {
   const [limit, setLimit] = useState(100);
   const [loading, setLoading] = useState(false);
   const [replayBusy, setReplayBusy] = useState(false);
+  const [cronBusy, setCronBusy] = useState(false);
   const [jobReplayBusyId, setJobReplayBusyId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [cronNotice, setCronNotice] = useState('');
 
   const [summary, setSummary] = useState<NotificationQueueSummary | null>(null);
   const [health, setHealth] = useState<NotificationQueueHealth | null>(null);
@@ -96,6 +99,22 @@ export default function NotificationQueuePanel() {
     }
   };
 
+  const runCronNow = async () => {
+    if (!token || !canManage) return;
+    setCronBusy(true);
+    setError('');
+    setCronNotice('');
+    try {
+      const { stats } = await runNotificationQueueWorkerApi(token, limit);
+      setCronNotice(`Queue worker finished: processed ${stats.processed}, retried ${stats.retried}, failed ${stats.failed}.`);
+      await loadData();
+    } catch (e) {
+      setError((e as Error).message ?? 'Failed to run queue worker.');
+    } finally {
+      setCronBusy(false);
+    }
+  };
+
   if (!canManage) {
     return (
       <div className="w-full max-w-4xl rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -119,8 +138,17 @@ export default function NotificationQueuePanel() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => { void runCronNow(); }}
+            disabled={cronBusy || loading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm border border-brand-orange/60 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange hover:text-white disabled:opacity-50 transition-colors"
+          >
+            {cronBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Workflow className="w-3.5 h-3.5" />}
+            Run Cron Now
+          </button>
+          <button
+            type="button"
             onClick={() => { void replayFailed(); }}
-            disabled={replayBusy || loading || failedJobs.length === 0}
+            disabled={replayBusy || cronBusy || loading || failedJobs.length === 0}
             className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm border border-yellow-600/40 text-yellow-300 hover:border-yellow-400 hover:text-yellow-200 disabled:opacity-50 transition-colors"
           >
             {replayBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
@@ -129,7 +157,7 @@ export default function NotificationQueuePanel() {
           <button
             type="button"
             onClick={() => { void loadData(); }}
-            disabled={loading}
+            disabled={loading || cronBusy}
             className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -151,6 +179,12 @@ export default function NotificationQueuePanel() {
       {error && (
         <div className="flex items-center gap-2 rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
+
+      {cronNotice && (
+        <div className="flex items-center gap-2 rounded-sm border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {cronNotice}
         </div>
       )}
 

@@ -137,6 +137,12 @@ define('NOTIFICATION_QUEUE_ENABLED', filter_var($_ENV['NOTIFICATION_QUEUE_ENABLE
 define('NOTIFICATION_QUEUE_BATCH_SIZE', max(1, (int) ($_ENV['NOTIFICATION_QUEUE_BATCH_SIZE'] ?? 25)));
 define('NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS', max(15, (int) ($_ENV['NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS'] ?? 60)));
 
+// Optional on-request auto workers (fallback when cron is unavailable)
+define('AUTO_CRON_ON_REQUEST', filter_var($_ENV['AUTO_CRON_ON_REQUEST'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
+define('AUTO_CRON_MIN_INTERVAL_SECONDS', max(10, (int) ($_ENV['AUTO_CRON_MIN_INTERVAL_SECONDS'] ?? 45)));
+define('AUTO_CRON_QUEUE_LIMIT', max(1, (int) ($_ENV['AUTO_CRON_QUEUE_LIMIT'] ?? 10)));
+define('AUTO_CRON_CAMPAIGN_LIMIT', max(1, (int) ($_ENV['AUTO_CRON_CAMPAIGN_LIMIT'] ?? 5)));
+
 // ---------------------------------------------------------------------------
 // Cloudflare Turnstile
 // TURNSTILE_SECRET_KEY: server-side secret from the Turnstile dashboard.
