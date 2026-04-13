@@ -646,6 +646,45 @@ class UserService
         return $this->findById($id);
     }
 
+    /**
+     * Delete a user account from the admin panel.
+     */
+    public function deleteByAdmin(int $id, ?int $actorUserId = null, ?string $actorName = null): void
+    {
+        $target = $this->findById($id);
+        $targetRole = strtolower(trim((string) ($target['role'] ?? '')));
+
+        if ($targetRole === 'owner' && $this->countUsersByRole('owner') <= 1) {
+            throw new RuntimeException('You cannot delete the last owner account.', 422);
+        }
+
+        $this->db->beginTransaction();
+        try {
+            (new PrivacyService())->deleteAccount($id, 'admin_delete');
+
+            $this->logRoleAudit(
+                'user_deleted',
+                null,
+                $targetRole !== '' ? $targetRole : null,
+                $id,
+                $actorUserId,
+                $actorName,
+                [
+                    'targetEmail' => (string) ($target['email'] ?? ''),
+                    'targetName' => (string) ($target['name'] ?? ''),
+                    'targetRole' => $targetRole,
+                ]
+            );
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     private function issueTokenFor(array $user): string
     {
         return Auth::issueToken([
@@ -686,6 +725,13 @@ class UserService
         $stmt = $this->db->prepare('SELECT 1 FROM roles WHERE role_key = :role LIMIT 1');
         $stmt->execute([':role' => $role]);
         return (bool) $stmt->fetchColumn();
+    }
+
+    private function countUsersByRole(string $role): int
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM users WHERE role = :role');
+        $stmt->execute([':role' => strtolower(trim($role))]);
+        return (int) $stmt->fetchColumn();
     }
 
     /**

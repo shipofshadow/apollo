@@ -824,6 +824,11 @@ export const updateAdminUserInfoApi = (
     body: JSON.stringify(data),
   }, token);
 
+export const deleteAdminUserApi = (token: string, id: number) =>
+  apiFetch<{ deleted: boolean }>(`/api/admin/users/${id}`, {
+    method: 'DELETE',
+  }, token);
+
 export const fetchAdminClientsApi = (token: string, params?: { search?: string }) => {
   const q = new URLSearchParams();
   if (params?.search) q.set('search', params.search);

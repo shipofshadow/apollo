@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, Filter, Loader2, UserPlus, Users } from 'lucide-react';
+import { Ban, CheckCircle2, Filter, Loader2, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
   createAdminUserApi,
+  deleteAdminUserApi,
   fetchAdminRolesApi,
   fetchAdminUsersApi,
   updateAdminUserRoleApi,
@@ -42,6 +43,7 @@ export default function ManageUsersPanel() {
   const [creatingUser, setCreatingUser] = useState(false);
   const [updatingRoleId, setUpdatingRoleId] = useState<number | null>(null);
   const [togglingStatusId, setTogglingStatusId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   const [usersPage, setUsersPage] = useState(1);
   const [userSearch, setUserSearch] = useState('');
@@ -202,6 +204,30 @@ export default function ManageUsersPanel() {
     });
   };
 
+  const performDeleteUser = async (id: number, name: string) => {
+    if (!token || !canManageUsers) return;
+    setDeletingUserId(id);
+    try {
+      await deleteAdminUserApi(token, id);
+      setUsers(prev => prev.filter(item => item.id !== id));
+      showToast(`${name} deleted.`, 'success');
+    } catch (e) {
+      showToast((e as Error).message ?? 'Failed to delete user.', 'error');
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = (id: number, name: string) => {
+    requestConfirmation({
+      title: 'Delete user account?',
+      message: `${name}'s account and personal data will be permanently deleted. This cannot be undone.`,
+      confirmLabel: 'Delete User',
+      tone: 'danger',
+      onConfirm: async () => performDeleteUser(id, name),
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
@@ -305,6 +331,7 @@ export default function ManageUsersPanel() {
                     const isActive = item.is_active !== false;
                     // Admins cannot edit other admin or owner accounts — only owners can.
                     const isProtected = !isOwner && (item.role === 'admin' || item.role === 'owner');
+                    const isSelf = user?.id === item.id;
                     return (
                       <tr key={item.id} className={`border-b border-gray-800/70 ${!isActive ? 'opacity-60' : ''}`}>
                         <td className="py-2.5 px-3 md:px-4 text-white font-medium">{item.name}</td>
@@ -331,21 +358,40 @@ export default function ManageUsersPanel() {
                           {new Date(item.created_at).toLocaleDateString()}
                         </td>
                         <td className="py-2.5 px-3 md:px-4">
-                          <button type="button"
-                            disabled={isProtected || togglingStatusId === item.id}
-                            onClick={() => handleToggleStatus(item.id, isActive, item.name)}
-                            title={isProtected ? 'Only the owner can change status of admin/owner accounts' : undefined}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors ${
-                              isActive
-                                ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
-                                : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
-                            }`}>
-                            {togglingStatusId === item.id
-                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
-                              : isActive
-                                ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
-                                : <><CheckCircle2 className="w-3.5 h-3.5" /><span>Enable</span></>}
-                          </button>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button type="button"
+                              disabled={isProtected || togglingStatusId === item.id}
+                              onClick={() => handleToggleStatus(item.id, isActive, item.name)}
+                              title={isProtected ? 'Only the owner can change status of admin/owner accounts' : undefined}
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors ${
+                                isActive
+                                  ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
+                                  : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
+                              }`}>
+                              {togglingStatusId === item.id
+                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
+                                : isActive
+                                  ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
+                                  : <><CheckCircle2 className="w-3.5 h-3.5" /><span>Enable</span></>}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isProtected || isSelf || deletingUserId === item.id}
+                              onClick={() => handleDeleteUser(item.id, item.name)}
+                              title={
+                                isSelf
+                                  ? 'You cannot delete your own account here'
+                                  : isProtected
+                                    ? 'Only the owner can delete admin/owner accounts'
+                                    : undefined
+                              }
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors"
+                            >
+                              {deletingUserId === item.id
+                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Deleting...</span></>
+                                : <><Trash2 className="w-3.5 h-3.5" /><span>Delete</span></>}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

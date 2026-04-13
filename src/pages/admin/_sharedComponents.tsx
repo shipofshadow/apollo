@@ -116,11 +116,18 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const isDanger = dialog.tone === 'danger';
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-md rounded-sm border border-gray-700 bg-brand-dark p-5 shadow-2xl">
         <h3 className="text-sm font-bold uppercase tracking-widest text-white">{dialog.title}</h3>
         <p className="mt-2 text-sm text-gray-300">{dialog.message}</p>
+        {isDanger && (
+          <div className="mt-3 rounded-sm border border-red-900/70 bg-red-950/30 px-3 py-2">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-red-300">Warning: This action cannot be undone.</p>
+          </div>
+        )}
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             type="button"
@@ -136,7 +143,7 @@ export function ConfirmDialog({
             disabled={confirming}
             className={[
               'px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-widest text-white disabled:opacity-50',
-              dialog.tone === 'danger' ? 'bg-red-700 hover:bg-red-600' : 'bg-brand-orange hover:bg-orange-600',
+              isDanger ? 'bg-red-700 hover:bg-red-600' : 'bg-brand-orange hover:bg-orange-600',
             ].join(' ')}
           >
             {confirming ? 'Please wait...' : (dialog.confirmLabel ?? 'Confirm')}

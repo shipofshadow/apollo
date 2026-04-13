@@ -288,6 +288,7 @@ class Router
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/role',   'handleAdminUserRoleUpdate');
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/status', 'handleAdminUserStatusUpdate');
             $r->addRoute('PATCH',  '/api/admin/users/{id:\d+}/info',   'handleAdminUserInfoUpdate');
+            $r->addRoute('DELETE', '/api/admin/users/{id:\d+}',        'handleAdminUserDelete');
             $r->addRoute('GET',  '/api/admin/clients', 'handleAdminClientList');
             $r->addRoute('GET',  '/api/admin/clients/{id:\d+}/bookings', 'handleAdminClientBookings');
             $r->addRoute('GET',  '/api/admin/clients/{id:\d+}/vehicles', 'handleAdminClientVehicles');
@@ -2027,6 +2028,35 @@ class Router
         $data = $this->jsonBody();
         $user = (new UserService())->updateUserInfo($id, $data);
         echo json_encode(['user' => $user]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminUserDelete(array $vars = []): void
+    {
+        $payload = $this->requirePermission('users:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid user id.', 422);
+        }
+
+        $actorId = (int) ($payload['sub'] ?? 0);
+        if ($actorId > 0 && $actorId === $id) {
+            throw new RuntimeException('You cannot delete your own account from this screen.', 422);
+        }
+
+        $actorRole = strtolower(trim((string) ($payload['role'] ?? '')));
+        $actorName = (string) ($payload['name'] ?? '');
+
+        if ($actorRole !== 'owner') {
+            $target = (new UserService())->findById($id);
+            $targetRole = strtolower(trim((string) ($target['role'] ?? '')));
+            if ($targetRole === 'admin' || $targetRole === 'owner') {
+                throw new RuntimeException('You do not have permission to delete an admin or owner account.', 403);
+            }
+        }
+
+        (new UserService())->deleteByAdmin($id, $actorId > 0 ? $actorId : null, $actorName);
+        echo json_encode(['deleted' => true]);
     }
 
     /** @param array<string, string> $vars */

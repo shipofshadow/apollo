@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, ExternalLink, Filter, Loader2, Pencil, Save, Users, X } from 'lucide-react';
+import { Ban, CheckCircle2, ExternalLink, Filter, Loader2, Pencil, Save, Trash2, Users, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
+  deleteAdminUserApi,
   fetchAdminClientsApi,
   updateAdminUserInfoApi,
   updateAdminUserStatusApi,
@@ -34,6 +35,7 @@ export default function ManageClientsPanel({ onView }: Props) {
   const [editingClientId, setEditingClientId] = useState<number | null>(null);
   const [clientEditDraft, setClientEditDraft] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
   const [savingClientId, setSavingClientId] = useState<number | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<number | null>(null);
 
   const [clientsPage, setClientsPage] = useState(1);
   const [clientSearch, setClientSearch] = useState('');
@@ -153,6 +155,33 @@ export default function ManageClientsPanel({ onView }: Props) {
     });
   };
 
+  const performDeleteClient = async (id: number, name: string) => {
+    if (!token || !canManageUsers) return;
+    setDeletingClientId(id);
+    try {
+      await deleteAdminUserApi(token, id);
+      setClients(prev => prev.filter(item => item.id !== id));
+      if (editingClientId === id) {
+        handleCancelClientEdit();
+      }
+      showToast(`${name} deleted.`, 'success');
+    } catch (e) {
+      showToast((e as Error).message ?? 'Failed to delete client.', 'error');
+    } finally {
+      setDeletingClientId(null);
+    }
+  };
+
+  const handleDeleteClient = (id: number, name: string) => {
+    requestConfirmation({
+      title: 'Delete client account?',
+      message: `${name}'s account and personal data will be permanently deleted. This cannot be undone.`,
+      confirmLabel: 'Delete Client',
+      tone: 'danger',
+      onConfirm: async () => performDeleteClient(id, name),
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Breadcrumbs */}
@@ -238,6 +267,7 @@ export default function ManageClientsPanel({ onView }: Props) {
                 ) : pagedClients.map(item => {
                   const isClientActive = item.is_active !== false;
                   const isTogglingThis = togglingStatusId === item.id;
+                  const isDeletingThis = deletingClientId === item.id;
 
                   return (
                     <tr key={item.id} className={`border-b border-gray-800/70 align-middle ${!isClientActive ? 'opacity-60' : ''}`}>
@@ -286,6 +316,16 @@ export default function ManageClientsPanel({ onView }: Props) {
                                 : isClientActive
                                   ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
                                   : <><CheckCircle2 className="w-3.5 h-3.5" /><span>Enable</span></>}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isDeletingThis}
+                              onClick={() => handleDeleteClient(item.id, item.name)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 text-xs font-semibold whitespace-nowrap disabled:opacity-60 transition-colors"
+                            >
+                              {isDeletingThis
+                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Deleting...</span></>
+                                : <><Trash2 className="w-3.5 h-3.5" /><span>Delete</span></>}
                             </button>
                           </div>
                         </td>
