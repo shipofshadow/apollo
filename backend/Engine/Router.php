@@ -301,6 +301,10 @@ class Router
             $r->addRoute('GET',  '/api/admin/security/audit/export', 'handleAdminSecurityAuditExport');
             $r->addRoute('GET',  '/api/admin/activity-logs/users', 'handleAdminActivityLogUsers');
             $r->addRoute('GET',  '/api/admin/activity-logs', 'handleAdminActivityLogList');
+            $r->addRoute('GET',  '/api/admin/backups', 'handleAdminBackupList');
+            $r->addRoute('POST', '/api/admin/backups', 'handleAdminBackupCreate');
+            $r->addRoute('POST', '/api/admin/backups/{id:[A-Za-z0-9_\\-]+}/restore', 'handleAdminBackupRestore');
+            $r->addRoute('GET', '/api/admin/backups/{id:[A-Za-z0-9_\\-]+}/download', 'handleAdminBackupDownload');
             $r->addRoute('GET',  '/api/admin/semaphore/account', 'handleAdminSemaphoreAccount');
             $r->addRoute('GET',  '/api/admin/semaphore/messages', 'handleAdminSemaphoreMessages');
             $r->addRoute('GET',  '/api/admin/notification-queue', 'handleAdminNotificationQueue');
@@ -2533,6 +2537,90 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleAdminBackupList(array $vars = []): void
+    {
+        $this->requireRoles(['owner']);
+        $backups = (new BackupRestoreService())->listBackups();
+        echo json_encode(['backups' => $backups]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupCreate(array $vars = []): void
+    {
+        $payload = $this->requireRoles(['owner']);
+        $data = $this->jsonBody();
+
+        $storage = strtolower(trim((string) ($data['storage'] ?? 'server')));
+        $includeDatabase = !array_key_exists('includeDatabase', $data)
+            ? true
+            : filter_var($data['includeDatabase'], FILTER_VALIDATE_BOOLEAN);
+        $includeFiles = !array_key_exists('includeFiles', $data)
+            ? true
+            : filter_var($data['includeFiles'], FILTER_VALIDATE_BOOLEAN);
+
+        $entry = (new BackupRestoreService())->createBackup([
+            'storage' => $storage,
+            'includeDatabase' => (bool) $includeDatabase,
+            'includeFiles' => (bool) $includeFiles,
+            'createdBy' => (string) ($payload['name'] ?? $payload['email'] ?? 'Owner'),
+        ]);
+
+        echo json_encode(['backup' => $entry]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupRestore(array $vars = []): void
+    {
+        $this->requireRoles(['owner']);
+        $id = (string) ($vars['id'] ?? '');
+        if ($id === '') {
+            throw new RuntimeException('Backup id is required.', 422);
+        }
+
+        $data = $this->jsonBody();
+        $restoreDatabase = !array_key_exists('restoreDatabase', $data)
+            ? true
+            : filter_var($data['restoreDatabase'], FILTER_VALIDATE_BOOLEAN);
+        $restoreFiles = !array_key_exists('restoreFiles', $data)
+            ? true
+            : filter_var($data['restoreFiles'], FILTER_VALIDATE_BOOLEAN);
+
+        $result = (new BackupRestoreService())->restoreBackup($id, [
+            'restoreDatabase' => (bool) $restoreDatabase,
+            'restoreFiles' => (bool) $restoreFiles,
+        ]);
+
+        echo json_encode(['result' => $result]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupDownload(array $vars = []): void
+    {
+        $this->requireRoles(['owner']);
+        $id = (string) ($vars['id'] ?? '');
+        if ($id === '') {
+            throw new RuntimeException('Backup id is required.', 422);
+        }
+
+        $service = new BackupRestoreService();
+        $entry = $service->findBackup($id);
+        if (($entry['storage'] ?? '') === 's3') {
+            $url = (string) ($entry['url'] ?? '');
+            if ($url === '') {
+                throw new RuntimeException('Backup URL is missing.', 404);
+            }
+            header('Location: ' . $url, true, 302);
+            return;
+        }
+
+        $path = $service->getServerFilePath($id);
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . basename($path) . '"');
+        header('Content-Length: ' . (string) (filesize($path) ?: 0));
+        readfile($path);
+    }
+
+    /** @param array<string, string> $vars */
     private function handleAdminSemaphoreAccount(array $vars = []): void
     {
         $this->requirePermission('settings:manage');
@@ -4152,4 +4240,3 @@ class Router
         echo json_encode(['entry' => $entry]);
     }
 }
-
