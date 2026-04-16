@@ -95,7 +95,7 @@ def require_admin(payload: Dict[str, Any] = Depends(get_current_user)) -> Dict[s
     if not db_role:
         raise HTTPException(status_code=401, detail="User not found.")
 
-    if db_role != "admin":
+    if db_role != "admin" and db_role != "owner":
         raise HTTPException(status_code=403, detail="Forbidden.")
 
     token_role = str(payload.get("role", "")).strip().lower()
