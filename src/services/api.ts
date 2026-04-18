@@ -1799,3 +1799,43 @@ export const updateAdminOrderPaymentApi = (token: string, id: number, paymentSta
     method: 'PATCH',
     body: JSON.stringify({ paymentStatus }),
   }, token);
+
+// ── Owner Backup / Restore ───────────────────────────────────────────────────
+
+export interface AdminBackupEntry {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  storage: 'server' | 's3';
+  includeDatabase: boolean;
+  includeFiles: boolean;
+  sizeBytes?: number | null;
+  serverPath?: string | null;
+  url?: string | null;
+}
+
+export const fetchAdminBackupsApi = (token: string) =>
+  apiFetch<{ backups: AdminBackupEntry[] }>('/api/admin/backups', {}, token);
+
+export const createAdminBackupApi = (
+  token: string,
+  data: { storage: 'server' | 's3'; includeDatabase: boolean; includeFiles: boolean }
+) =>
+  apiFetch<{ backup: AdminBackupEntry }>('/api/admin/backups', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const restoreAdminBackupApi = (
+  token: string,
+  id: string,
+  data: { restoreDatabase: boolean; restoreFiles: boolean }
+) =>
+  apiFetch<{ result: { id: string; restoredDatabase: boolean; restoredFiles: boolean; restoredAt: string } }>(
+    `/api/admin/backups/${encodeURIComponent(id)}/restore`,
+    { method: 'POST', body: JSON.stringify(data) },
+    token
+  );
+
+export const getAdminBackupDownloadUrl = (id: string): string =>
+  `${BACKEND_URL}/api/admin/backups/${encodeURIComponent(id)}/download`;
