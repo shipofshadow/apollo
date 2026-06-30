@@ -42,6 +42,7 @@ const MyOrders = lazy(() => import('./pages/client/MyOrders'));
 const OrderReceiptPage = lazy(() => import('./pages/OrderReceiptPage'));
 const Admin = lazy(() => import('./pages/Admin'));
 const BuildShowcase = lazy(() => import('./pages/BuildShowcase'));
+const CustomerFormPage = lazy(() => import('./pages/CustomerFormPage'));
 
 function RouteFallback() {
   return (
@@ -75,77 +76,78 @@ function AppInner() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
 
-      {/* ── Public website — has Header + Footer ────────────── */}
-      <Route element={<PublicLayout />}>
-        <Route path="/"             element={<Home />} />
-        <Route path="/services"     element={<ServicesPage />} />
-        <Route path="/services/:slug" element={<ServiceDetail />} />
-        <Route path="/products"     element={<Products />} />
-        <Route path="/products/:id" element={<ProductDetail />} />
-        <Route path="/cart"         element={<CartPage />} />
-        <Route path="/checkout"     element={<CheckoutPage />} />
-        <Route path="/portfolio"    element={<Portfolio />} />
-        <Route path="/builds/:slug" element={<BuildShowcase />} />
-        <Route path="/blog"         element={<Blog />} />
-        <Route path="/blog/:id"     element={<BlogPostDetail />} />
-        <Route path="/faq"          element={<FaqPage />} />
-        <Route path="/contact"      element={<ContactPage />} />
-        <Route path="/about"        element={<About />} />
-        <Route path="/booking"      element={<BookingPage />} />
-        <Route path="/login"             element={<LoginPage />} />
-        <Route path="/register"          element={<RegisterPage />} />
-        <Route path="/forgot-password"   element={<ForgotPasswordPage />} />
-        <Route path="/reset-password"    element={<ResetPasswordPage />} />
-        <Route path="*"             element={<NotFoundPage />} />
-      </Route>
+          {/* ── Public website — has Header + Footer ────────────── */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/services/:slug" element={<ServiceDetail />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/builds/:slug" element={<BuildShowcase />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPostDetail />} />
+            <Route path="/faq" element={<FaqPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/booking" element={<BookingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/inquiry" element={<CustomerFormPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
 
-      {/* ── Client portal — own sidebar, no public nav ──────── */}
-      <Route
-        path="/client"
-        element={
-          <ProtectedRoute requiredRole="client">
-            <ClientLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard"     element={<ClientDashboard />} />
-        <Route path="bookings"      element={<MyBookings />} />
-        <Route path="bookings/:id"  element={<BookingDetail />} />
-        <Route path="orders"        element={<MyOrders />} />
-        <Route path="garage"        element={<MyGarage />} />
-        <Route path="profile"       element={<Profile />} />
-      </Route>
+          {/* ── Client portal — own sidebar, no public nav ──────── */}
+          <Route
+            path="/client"
+            element={
+              <ProtectedRoute requiredRole="client">
+                <ClientLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="dashboard" element={<ClientDashboard />} />
+            <Route path="bookings" element={<MyBookings />} />
+            <Route path="bookings/:id" element={<BookingDetail />} />
+            <Route path="orders" element={<MyOrders />} />
+            <Route path="garage" element={<MyGarage />} />
+            <Route path="profile" element={<Profile />} />
+          </Route>
 
-      {/* ── Admin — own sidebar, no public nav ──────────────── */}
-      <Route path="/admin/*" element={<Admin />} />
+          {/* ── Admin — own sidebar, no public nav ──────────────── */}
+          <Route path="/admin/*" element={<Admin />} />
 
-      {/* ── Order receipt — auth required, no header/footer ─── */}
-      <Route
-        path="/orders/:id/receipt"
-        element={
-          <ProtectedRoute>
-            <OrderReceiptPage />
-          </ProtectedRoute>
-        }
-      />
+          {/* ── Order receipt — auth required, no header/footer ─── */}
+          <Route
+            path="/orders/:id/receipt"
+            element={
+              <ProtectedRoute>
+                <OrderReceiptPage />
+              </ProtectedRoute>
+            }
+          />
 
-      {/* ── Chatbot standalone pages — protected (staff+) ────── */}
-      <Route
-        path="/chatbot/conversations"
-        element={
-          <ProtectedRoute denyClientRole>
-            <Admin />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/chatbot/flow-editor"
-        element={
-          <ProtectedRoute denyClientRole>
-            <Admin />
-          </ProtectedRoute>
-        }
-      />
+          {/* ── Chatbot standalone pages — protected (staff+) ────── */}
+          <Route
+            path="/chatbot/conversations"
+            element={
+              <ProtectedRoute denyClientRole>
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chatbot/flow-editor"
+            element={
+              <ProtectedRoute denyClientRole>
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
 
         </Routes>
       </Suspense>
