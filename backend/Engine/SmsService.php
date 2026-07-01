@@ -80,6 +80,30 @@ class SmsService
     }
 
     /**
+     * Send a customer-inquiry alert SMS to admins/owners.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function customerInquiryAdmin(array $inquiry): void
+    {
+        $name = (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer');
+        $product = (string) ($inquiry['productToPurchase'] ?? '');
+        $make = (string) ($inquiry['make'] ?? '');
+        $model = (string) ($inquiry['model'] ?? '');
+        $otherModel = (string) ($inquiry['otherModel'] ?? '');
+        $vehicle = trim($make . ' ' . ($model === 'Other Model' ? $otherModel : $model));
+        $vehicle = trim($vehicle);
+
+        $message = 'New inquiry from ' . $name . ($product !== '' ? ' for ' . $product : '')
+            . ($vehicle !== '' ? ' (' . $vehicle . ')' : '')
+            . '. - 1625 Auto Lab';
+
+        foreach ($this->fetchAlertRecipients('new_inquiry') as $phone) {
+            $this->send($phone, $message);
+        }
+    }
+
+    /**
      * Send a booking confirmation SMS to the client.
      *
      * @param array<string, mixed> $booking

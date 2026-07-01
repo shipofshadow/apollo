@@ -53,19 +53,51 @@ class NotificationService
         ]);
 
         $emailSubject = "Contact Form: $rawSubject";
+        $this->send($to, $rawName !== '' ? $rawName : 'Customer', $emailSubject, $body);
+    }
 
-        // Build headers; use RFC 2047 base64 encoding for the Reply-To display name
-        $fromName   = MAIL_FROM_NAME;
-        $from       = MAIL_FROM !== '' ? MAIL_FROM : $to;
-        $headers    = implode("\r\n", [
-            "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>",
-            "Reply-To: =?UTF-8?B?" . base64_encode($rawName) . "?= <$rawEmail>",
-            'MIME-Version: 1.0',
-            'Content-Type: text/html; charset=UTF-8',
-            'X-Mailer: 1625-AutoLab',
+    /**
+     * Send a new customer-inquiry email to the admin inbox.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function customerInquiryAdmin(array $inquiry): void
+    {
+        $to = '1625autolab@gmail.com';
+        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? ''));
+        $rawEmail = str_replace(["\r", "\n"], '', (string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? ''));
+        $rawPhone = str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
+        $rawProduct = str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? ''));
+        $rawMake = str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? ''));
+        $rawModel = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
+        $rawOtherModel = str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? ''));
+        $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
+        $rawAddress = str_replace(["\r", "\n"], '', (string) ($inquiry['address'] ?? ''));
+        $rawFacebook = str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? ''));
+
+        $name = htmlspecialchars($rawName);
+        $email = htmlspecialchars($rawEmail);
+        $phone = htmlspecialchars($rawPhone);
+        $product = htmlspecialchars($rawProduct);
+        $make = htmlspecialchars($rawMake);
+        $model = htmlspecialchars($rawModel === 'Other Model' ? $rawOtherModel : $rawModel);
+        $year = htmlspecialchars($rawYear);
+        $address = htmlspecialchars($rawAddress);
+        $facebook = htmlspecialchars($rawFacebook);
+
+        $body = $this->render('customer-inquiry-admin', [
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone !== '' ? '<a href="tel:' . htmlspecialchars($rawPhone) . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>' : '—',
+            'product' => $product !== '' ? $product : '—',
+            'make' => $make !== '' ? $make : '—',
+            'model' => $model !== '' ? $model : '—',
+            'year' => $year !== '' ? $year : '—',
+            'address' => $address !== '' ? $address : '—',
+            'facebook' => $facebook !== '' ? $facebook : '—',
         ]);
 
-        @mail($to, $emailSubject, $body, $headers);
+        $this->send($to, $rawName !== '' ? $rawName : 'Customer', 'New Customer Inquiry | 1625 Auto Lab', $body);
     }
 
     /**

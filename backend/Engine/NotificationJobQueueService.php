@@ -610,6 +610,12 @@ class NotificationJobQueueService
                 (new NotificationService())->contactMessage($data);
                 return;
 
+            case 'customer_inquiry':
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+                (new NotificationService())->customerInquiryAdmin($data);
+                (new SmsService())->customerInquiryAdmin($data);
+                return;
+
             case 'waitlist_slot_available':
                 $name = (string) ($payload['name'] ?? 'there');
                 $email = (string) ($payload['email'] ?? '');

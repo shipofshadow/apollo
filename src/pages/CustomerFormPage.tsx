@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import PageSEO from '../components/PageSEO';
 import { useToast } from '../context/ToastContext';
+import { BACKEND_URL } from '../config';
 import { fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
-import { VEHICLE_MAKES as STATIC_MAKES, VEHICLE_MODELS as STATIC_MODELS, type VehicleMake } from '../data/vehicles';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -25,14 +25,16 @@ export default function CustomerFormPage() {
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const { showToast } = useToast();
 
-  const makes = dynamicMakes.length > 0 ? dynamicMakes : [...STATIC_MAKES];
-  const models = dynamicModels.length > 0 ? dynamicModels :
-    (formData.make ? (STATIC_MODELS[formData.make as VehicleMake] ?? []) : []);
+  const makes = dynamicMakes;
+  const models = dynamicModels;
 
   useEffect(() => {
     fetchVehicleMakesApi()
       .then(res => setDynamicMakes(res.makes || []))
-      .catch(err => console.error('Failed to load makes from API, using fallback', err));
+      .catch(err => {
+        console.error('Failed to load vehicle makes', err);
+        setDynamicMakes([]);
+      });
   }, []);
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function CustomerFormPage() {
         }
       })
       .catch(err => {
-        console.error('Failed to load models from API, using fallback', err);
+        console.error('Failed to load vehicle models', err);
         setDynamicModels([]);
       });
   }, [formData.make]);
@@ -69,30 +71,49 @@ export default function CustomerFormPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Replace this with your Google Apps Script Web App URL
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbzhS1M8GX-4A-N6oEDR0ZVIkBARF2krKoDthjC1o54cHHPJUBs1YGSW0ZZLEp1LuzRh/exec';
-
     try {
-      const data = new URLSearchParams();
-      data.append('Timestamp', new Date().toLocaleString());
-      data.append('Full Name', formData.fullName);
-      data.append('Address', formData.address);
-      data.append('Contact Number', formData.contactNumber);
-      data.append('Email address', formData.emailAddress);
-      data.append('Facebook Name', formData.facebookName);
-      data.append('Car Make', formData.make);
-
       const actualModel = formData.model === 'Other Model' || formData.make === 'Other' ? formData.otherModel : formData.model;
-      data.append('Car Model', actualModel);
 
-      data.append('Year Model', formData.yearModel);
-      data.append('Product to Purchase', formData.productToPurchase);
+      const scriptURL = 'https://script.google.com/macros/s/AKfycbzhS1M8GX-4A-N6oEDR0ZVIkBARF2krKoDthjC1o54cHHPJUBs1YGSW0ZZLEp1LuzRh/exec';
+      const googleData = new URLSearchParams();
+      googleData.append('Timestamp', new Date().toLocaleString());
+      googleData.append('Full Name', formData.fullName);
+      googleData.append('Address', formData.address);
+      googleData.append('Contact Number', formData.contactNumber);
+      googleData.append('Email address', formData.emailAddress);
+      googleData.append('Facebook Name', formData.facebookName);
+      googleData.append('Car Make', formData.make);
+      googleData.append('Car Model', actualModel);
+      googleData.append('Year Model', formData.yearModel);
+      googleData.append('Product to Purchase', formData.productToPurchase);
 
       await fetch(scriptURL, {
         method: 'POST',
-        body: data,
-        mode: 'no-cors' // Prevents CORS errors from Google
+        body: googleData,
+        mode: 'no-cors'
       });
+
+      const response = await fetch(`${BACKEND_URL}/api/inquiries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          address: formData.address,
+          contactNumber: formData.contactNumber,
+          emailAddress: formData.emailAddress,
+          facebookName: formData.facebookName,
+          make: formData.make,
+          model: actualModel,
+          otherModel: formData.otherModel,
+          yearModel: formData.yearModel,
+          productToPurchase: formData.productToPurchase,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error((result as { detail?: string } | null)?.detail ?? 'Unable to submit inquiry.');
+      }
 
       showToast('Form submitted successfully! We will contact you soon.', 'success');
 
@@ -120,7 +141,7 @@ export default function CustomerFormPage() {
   return (
     <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <PageSEO
-        title="Purchase Order Form | 1625 Auto Lab"
+        title="Inquiry Form | 1625 Auto Lab"
         description="Fill out this form to order products or schedule a service with 1625 Auto Lab."
       />
 
@@ -130,7 +151,7 @@ export default function CustomerFormPage() {
             Order <span className="text-brand-orange">Form</span>
           </h1>
           <p className="text-gray-400 max-w-2xl mx-auto">
-            Please fill out the details below to process your request. Our team will get back to you shortly to confirm your order.
+            Please fill out the details below to submit your inquiry. Our team will get back to you shortly.
           </p>
         </div>
 

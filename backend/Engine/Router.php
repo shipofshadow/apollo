@@ -275,6 +275,7 @@ class Router
 
             // ── Contact message (public) ─────────────────────────────────────
             $r->addRoute('POST', '/api/contact', 'handleContactMessage');
+            $r->addRoute('POST', '/api/inquiries', 'handleCustomerInquiry');
 
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
@@ -3999,6 +4000,35 @@ class Router
         ]);
 
         echo json_encode(['message' => 'Your message has been sent successfully.']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Customer Inquiry handler
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleCustomerInquiry(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $name    = trim((string) ($data['fullName']    ?? ''));
+        $email   = trim((string) ($data['emailAddress'] ?? ''));
+        $phone   = trim((string) ($data['contactNumber'] ?? ''));
+        $product = trim((string) ($data['productToPurchase'] ?? ''));
+        $make    = trim((string) ($data['make'] ?? ''));
+        $model   = trim((string) ($data['model'] ?? ''));
+        $year    = trim((string) ($data['yearModel'] ?? ''));
+
+        if ($name === '' || $phone === '' || $product === '') {
+            http_response_code(422);
+            echo json_encode(['detail' => 'Name, phone, and product are required.']);
+            return;
+        }
+
+        (new NotificationJobQueueService())->dispatch('customer_inquiry', [
+            'data' => $data
+        ]);
+
+        echo json_encode(['message' => 'Inquiry submitted successfully.']);
     }
 
         /**
