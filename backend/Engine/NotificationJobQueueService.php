@@ -38,6 +38,12 @@ class NotificationJobQueueService
         ]);
     }
 
+    /** @param array<string, mixed> $payload */
+    public function dispatchNow(string $event, array $payload): void
+    {
+        $this->handleNow($event, $payload);
+    }
+
     public function processPending(?int $limit = null): array
     {
         if ($this->db === null) {

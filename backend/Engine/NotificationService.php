@@ -63,7 +63,11 @@ class NotificationService
      */
     public function customerInquiryAdmin(array $inquiry): void
     {
-        $to = '1625autolab@gmail.com';
+        $recipients = $this->adminRecipients();
+        if (count($recipients) === 0) {
+            $recipients = ['1625autolab@gmail.com'];
+        }
+
         $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? ''));
         $rawEmail = str_replace(["\r", "\n"], '', (string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? ''));
         $rawPhone = str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
@@ -97,7 +101,7 @@ class NotificationService
             'facebook' => $facebook !== '' ? $facebook : '—',
         ]);
 
-        $this->send($to, $rawName !== '' ? $rawName : 'Customer', 'New Customer Inquiry | 1625 Auto Lab', $body);
+        $this->sendToRecipients($recipients, 'New Customer Inquiry | 1625 Auto Lab', $body, 'Admin');
     }
 
     /**

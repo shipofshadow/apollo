@@ -4018,13 +4018,19 @@ class Router
         $model   = trim((string) ($data['model'] ?? ''));
         $year    = trim((string) ($data['yearModel'] ?? ''));
 
-        if ($name === '' || $phone === '' || $product === '') {
+        if ($name === '' || $email === '' || $phone === '' || $product === '') {
             http_response_code(422);
-            echo json_encode(['detail' => 'Name, phone, and product are required.']);
+            echo json_encode(['detail' => 'Name, email, phone, and product are required.']);
             return;
         }
 
-        (new NotificationJobQueueService())->dispatch('customer_inquiry', [
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(422);
+            echo json_encode(['detail' => 'Invalid email address.']);
+            return;
+        }
+
+        (new NotificationJobQueueService())->dispatchNow('customer_inquiry', [
             'data' => $data
         ]);
 
