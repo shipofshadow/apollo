@@ -333,7 +333,7 @@ class Router
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
 
-            // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
+            // ── Vehicle data (NHTSA vPIC proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
             $r->addRoute('GET', '/api/vehicles/models', 'handleVehicleModels');
             $r->addRoute('GET', '/api/vehicles/trims',  'handleVehicleTrims');
@@ -3618,7 +3618,7 @@ class Router
     }
 
     // -------------------------------------------------------------------------
-    // Vehicle data handlers (API Ninjas proxy)
+    // Vehicle data handlers (NHTSA vPIC proxy)
     // -------------------------------------------------------------------------
 
     /** @param array<string, string> $vars */

@@ -132,9 +132,7 @@ php -S localhost:8000
 | `SMTP_ENCRYPTION` | ❌ | `tls` | SMTP transport security (`tls`, `ssl`, `none`) |
 | `SMTP_AUTH` | ❌ | `true` | Enable SMTP authentication |
 | `SMTP_TIMEOUT` | ❌ | `10` | SMTP timeout in seconds |
-| **Vehicle data (CarAPI)** | | | |
-| `CARAPI_TOKEN` | ✅ (for vehicle lookup) | — | CarAPI token |
-| `CARAPI_SECRET` | ✅ (for vehicle lookup) | — | CarAPI secret |
+| **Vehicle data (NHTSA vPIC)** | | | |
 | `CARAPI_MAKES_TTL` | ❌ | `86400` | Cache TTL for vehicle makes (seconds) |
 | `CARAPI_MODELS_TTL` | ❌ | `43200` | Cache TTL for vehicle models (seconds) |
 | **Media uploads** | | | |

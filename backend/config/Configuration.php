@@ -82,14 +82,12 @@ define('SMTP_AUTH',      filter_var($_ENV['SMTP_AUTH'] ?? 'true', FILTER_VALIDAT
 define('SMTP_TIMEOUT',   (int) ($_ENV['SMTP_TIMEOUT'] ?? 10));
 
 // ---------------------------------------------------------------------------
-// CarAPI – vehicle make / model / trim data
-// Sign up at https://carapi.app and create an API token/secret pair.
+// NHTSA vPIC vehicle make / model data
+// Uses the public vPIC API; no API credentials are required.
 // CARAPI_MAKES_TTL:  cache lifetime in seconds for makes  (default 86400 = 24 h)
 // CARAPI_MODELS_TTL: cache lifetime in seconds for models (default 43200 = 12 h)
 // ---------------------------------------------------------------------------
 
-define('CARAPI_TOKEN',      $_ENV['CARAPI_TOKEN']      ?? '');
-define('CARAPI_SECRET',     $_ENV['CARAPI_SECRET']     ?? '');
 /** TTL in seconds for cached vehicle data (24 h for makes, 12 h for models) */
 define('CARAPI_MAKES_TTL',  (int) ($_ENV['CARAPI_MAKES_TTL']  ?? 86400));
 define('CARAPI_MODELS_TTL', (int) ($_ENV['CARAPI_MODELS_TTL'] ?? 43200));

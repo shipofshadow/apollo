@@ -2,73 +2,52 @@
 
 declare(strict_types=1);
 
-use CarApiSdk\CarApi;
-use CarApiSdk\CarApiException;
-
 /**
- * Proxies vehicle data from the CarAPI SDK (https://carapi.app).
+ * Proxies vehicle data from the NHTSA vPIC API.
  *
- * Endpoints used:
- *   GET /api/makes                        → list of all makes
- *   GET /api/models?make=X                → list of models for a given make
- *   GET /api/trims?make=X&model=Y         → list of trims
+ * Public methods intentionally keep the old output shape:
+ *   getMakes()  -> string[]
+ *   getModels() -> string[]
+ *   getTrims()  -> array<int, array<string, mixed>>
  *
- * Results are cached (APCu when available, file-system otherwise) to avoid
- * hammering the upstream API on every page load.
- *
- * Requires CARAPI_TOKEN and CARAPI_SECRET to be set in .env.
+ * vPIC endpoints used:
+ *   GET /api/vehicles/getallmakes?format=json
+ *   GET /api/vehicles/GetModelsForMakeIdYear/makeId/{id}/modelyear/{year}?format=json
  */
 class VehicleService
 {
-    private const JWT_CACHE_KEY = 'carapi_sdk_jwt';
-    /** CarAPI JWTs last ~1 hour; cache slightly shorter to refresh before expiry */
-    private const JWT_TTL = 3300;
-
-    private CarApi $sdk;
-
-    public function __construct()
-    {
-        if (CARAPI_TOKEN === '' || CARAPI_SECRET === '') {
-            throw new RuntimeException(
-                'CARAPI_TOKEN and CARAPI_SECRET are not configured on this server.', 503
-            );
-        }
-
-        $this->sdk = CarApi::build([
-            'token'  => CARAPI_TOKEN,
-            'secret' => CARAPI_SECRET,
-        ]);
-
-        $this->ensureAuthenticated();
-    }
+    private const BASE_URL = 'https://vpic.nhtsa.dot.gov/api/vehicles';
 
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
 
     /**
-     * Return all car makes.
+     * Return all vehicle makes.
      *
-     * @param  int|null $year  Optional year filter.
+     * @param  int|null $year  Kept for backward compatibility; vPIC all-makes is not year-filtered.
      * @return string[]
      */
     public function getMakes(?int $year = null): array
     {
-        $cacheKey = 'carapi_makes_' . ($year ?? 'all');
+        $cacheKey = 'vpic_makes_all';
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached['items'] ?? [];
         }
 
-        $query = ['limit' => 100];
-        if ($year !== null) {
-            $query['year'] = $year;
+        $makes = [];
+        foreach ($this->getMakeRows() as $row) {
+            $name = trim((string) ($row['Make_Name'] ?? ''));
+            if ($name !== '') {
+                $makes[] = $this->formatName($name);
+            }
         }
 
-        $makes = $this->fetchAllNames(fn (int $page) => $this->sdk->makes(['query' => array_merge($query, ['page' => $page])]));
-
+        $makes = $this->uniqueSorted($makes);
         Cache::set($cacheKey, ['items' => $makes], CARAPI_MAKES_TTL);
+
         return $makes;
     }
 
@@ -80,33 +59,49 @@ class VehicleService
      */
     public function getModels(string $make, ?int $year = null): array
     {
+        $make = trim($make);
         if ($make === '') {
             throw new RuntimeException("Parameter 'make' is required.", 422);
         }
 
-        $cacheKey = 'carapi_models_' . md5(strtolower($make) . '_' . ($year ?? 'all'));
+        $makeId = $this->resolveMakeId($make);
+        if ($makeId === null) {
+            return [];
+        }
+
+        $cacheKey = 'vpic_models_' . md5(strtolower($make) . '|' . $makeId . '|' . ($year ?? 'all'));
 
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
             return $cached['items'] ?? [];
         }
 
-        $query = ['make' => $make, 'limit' => 100];
-        if ($year !== null) {
-            $query['year'] = $year;
+        $path = $year !== null
+            ? '/GetModelsForMakeIdYear/makeId/' . rawurlencode((string) $makeId) . '/modelyear/' . rawurlencode((string) $year)
+            : '/GetModelsForMakeId/' . rawurlencode((string) $makeId);
+
+        $payload = $this->request($path, ['format' => 'json']);
+        $models = [];
+        foreach (($payload['Results'] ?? []) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $name = trim((string) ($row['Model_Name'] ?? ''));
+            if ($name !== '') {
+                $models[] = $this->formatName($name);
+            }
         }
 
-        $models = $this->fetchAllNames(fn (int $page) => $this->sdk->models(['query' => array_merge($query, ['page' => $page])]));
-
+        $models = $this->uniqueSorted($models);
         Cache::set($cacheKey, ['items' => $models], CARAPI_MODELS_TTL);
+
         return $models;
     }
 
     /**
-     * Return trims for a given make and model.
+     * vPIC does not expose trim data in the old trim shape used here.
      *
-     * @param  int $limit  Max results per page (1–100).
-     * @param  int $page   1-based page number.
      * @return array<int, array<string, mixed>>
      */
     public function getTrims(string $make, string $model, int $limit = 50, int $page = 1): array
@@ -115,93 +110,103 @@ class VehicleService
             throw new RuntimeException("Parameters 'make' and 'model' are required.", 422);
         }
 
-        $limit = max(1, min(100, $limit));
-        $page  = max(1, $page);
-
-        $cacheKey = 'carapi_trims_' . md5(strtolower("$make|$model|$limit|$page"));
-
-        $cached = Cache::get($cacheKey);
-        if ($cached !== null) {
-            return $cached['items'] ?? [];
-        }
-
-        try {
-            $result = $this->sdk->trims(['query' => [
-                'make'  => $make,
-                'model' => $model,
-                'limit' => $limit,
-                'page'  => $page,
-            ]]);
-        } catch (CarApiException $e) {
-            throw new RuntimeException('Vehicle API request failed: ' . $e->getMessage(), 502);
-        }
-
-        $trims = array_map(fn ($t) => (array) $t, $result->data ?? []);
-
-        Cache::set($cacheKey, ['items' => $trims], CARAPI_MODELS_TTL);
-        return $trims;
+        return [];
     }
 
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    /**
-     * Authenticate against CarAPI, using a cached JWT when still valid.
-     */
-    private function ensureAuthenticated(): void
+    /** @return array<int, array<string, mixed>> */
+    private function getMakeRows(): array
     {
-        $cached = Cache::get(self::JWT_CACHE_KEY);
-        $jwt    = $cached['jwt'] ?? null;
+        $cached = Cache::get('vpic_make_rows_all');
+        if ($cached !== null) {
+            return $cached['items'] ?? [];
+        }
 
-        if (!empty($jwt)) {
-            $this->sdk->loadJwt($jwt);
-            if ($this->sdk->isJwtExpired() === false) {
-                return;
+        $payload = $this->request('/getallmakes', ['format' => 'json']);
+        $rows = [];
+        foreach (($payload['Results'] ?? []) as $row) {
+            if (is_array($row)) {
+                $rows[] = $row;
             }
         }
 
-        try {
-            $jwt = $this->sdk->authenticate();
-        } catch (CarApiException $e) {
-            throw new RuntimeException(
-                'Unable to authenticate with CarAPI. Check CARAPI_TOKEN and CARAPI_SECRET.', 503
-            );
+        Cache::set('vpic_make_rows_all', ['items' => $rows], CARAPI_MAKES_TTL);
+        return $rows;
+    }
+
+    private function resolveMakeId(string $make): ?int
+    {
+        $needle = $this->normalizeName($make);
+
+        foreach ($this->getMakeRows() as $row) {
+            $name = $this->normalizeName((string) ($row['Make_Name'] ?? ''));
+            if ($name === $needle) {
+                $id = (int) ($row['Make_ID'] ?? 0);
+                return $id > 0 ? $id : null;
+            }
         }
 
-        Cache::set(self::JWT_CACHE_KEY, ['jwt' => $jwt], self::JWT_TTL);
+        return null;
     }
 
     /**
-     * Paginate through all pages of a collection endpoint, collecting the
-     * `name` property of each item.
-     *
-     * @param  callable(int): object $fetcher  Accepts 1-based page number, returns SDK result object.
+     * @param array<string, string> $query
+     * @return array<string, mixed>
+     */
+    private function request(string $path, array $query): array
+    {
+        $url = self::BASE_URL . $path . '?' . http_build_query($query);
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 15,
+                'header' => "Accept: application/json\r\nUser-Agent: 1625-AutoLab/1.0\r\n",
+            ],
+        ]);
+
+        $raw = @file_get_contents($url, false, $context);
+        if ($raw === false) {
+            throw new RuntimeException('Vehicle API request failed.', 502);
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            throw new RuntimeException('Vehicle API returned an invalid response.', 502);
+        }
+
+        return $decoded;
+    }
+
+    private function normalizeName(string $name): string
+    {
+        return preg_replace('/\s+/', ' ', strtoupper(trim($name))) ?? '';
+    }
+
+    private function formatName(string $name): string
+    {
+        return preg_replace('/\s+/', ' ', trim($name)) ?? trim($name);
+    }
+
+    /**
+     * @param string[] $items
      * @return string[]
      */
-    private function fetchAllNames(callable $fetcher): array
+    private function uniqueSorted(array $items): array
     {
-        $names = [];
-        $page  = 1;
-
-        do {
-            try {
-                $result = $fetcher($page);
-            } catch (CarApiException $e) {
-                throw new RuntimeException('Vehicle API request failed: ' . $e->getMessage(), 502);
+        $unique = [];
+        foreach ($items as $item) {
+            $key = $this->normalizeName($item);
+            if ($key !== '') {
+                $unique[$key] = $item;
             }
+        }
 
-            foreach ($result->data ?? [] as $item) {
-                if (isset($item->name) && $item->name !== '') {
-                    $names[] = $item->name;
-                }
-            }
+        $values = array_values($unique);
+        natcasesort($values);
 
-            $lastPage = $result->collection->pages ?? 1;
-            $page++;
-        } while ($page <= $lastPage);
-
-        return array_values(array_unique($names));
+        return array_values($values);
     }
 }
-

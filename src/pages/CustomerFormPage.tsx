@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PageSEO from '../components/PageSEO';
+import SearchableSelect from '../components/SearchableSelect';
 import { useToast } from '../context/ToastContext';
 import { BACKEND_URL } from '../config';
 import { fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
@@ -25,8 +26,8 @@ export default function CustomerFormPage() {
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const { showToast } = useToast();
 
-  const makes = dynamicMakes;
-  const models = dynamicModels;
+  const makeOptions = [...dynamicMakes, ...(dynamicMakes.includes('Other') ? [] : ['Other'])];
+  const modelOptions = [...dynamicModels, ...(dynamicModels.includes('Other Model') ? [] : ['Other Model'])];
 
   useEffect(() => {
     fetchVehicleMakesApi()
@@ -43,7 +44,13 @@ export default function CustomerFormPage() {
       return;
     }
 
-    fetchVehicleModelsApi(formData.make)
+    if (formData.make === 'Other' || !formData.yearModel) {
+      setDynamicModels([]);
+      return;
+    }
+
+    const year = parseInt(formData.yearModel, 10);
+    fetchVehicleModelsApi(formData.make, Number.isFinite(year) ? year : undefined)
       .then(res => {
         const backendModels = res.models || [];
         if (!backendModels.includes('Other Model')) {
@@ -56,15 +63,23 @@ export default function CustomerFormPage() {
         console.error('Failed to load vehicle models', err);
         setDynamicModels([]);
       });
-  }, [formData.make]);
+  }, [formData.make, formData.yearModel]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const updateField = (name: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      ...(name === 'make' ? { model: '', otherModel: '' } : {}) // Reset model when make changes
+      ...(name === 'make' || name === 'yearModel' ? { model: '', otherModel: '' } : {})
     }));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    updateField(name, value);
+  };
+
+  const handleCustomSelectChange = (name: string, value: string) => {
+    updateField(name, value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -247,43 +262,6 @@ export default function CustomerFormPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label htmlFor="make" className="block text-sm font-medium text-gray-300">Car Make *</label>
-                  <select
-                    id="make"
-                    name="make"
-                    required
-                    value={formData.make}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors appearance-none"
-                  >
-                    <option value="" disabled>Select Make</option>
-                    {makes.map(make => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                    {!makes.includes('Other') && <option value="Other">Other</option>}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="model" className="block text-sm font-medium text-gray-300">Car Model *</label>
-                  <select
-                    id="model"
-                    name="model"
-                    required
-                    value={formData.model}
-                    onChange={handleChange}
-                    disabled={!formData.make}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="" disabled>Select Model</option>
-                    {models.map(model => (
-                      <option key={model} value={model}>{model}</option>
-                    ))}
-                    {!models.includes('Other Model') && <option value="Other Model">Other Model</option>}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
                   <label htmlFor="yearModel" className="block text-sm font-medium text-gray-300">Year Model *</label>
                   <select
                     id="yearModel"
@@ -298,6 +276,36 @@ export default function CustomerFormPage() {
                       <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="make" className="block text-sm font-medium text-gray-300">Car Make *</label>
+                  <SearchableSelect
+                    id="make"
+                    value={formData.make}
+                    options={makeOptions}
+                    placeholder="Select Make"
+                    searchPlaceholder="Search make..."
+                    disabled={!formData.yearModel}
+                    required
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    onChange={(value) => handleCustomSelectChange('make', value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="model" className="block text-sm font-medium text-gray-300">Car Model *</label>
+                  <SearchableSelect
+                    id="model"
+                    value={formData.model}
+                    options={modelOptions}
+                    placeholder="Select Model"
+                    searchPlaceholder="Search model..."
+                    disabled={!formData.yearModel || !formData.make}
+                    required
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    onChange={(value) => handleCustomSelectChange('model', value)}
+                  />
                 </div>
               </div>
 
