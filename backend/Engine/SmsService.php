@@ -104,6 +104,27 @@ class SmsService
     }
 
     /**
+     * Send a confirmation SMS to the customer who submitted an inquiry.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function customerInquiryCustomer(array $inquiry): void
+    {
+        $phone = $this->normalisePhone((string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $name = trim((string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'there'));
+        $product = trim((string) ($inquiry['productToPurchase'] ?? 'your request'));
+
+        $msgProduct = $product !== '' ? ' regarding ' . $product : '';
+
+        $this->send(
+            $phone,
+            "Hi {$name}! Thanks for your inquiry{$msgProduct}. We'll contact you soon. - 1625 Auto Lab"
+        );
+    }
+
+    /**
      * Send a booking confirmation SMS to the client.
      *
      * @param array<string, mixed> $booking

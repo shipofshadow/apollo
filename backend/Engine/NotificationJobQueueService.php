@@ -620,6 +620,21 @@ class NotificationJobQueueService
                 $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
                 (new NotificationService())->customerInquiryAdmin($data);
                 (new SmsService())->customerInquiryAdmin($data);
+                // Send confirmation to the customer (email + SMS) when contact details present
+                try {
+                    $customerEmail = strtolower(trim((string) ($data['emailAddress'] ?? $data['email'] ?? '')));
+                    $customerPhone = trim((string) ($data['contactNumber'] ?? $data['phone'] ?? ''));
+
+                    if ($customerEmail !== '') {
+                        (new NotificationService())->customerInquiryCustomer($data);
+                    }
+
+                    if ($customerPhone !== '') {
+                        (new SmsService())->customerInquiryCustomer($data);
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[NotificationJobQueueService] customer inquiry customer notification failed: ' . $e->getMessage());
+                }
                 return;
 
             case 'waitlist_slot_available':

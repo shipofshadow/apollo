@@ -105,6 +105,47 @@ class NotificationService
     }
 
     /**
+     * Send a confirmation email to the customer who submitted an inquiry.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function customerInquiryCustomer(array $inquiry): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = strtolower(trim((string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? '')));
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? ''));
+        $rawProduct = str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? ''));
+        $rawMake = str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? ''));
+        $rawModel = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
+        $rawOtherModel = str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? ''));
+        $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
+
+        $name = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
+        $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : '—');
+        $make = htmlspecialchars($rawMake !== '' ? $rawMake : '—');
+        $model = htmlspecialchars($rawModel === 'Other Model' ? $rawOtherModel : $rawModel);
+        $year = htmlspecialchars($rawYear !== '' ? $rawYear : '—');
+
+        $body = $this->render('customer-inquiry-customer', [
+            'name' => $name,
+            'product' => $product,
+            'make' => $make,
+            'model' => $model !== '' ? $model : '—',
+            'year' => $year,
+        ]);
+
+        $subject = 'Thanks for your inquiry | 1625 Auto Lab';
+        $this->send($customerEmail, $name !== '' ? $name : 'Customer', $subject, $body);
+    }
+
+    /**
      * Send a booking-confirmation email to the customer and a copy to the admin
      * inbox (if MAIL_ADMIN is set).
      *

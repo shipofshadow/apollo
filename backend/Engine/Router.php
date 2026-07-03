@@ -277,6 +277,17 @@ class Router
             $r->addRoute('POST', '/api/contact', 'handleContactMessage');
             $r->addRoute('POST', '/api/inquiries', 'handleCustomerInquiry');
 
+            // ── Vehicle catalog admin CRUD ─────────────────────────────────
+            $r->addRoute('GET',    '/api/admin/vehicle-makes',          'handleAdminVehicleMakesList');
+            $r->addRoute('POST',   '/api/admin/vehicle-makes',          'handleAdminVehicleMakesCreate');
+            $r->addRoute('PUT',    '/api/admin/vehicle-makes/{id:\d+}', 'handleAdminVehicleMakesUpdate');
+            $r->addRoute('DELETE', '/api/admin/vehicle-makes/{id:\d+}', 'handleAdminVehicleMakesDelete');
+
+            $r->addRoute('GET',    '/api/admin/vehicle-models',          'handleAdminVehicleModelsList');
+            $r->addRoute('POST',   '/api/admin/vehicle-models',          'handleAdminVehicleModelsCreate');
+            $r->addRoute('PUT',    '/api/admin/vehicle-models/{id:\d+}', 'handleAdminVehicleModelsUpdate');
+            $r->addRoute('DELETE', '/api/admin/vehicle-models/{id:\d+}', 'handleAdminVehicleModelsDelete');
+
             // ── Admin utilities ─────────────────────────────────────────────
             $r->addRoute('POST', '/api/admin/migrate', 'handleMigrateRun');
             $r->addRoute('GET',  '/api/admin/migrate', 'handleMigrateStatus');
@@ -3628,6 +3639,18 @@ class Router
             ? (int) $_GET['year']
             : null;
 
+        // Prefer local DB catalog when available
+        try {
+            $catalog = new VehicleCatalogService();
+            $makes = $catalog->listMakes();
+            if (!empty($makes)) {
+                echo json_encode(['makes' => $makes]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Fall back to external VehicleService
+        }
+
         $makes = (new VehicleService())->getMakes($year);
         echo json_encode(['makes' => $makes]);
     }
@@ -3642,6 +3665,18 @@ class Router
 
         if ($make === '') {
             throw new RuntimeException("Query parameter 'make' is required.", 422);
+        }
+
+        // Prefer local DB catalog when available
+        try {
+            $catalog = new VehicleCatalogService();
+            $models = $catalog->listModelsByMakeName($make);
+            if (!empty($models)) {
+                echo json_encode(['models' => $models]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Fall back to external VehicleService
         }
 
         $models = (new VehicleService())->getModels($make, $year);
@@ -3667,6 +3702,114 @@ class Router
     // -------------------------------------------------------------------------
     // Site settings handlers
     // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // Admin Vehicle catalog handlers (CRUD)
+    // -------------------------------------------------------------------------
+
+    private function handleAdminVehicleMakesList(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $db = Database::getInstance();
+        $stmt = $db->query('SELECT id, name FROM vehicle_makes ORDER BY name ASC');
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        echo json_encode(['makes' => $rows]);
+    }
+
+    private function handleAdminVehicleMakesCreate(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $data = $this->jsonBody();
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            throw new RuntimeException('Name is required.', 422);
+        }
+        $svc = new VehicleCatalogService();
+        $id = $svc->createMake($name);
+        http_response_code(201);
+        echo json_encode(['id' => $id, 'name' => $name]);
+    }
+
+    private function handleAdminVehicleMakesUpdate(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = isset($vars['id']) ? (int) $vars['id'] : 0;
+        $data = $this->jsonBody();
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($id <= 0 || $name === '') {
+            throw new RuntimeException('Invalid id or name.', 422);
+        }
+        $svc = new VehicleCatalogService();
+        $svc->updateMake($id, $name);
+        echo json_encode(['id' => $id, 'name' => $name]);
+    }
+
+    private function handleAdminVehicleMakesDelete(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = isset($vars['id']) ? (int) $vars['id'] : 0;
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid id.', 422);
+        }
+        $svc = new VehicleCatalogService();
+        $svc->deleteMake($id);
+        echo json_encode(['message' => 'deleted']);
+    }
+
+    private function handleAdminVehicleModelsList(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $make = trim((string) ($_GET['make'] ?? ''));
+        if ($make === '') {
+            echo json_encode(['models' => []]);
+            return;
+        }
+        $svc = new VehicleCatalogService();
+        echo json_encode(['models' => $svc->listModelsByMakeName($make)]);
+    }
+
+    private function handleAdminVehicleModelsCreate(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $data = $this->jsonBody();
+        $makeId = isset($data['makeId']) ? (int) $data['makeId'] : 0;
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($makeId <= 0 || $name === '') {
+            throw new RuntimeException('makeId and name are required.', 422);
+        }
+        $svc = new VehicleCatalogService();
+        $id = $svc->createModel($makeId, $name);
+        http_response_code(201);
+        echo json_encode(['id' => $id, 'makeId' => $makeId, 'name' => $name]);
+    }
+
+    private function handleAdminVehicleModelsUpdate(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = isset($vars['id']) ? (int) $vars['id'] : 0;
+        $data = $this->jsonBody();
+        $makeId = isset($data['makeId']) ? (int) $data['makeId'] : 0;
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($id <= 0 || $makeId <= 0 || $name === '') {
+            throw new RuntimeException('Invalid input.', 422);
+        }
+        $svc = new VehicleCatalogService();
+        $svc->updateModel($id, $makeId, $name);
+        echo json_encode(['id' => $id, 'makeId' => $makeId, 'name' => $name]);
+    }
+
+    private function handleAdminVehicleModelsDelete(array $vars = []): void
+    {
+        $this->requirePermission('settings:manage');
+        $id = isset($vars['id']) ? (int) $vars['id'] : 0;
+        if ($id <= 0) {
+            throw new RuntimeException('Invalid id.', 422);
+        }
+        $svc = new VehicleCatalogService();
+        $svc->deleteModel($id);
+        echo json_encode(['message' => 'deleted']);
+    }
+
 
     /** @param array<string, string> $vars */
     private function handleSiteSettingsGet(array $vars = []): void
