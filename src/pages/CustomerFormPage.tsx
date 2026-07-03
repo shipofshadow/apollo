@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import Select from 'react-select';
-import type { SingleValue } from 'react-select';
+import React, { useState } from 'react';
 import PageSEO from '../components/PageSEO';
 import { useToast } from '../context/ToastContext';
 import { BACKEND_URL } from '../config';
-import { fetchVehicleMakesApi, fetchVehicleModelsApi } from '../services/api';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -18,81 +15,17 @@ export default function CustomerFormPage() {
     facebookName: '',
     make: '',
     model: '',
-    otherModel: '',
     yearModel: '',
     productToPurchase: ''
   });
 
-  const [dynamicMakes, setDynamicMakes] = useState<string[]>([]);
-  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const { showToast } = useToast();
-
-  const makes = dynamicMakes;
-  const models = dynamicModels;
-
-  const makeOptions = makes.map(m => ({ value: m, label: m }));
-  const modelOptions = models.map(m => ({ value: m, label: m }));
-
-  const selectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      backgroundColor: 'transparent',
-      borderColor: state.isFocused ? '#FB923C' : '#374151',
-      boxShadow: 'none',
-      minHeight: '44px',
-      borderRadius: '0.5rem',
-      '&:hover': { borderColor: '#FB923C' }
-    }),
-    menu: (provided: any) => ({ ...provided, zIndex: 9999, backgroundColor: '#0f1724', color: '#fff' }),
-    option: (provided: any, state: any) => ({
-      ...provided,
-      backgroundColor: state.isFocused ? '#FB923C' : 'transparent',
-      color: state.isFocused ? '#000' : '#fff',
-    }),
-    singleValue: (provided: any) => ({ ...provided, color: '#fff' }),
-    placeholder: (provided: any) => ({ ...provided, color: '#9CA3AF' }),
-    input: (provided: any) => ({ ...provided, color: '#fff' }),
-    dropdownIndicator: (provided: any) => ({ ...provided, color: '#9CA3AF' }),
-    indicatorSeparator: () => ({ display: 'none' }),
-    menuPortal: (provided: any) => ({ ...provided, zIndex: 9999 })
-  };
-
-  useEffect(() => {
-    fetchVehicleMakesApi()
-      .then(res => setDynamicMakes(res.makes || []))
-      .catch(err => {
-        console.error('Failed to load vehicle makes', err);
-        setDynamicMakes([]);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!formData.make) {
-      setDynamicModels([]);
-      return;
-    }
-
-    fetchVehicleModelsApi(formData.make)
-      .then(res => {
-        const backendModels = res.models || [];
-        if (!backendModels.includes('Other Model')) {
-          setDynamicModels([...backendModels, 'Other Model']);
-        } else {
-          setDynamicModels(backendModels);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load vehicle models', err);
-        setDynamicModels([]);
-      });
-  }, [formData.make]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      ...(name === 'make' ? { model: '', otherModel: '' } : {}) // Reset model when make changes
     }));
   };
 
@@ -101,7 +34,7 @@ export default function CustomerFormPage() {
     setIsSubmitting(true);
 
     try {
-      const actualModel = formData.model === 'Other Model' || formData.make === 'Other' ? formData.otherModel : formData.model;
+      const actualModel = formData.model;
 
       const scriptURL = 'https://script.google.com/macros/s/AKfycbzhS1M8GX-4A-N6oEDR0ZVIkBARF2krKoDthjC1o54cHHPJUBs1YGSW0ZZLEp1LuzRh/exec';
       const googleData = new URLSearchParams();
@@ -133,7 +66,6 @@ export default function CustomerFormPage() {
           facebookName: formData.facebookName,
           make: formData.make,
           model: actualModel,
-          otherModel: formData.otherModel,
           yearModel: formData.yearModel,
           productToPurchase: formData.productToPurchase,
         }),
@@ -155,7 +87,6 @@ export default function CustomerFormPage() {
         facebookName: '',
         make: '',
         model: '',
-        otherModel: '',
         yearModel: '',
         productToPurchase: ''
       });
@@ -277,42 +208,29 @@ export default function CustomerFormPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label htmlFor="make" className="block text-sm font-medium text-gray-300">Car Make *</label>
-                  <Select
-                    inputId="make"
+                  <input
+                    type="text"
+                    id="make"
                     name="make"
-                    isClearable
-                    options={makeOptions}
-                    value={formData.make ? { value: formData.make, label: formData.make } : null}
-                    onChange={(opt: SingleValue<{ value: string; label: string }>) => {
-                      const val = opt ? opt.value : '';
-                      setFormData(prev => ({ ...prev, make: val, model: '', otherModel: '' }));
-                    }}
-                    classNamePrefix="rs"
-                    placeholder="Select Make"
-                    styles={selectStyles}
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
-                    menuPosition="fixed"
+                    required
+                    value={formData.make}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors"
+                    placeholder="Enter Car Make"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label htmlFor="model" className="block text-sm font-medium text-gray-300">Car Model *</label>
-                  <Select
-                    inputId="model"
+                  <input
+                    type="text"
+                    id="model"
                     name="model"
-                    isClearable
-                    options={modelOptions}
-                    value={formData.model ? { value: formData.model, label: formData.model } : null}
-                    onChange={(opt: SingleValue<{ value: string; label: string }>) => {
-                      const val = opt ? opt.value : '';
-                      setFormData(prev => ({ ...prev, model: val }));
-                    }}
-                    isDisabled={!formData.make}
-                    classNamePrefix="rs"
-                    placeholder={formData.make ? 'Select Model' : 'Choose Make first'}
-                    styles={selectStyles}
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
-                    menuPosition="fixed"
+                    required
+                    value={formData.model}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors"
+                    placeholder="Enter Car Model"
                   />
                 </div>
 
@@ -334,21 +252,6 @@ export default function CustomerFormPage() {
                 </div>
               </div>
 
-              {(formData.make === 'Other' || formData.model === 'Other Model') && (
-                <div className="space-y-2">
-                  <label htmlFor="otherModel" className="block text-sm font-medium text-gray-300">Specify Car Make/Model *</label>
-                  <input
-                    type="text"
-                    id="otherModel"
-                    name="otherModel"
-                    required
-                    value={formData.otherModel}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors"
-                    placeholder="e.g. Mazda 3"
-                  />
-                </div>
-              )}
             </div>
 
             {/* Order Details */}
