@@ -617,6 +617,43 @@ export const fetchVehicleTrimsApi = (make: string, model: string, limit = 50, pa
   return apiFetch<{ trims: CarTrim[] }>(`/api/vehicles/trims?${params}`);
 };
 
+// ── Admin vehicle catalog CRUD (requires settings:manage)
+export const fetchAdminVehicleMakesApi = (token: string) =>
+  apiFetch<{ makes: Array<{ id: number; name: string }> }>('/api/admin/vehicle-makes', {}, token);
+
+export const createAdminVehicleMakeApi = (token: string, name: string) =>
+  apiFetch<{ id: number; name: string }>('/api/admin/vehicle-makes', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }, token);
+
+export const updateAdminVehicleMakeApi = (token: string, id: number, name: string) =>
+  apiFetch<{ id: number; name: string }>(`/api/admin/vehicle-makes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  }, token);
+
+export const deleteAdminVehicleMakeApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/admin/vehicle-makes/${id}`, { method: 'DELETE' }, token);
+
+export const fetchAdminVehicleModelsApi = (token: string, make?: string) =>
+  apiFetch<{ models: string[] }>(`/api/admin/vehicle-models${make ? '?make=' + encodeURIComponent(make) : ''}`, {}, token);
+
+export const createAdminVehicleModelApi = (token: string, makeId: number, name: string) =>
+  apiFetch<{ id: number; makeId: number; name: string }>('/api/admin/vehicle-models', {
+    method: 'POST',
+    body: JSON.stringify({ makeId, name }),
+  }, token);
+
+export const updateAdminVehicleModelApi = (token: string, id: number, makeId: number, name: string) =>
+  apiFetch<{ id: number; makeId: number; name: string }>(`/api/admin/vehicle-models/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ makeId, name }),
+  }, token);
+
+export const deleteAdminVehicleModelApi = (token: string, id: number) =>
+  apiFetch<{ message: string }>(`/api/admin/vehicle-models/${id}`, { method: 'DELETE' }, token);
+
 export const fetchShopHoursApi = () =>
   apiFetch<{ hours: import('../types').ShopDayHours[] }>('/api/shop/hours');
 

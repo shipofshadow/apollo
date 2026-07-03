@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Select from 'react-select';
+import type { SingleValue } from 'react-select';
 import PageSEO from '../components/PageSEO';
 import { useToast } from '../context/ToastContext';
 import { BACKEND_URL } from '../config';
@@ -27,6 +29,33 @@ export default function CustomerFormPage() {
 
   const makes = dynamicMakes;
   const models = dynamicModels;
+
+  const makeOptions = makes.map(m => ({ value: m, label: m }));
+  const modelOptions = models.map(m => ({ value: m, label: m }));
+
+  const selectStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      backgroundColor: 'transparent',
+      borderColor: state.isFocused ? '#FB923C' : '#374151',
+      boxShadow: 'none',
+      minHeight: '44px',
+      borderRadius: '0.5rem',
+      '&:hover': { borderColor: '#FB923C' }
+    }),
+    menu: (provided: any) => ({ ...provided, zIndex: 9999, backgroundColor: '#0f1724', color: '#fff' }),
+    option: (provided: any, state: any) => ({
+      ...provided,
+      backgroundColor: state.isFocused ? '#FB923C' : 'transparent',
+      color: state.isFocused ? '#000' : '#fff',
+    }),
+    singleValue: (provided: any) => ({ ...provided, color: '#fff' }),
+    placeholder: (provided: any) => ({ ...provided, color: '#9CA3AF' }),
+    input: (provided: any) => ({ ...provided, color: '#fff' }),
+    dropdownIndicator: (provided: any) => ({ ...provided, color: '#9CA3AF' }),
+    indicatorSeparator: () => ({ display: 'none' }),
+    menuPortal: (provided: any) => ({ ...provided, zIndex: 9999 })
+  };
 
   useEffect(() => {
     fetchVehicleMakesApi()
@@ -248,39 +277,43 @@ export default function CustomerFormPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label htmlFor="make" className="block text-sm font-medium text-gray-300">Car Make *</label>
-                  <select
-                    id="make"
+                  <Select
+                    inputId="make"
                     name="make"
-                    required
-                    value={formData.make}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors appearance-none"
-                  >
-                    <option value="" disabled>Select Make</option>
-                    {makes.map(make => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                    {!makes.includes('Other') && <option value="Other">Other</option>}
-                  </select>
+                    isClearable
+                    options={makeOptions}
+                    value={formData.make ? { value: formData.make, label: formData.make } : null}
+                    onChange={(opt: SingleValue<{ value: string; label: string }>) => {
+                      const val = opt ? opt.value : '';
+                      setFormData(prev => ({ ...prev, make: val, model: '', otherModel: '' }));
+                    }}
+                    classNamePrefix="rs"
+                    placeholder="Select Make"
+                    styles={selectStyles}
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                    menuPosition="fixed"
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <label htmlFor="model" className="block text-sm font-medium text-gray-300">Car Model *</label>
-                  <select
-                    id="model"
+                  <Select
+                    inputId="model"
                     name="model"
-                    required
-                    value={formData.model}
-                    onChange={handleChange}
-                    disabled={!formData.make}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="" disabled>Select Model</option>
-                    {models.map(model => (
-                      <option key={model} value={model}>{model}</option>
-                    ))}
-                    {!models.includes('Other Model') && <option value="Other Model">Other Model</option>}
-                  </select>
+                    isClearable
+                    options={modelOptions}
+                    value={formData.model ? { value: formData.model, label: formData.model } : null}
+                    onChange={(opt: SingleValue<{ value: string; label: string }>) => {
+                      const val = opt ? opt.value : '';
+                      setFormData(prev => ({ ...prev, model: val }));
+                    }}
+                    isDisabled={!formData.make}
+                    classNamePrefix="rs"
+                    placeholder={formData.make ? 'Select Model' : 'Choose Make first'}
+                    styles={selectStyles}
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                    menuPosition="fixed"
+                  />
                 </div>
 
                 <div className="space-y-2">
