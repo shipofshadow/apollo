@@ -65,14 +65,42 @@ class InquiryService
      */
     public function updateStatus(string $id, string $status): array
     {
-        $status = trim($status);
-        $allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
-        if (!in_array($status, $allowed, true)) {
-            throw new RuntimeException('Invalid inquiry status.', 422);
+        return $this->updateDetails($id, $status, null, null);
+    }
+
+    /**
+     * Update inquiry details such as status or appointment schedule.
+     *
+     * @param string $id
+     * @param string|null $status
+     * @param string|null $appointmentDate
+     * @param string|null $appointmentTime
+     * @return array<string, mixed>
+     */
+    public function updateDetails(string $id, ?string $status = null, ?string $appointmentDate = null, ?string $appointmentTime = null): array
+    {
+        $status = $status === null ? null : trim($status);
+        if ($status !== null) {
+            $allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
+            if (!in_array($status, $allowed, true)) {
+                throw new RuntimeException('Invalid inquiry status.', 422);
+            }
+        }
+
+        if ($appointmentDate !== null && trim($appointmentDate) === '') {
+            throw new RuntimeException('Appointment date is required.', 422);
+        }
+
+        if ($appointmentTime !== null && trim($appointmentTime) === '') {
+            throw new RuntimeException('Appointment time is required.', 422);
+        }
+
+        if ($status === null && $appointmentDate === null && $appointmentTime === null) {
+            throw new RuntimeException('No changes were provided.', 422);
         }
 
         if ($this->useDb) {
-            $this->dbUpdateStatus($id, $status);
+            $this->dbUpdateDetails($id, $status, $appointmentDate, $appointmentTime);
             $inquiry = $this->dbGetById($id);
             if ($inquiry === null) {
                 throw new RuntimeException('Inquiry not found.', 404);
@@ -84,7 +112,15 @@ class InquiryService
         $found = false;
         foreach ($inquiries as &$item) {
             if ((string) ($item['id'] ?? '') === $id) {
-                $item['status'] = $status;
+                if ($status !== null) {
+                    $item['status'] = $status;
+                }
+                if ($appointmentDate !== null) {
+                    $item['appointmentDate'] = $appointmentDate;
+                }
+                if ($appointmentTime !== null) {
+                    $item['appointmentTime'] = $appointmentTime;
+                }
                 $item['updatedAt'] = date('c');
                 $found = true;
                 break;
@@ -97,7 +133,12 @@ class InquiryService
         }
 
         file_put_contents(self::$storageFile, json_encode($inquiries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        return array_values(array_filter($inquiries, fn ($item) => (string) ($item['id'] ?? '') === $id))[0];
+        $updated = array_values(array_filter($inquiries, fn ($item) => (string) ($item['id'] ?? '') === $id))[0] ?? null;
+        if (!is_array($updated)) {
+            throw new RuntimeException('Inquiry not found.', 404);
+        }
+
+        return $updated;
     }
 
     /**
@@ -232,17 +273,37 @@ class InquiryService
 
     /**
      * @param string $id
-     * @param string $status
+     * @param string|null $status
+     * @param string|null $appointmentDate
+     * @param string|null $appointmentTime
      */
-    private function dbUpdateStatus(string $id, string $status): void
+    private function dbUpdateDetails(string $id, ?string $status, ?string $appointmentDate, ?string $appointmentTime): void
     {
         $db = Database::getInstance();
+        $fields = ['updated_at = CURRENT_TIMESTAMP'];
+        $params = [':id' => $id];
+
+        if ($status !== null) {
+            $fields[] = 'status = :status';
+            $params[':status'] = $status;
+        }
+
+        if ($appointmentDate !== null) {
+            $fields[] = 'appointment_date = :appointment_date';
+            $params[':appointment_date'] = $appointmentDate;
+        }
+
+        if ($appointmentTime !== null) {
+            $fields[] = 'appointment_time = :appointment_time';
+            $params[':appointment_time'] = $appointmentTime;
+        }
+
         $stmt = $db->prepare(
             'UPDATE customer_inquiries
-             SET status = :status, updated_at = CURRENT_TIMESTAMP
+             SET ' . implode(', ', $fields) . '
              WHERE id = :id'
         );
-        $stmt->execute([':status' => $status, ':id' => $id]);
+        $stmt->execute($params);
     }
 
     /**

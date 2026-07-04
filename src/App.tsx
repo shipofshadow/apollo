@@ -99,7 +99,14 @@ function AppInner() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/order" element={<CustomerFormPage />} />
-            <Route path="/calendar" element={<CalendarPage />} />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <CalendarPage isAdminPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/calender" element={<Navigate to="/calendar" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

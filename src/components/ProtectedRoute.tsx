@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 interface Props {
   children: ReactNode;
-  requiredRole?: 'client' | 'admin';
+  requiredRole?: 'client' | 'admin' | 'owner';
   /** When true, redirect any 'client' role to / (allow admin/manager/staff) */
   denyClientRole?: boolean;
 }
@@ -22,8 +22,14 @@ export default function ProtectedRoute({ children, requiredRole, denyClientRole 
     );
   }
 
-  if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to="/" replace />;
+  if (requiredRole) {
+    const isAllowedRole = requiredRole === 'admin'
+      ? user.role === 'admin' || user.role === 'owner'
+      : user.role === requiredRole;
+
+    if (!isAllowedRole) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   if (denyClientRole && user.role === 'client') {

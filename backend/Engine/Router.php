@@ -1244,13 +1244,20 @@ class Router
         $payload = $this->requirePermission('bookings:manage');
         $id = $vars['id'] ?? '';
         $data = $this->jsonBody();
-        $status = trim((string) ($data['status'] ?? ''));
+        $status = isset($data['status']) ? trim((string) $data['status']) : '';
+        $appointmentDate = array_key_exists('appointmentDate', $data) ? trim((string) $data['appointmentDate']) : null;
+        $appointmentTime = array_key_exists('appointmentTime', $data) ? trim((string) $data['appointmentTime']) : null;
 
-        if ($status === '') {
-            throw new RuntimeException('Status is required.', 422);
+        if ($status === '' && $appointmentDate === null && $appointmentTime === null) {
+            throw new RuntimeException('No changes were provided.', 422);
         }
 
-        $inquiry = (new InquiryService())->updateStatus($id, $status);
+        $inquiry = (new InquiryService())->updateDetails(
+            $id,
+            $status !== '' ? $status : null,
+            $appointmentDate,
+            $appointmentTime
+        );
         echo json_encode(['inquiry' => $inquiry]);
     }
 

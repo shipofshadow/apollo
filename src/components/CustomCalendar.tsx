@@ -15,6 +15,7 @@ export interface CustomCalendarProps {
   slotCounts?: Record<string, number>;
   slotCapacity?: number;
   showAvailabilityIndicators?: boolean;
+  allowAnyDate?: boolean;
 }
 
 const formatDateYMD = (date: Date) => {
@@ -31,7 +32,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   closedDatesSet, 
   slotCounts = {}, 
   slotCapacity = 3, 
-  showAvailabilityIndicators = true 
+  showAvailabilityIndicators = true,
+  allowAnyDate = false,
 }) => {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -107,13 +109,15 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           const slotsLeft = slotCapacity - count;
           const isFull = count >= slotCapacity;
 
+          const canSelect = allowAnyDate ? !closed : available && !closed;
+
           // Determine Cell State
           let cellStyle = "bg-transparent";
           let cursorStyle = "cursor-not-allowed opacity-50";
 
           if (closed) {
             cellStyle = "bg-red-950/20";
-          } else if (available) {
+          } else if (canSelect) {
             cursorStyle = "cursor-pointer hover:bg-slate-800";
             
             if (selected) {
@@ -124,8 +128,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           return (
             <button
               key={iso}
-              onClick={() => available && !closed && onChange(date)}
-              disabled={!available || closed}
+              onClick={() => canSelect && onChange(date)}
+              disabled={!canSelect}
               className={`min-h-[72px] p-2 flex flex-col items-center justify-start rounded-xl transition-all ${cellStyle} ${cursorStyle}`}
             >
               {/* Date Number Container */}

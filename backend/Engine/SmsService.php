@@ -114,14 +114,18 @@ class SmsService
         if ($phone === '') return;
 
         $name = trim((string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'there'));
-        $product = trim((string) ($inquiry['productToPurchase'] ?? 'your request'));
+        $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
+        $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
 
-        $msgProduct = $product !== '' ? ' regarding ' . $product : '';
+        $message = "Hi {$name}!\n\n"
+            . "Thank you for booking an installation service with us. Your appointment has been successfully received.\n\n"
+            . ($date !== '' ? "Date: {$date}\n" : '')
+            . ($time !== '' ? "Time: {$time}\n\n" : "\n")
+            . "Our team will contact you before the scheduled appointment to confirm your booking and provide any necessary updates.\n\n"
+            . "If you need to reschedule or have any questions, simply contact us on our Facebook page.\n\n"
+            . "Thank you for choosing us—we look forward to serving you!";
 
-        $this->send(
-            $phone,
-            "Hi {$name}! Thanks for your inquiry{$msgProduct}. We'll contact you soon. - 1625 Auto Lab"
-        );
+        $this->send($phone, $message);
     }
 
     /**
