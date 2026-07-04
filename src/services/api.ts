@@ -412,6 +412,11 @@ export const fetchAvailabilityApi = (date: string) =>
 export const fetchInquiryCalendarApi = () =>
   apiFetch<{ events: Array<{ id: string; fullName: string; contactNumber: string; emailAddress: string; facebookName: string; appointmentDate: string; appointmentTime: string; make: string; model: string; productToPurchase: string; status: string }> }>('/api/inquiries/calendar');
 
+export const deleteInquiryApi = (token: string, id: string) =>
+  apiFetch<{ deleted: boolean }>(`/api/inquiries/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }, token);
+
 export const updateInquiryStatusApi = (
   token: string,
   id: string,

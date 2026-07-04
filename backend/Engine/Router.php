@@ -132,6 +132,7 @@ class Router
             $r->addRoute('GET',   '/api/inquiries',                 'handleInquiryList');
             $r->addRoute('GET',   '/api/inquiries/calendar',        'handleInquiryCalendar');
             $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
+            $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
@@ -1259,6 +1260,20 @@ class Router
             $appointmentTime
         );
         echo json_encode(['inquiry' => $inquiry]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryDelete(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $id = $vars['id'] ?? '';
+
+        if ($id === '') {
+            throw new RuntimeException('Inquiry ID is required.', 400);
+        }
+
+        (new InquiryService())->delete($id);
+        echo json_encode(['deleted' => true]);
     }
 
     /**

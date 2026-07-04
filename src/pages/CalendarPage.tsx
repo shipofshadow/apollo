@@ -5,6 +5,7 @@ import PageSEO from '../components/PageSEO';
 import CustomCalendar from '../components/CustomCalendar';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../config';
+import { deleteInquiryApi } from '../services/api';
 
 // FontAwesome Icons
 import { 
@@ -16,7 +17,8 @@ import {
   FaEnvelope, 
   FaWrench, 
   FaCheckCircle, 
-  FaSpinner 
+  FaSpinner,
+  FaTrash 
 } from 'react-icons/fa';
 
 interface InquiryEvent {
@@ -143,6 +145,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const [rescheduleTimeObj, setRescheduleTimeObj] = useState<Date | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [reschedulePreview, setReschedulePreview] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadEvents() {
@@ -299,6 +302,28 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update status.');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteInquiry = async (id: string) => {
+    if (!token) return;
+    if (!window.confirm('Delete this inquiry from the calendar?')) return;
+
+    try {
+      setDeletingId(id);
+      setLoading(true);
+      const result = await deleteInquiryApi(token, id);
+      if (!result.deleted) {
+        throw new Error('Unable to delete inquiry.');
+      }
+
+      setEvents((prev) => prev.filter((event) => event.id !== id));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete inquiry.');
+    } finally {
+      setDeletingId(null);
       setLoading(false);
     }
   };
@@ -461,18 +486,31 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                       
                       {isAdminPage && canManage ? (
                         <div className="mt-4 rounded-2xl border border-gray-700/60 bg-gray-900/70 p-4">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <p className="text-sm font-semibold text-white">Reschedule appointment</p>
-                              <p className="text-xs text-gray-400">Adjust the date or time for this order.</p>
+                              <p className="text-sm font-semibold text-white">Manage this order</p>
+                              <p className="text-xs text-gray-400">Adjust the date or remove it from the calendar.</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => startReschedule(event)}
-                              className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-sm font-semibold text-brand-orange transition hover:bg-brand-orange/20"
-                            >
-                              Reschedule
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startReschedule(event)}
+                                className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-sm font-semibold text-brand-orange transition hover:bg-brand-orange/20"
+                              >
+                                Reschedule
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteInquiry(event.id)}
+                                disabled={deletingId === event.id}
+                                className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  <FaTrash />
+                                  {deletingId === event.id ? 'Deleting...' : 'Delete'}
+                                </span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : null}

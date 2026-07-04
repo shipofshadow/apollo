@@ -143,6 +143,29 @@ class InquiryService
 
     /**
      * @param string $id
+     */
+    public function delete(string $id): void
+    {
+        if ($this->useDb) {
+            $this->dbDelete($id);
+            return;
+        }
+
+        $inquiries = $this->fileGetAll();
+        $filtered = array_values(array_filter(
+            $inquiries,
+            static fn (array $item): bool => (string) ($item['id'] ?? '') !== $id
+        ));
+
+        if (count($filtered) === count($inquiries)) {
+            throw new RuntimeException('Inquiry not found.', 404);
+        }
+
+        file_put_contents(self::$storageFile, json_encode($filtered, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * @param string $id
      * @return array<string, mixed>|null
      */
     public function getById(string $id): ?array
@@ -304,6 +327,20 @@ class InquiryService
              WHERE id = :id'
         );
         $stmt->execute($params);
+    }
+
+    /**
+     * @param string $id
+     */
+    private function dbDelete(string $id): void
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('DELETE FROM customer_inquiries WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException('Inquiry not found.', 404);
+        }
     }
 
     /**
