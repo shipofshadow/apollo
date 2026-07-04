@@ -36,7 +36,7 @@ class InquiryService
             'appointmentDate' => $normalized['appointmentDate'],
             'appointmentTime' => $normalized['appointmentTime'],
             'status' => 'pending',
-            'createdAt' => date('c'),
+            'createdAt' => date('Y-m-d H:i:s'),
         ];
 
         if ($this->useDb) {
