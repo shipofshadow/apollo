@@ -16,6 +16,8 @@ export default function CustomerFormPage() {
     make: '',
     model: '',
     yearModel: '',
+    appointmentDate: '',
+    appointmentTime: '',
     productToPurchase: ''
   });
 
@@ -47,6 +49,8 @@ export default function CustomerFormPage() {
       googleData.append('Car Make', formData.make);
       googleData.append('Car Model', actualModel);
       googleData.append('Year Model', formData.yearModel);
+      googleData.append('Appointment Date', formData.appointmentDate);
+      googleData.append('Appointment Time', formData.appointmentTime);
       googleData.append('Product to Purchase', formData.productToPurchase);
 
       await fetch(scriptURL, {
@@ -67,6 +71,8 @@ export default function CustomerFormPage() {
           make: formData.make,
           model: actualModel,
           yearModel: formData.yearModel,
+          appointmentDate: formData.appointmentDate,
+          appointmentTime: formData.appointmentTime,
           productToPurchase: formData.productToPurchase,
         }),
       });
@@ -88,6 +94,8 @@ export default function CustomerFormPage() {
         make: '',
         model: '',
         yearModel: '',
+        appointmentDate: '',
+        appointmentTime: '',
         productToPurchase: ''
       });
     } catch (error) {
@@ -101,8 +109,8 @@ export default function CustomerFormPage() {
   return (
     <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <PageSEO
-        title="Inquiry Form | 1625 Auto Lab"
-        description="Fill out this form to order products or schedule a service with 1625 Auto Lab."
+        title="Inquiry Form | 1625 Autolab"
+        description="Fill out this form to order products or schedule a service with 1625 Autolab."
       />
 
       <div className="max-w-3xl mx-auto">
@@ -249,6 +257,32 @@ export default function CustomerFormPage() {
                       <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="appointmentDate" className="block text-sm font-medium text-gray-300">Appointment Date *</label>
+                  <input
+                    type="date"
+                    id="appointmentDate"
+                    name="appointmentDate"
+                    required
+                    value={formData.appointmentDate}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="appointmentTime" className="block text-sm font-medium text-gray-300">Appointment Time *</label>
+                  <input
+                    type="time"
+                    id="appointmentTime"
+                    name="appointmentTime"
+                    required
+                    value={formData.appointmentTime}
+                    onChange={handleChange}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-colors"
+                  />
                 </div>
               </div>
 

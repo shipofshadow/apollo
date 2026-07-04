@@ -128,6 +128,10 @@ class Router
             // ── Bookings ────────────────────────────────────────────────────
             $r->addRoute('POST',  '/api/bookings',                  'handleBookingCreate');
             $r->addRoute('POST',  '/api/booking/external',          'handleBookingExternalCreate');
+            $r->addRoute('POST',  '/api/inquiries',                 'handleInquiryCreate');
+            $r->addRoute('GET',   '/api/inquiries',                 'handleInquiryList');
+            $r->addRoute('GET',   '/api/inquiries/calendar',        'handleInquiryCalendar');
+            $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
@@ -275,7 +279,6 @@ class Router
 
             // ── Contact message (public) ─────────────────────────────────────
             $r->addRoute('POST', '/api/contact', 'handleContactMessage');
-            $r->addRoute('POST', '/api/inquiries', 'handleCustomerInquiry');
 
             // ── Vehicle catalog admin CRUD ─────────────────────────────────
             $r->addRoute('GET',    '/api/admin/vehicle-makes',          'handleAdminVehicleMakesList');
@@ -1196,6 +1199,60 @@ class Router
         echo json_encode(['booking' => $booking]);
     }
 
+    /** @param array<string, string> $vars */
+    private function handleInquiryCreate(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $inquiry = (new InquiryService())->create($data);
+        (new NotificationJobQueueService())->dispatch('customer_inquiry', ['data' => $data]);
+        http_response_code(201);
+        echo json_encode(['inquiry' => $inquiry]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryList(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $inquiries = (new InquiryService())->getAll();
+        echo json_encode(['inquiries' => $inquiries]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryCalendar(array $vars = []): void
+    {
+        $inquiries = (new InquiryService())->getAll();
+        $events = array_map(static fn (array $inquiry): array => [
+            'id' => (string) ($inquiry['id'] ?? ''),
+            'fullName' => (string) ($inquiry['fullName'] ?? ''),
+            'contactNumber' => (string) ($inquiry['contactNumber'] ?? ''),
+            'emailAddress' => (string) ($inquiry['emailAddress'] ?? ''),
+            'facebookName' => (string) ($inquiry['facebookName'] ?? ''),
+            'appointmentDate' => (string) ($inquiry['appointmentDate'] ?? ''),
+            'appointmentTime' => (string) ($inquiry['appointmentTime'] ?? ''),
+            'make' => (string) ($inquiry['make'] ?? ''),
+            'model' => (string) ($inquiry['model'] ?? ''),
+            'productToPurchase' => (string) ($inquiry['productToPurchase'] ?? ''),
+            'status' => (string) ($inquiry['status'] ?? 'pending'),
+        ], $inquiries);
+
+        echo json_encode(['events' => $events]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryUpdate(array $vars = []): void
+    {
+        $payload = $this->requirePermission('bookings:manage');
+        $id = $vars['id'] ?? '';
+        $data = $this->jsonBody();
+        $status = trim((string) ($data['status'] ?? ''));
+
+        if ($status === '') {
+            throw new RuntimeException('Status is required.', 422);
+        }
+
+        $inquiry = (new InquiryService())->updateStatus($id, $status);
+        echo json_encode(['inquiry' => $inquiry]);
+    }
 
     /**
      * Handle external booking creation (chatbot, integrations, etc).

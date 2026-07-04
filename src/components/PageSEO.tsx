@@ -9,7 +9,7 @@ interface PageSEOProps {
   description: string;
   image?: string;
   type?: 'website' | 'article';
-  /** When false the title is used as-is; when true (default) " | 1625 Auto Lab" is appended. */
+  /** When false the title is used as-is; when true (default) " | 1625 Autolab" is appended. */
   appendSiteName?: boolean;
 }
 
@@ -32,7 +32,7 @@ export default function PageSEO({
   const { pathname } = useLocation();
 
   useEffect(() => {
-    const fullTitle = appendSiteName ? `${title} | 1625 Auto Lab` : title;
+    const fullTitle = appendSiteName ? `${title} | 1625 Autolab` : title;
     const canonicalUrl = `${SITE_URL}${pathname}`;
 
     document.title = fullTitle;

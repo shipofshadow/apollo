@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Provider } from 'react-redux';
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { store } from './store';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -42,6 +42,7 @@ const MyOrders = lazy(() => import('./pages/client/MyOrders'));
 const OrderReceiptPage = lazy(() => import('./pages/OrderReceiptPage'));
 const Admin = lazy(() => import('./pages/Admin'));
 const BuildShowcase = lazy(() => import('./pages/BuildShowcase'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const CustomerFormPage = lazy(() => import('./pages/CustomerFormPage'));
 
 function RouteFallback() {
@@ -97,7 +98,9 @@ function AppInner() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/inquiry" element={<CustomerFormPage />} />
+            <Route path="/order" element={<CustomerFormPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/calender" element={<Navigate to="/calendar" replace />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 

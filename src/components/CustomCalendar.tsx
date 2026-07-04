@@ -14,6 +14,7 @@ export interface CustomCalendarProps {
   closedDatesSet: Set<string>;
   slotCounts?: Record<string, number>;
   slotCapacity?: number;
+  showAvailabilityIndicators?: boolean;
 }
 
 const formatDateYMD = (date: Date) => {
@@ -23,7 +24,7 @@ const formatDateYMD = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
-const CustomCalendar: React.FC<CustomCalendarProps> = ({ value, onChange, availableDates, closedDatesSet, slotCounts = {}, slotCapacity = 3 }) => {
+const CustomCalendar: React.FC<CustomCalendarProps> = ({ value, onChange, availableDates, closedDatesSet, slotCounts = {}, slotCapacity = 3, showAvailabilityIndicators = true }) => {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -95,7 +96,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({ value, onChange, availa
           const closed = isClosed(date);
           const available = isAvailable(date);
           let bookingIndicator = null;
-          if (available && !closed) {
+
+          if (showAvailabilityIndicators && available && !closed) {
             const count = slotCounts[iso] ?? 0;
             if (count >= slotCapacity) {
               bookingIndicator = <span className="text-[9px] text-red-400 font-bold">Full</span>;
@@ -108,12 +110,12 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({ value, onChange, availa
           return (
             <button
               key={iso}
-              onClick={() => available && !closed && (slotCounts[iso] ?? 0) < slotCapacity && onChange(date)}
+              onClick={() => available && !closed && onChange(date)}
               className={`min-h-[56px] md:min-h-[72px] border-r border-b border-gray-800 p-1.5 w-full h-full flex flex-col items-center justify-center transition-colors rounded-sm
                 ${selected ? 'bg-brand-orange/10 border-brand-orange' : closed ? 'bg-red-500/5 border-red-500/30' : ''}
-                ${available && !closed && (slotCounts[iso] ?? 0) < slotCapacity ? 'hover:bg-brand-orange/10 cursor-pointer' : 'opacity-50 cursor-not-allowed'}
+                ${available && !closed ? 'hover:bg-brand-orange/10 cursor-pointer' : 'opacity-50 cursor-not-allowed'}
               `}
-              disabled={!available || closed || (slotCounts[iso] ?? 0) >= slotCapacity}
+              disabled={!available || closed}
             >
               <div className={`w-7 h-7 md:w-9 md:h-9 flex items-center justify-center rounded-full text-sm md:text-base font-bold mb-1
                 ${todayIso ? 'bg-brand-orange text-white' : closed ? 'bg-red-500/20 text-red-400 border border-red-500/30' : selected ? 'text-brand-orange' : 'text-gray-400'}`}>{day}</div>

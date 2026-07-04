@@ -101,7 +101,7 @@ class NotificationService
             'facebook' => $facebook !== '' ? $facebook : '—',
         ]);
 
-        $this->sendToRecipients($recipients, 'New Customer Inquiry | 1625 Auto Lab', $body, 'Admin');
+        $this->sendToRecipients($recipients, 'New Customer Inquiry | 1625 Autolab', $body, 'Admin');
     }
 
     /**
@@ -141,7 +141,7 @@ class NotificationService
             'year' => $year,
         ]);
 
-        $subject = 'Thanks for your inquiry | 1625 Auto Lab';
+        $subject = 'Thanks for your inquiry | 1625 Autolab';
         $this->send($customerEmail, $name !== '' ? $name : 'Customer', $subject, $body);
     }
 
@@ -161,7 +161,7 @@ class NotificationService
         $customerName  = (string) ($booking['name']  ?? 'Customer');
 
         if ($customerEmail !== '') {
-            $subject = 'Booking Confirmed | 1625 Auto Lab';
+            $subject = 'Booking Confirmed | 1625 Autolab';
             $body    = $this->buildConfirmationBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -191,7 +191,7 @@ class NotificationService
             // Continue to admin notification even if customer email is missing.
         } else {
             $status  = ucfirst((string) ($booking['status'] ?? ''));
-            $subject = "Your Booking is $status | 1625 Auto Lab";
+            $subject = "Your Booking is $status | 1625 Autolab";
             $body    = $this->buildStatusUpdateBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -223,7 +223,7 @@ class NotificationService
         if ($customerEmail === '') {
             // Continue to admin notification even if customer email is missing.
         } else {
-            $subject = 'Job Update: Awaiting Parts | 1625 Auto Lab';
+            $subject = 'Job Update: Awaiting Parts | 1625 Autolab';
             $body    = $this->buildAwaitingPartsBody($booking);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -255,7 +255,7 @@ class NotificationService
         if ($customerEmail === '') {
             // Continue to admin notification even if customer email is missing.
         } else {
-            $subject = 'Build Update on Your Vehicle | 1625 Auto Lab';
+            $subject = 'Build Update on Your Vehicle | 1625 Autolab';
             $body    = $this->buildProgressUpdateBody($booking, $update);
             $this->send($customerEmail, $customerName, $subject, $body);
         }
@@ -289,7 +289,7 @@ class NotificationService
         $this->send(
             $customerEmail,
             $customerName,
-            'Order Received | 1625 Auto Lab',
+            'Order Received | 1625 Autolab',
             $this->buildOrderCreatedBody($order)
         );
     }
@@ -315,7 +315,7 @@ class NotificationService
         $this->send(
             $customerEmail,
             $customerName,
-            'Order Status Updated: ' . $label . ' | 1625 Auto Lab',
+            'Order Status Updated: ' . $label . ' | 1625 Autolab',
             $this->buildOrderStatusBody($order)
         );
     }
@@ -340,7 +340,7 @@ class NotificationService
         $this->send(
             $customerEmail,
             $customerName,
-            'Order Tracking Updated | 1625 Auto Lab',
+            'Order Tracking Updated | 1625 Autolab',
             $this->buildOrderTrackingBody($order)
         );
     }
@@ -367,7 +367,7 @@ class NotificationService
             'verify_url' => $safeUrl,
         ]);
 
-        $this->send($to, trim($name) !== '' ? $name : 'Customer', 'Verify Your Email | 1625 Auto Lab', $body);
+        $this->send($to, trim($name) !== '' ? $name : 'Customer', 'Verify Your Email | 1625 Autolab', $body);
     }
 
     /**
@@ -401,7 +401,7 @@ class NotificationService
             return;
         }
 
-        $subject = 'Booking Assigned To You | 1625 Auto Lab';
+        $subject = 'Booking Assigned To You | 1625 Autolab';
         $body = $this->buildStaffAssignedBody($booking, $staffName);
         $this->send($staffEmail, $staffName !== '' ? $staffName : 'Staff', $subject, $body);
     }
@@ -437,10 +437,10 @@ class NotificationService
           <h2 style="margin:0 0 14px 0;color:#fff">' . $safeTitle . '</h2>
                     <div style="line-height:1.6;color:#d1d5db">' . ($safeMessageHtml !== '' ? $safeMessageHtml : $safeMessage) . '</div>
           ' . $ctaBlock . '
-          <p style="margin-top:24px;color:#9ca3af;font-size:12px">1625 Auto Lab</p>
+          <p style="margin-top:24px;color:#9ca3af;font-size:12px">1625 Autolab</p>
         </div>';
 
-        $this->send($email, $safeName, $safeTitle . ' | 1625 Auto Lab', $body);
+        $this->send($email, $safeName, $safeTitle . ' | 1625 Autolab', $body);
     }
 
     private function sanitizeCampaignHtml(string $html): string
@@ -474,7 +474,7 @@ class NotificationService
             'reset_url' => $safeUrl,
         ]);
 
-        $this->send($email, 'Customer', 'Reset Your Password | 1625 Auto Lab', $body);
+        $this->send($email, 'Customer', 'Reset Your Password | 1625 Autolab', $body);
     }
 
     /**
@@ -514,10 +514,10 @@ class NotificationService
                             Claim & Book Now
             </a>
           </p>
-          <p style='color:#888;font-size:12px;margin-top:32px'>– 1625 Auto Lab</p>
+          <p style='color:#888;font-size:12px;margin-top:32px'>– 1625 Autolab</p>
         </div>";
 
-        $this->send($email, $name, "Slot Available: {$date} at {$time} | 1625 Auto Lab", $body);
+        $this->send($email, $name, "Slot Available: {$date} at {$time} | 1625 Autolab", $body);
     }
 
     // -------------------------------------------------------------------------
@@ -637,7 +637,7 @@ class NotificationService
         $messages = [
             'confirmed'      => 'Your appointment is <strong style="color:#4ade80">confirmed</strong>. We look forward to seeing you and your vehicle!',
             'in_progress'    => 'Our technicians have <strong style="color:#60a5fa">started working on your vehicle</strong>. We\'ll keep you posted on progress.',
-            'completed'      => 'Your vehicle is <strong style="color:#34d399">ready for pickup</strong>! Thank you for trusting 1625 Auto Lab with your build.',
+            'completed'      => 'Your vehicle is <strong style="color:#34d399">ready for pickup</strong>! Thank you for trusting 1625 Autolab with your build.',
             'cancelled'      => 'Your booking has been <strong style="color:#f87171">cancelled</strong>. If this was a mistake or you\'d like to rebook, feel free to contact us.',
             'awaiting_parts' => 'Your job is currently <strong style="color:#fb923c">on hold</strong> while we wait for parts. We\'ll notify you as soon as work resumes.',
         ];
@@ -820,7 +820,7 @@ class NotificationService
 
         return '
         <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#0f172a;color:#e2e8f0;padding:24px;border-radius:12px">
-          <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700">1625 Auto Lab</p>
+          <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700">1625 Autolab</p>
           <h2 style="margin:0 0 16px;font-size:24px;color:#ffffff">New Booking Assignment</h2>
           <p style="margin:0 0 16px;color:#cbd5e1">Hi ' . $name . ', you have been assigned to a booking.</p>
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#111827">
@@ -1194,7 +1194,7 @@ class NotificationService
             ];
         }
 
-        $subject = 'Test Email | 1625 Auto Lab';
+        $subject = 'Test Email | 1625 Autolab';
         $body = $this->render('test-email', [
             'sent_at' => date('Y-m-d H:i:s'),
         ]);

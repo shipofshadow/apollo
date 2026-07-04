@@ -139,7 +139,7 @@ define('NOTIFICATION_QUEUE_RETRY_DELAY_SECONDS', max(15, (int) ($_ENV['NOTIFICAT
 
 // Optional on-request auto workers (fallback when cron is unavailable)
 define('AUTO_CRON_ON_REQUEST', filter_var($_ENV['AUTO_CRON_ON_REQUEST'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
-define('AUTO_CRON_MIN_INTERVAL_SECONDS', max(10, (int) ($_ENV['AUTO_CRON_MIN_INTERVAL_SECONDS'] ?? 45)));
+define('AUTO_CRON_MIN_INTERVAL_SECONDS', max(10, (int) ($_ENV['AUTO_CRON_MIN_INTERVAL_SECONDS'] ?? 10)));
 define('AUTO_CRON_QUEUE_LIMIT', max(1, (int) ($_ENV['AUTO_CRON_QUEUE_LIMIT'] ?? 10)));
 define('AUTO_CRON_CAMPAIGN_LIMIT', max(1, (int) ($_ENV['AUTO_CRON_CAMPAIGN_LIMIT'] ?? 5)));
 

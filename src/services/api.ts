@@ -409,6 +409,23 @@ export const fetchAvailabilityApi = (date: string) =>
     `/api/bookings/availability?date=${encodeURIComponent(date)}`
   );
 
+export const fetchInquiryCalendarApi = () =>
+  apiFetch<{ events: Array<{ id: string; fullName: string; contactNumber: string; emailAddress: string; facebookName: string; appointmentDate: string; appointmentTime: string; make: string; model: string; productToPurchase: string; status: string }> }>('/api/inquiries/calendar');
+
+export const updateInquiryStatusApi = (
+  token: string,
+  id: string,
+  status: string
+) =>
+  apiFetch<{ inquiry: { id: string; status: string } }>(
+    `/api/inquiries/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+    token
+  );
+
 export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> => {
   const form = new FormData();
   files.forEach(f => form.append('files[]', f));

@@ -36,6 +36,14 @@ class NotificationJobQueueService
             ':event' => $event,
             ':payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ]);
+
+        if (PHP_SAPI !== 'cli') {
+            try {
+                $this->processPending(1);
+            } catch (\Throwable $e) {
+                error_log('[NotificationJobQueueService] Immediate queue processing failed: ' . $e->getMessage());
+            }
+        }
     }
 
     /** @param array<string, mixed> $payload */

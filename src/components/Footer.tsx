@@ -18,7 +18,7 @@ export default function Footer() {
 
   // Resolve dynamic values with hardcoded fallbacks
   const tagline   = settings.footer_tagline   ?? 'The premier automotive retrofitting shop. We turn ordinary vehicles into extraordinary machines.';
-  const address   = settings.footer_address   ?? 'NKKS Arcade, Krystal Homes, Brgy. Alasas\nPampanga, San Fernando, Philippines, 2000';
+  const address   = settings.footer_address   ?? 'KM 20 Ortigas Ave Ext., Cainta, Philippines, 1900';
   const phone     = settings.footer_phone     ?? '0939 330 8263';
   const email     = settings.footer_email     ?? '1625autolab@gmail.com';
   const instagram = settings.footer_instagram ?? 'https://www.instagram.com/1625autolab';
