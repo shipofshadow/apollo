@@ -266,6 +266,77 @@ class ShopHoursService
     }
 
     /**
+     * Validate that an appointment date/time falls inside the configured shop schedule.
+     *
+     * @throws RuntimeException
+     */
+    public function validateAppointmentSlot(string $date, string $time): void
+    {
+        $date = trim($date);
+        if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('Invalid date format. Expected YYYY-MM-DD.', 422);
+        }
+
+        $ts = strtotime($date);
+        if ($ts === false) {
+            throw new RuntimeException('Invalid date. Expected a valid YYYY-MM-DD date.', 422);
+        }
+
+        $dayHours = $this->getForDate($date);
+        if (!$dayHours['isOpen']) {
+            throw new RuntimeException('The shop is closed on this date. Please choose a different day.', 422);
+        }
+
+        $candidateMinutes = $this->parseTimeToMinutes($time);
+        if ($candidateMinutes === null) {
+            throw new RuntimeException('Appointment time is required.', 422);
+        }
+
+        $allowedMinutes = [];
+        foreach ($this->generateSlots($dayHours) as $slot) {
+            $slotMinutes = $this->parseTimeToMinutes($slot);
+            if ($slotMinutes !== null) {
+                $allowedMinutes[] = $slotMinutes;
+            }
+        }
+
+        if (!in_array($candidateMinutes, $allowedMinutes, true)) {
+            throw new RuntimeException('Selected time is outside the shop schedule. Please choose a different time.', 422);
+        }
+    }
+
+    /**
+     * Convert a time like 09:00 AM, 9:00pm, or 17:00 into minutes since midnight.
+     */
+    public function parseTimeToMinutes(string $value): ?int
+    {
+        $normalized = trim($value);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $normalized = preg_replace('/\s+/', ' ', strtoupper($normalized)) ?? $normalized;
+        if (preg_match('/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/', $normalized, $matches) !== 1) {
+            return null;
+        }
+
+        $hour = (int) $matches[1];
+        $minute = isset($matches[2]) ? (int) $matches[2] : 0;
+        if ($minute < 0 || $minute > 59 || $hour < 0 || $hour > 23) {
+            return null;
+        }
+
+        $meridiem = $matches[3] ?? '';
+        if ($meridiem === 'AM' && $hour === 12) {
+            $hour = 0;
+        } elseif ($meridiem === 'PM' && $hour !== 12) {
+            $hour += 12;
+        }
+
+        return $hour * 60 + $minute;
+    }
+
+    /**
      * Generate the list of time-slot labels (e.g. "09:00 AM") for a day record.
      *
      * @param  array{dayOfWeek:int,isOpen:bool,openTime:string,closeTime:string,slotIntervalH:int} $dayHours

@@ -667,11 +667,11 @@ export default function BookingPage() {
                     ) : (
                         <div className="flex-1">
                           {!availabilityLoading && !shopDayIsOpen && (
-                            <div className="bg-red-500/10 border border-red-500/20 px-6 py-4 rounded-sm text-center">
-                              <p className="text-sm text-red-400">
+                            <div className="bg-amber-500/10 border border-amber-500/20 px-6 py-4 rounded-sm text-center">
+                              <p className="text-sm text-amber-300">
                                 {closureReason
-                                  ? `Shop closed – ${closureReason}. Please choose a different day.`
-                                  : 'The shop is closed on this date. Please choose a different day.'}
+                                  ? `Currently not accepting appointments – ${closureReason}.` 
+                                  : 'Currently not accepting appointments for this date.'}
                               </p>
                             </div>
                           )}
@@ -689,7 +689,9 @@ export default function BookingPage() {
                             return (
                               <>
                                 <p className="text-xs text-gray-500 mb-4 pb-4 border-b border-gray-800">
-                                  Shop closes at {shopCloseTime}. Slots that won't accommodate your {totalMaxHours}h service duration are hidden.
+                                  {shopDayIsOpen
+                                    ? `We are currently accepting appointments until ${shopCloseTime}.`
+                                    : 'We are currently not accepting appointments for this date.'}
                                 </p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                   {visibleSlots.length === 0 && !isTodaySelected && (
@@ -783,7 +785,7 @@ export default function BookingPage() {
                 <button onClick={() => setStep(1)} className="w-full sm:w-auto text-gray-400 hover:text-white px-6 py-3 font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 border border-gray-800 rounded-sm">
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <button onClick={() => setStep(3)} disabled={!selectedDate || !selectedTime || !shopDayIsOpen}
+                <button onClick={() => setStep(3)} disabled={!selectedDate || !selectedTime}
                   className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm"
                   title={!selectedDate ? 'Please pick a date first' : !selectedTime ? 'Please pick a time slot' : undefined}>
                   Next Step <ArrowRight className="w-4 h-4" />

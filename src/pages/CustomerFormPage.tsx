@@ -444,10 +444,10 @@ export default function CustomerFormPage() {
                       ) : (
                         <div className="flex-1">
                           {!availabilityLoading && !shopDayIsOpen && (
-                            <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-center text-sm text-red-400">
+                            <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-300">
                               {closureReason
-                                ? `The shop is closed – ${closureReason}. Please choose a different day.`
-                                : 'The shop is closed on this date. Please choose a different day.'}
+                                ? `Currently not accepting appointments – ${closureReason}.`
+                                : 'Currently not accepting appointments for this date.'}
                             </div>
                           )}
 
@@ -465,7 +465,9 @@ export default function CustomerFormPage() {
                             return (
                               <>
                                 <p className="mb-4 border-b border-gray-800 pb-4 text-xs text-gray-500">
-                                  Shop closes at {shopCloseTime}. Slots that would not fit your estimated {totalMaxHours}h service duration are hidden.
+                                  {shopDayIsOpen
+                                    ? `We are currently accepting appointments until ${shopCloseTime}.`
+                                    : 'We are currently not accepting appointments for this date.'}
                                 </p>
                                 <div className="grid grid-cols-2 gap-3">
                                   {visibleSlots.length === 0 && !isTodaySelected && (
