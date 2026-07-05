@@ -126,12 +126,16 @@ class NotificationService
         $rawModel = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
         $rawOtherModel = str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? ''));
         $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
+        $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
+        $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
 
         $name = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
         $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : '—');
         $make = htmlspecialchars($rawMake !== '' ? $rawMake : '—');
         $model = htmlspecialchars($rawModel === 'Other Model' ? $rawOtherModel : $rawModel);
         $year = htmlspecialchars($rawYear !== '' ? $rawYear : '—');
+        $appointmentDate = htmlspecialchars($rawAppointmentDate !== '' ? $this->formatAppointmentDate($rawAppointmentDate) : '—');
+        $appointmentTime = htmlspecialchars($rawAppointmentTime !== '' ? $rawAppointmentTime : '—');
 
         $body = $this->render('customer-inquiry-customer', [
             'name' => $name,
@@ -139,6 +143,8 @@ class NotificationService
             'make' => $make,
             'model' => $model !== '' ? $model : '—',
             'year' => $year,
+            'booking_date' => $appointmentDate,
+            'booking_time' => $appointmentTime,
         ]);
 
         $subject = 'Thanks for your inquiry | 1625 Autolab';
@@ -1142,6 +1148,21 @@ class NotificationService
      * @param string               $template Template filename without .html (e.g. 'booking-confirmation')
      * @param array<string, string> $vars     Map of placeholder name → value (values must already be HTML-safe)
      */
+    private function formatAppointmentDate(string $value): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '—';
+        }
+
+        $timestamp = strtotime($trimmed);
+        if ($timestamp === false) {
+            return htmlspecialchars($trimmed);
+        }
+
+        return htmlspecialchars(date('F j, Y', $timestamp));
+    }
+
     private function render(string $template, array $vars): string
     {
         static $layout = null;

@@ -436,6 +436,21 @@ export const updateInquiryStatusApi = (
     token
   );
 
+export const rescheduleInquiryApi = (
+  token: string,
+  id: string,
+  appointmentDate: string,
+  appointmentTime: string
+) =>
+  apiFetch<{ inquiry: { id: string; appointmentDate: string; appointmentTime: string } }>(
+    `/api/inquiries/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ appointmentDate, appointmentTime }),
+    },
+    token
+  );
+
 export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> => {
   const form = new FormData();
   files.forEach(f => form.append('files[]', f));
