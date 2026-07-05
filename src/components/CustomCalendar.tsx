@@ -31,7 +31,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   availableDates, 
   closedDatesSet, 
   slotCounts = {}, 
-  slotCapacity = 3, 
+  slotCapacity = 2, 
   showAvailabilityIndicators = true,
   allowAnyDate = false,
 }) => {
