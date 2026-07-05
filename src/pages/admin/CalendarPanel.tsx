@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { ChevronLeft, ChevronRight, Calendar, Loader2, CalendarX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Loader2, CalendarX, Clock } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllBookingsAsync } from '../../store/bookingSlice';
 import {
@@ -17,6 +16,7 @@ import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatStatus } from '../../utils/formatStatus';
 import { ModalShell } from './_sharedComponents';
+import CustomCalendar from '../../components/CustomCalendar';
 
 const STATUS_DOT: Record<Booking['status'] | string, string> = {
   pending:        'bg-yellow-400',
@@ -91,6 +91,48 @@ const formatDateForInput = (date: Date | null) => {
   return `${year}-${month}-${day}`;
 };
 
+const parseDateOnly = (value?: string | null): Date | null => {
+  if (!value) return null;
+
+  const normalized = String(value).trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+function slotToHour(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  let hour = parseInt(timePart.split(':')[0], 10);
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour;
+}
+
+function slotToMinutes(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  const [hourRaw, minuteRaw] = timePart.split(':').map(Number);
+  let hour = hourRaw;
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + (minuteRaw || 0);
+}
+
+function slotCompletionLabel(slot: string, totalHours: number): string {
+  const end = slotToHour(slot) + totalHours;
+  if (end > 12) return `~${end - 12}:00 PM`;
+  if (end === 12) return '~12:00 PM';
+  return `~${end}:00 AM`;
+}
+
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
 export default function CalendarPanel({ onView }: Props) {
   const dispatch = useDispatch<AppDispatch>();
   const { token } = useAuth();
@@ -108,6 +150,9 @@ export default function CalendarPanel({ onView }: Props) {
   const [editDateObj, setEditDateObj] = useState<Date | null>(null);
   const [editTime, setEditTime] = useState<string>('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [editDayIsOpen, setEditDayIsOpen] = useState(true);
+  const [editClosureReason, setEditClosureReason] = useState<string | null>(null);
+  const [editCloseTime, setEditCloseTime] = useState('18:00');
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
   const [slotCapacity, setSlotCapacity] = useState<number | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
@@ -124,9 +169,12 @@ export default function CalendarPanel({ onView }: Props) {
     setIsEditingInquiry(false);
     setModalError(null);
     setEditDate(event.appointmentDate);
-    setEditDateObj(new Date(`${event.appointmentDate}T${event.appointmentTime}`));
+    setEditDateObj(parseDateOnly(event.appointmentDate));
     setEditTime(event.appointmentTime);
     setAvailableSlots([]);
+    setEditDayIsOpen(true);
+    setEditClosureReason(null);
+    setEditCloseTime('18:00');
     if (event.eventType === 'inquiry') {
       await loadAvailability(event.appointmentDate);
     }
@@ -141,6 +189,9 @@ export default function CalendarPanel({ onView }: Props) {
     setSlotCapacity(null);
     setEditDate('');
     setEditTime('');
+    setEditDayIsOpen(true);
+    setEditClosureReason(null);
+    setEditCloseTime('18:00');
   };
 
   const loadAvailability = async (date: string) => {
@@ -157,6 +208,9 @@ export default function CalendarPanel({ onView }: Props) {
       setAvailableSlots(data.availableSlots ?? []);
       setSlotCounts(data.slotCounts ?? {});
       setSlotCapacity(typeof (data as any).slotCapacity === 'number' ? (data as any).slotCapacity : null);
+      setEditDayIsOpen(typeof (data as any).isOpen === 'boolean' ? (data as any).isOpen : true);
+      setEditClosureReason(typeof (data as any).closureReason === 'string' ? (data as any).closureReason : null);
+      setEditCloseTime(typeof (data as any).closeTime === 'string' ? (data as any).closeTime : '18:00');
     } catch (err) {
       setAvailableSlots([]);
       setSlotCounts({});
@@ -686,46 +740,124 @@ export default function CalendarPanel({ onView }: Props) {
                   </div>
 
             {isEditingInquiry && (
-              <div className="rounded-2xl border border-gray-800 bg-gray-900/80 p-3 space-y-2">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.3em] text-gray-400">New date</label>
-                  <div className="mt-2 rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-inner">
-                    <DatePicker
-                      selected={editDateObj}
-                      onChange={(date: Date | null) => {
+              <div className="rounded-2xl border border-gray-800 bg-gray-900/80 p-3 space-y-3">
+                <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-xl border border-gray-800 bg-gray-950/60 p-3">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-gray-400">New date</p>
+                    <CustomCalendar
+                      value={editDateObj}
+                      onChange={(date: Date) => {
                         setEditDateObj(date);
                         setEditDate(formatDateForInput(date));
+                        setEditTime('');
                       }}
-                      minDate={new Date()}
-                      dateFormat="MMMM d, yyyy"
-                      placeholderText="Select a date"
-                      className="w-full rounded-xl border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-white focus:border-brand-orange focus:outline-none"
-                      wrapperClassName="w-full"
+                      availableDates={(() => {
+                        const dates: Date[] = [];
+                        const cursor = new Date();
+                        cursor.setHours(0, 0, 0, 0);
+                        for (let index = 0; index < 14; index += 1) {
+                          dates.push(new Date(cursor));
+                          cursor.setDate(cursor.getDate() + 1);
+                        }
+                        return dates;
+                      })()}
+                      closedDatesSet={new Set(closedDates.map((item) => item.date))}
+                      allowAnyDate={true}
+                      showAvailabilityIndicators={false}
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.3em] text-gray-400">New time</label>
-                  <div className="mt-2 rounded-xl border border-gray-700 bg-gray-950 p-2 shadow-inner">
-                    <select
-                      value={editTime}
-                      onChange={(e) => setEditTime(e.target.value)}
-                      disabled={availabilityLoading}
-                      className="w-full rounded-xl border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-orange"
-                    >
-                      <option value="">Select a time slot</option>
-                      {availableSlots.map((slot) => {
-                        const remaining = slotCapacity !== null ? Math.max(slotCapacity - (slotCounts[slot] ?? 0), 0) : null;
-                        return (
-                          <option key={slot} value={slot}>{slot}{remaining !== null ? ` (${remaining} left)` : ''}</option>
-                        );
-                      })}
-                    </select>
+                  <div className="rounded-xl border border-gray-800 bg-gray-950/60 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-gray-400">
+                        <Clock className="h-3.5 w-3.5" /> New time
+                      </label>
+                      {availabilityLoading && (
+                        <span className="flex items-center gap-1 text-[11px] text-gray-500">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Checking…
+                        </span>
+                      )}
+                    </div>
+
+                    {!editDate ? (
+                      <div className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-800 bg-black/20 p-6 text-center">
+                        <Calendar className="mb-3 h-8 w-8 text-gray-700" />
+                        <p className="text-sm text-gray-500">Select a date from the calendar to view available time slots.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {!availabilityLoading && !editDayIsOpen && (
+                          <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-center text-sm text-amber-300">
+                            {editClosureReason
+                              ? `Currently not accepting appointments – ${editClosureReason}.`
+                              : 'Currently not accepting appointments for this date.'}
+                          </div>
+                        )}
+
+                        {!availabilityLoading && editDayIsOpen && (() => {
+                          const [closeHour] = editCloseTime.split(':').map(Number);
+                          const now = new Date();
+                          const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                          const isTodaySelected = !!editDateObj && isSameLocalDay(editDateObj, now);
+                          const visibleSlots = availableSlots.filter((time) => {
+                            const slotTimeMinutes = slotToMinutes(time);
+                            return slotToHour(time) + 4 <= closeHour && (!isTodaySelected || slotTimeMinutes > nowMinutes);
+                          });
+
+                          return (
+                            <>
+                              <p className="border-b border-gray-800 pb-3 text-xs text-gray-500">
+                                {editDayIsOpen
+                                  ? `We are currently accepting appointments until ${editCloseTime}.`
+                                  : 'We are currently not accepting appointments for this date.'}
+                              </p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {visibleSlots.length === 0 && !isTodaySelected && (
+                                  <p className="col-span-full rounded-lg border border-brand-orange/10 bg-brand-orange/5 px-3 py-6 text-center text-sm text-brand-orange/80">
+                                    No available slots for this date.
+                                  </p>
+                                )}
+                                {visibleSlots.length === 0 && isTodaySelected && (
+                                  <p className="col-span-full rounded-lg border border-brand-orange/10 bg-brand-orange/5 px-3 py-6 text-center text-sm text-brand-orange/80">
+                                    No available slots left for today.
+                                  </p>
+                                )}
+                                {visibleSlots.map((slot) => {
+                                  const isSelected = editTime === slot;
+                                  const completion = slotCompletionLabel(slot, 4);
+                                  const takenCount = slotCounts[slot] ?? 0;
+                                  const spotsLeft = (slotCapacity ?? 2) - takenCount;
+                                  const almostFull = spotsLeft === 1;
+
+                                  return (
+                                    <button
+                                      key={slot}
+                                      type="button"
+                                      onClick={() => setEditTime(slot)}
+                                      className={`flex flex-col items-center justify-center rounded-lg border p-2.5 text-center transition-all duration-200 focus:outline-none ${
+                                        isSelected
+                                          ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
+                                          : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
+                                      }`}
+                                    >
+                                      <span className="text-sm font-bold tracking-wide">{slot}</span>
+                                      <span className={`mt-1 text-[10px] ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                                        done by {completion}
+                                      </span>
+                                      {spotsLeft > 0 && (
+                                        <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
+                                          {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
-                  {availabilityLoading && <p className="text-xs text-gray-500 mt-2">Checking availability...</p>}
-                  {!availabilityLoading && availableSlots.length === 0 && (
-                    <p className="text-xs text-red-400 mt-2">No available slots for this date.</p>
-                  )}
                 </div>
                 {modalError && (
                   <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-2 text-sm text-red-200">
