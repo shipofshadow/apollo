@@ -650,7 +650,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                                   >
                                     <div className="text-sm font-semibold">{time}</div>
                                     <div className="mt-1 text-[11px] uppercase tracking-widest">
-                                      {isTaken ? 'Taken' : `${slotCounts[time] ?? 0} request${(slotCounts[time] ?? 0) === 1 ? '' : 's'}`}
+                                      {isTaken ? 'Taken' : `${slotCounts[time] ?? 0} order${(slotCounts[time] ?? 0) === 1 ? '' : 's'}`}
                                     </div>
                                   </button>
                                 );
@@ -666,7 +666,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                               disabled={!selectedTime}
                               className="mt-5 w-full rounded-xl bg-brand-orange px-4 py-3 text-sm font-black uppercase tracking-[0.25em] text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
                             >
-                              Continue to request form
+                              Continue to order
                             </button>
                           </>
                         )}
