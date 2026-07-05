@@ -29,7 +29,7 @@ interface InquiryEvent {
   appointmentTime: string;
   make: string;
   model: string;
-  year?: string | number; // Added Year
+  year?: string | number;
   productToPurchase: string;
   status: string;
   contactNumber?: string;
@@ -144,6 +144,8 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Reschedule state
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
@@ -151,6 +153,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const [rescheduleTimeObj, setRescheduleTimeObj] = useState<Date | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [reschedulePreview, setReschedulePreview] = useState('');
+  
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -380,8 +383,8 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
     <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8 font-sans text-gray-200">
       <PageSEO title="Calendar | 1625 Autolab" description="View scheduled inquiry appointments in a calendar layout." />
 
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-5">
           <div>
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-white flex items-center gap-3">
               <FaCalendarAlt className="text-brand-orange text-3xl" />
@@ -397,8 +400,8 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
 
         {isAdminPage ? (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-gray-900/70 rounded-2xl border border-gray-700/50 p-4 flex flex-col justify-between shadow-sm">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
                   <FaCar /> Total
                 </span>
@@ -477,12 +480,13 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                     <p className="text-gray-400 font-medium">The shop floor is clear. No bookings for this date.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 pt-2">
+                  // ADDED: Scrollable wrapper for the admin appointment list
+                  <div className="max-h-[600px] overflow-y-auto pr-2 space-y-4 pt-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
                     {eventsForSelectedDate.map((event) => (
-                      <div key={event.id} className="group flex flex-col sm:flex-row gap-5 bg-gray-800/40 border border-gray-700/50 hover:border-brand-orange/50 rounded-2xl p-5 transition-all shadow-md">
-                        <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-0 min-w-[120px] bg-gray-900 rounded-xl p-4 border border-gray-700 shrink-0">
-                          <FaClock className="text-brand-orange mb-1 text-xl hidden sm:block" />
-                          <span className="text-2xl font-black text-white">
+                      <div key={event.id} className="group flex flex-col sm:flex-row gap-4 bg-gray-900/70 border border-gray-700/60 hover:border-brand-orange/50 rounded-2xl p-4 transition-all shadow-md">
+                        <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-0 min-w-[88px] sm:min-w-[100px] bg-gray-950/80 rounded-xl p-3 border border-gray-700 shrink-0">
+                          <FaClock className="text-brand-orange mb-1 text-lg hidden sm:block" />
+                          <span className="text-xl font-black text-white">
                             {formatAppointmentTime(event.appointmentTime).time}
                           </span>
                           {formatAppointmentTime(event.appointmentTime).suffix && (
@@ -495,7 +499,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                         <div className="flex-1 flex flex-col justify-center">
                           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
                             <div>
-                              <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                              <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
                                 {event.year && <span className="text-brand-orange">{event.year}</span>}
                                 {event.make} {event.model}
                               </h3>
@@ -526,7 +530,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                           </div>
 
                           {isAdminPage && canManage ? (
-                            <div className="mt-4 rounded-2xl border border-gray-700/60 bg-gray-900/70 p-4">
+                            <div className="mt-3 rounded-2xl border border-gray-700/60 bg-gray-950/70 p-3">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                   <p className="text-sm font-semibold text-white">Manage this order</p>
@@ -628,33 +632,37 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                         ) : (
                           <>
                             <div className="mb-4 text-sm text-gray-400">
-                              {slotAvailability.length === 0 ? 'No schedule is available for this day.' : 'Choose an open time slot below to continue to the request form.'}
+                              {slotAvailability.length === 0 ? 'No schedule is available for this day.' : 'Scroll to browse available times.'}
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              {slotAvailability.map((time) => {
-                                const isTaken = bookedSlots.includes(time);
-                                const isSelected = selectedTime === time;
-                                return (
-                                  <button
-                                    key={time}
-                                    type="button"
-                                    disabled={isTaken}
-                                    onClick={() => setSelectedTime(time)}
-                                    className={`rounded-xl border px-3 py-3 text-left transition ${
-                                      isTaken
-                                        ? 'cursor-not-allowed border-red-500/20 bg-red-500/10 text-red-400'
-                                        : isSelected
-                                          ? 'border-brand-orange bg-brand-orange/15 text-brand-orange'
-                                          : 'border-gray-700 bg-gray-800/70 text-gray-200 hover:border-brand-orange/50 hover:bg-gray-800'
-                                    }`}
-                                  >
-                                    <div className="text-sm font-semibold">{time}</div>
-                                    <div className="mt-1 text-[11px] uppercase tracking-widest">
-                                      {isTaken ? 'Taken' : `${slotCounts[time] ?? 0} order${(slotCounts[time] ?? 0) === 1 ? '' : 's'}`}
-                                    </div>
-                                  </button>
-                                );
-                              })}
+                            
+                            {/* ADDED: Vertical scrollable grid for time slots instead of horizontal overflow */}
+                            <div className="max-h-[400px] overflow-y-auto pr-2 pb-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+                              <div className="grid grid-cols-2 gap-3">
+                                {slotAvailability.map((time) => {
+                                  const isTaken = bookedSlots.includes(time);
+                                  const isSelected = selectedTime === time;
+                                  return (
+                                    <button
+                                      key={time}
+                                      type="button"
+                                      disabled={isTaken}
+                                      onClick={() => setSelectedTime(time)}
+                                      className={`rounded-xl border px-3 py-3 text-left transition ${
+                                        isTaken
+                                          ? 'cursor-not-allowed border-red-500/20 bg-red-500/10 text-red-400/50'
+                                          : isSelected
+                                            ? 'border-brand-orange bg-brand-orange/15 text-brand-orange shadow-[0_0_15px_rgba(249,115,22,0.15)]'
+                                            : 'border-gray-700 bg-gray-800/70 text-gray-200 hover:border-brand-orange/50 hover:bg-gray-800'
+                                      }`}
+                                    >
+                                      <div className="text-sm font-semibold whitespace-nowrap">{time}</div>
+                                      <div className="mt-1 text-[11px] uppercase tracking-widest whitespace-nowrap opacity-80">
+                                        {isTaken ? 'Taken' : `${slotCounts[time] ?? 0} order${(slotCounts[time] ?? 0) === 1 ? '' : 's'}`}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             <button
