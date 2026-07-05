@@ -131,6 +131,7 @@ class Router
             $r->addRoute('POST',  '/api/inquiries',                 'handleInquiryCreate');
             $r->addRoute('GET',   '/api/inquiries',                 'handleInquiryList');
             $r->addRoute('GET',   '/api/inquiries/calendar',        'handleInquiryCalendar');
+            $r->addRoute('GET',   '/api/inquiries/availability',   'handleInquiryAvailability');
             $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
             $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
@@ -1237,6 +1238,41 @@ class Router
         ], $inquiries);
 
         echo json_encode(['events' => $events]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryAvailability(array $vars = []): void
+    {
+        $date = trim((string) ($_GET['date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            throw new RuntimeException('A valid date parameter (YYYY-MM-DD) is required.', 422);
+        }
+
+        $svc = new ShopHoursService();
+        $dayHours = $svc->getForDate($date);
+        $allSlots = $svc->generateSlots($dayHours);
+
+        $inquirySvc = new InquiryService();
+        $availability = $dayHours['isOpen']
+            ? $inquirySvc->getAvailabilityForDate($date, $allSlots)
+            : [
+                'availableSlots' => [],
+                'bookedSlots' => [],
+                'slotCounts' => [],
+                'slotCapacity' => 2,
+            ];
+
+        echo json_encode([
+            'isOpen'         => $dayHours['isOpen'],
+            'openTime'       => $dayHours['openTime'],
+            'closeTime'      => $dayHours['closeTime'],
+            'slotIntervalH'  => $dayHours['slotIntervalH'],
+            'closureReason'  => $dayHours['closureReason'] ?? null,
+            'availableSlots' => $availability['availableSlots'],
+            'bookedSlots'    => $availability['bookedSlots'],
+            'slotCapacity'   => $availability['slotCapacity'],
+            'slotCounts'     => $availability['slotCounts'],
+        ]);
     }
 
     /** @param array<string, string> $vars */

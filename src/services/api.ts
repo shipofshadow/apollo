@@ -409,6 +409,11 @@ export const fetchAvailabilityApi = (date: string) =>
     `/api/bookings/availability?date=${encodeURIComponent(date)}`
   );
 
+export const fetchInquiryAvailabilityApi = (date: string) =>
+  apiFetch<import('../types').AvailabilityResponse>(
+    `/api/inquiries/availability?date=${encodeURIComponent(date)}`
+  );
+
 export const fetchInquiryCalendarApi = () =>
   apiFetch<{ events: Array<{ id: string; fullName: string; contactNumber: string; emailAddress: string; facebookName: string; appointmentDate: string; appointmentTime: string; make: string; model: string; productToPurchase: string; status: string }> }>('/api/inquiries/calendar');
 

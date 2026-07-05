@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import PageSEO from '../components/PageSEO';
@@ -136,6 +137,11 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const { token, hasPermission, user } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState('');
+  const [slotAvailability, setSlotAvailability] = useState<string[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
@@ -146,6 +152,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [reschedulePreview, setReschedulePreview] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function loadEvents() {
@@ -174,7 +181,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
         }));
 
         setEvents(mapped);
-        if (mapped.length > 0) {
+        if (isAdminPage && mapped.length > 0) {
           setSelectedDate(new Date(mapped[0].appointmentDate));
         } else if (isAdminPage && (user?.role === 'admin' || user?.role === 'owner')) {
           setSelectedDate(new Date());
@@ -197,7 +204,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
 
   const closedDatesSet = useMemo(() => new Set<string>(), []);
 
-  const slotCounts = useMemo(() => {
+  const eventSlotCounts = useMemo(() => {
     return events.reduce<Record<string, number>>((acc, event) => {
       const key = event.appointmentDate;
       acc[key] = (acc[key] ?? 0) + 1;
@@ -221,6 +228,47 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
     () => (selectedDateKey ? events.filter((event) => event.appointmentDate === selectedDateKey) : []),
     [events, selectedDateKey]
   );
+
+  useEffect(() => {
+    if (isAdminPage || !selectedDate || !BACKEND_URL) {
+      setAvailabilityLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const loadAvailability = async () => {
+      setAvailabilityLoading(true);
+      setSelectedTime('');
+      setSlotAvailability([]);
+      setBookedSlots([]);
+      setSlotCounts({});
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/inquiries/availability?date=${formatDateYMD(selectedDate)}`);
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Unable to load time slots.');
+        }
+        if (!isMounted) return;
+        setSlotAvailability((data.availableSlots ?? []) as string[]);
+        setBookedSlots((data.bookedSlots ?? []) as string[]);
+        setSlotCounts((data.slotCounts ?? {}) as Record<string, number>);
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Unable to load time slots.');
+        }
+      } finally {
+        if (isMounted) {
+          setAvailabilityLoading(false);
+        }
+      }
+    };
+
+    void loadAvailability();
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdminPage, selectedDate]);
 
   const canManage = hasPermission('bookings:manage') && (isAdminPage ? (user?.role === 'admin' || user?.role === 'owner') : true);
 
@@ -333,214 +381,307 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
       <PageSEO title="Calendar | 1625 Autolab" description="View scheduled inquiry appointments in a calendar layout." />
 
       <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-white flex items-center gap-3">
               <FaCalendarAlt className="text-brand-orange text-3xl" />
-              {isAdminPage ? 'Order Calendar' : 'Schedule Dashboard'}
+              {isAdminPage ? 'Order Calendar' : 'Schedule Calendar'}
             </h1>
-            <p className="text-sm text-gray-400 mt-2 font-medium">{isAdminPage ? 'Manage incoming orders and reschedule appointments from the admin dashboard.' : 'Manage incoming inquiries and service appointments.'}</p>
+            <p className="text-sm text-gray-400 mt-2 font-medium">
+              {isAdminPage
+                ? 'Manage incoming orders and reschedule appointments from the admin dashboard.'
+                : 'Browse available appointment dates on the public calendar.'}
+            </p>
           </div>
         </div>
 
-        {/* Quick Stats - Enhanced with Icons */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <FaCar /> Total
-              </span>
-              <span className="text-3xl font-black text-white mt-3">{totalEvents}</span>
-            </div>
-            <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <FaSpinner className="text-brand-orange" /> Pending
-              </span>
-              <span className="text-3xl font-black text-brand-orange mt-3">{statusCounts.pending}</span>
-            </div>
-            <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <FaCheckCircle className="text-sky-400" /> Confirmed
-              </span>
-              <span className="text-3xl font-black text-sky-400 mt-3">{statusCounts.confirmed}</span>
-            </div>
-            <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                <FaCalendarAlt /> Selected Date
-              </span>
-              <span className="text-lg font-bold text-white mt-3 leading-tight">
-                {formatHumanDate(selectedDate)}
-              </span>
-            </div>
-        </div>
-
-        {/* Main Grid: Calendar & Schedule */}
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
-          
-          {/* Calendar Sidebar */}
-          <div className="bg-gray-800/40 border border-gray-700/50 rounded-3xl p-6 h-fit shadow-xl">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <FaCalendarAlt /> Pick a Date
-            </h2>
-            {loading ? (
-              <div className="animate-pulse h-64 bg-gray-800 rounded-xl"></div>
-            ) : error ? (
-              <p className="text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{error}</p>
-            ) : availableDates.length === 0 && !(isAdminPage && canManage) ? (
-              <p className="text-sm text-gray-500 text-center py-8">No appointments scheduled.</p>
-            ) : (
-              <div className="calendar-wrapper">
-                <CustomCalendar
-                  value={selectedDate}
-                  onChange={setSelectedDate}
-                  availableDates={availableDates}
-                  closedDatesSet={closedDatesSet}
-                  slotCounts={slotCounts}
-                  showAvailabilityIndicators={false}
-                  allowAnyDate={isAdminPage && canManage}
-                />
+        {isAdminPage ? (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <FaCar /> Total
+                </span>
+                <span className="text-3xl font-black text-white mt-3">{totalEvents}</span>
               </div>
-            )}
-          </div>
-
-          {/* Daily Schedule List */}
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-              <h2 className="text-2xl font-black text-white tracking-tight">
-                {selectedDate ? formatHumanDate(selectedDate) : 'Appointments'}
-              </h2>
-              <span className="text-sm font-bold px-4 py-1.5 bg-gray-800 rounded-lg text-gray-300 shadow-sm border border-gray-700">
-                {eventsForSelectedDate.length} {eventsForSelectedDate.length === 1 ? 'Slot' : 'Slots'}
-              </span>
+              <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <FaSpinner className="text-brand-orange" /> Pending
+                </span>
+                <span className="text-3xl font-black text-brand-orange mt-3">{statusCounts.pending}</span>
+              </div>
+              <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <FaCheckCircle className="text-sky-400" /> Confirmed
+                </span>
+                <span className="text-3xl font-black text-sky-400 mt-3">{statusCounts.confirmed}</span>
+              </div>
+              <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-5 flex flex-col justify-between shadow-sm">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <FaCalendarAlt /> Selected Date
+                </span>
+                <span className="text-lg font-bold text-white mt-3 leading-tight">
+                  {formatHumanDate(selectedDate)}
+                </span>
+              </div>
             </div>
 
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2].map(i => <div key={i} className="animate-pulse h-32 bg-gray-800/40 rounded-2xl border border-gray-700/50"></div>)}
+            <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
+              <div className="bg-gray-800/40 border border-gray-700/50 rounded-3xl p-6 h-fit shadow-xl">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                  <FaCalendarAlt /> Pick a Date
+                </h2>
+                {loading ? (
+                  <div className="animate-pulse h-64 bg-gray-800 rounded-xl"></div>
+                ) : error ? (
+                  <p className="text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{error}</p>
+                ) : availableDates.length === 0 && !(isAdminPage && canManage) ? (
+                  <p className="text-sm text-gray-500 text-center py-8">No appointments scheduled.</p>
+                ) : (
+                  <div className="calendar-wrapper">
+                    <CustomCalendar
+                      value={selectedDate}
+                      onChange={setSelectedDate}
+                      availableDates={availableDates}
+                      closedDatesSet={closedDatesSet}
+                      slotCounts={eventSlotCounts}
+                      showAvailabilityIndicators={false}
+                      allowAnyDate={isAdminPage && canManage}
+                    />
+                  </div>
+                )}
               </div>
-            ) : !selectedDate ? (
-              <div className="text-center py-16 border-2 border-dashed border-gray-700 rounded-3xl bg-gray-800/20">
-                <FaCalendarAlt className="mx-auto text-4xl text-gray-600 mb-4" />
-                <p className="text-gray-400 font-medium">Pick a date from the calendar to view the schedule.</p>
-              </div>
-            ) : eventsForSelectedDate.length === 0 ? (
-              <div className="text-center py-16 border-2 border-dashed border-gray-700 rounded-3xl bg-gray-800/20">
-                <FaCar className="mx-auto text-4xl text-gray-600 mb-4" />
-                <p className="text-gray-400 font-medium">The shop floor is clear. No bookings for this date.</p>
-              </div>
-            ) : (
-              <div className="space-y-4 pt-2">
-                {eventsForSelectedDate.map((event) => (
-                  <div key={event.id} className="group flex flex-col sm:flex-row gap-5 bg-gray-800/40 border border-gray-700/50 hover:border-brand-orange/50 rounded-2xl p-5 transition-all shadow-md">
-                    
-                    {/* Time Block - Highly Visible */}
-                    <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-0 min-w-[120px] bg-gray-900 rounded-xl p-4 border border-gray-700 shrink-0">
-                      <FaClock className="text-brand-orange mb-1 text-xl hidden sm:block" />
-                      <span className="text-2xl font-black text-white">
-                        {formatAppointmentTime(event.appointmentTime).time}
-                      </span>
-                      {formatAppointmentTime(event.appointmentTime).suffix && (
-                        <span className="text-sm font-bold text-brand-orange uppercase">
-                          {formatAppointmentTime(event.appointmentTime).suffix}
-                        </span>
-                      )}
-                    </div>
 
-                    {/* Details Block */}
-                    <div className="flex-1 flex flex-col justify-center">
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
-                        <div>
-                          {/* Emphasize the Car */}
-                          <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-                            {event.year && <span className="text-brand-orange">{event.year}</span>}
-                            {event.make} {event.model}
-                          </h3>
-                          {/* Service Type */}
-                          <p className="text-sm text-gray-400 font-bold mt-1 flex items-center gap-2">
-                            <FaWrench className="text-gray-500" />
-                            {event.orderLabel}
-                          </p>
-                        </div>
-                        
-                        {/* Mobile-friendly Status/Actions */}
-                        <div className="shrink-0 mt-2 sm:mt-0">
-                          {canManage ? (
-                            <select
-                              value={event.status}
-                              onChange={(e) => changeStatus(event.id, e.target.value)}
-                              className={`w-full sm:w-auto border rounded-lg px-3 py-1.5 text-sm font-bold uppercase tracking-wider focus:ring-2 focus:ring-brand-orange outline-none cursor-pointer appearance-none ${getStatusColor(event.status)}`}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="confirmed">Confirmed</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                          ) : (
-                            <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border ${getStatusColor(event.status)}`}>
-                              {event.status}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    {selectedDate ? formatHumanDate(selectedDate) : 'Appointments'}
+                  </h2>
+                  <span className="text-sm font-bold px-4 py-1.5 bg-gray-800 rounded-lg text-gray-300 shadow-sm border border-gray-700">
+                    {eventsForSelectedDate.length} {eventsForSelectedDate.length === 1 ? 'Slot' : 'Slots'}
+                  </span>
+                </div>
+
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2].map(i => <div key={i} className="animate-pulse h-32 bg-gray-800/40 rounded-2xl border border-gray-700/50"></div>)}
+                  </div>
+                ) : !selectedDate ? (
+                  <div className="text-center py-16 border-2 border-dashed border-gray-700 rounded-3xl bg-gray-800/20">
+                    <FaCalendarAlt className="mx-auto text-4xl text-gray-600 mb-4" />
+                    <p className="text-gray-400 font-medium">Pick a date from the calendar to view the schedule.</p>
+                  </div>
+                ) : eventsForSelectedDate.length === 0 ? (
+                  <div className="text-center py-16 border-2 border-dashed border-gray-700 rounded-3xl bg-gray-800/20">
+                    <FaCar className="mx-auto text-4xl text-gray-600 mb-4" />
+                    <p className="text-gray-400 font-medium">The shop floor is clear. No bookings for this date.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 pt-2">
+                    {eventsForSelectedDate.map((event) => (
+                      <div key={event.id} className="group flex flex-col sm:flex-row gap-5 bg-gray-800/40 border border-gray-700/50 hover:border-brand-orange/50 rounded-2xl p-5 transition-all shadow-md">
+                        <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-0 min-w-[120px] bg-gray-900 rounded-xl p-4 border border-gray-700 shrink-0">
+                          <FaClock className="text-brand-orange mb-1 text-xl hidden sm:block" />
+                          <span className="text-2xl font-black text-white">
+                            {formatAppointmentTime(event.appointmentTime).time}
+                          </span>
+                          {formatAppointmentTime(event.appointmentTime).suffix && (
+                            <span className="text-sm font-bold text-brand-orange uppercase">
+                              {formatAppointmentTime(event.appointmentTime).suffix}
                             </span>
                           )}
                         </div>
-                      </div>
-                      
-                      {isAdminPage && canManage ? (
-                        <div className="mt-4 rounded-2xl border border-gray-700/60 bg-gray-900/70 p-4">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-white">Manage this order</p>
-                              <p className="text-xs text-gray-400">Adjust the date or remove it from the calendar.</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => startReschedule(event)}
-                                className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-sm font-semibold text-brand-orange transition hover:bg-brand-orange/20"
-                              >
-                                Reschedule
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteInquiry(event.id)}
-                                disabled={deletingId === event.id}
-                                className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
-                              >
-                                <span className="inline-flex items-center gap-2">
-                                  <FaTrash />
-                                  {deletingId === event.id ? 'Deleting...' : 'Delete'}
-                                </span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
 
-                      {/* Contact Info Footer - Clear and Icon-driven */}
-                      <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm mt-3 pt-3 border-t border-gray-700/50">
-                        <div className="flex items-center gap-2">
-                          <FaUser className="text-gray-500" />
-                          <span className="text-gray-300 font-medium">{event.fullName}</span>
+                        <div className="flex-1 flex flex-col justify-center">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
+                            <div>
+                              <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                                {event.year && <span className="text-brand-orange">{event.year}</span>}
+                                {event.make} {event.model}
+                              </h3>
+                              <p className="text-sm text-gray-400 font-bold mt-1 flex items-center gap-2">
+                                <FaWrench className="text-gray-500" />
+                                {event.orderLabel}
+                              </p>
+                            </div>
+
+                            <div className="shrink-0 mt-2 sm:mt-0">
+                              {canManage ? (
+                                <select
+                                  value={event.status}
+                                  onChange={(e) => changeStatus(event.id, e.target.value)}
+                                  className={`w-full sm:w-auto border rounded-lg px-3 py-1.5 text-sm font-bold uppercase tracking-wider focus:ring-2 focus:ring-brand-orange outline-none cursor-pointer appearance-none ${getStatusColor(event.status)}`}
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="confirmed">Confirmed</option>
+                                  <option value="completed">Completed</option>
+                                  <option value="cancelled">Cancelled</option>
+                                </select>
+                              ) : (
+                                <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border ${getStatusColor(event.status)}`}>
+                                  {event.status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {isAdminPage && canManage ? (
+                            <div className="mt-4 rounded-2xl border border-gray-700/60 bg-gray-900/70 p-4">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <p className="text-sm font-semibold text-white">Manage this order</p>
+                                  <p className="text-xs text-gray-400">Adjust the date or remove it from the calendar.</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => startReschedule(event)}
+                                    className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-sm font-semibold text-brand-orange transition hover:bg-brand-orange/20"
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteInquiry(event.id)}
+                                    disabled={deletingId === event.id}
+                                    className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    <span className="inline-flex items-center gap-2">
+                                      <FaTrash />
+                                      {deletingId === event.id ? 'Deleting...' : 'Delete'}
+                                    </span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm mt-3 pt-3 border-t border-gray-700/50">
+                            <div className="flex items-center gap-2">
+                              <FaUser className="text-gray-500" />
+                              <span className="text-gray-300 font-medium">{event.fullName}</span>
+                            </div>
+                            {event.contactNumber && (
+                              <div className="flex items-center gap-2">
+                                <FaPhone className="text-gray-500" />
+                                <span className="text-gray-300">{event.contactNumber}</span>
+                              </div>
+                            )}
+                            {event.emailAddress && (
+                              <div className="flex items-center gap-2">
+                                <FaEnvelope className="text-gray-500" />
+                                <span className="text-gray-300 truncate max-w-[200px]">{event.emailAddress}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        {event.contactNumber && (
-                          <div className="flex items-center gap-2">
-                            <FaPhone className="text-gray-500" />
-                            <span className="text-gray-300">{event.contactNumber}</span>
-                          </div>
-                        )}
-                        {event.emailAddress && (
-                          <div className="flex items-center gap-2">
-                            <FaEnvelope className="text-gray-500" />
-                            <span className="text-gray-300 truncate max-w-[200px]">{event.emailAddress}</span>
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-3xl border border-gray-700/50 bg-gray-800/40 p-6 shadow-xl">
+            <div className="mx-auto max-w-5xl">
+              <div className="mb-6 text-center">
+                <p className="text-sm font-bold uppercase tracking-widest text-brand-orange">Public booking calendar</p>
+                <h2 className="mt-2 text-2xl font-black text-white">Choose a date and time for your appointment</h2>
+                <p className="mt-2 text-sm text-gray-400">Select a day from the calendar and reserve a slot that is still open.</p>
+              </div>
+              {loading ? (
+                <div className="animate-pulse h-80 bg-gray-800 rounded-2xl"></div>
+              ) : error ? (
+                <p className="text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{error}</p>
+              ) : (
+                <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="mx-auto w-full max-w-2xl">
+                    <CustomCalendar
+                      value={selectedDate}
+                      onChange={(date) => {
+                        setSelectedDate(date);
+                        setSelectedTime('');
+                      }}
+                      availableDates={availableDates}
+                      closedDatesSet={closedDatesSet}
+                      slotCounts={slotCounts}
+                      showAvailabilityIndicators={false}
+                      allowAnyDate
+                    />
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-700/60 bg-gray-900/70 p-5">
+                    {selectedDate ? (
+                      <>
+                        <div className="mb-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-orange">Selected date</p>
+                          <h3 className="mt-2 text-xl font-black text-white">{formatHumanDate(selectedDate)}</h3>
+                        </div>
+
+                        {availabilityLoading ? (
+                          <div className="space-y-3">
+                            {[1, 2, 3].map((item) => (
+                              <div key={item} className="h-12 animate-pulse rounded-xl bg-gray-800" />
+                            ))}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="mb-4 text-sm text-gray-400">
+                              {slotAvailability.length === 0 ? 'No schedule is available for this day.' : 'Choose an open time slot below to continue to the request form.'}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              {slotAvailability.map((time) => {
+                                const isTaken = bookedSlots.includes(time);
+                                const isSelected = selectedTime === time;
+                                return (
+                                  <button
+                                    key={time}
+                                    type="button"
+                                    disabled={isTaken}
+                                    onClick={() => setSelectedTime(time)}
+                                    className={`rounded-xl border px-3 py-3 text-left transition ${
+                                      isTaken
+                                        ? 'cursor-not-allowed border-red-500/20 bg-red-500/10 text-red-400'
+                                        : isSelected
+                                          ? 'border-brand-orange bg-brand-orange/15 text-brand-orange'
+                                          : 'border-gray-700 bg-gray-800/70 text-gray-200 hover:border-brand-orange/50 hover:bg-gray-800'
+                                    }`}
+                                  >
+                                    <div className="text-sm font-semibold">{time}</div>
+                                    <div className="mt-1 text-[11px] uppercase tracking-widest">
+                                      {isTaken ? 'Taken' : `${slotCounts[time] ?? 0} request${(slotCounts[time] ?? 0) === 1 ? '' : 's'}`}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedDate || !selectedTime) return;
+                                navigate(`/order?date=${formatDateYMD(selectedDate)}&time=${encodeURIComponent(selectedTime)}`);
+                              }}
+                              disabled={!selectedTime}
+                              className="mt-5 w-full rounded-xl bg-brand-orange px-4 py-3 text-sm font-black uppercase tracking-[0.25em] text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                            >
+                              Continue to request form
+                            </button>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex h-full min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-gray-700 text-center text-sm text-gray-400">
+                        Pick a date from the calendar to view the available time slots.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {isRescheduleModalOpen && reschedulingId ? (

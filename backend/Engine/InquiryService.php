@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 class InquiryService
 {
+    private const SLOT_CAPACITY = 2;
+    private const SLOT_WINDOW_MINUTES = 5 * 60;
+
     private bool $useDb;
 
     private static string $storageFile = __DIR__ . '/../storage/inquiries.json';
+    private static string $occupancyStorageFile = __DIR__ . '/../storage/inquiry_slot_occupancy.json';
 
     public function __construct()
     {
@@ -21,6 +25,7 @@ class InquiryService
     {
         $normalized = $this->normalizePayload($data);
         $this->validatePayload($normalized);
+        $this->assertSlotCapacity($normalized['appointmentDate'], $normalized['appointmentTime']);
 
         $inquiry = [
             'id' => $this->uuid(),
@@ -44,6 +49,8 @@ class InquiryService
         } else {
             $this->fileInsert($inquiry);
         }
+
+        $this->syncOccupancyForInquiry($inquiry);
 
         return $inquiry;
     }
@@ -99,12 +106,33 @@ class InquiryService
             throw new RuntimeException('No changes were provided.', 422);
         }
 
+        $targetDate = $appointmentDate;
+        $targetTime = $appointmentTime;
+        if ($targetDate === null || $targetTime === null) {
+            $existing = $this->useDb ? $this->dbGetById($id) : $this->fileGetById($id);
+            if ($existing === null) {
+                throw new RuntimeException('Inquiry not found.', 404);
+            }
+            if ($targetDate === null) {
+                $targetDate = (string) ($existing['appointmentDate'] ?? '');
+            }
+            if ($targetTime === null) {
+                $targetTime = (string) ($existing['appointmentTime'] ?? '');
+            }
+        }
+
+        $isScheduleChange = $appointmentDate !== null || $appointmentTime !== null;
+        if ($isScheduleChange && $targetDate !== null && $targetTime !== null && trim((string) $targetDate) !== '' && trim((string) $targetTime) !== '') {
+            $this->assertSlotCapacity((string) $targetDate, (string) $targetTime, $id);
+        }
+
         if ($this->useDb) {
             $this->dbUpdateDetails($id, $status, $appointmentDate, $appointmentTime);
             $inquiry = $this->dbGetById($id);
             if ($inquiry === null) {
                 throw new RuntimeException('Inquiry not found.', 404);
             }
+            $this->syncOccupancyForInquiry($inquiry);
             return $inquiry;
         }
 
@@ -134,6 +162,9 @@ class InquiryService
 
         file_put_contents(self::$storageFile, json_encode($inquiries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $updated = array_values(array_filter($inquiries, fn ($item) => (string) ($item['id'] ?? '') === $id))[0] ?? null;
+        if (is_array($updated)) {
+            $this->syncOccupancyForInquiry($updated);
+        }
         if (!is_array($updated)) {
             throw new RuntimeException('Inquiry not found.', 404);
         }
@@ -148,6 +179,7 @@ class InquiryService
     {
         if ($this->useDb) {
             $this->dbDelete($id);
+            $this->deleteOccupancyForInquiry($id);
             return;
         }
 
@@ -162,6 +194,69 @@ class InquiryService
         }
 
         file_put_contents(self::$storageFile, json_encode($filtered, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $this->deleteOccupancyForInquiry($id);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getOccupiedSlots(string $date): array
+    {
+        $availability = $this->getAvailabilityForDate($date, []);
+        return $availability['bookedSlots'];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function getSlotCounts(string $date): array
+    {
+        $availability = $this->getAvailabilityForDate($date, []);
+        return $availability['slotCounts'];
+    }
+
+    /**
+     * @param string[] $allSlots
+     * @return array{availableSlots:string[], bookedSlots:string[], slotCounts:array<string,int>, slotCapacity:int}
+     */
+    public function getAvailabilityForDate(string $date, array $allSlots = []): array
+    {
+        $slots = $allSlots;
+        if ($slots === []) {
+            $slots = $this->getAllSlotsForDate($date);
+        }
+
+        $activeAppointments = $this->getActiveAppointmentsForDate($date);
+        $slotCounts = [];
+        $bookedSlots = [];
+
+        foreach ($slots as $slot) {
+            $slotMinutes = $this->parseTimeToMinutes($slot);
+            if ($slotMinutes === null) {
+                continue;
+            }
+
+            $overlapCount = 0;
+            foreach ($activeAppointments as $appointment) {
+                if ($this->appointmentsOverlap($slotMinutes, $appointment['startMinutes'])) {
+                    $overlapCount++;
+                }
+            }
+
+            $slotCounts[$slot] = $overlapCount;
+            if ($overlapCount >= self::SLOT_CAPACITY) {
+                $bookedSlots[] = $slot;
+            }
+        }
+
+        $availableSlots = array_values(array_diff($slots, $bookedSlots));
+
+        return [
+            'availableSlots' => $availableSlots,
+            'bookedSlots' => $bookedSlots,
+            'slotCounts' => $slotCounts,
+            'slotCapacity' => self::SLOT_CAPACITY,
+        ];
     }
 
     /**
@@ -390,6 +485,242 @@ class InquiryService
     /**
      * @param array<string, mixed> $inquiry
      */
+    private function syncOccupancyForInquiry(array $inquiry): void
+    {
+        $inquiryId = (string) ($inquiry['id'] ?? '');
+        if ($inquiryId === '') {
+            return;
+        }
+
+        $appointmentDate = trim((string) ($inquiry['appointmentDate'] ?? ''));
+        $appointmentTime = trim((string) ($inquiry['appointmentTime'] ?? ''));
+        $status = strtolower(trim((string) ($inquiry['status'] ?? 'pending')));
+
+        if ($appointmentDate === '' || $appointmentTime === '' || $status === 'cancelled') {
+            $this->deleteOccupancyForInquiry($inquiryId);
+            return;
+        }
+
+        if ($this->useDb) {
+            $this->dbUpsertOccupancy($inquiry);
+            return;
+        }
+
+        $this->fileUpsertOccupancy($inquiry);
+    }
+
+    private function deleteOccupancyForInquiry(string $inquiryId): void
+    {
+        if ($inquiryId === '') {
+            return;
+        }
+
+        if ($this->useDb) {
+            $this->dbDeleteOccupancy($inquiryId);
+            return;
+        }
+
+        $rows = $this->fileGetOccupancyRows();
+        $filtered = array_values(array_filter(
+            $rows,
+            static fn (array $item): bool => (string) ($item['inquiryId'] ?? '') !== $inquiryId
+        ));
+
+        $this->fileWriteOccupancyRows($filtered);
+    }
+
+    /**
+     * @param array<string, mixed> $inquiry
+     */
+    private function dbUpsertOccupancy(array $inquiry): void
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            'INSERT INTO inquiry_slot_occupancy (
+                id, inquiry_id, appointment_date, appointment_time, status, created_at, updated_at
+            ) VALUES (
+                :id, :inquiry_id, :appointment_date, :appointment_time, :status, :created_at, :updated_at
+            ) ON DUPLICATE KEY UPDATE
+                appointment_date = VALUES(appointment_date),
+                appointment_time = VALUES(appointment_time),
+                status = VALUES(status),
+                updated_at = VALUES(updated_at)'
+        );
+
+        $stmt->execute([
+            ':id' => (string) $this->uuid(),
+            ':inquiry_id' => (string) ($inquiry['id'] ?? ''),
+            ':appointment_date' => trim((string) ($inquiry['appointmentDate'] ?? '')),
+            ':appointment_time' => trim((string) ($inquiry['appointmentTime'] ?? '')),
+            ':status' => strtolower(trim((string) ($inquiry['status'] ?? 'pending'))),
+            ':created_at' => date('Y-m-d H:i:s'),
+            ':updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function dbDeleteOccupancy(string $inquiryId): void
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('DELETE FROM inquiry_slot_occupancy WHERE inquiry_id = :inquiry_id');
+        $stmt->execute([':inquiry_id' => $inquiryId]);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function dbGetOccupiedSlots(string $date): array
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            'SELECT appointment_time FROM inquiry_slot_occupancy WHERE appointment_date = :appointment_date'
+        );
+        $stmt->execute([':appointment_date' => $date]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $slots = array_values(array_filter(array_map(
+            static fn (array $row): string => trim((string) ($row['appointment_time'] ?? '')),
+            $rows
+        ), static fn (string $slot): bool => $slot !== ''));
+        sort($slots);
+        return $slots;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function dbGetSlotCounts(string $date): array
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            'SELECT appointment_time, COUNT(*) AS slot_count FROM inquiry_slot_occupancy WHERE appointment_date = :appointment_date GROUP BY appointment_time'
+        );
+        $stmt->execute([':appointment_date' => $date]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $counts = [];
+        foreach ($rows as $row) {
+            $time = trim((string) ($row['appointment_time'] ?? ''));
+            if ($time !== '') {
+                $counts[$time] = (int) ($row['slot_count'] ?? 0);
+            }
+        }
+        return $counts;
+    }
+
+    /**
+     * @param array<string, mixed> $inquiry
+     */
+    private function fileUpsertOccupancy(array $inquiry): void
+    {
+        $rows = $this->fileGetOccupancyRows();
+        $inquiryId = (string) ($inquiry['id'] ?? '');
+        $appointmentDate = trim((string) ($inquiry['appointmentDate'] ?? ''));
+        $appointmentTime = trim((string) ($inquiry['appointmentTime'] ?? ''));
+        $status = strtolower(trim((string) ($inquiry['status'] ?? 'pending')));
+
+        if ($appointmentDate === '' || $appointmentTime === '' || $status === 'cancelled') {
+            $this->deleteOccupancyForInquiry($inquiryId);
+            return;
+        }
+
+        $found = false;
+        foreach ($rows as &$row) {
+            if ((string) ($row['inquiryId'] ?? '') === $inquiryId) {
+                $row['appointmentDate'] = $appointmentDate;
+                $row['appointmentTime'] = $appointmentTime;
+                $row['status'] = $status;
+                $row['updatedAt'] = date('c');
+                $found = true;
+                break;
+            }
+        }
+        unset($row);
+
+        if (!$found) {
+            $rows[] = [
+                'id' => $this->uuid(),
+                'inquiryId' => $inquiryId,
+                'appointmentDate' => $appointmentDate,
+                'appointmentTime' => $appointmentTime,
+                'status' => $status,
+                'createdAt' => date('c'),
+                'updatedAt' => date('c'),
+            ];
+        }
+
+        $this->fileWriteOccupancyRows($rows);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fileGetOccupancyRows(): array
+    {
+        if (!file_exists(self::$occupancyStorageFile)) {
+            return [];
+        }
+
+        $raw = file_get_contents(self::$occupancyStorageFile);
+        if ($raw === false) {
+            return [];
+        }
+
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function fileWriteOccupancyRows(array $rows): void
+    {
+        $dir = dirname(self::$occupancyStorageFile);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        file_put_contents(self::$occupancyStorageFile, json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * @return string[]
+     */
+    private function fileGetOccupiedSlots(string $date): array
+    {
+        $slots = array_values(array_filter(
+            array_map(
+                static fn (array $row): string => (string) ($row['appointmentTime'] ?? ''),
+                array_filter(
+                    $this->fileGetOccupancyRows(),
+                    static fn (array $row): bool => (string) ($row['appointmentDate'] ?? '') === $date
+                )
+            ),
+            static fn (string $slot): bool => $slot !== ''
+        ));
+        sort($slots);
+        return $slots;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function fileGetSlotCounts(string $date): array
+    {
+        $counts = [];
+        foreach ($this->fileGetOccupancyRows() as $row) {
+            if ((string) ($row['appointmentDate'] ?? '') !== $date) {
+                continue;
+            }
+            $time = trim((string) ($row['appointmentTime'] ?? ''));
+            if ($time === '') {
+                continue;
+            }
+            $counts[$time] = ($counts[$time] ?? 0) + 1;
+        }
+        return $counts;
+    }
+
+    /**
+     * @param array<string, mixed> $inquiry
+     */
     private function fileInsert(array $inquiry): void
     {
         $path = dirname(self::$storageFile);
@@ -418,6 +749,130 @@ class InquiryService
 
         $data = json_decode($raw, true);
         return is_array($data) ? $data : [];
+    }
+
+    private function assertSlotCapacity(string $date, string $time, ?string $excludeInquiryId = null): void
+    {
+        if ($date === '' || $time === '') {
+            return;
+        }
+
+        $count = $this->countOverlappingAppointments($date, $time, $excludeInquiryId);
+        if ($count >= self::SLOT_CAPACITY) {
+            throw new RuntimeException('This time slot is fully booked. Please choose a different time.', 409);
+        }
+    }
+
+    /**
+     * @return array<int, array{startMinutes:int}>
+     */
+    private function getActiveAppointmentsForDate(string $date): array
+    {
+        $items = $this->useDb ? $this->dbGetAll() : $this->fileGetAll();
+        $appointments = [];
+
+        foreach ($items as $item) {
+            $itemDate = trim((string) ($item['appointmentDate'] ?? ''));
+            if ($itemDate !== $date) {
+                continue;
+            }
+
+            $status = strtolower(trim((string) ($item['status'] ?? 'pending')));
+            if ($status === 'cancelled' || $status === 'completed') {
+                continue;
+            }
+
+            $itemTime = trim((string) ($item['appointmentTime'] ?? ''));
+            $startMinutes = $this->parseTimeToMinutes($itemTime);
+            if ($startMinutes === null) {
+                continue;
+            }
+
+            $appointments[] = [
+                'inquiryId' => (string) ($item['id'] ?? ''),
+                'startMinutes' => $startMinutes,
+            ];
+        }
+
+        return $appointments;
+    }
+
+    private function countOverlappingAppointments(string $date, string $time, ?string $excludeInquiryId = null): int
+    {
+        $candidateStart = $this->parseTimeToMinutes($time);
+        if ($candidateStart === null) {
+            return 0;
+        }
+
+        $appointments = $this->getActiveAppointmentsForDate($date);
+        $count = 0;
+        foreach ($appointments as $appointment) {
+            if ($excludeInquiryId !== null && isset($appointment['inquiryId']) && (string) $appointment['inquiryId'] === $excludeInquiryId) {
+                continue;
+            }
+            if ($this->appointmentsOverlap($candidateStart, $appointment['startMinutes'])) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function appointmentsOverlap(int $candidateStart, int $existingStart): bool
+    {
+        $candidateEnd = $candidateStart + self::SLOT_WINDOW_MINUTES;
+        $existingEnd = $existingStart + self::SLOT_WINDOW_MINUTES;
+        return $candidateStart < $existingEnd && $existingStart < $candidateEnd;
+    }
+
+    private function getAllSlotsForDate(string $date): array
+    {
+        $shopHoursService = new ShopHoursService();
+        $dayHours = $shopHoursService->getForDate($date);
+        return $shopHoursService->generateSlots($dayHours);
+    }
+
+    private function parseTimeToMinutes(string $value): ?int
+    {
+        $normalized = trim($value);
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (preg_match('/^(\d{1,2}):(\d{2})(?:\s*([ap]\.?m\.?))?$/i', $normalized, $matches) !== 1) {
+            return null;
+        }
+
+        $hours = (int) $matches[1];
+        $minutes = (int) $matches[2];
+        $meridiem = isset($matches[3]) ? strtolower($matches[3]) : null;
+
+        if ($meridiem === 'p' || $meridiem === 'pm') {
+            if ($hours < 12) {
+                $hours += 12;
+            }
+        } elseif ($meridiem === 'a' || $meridiem === 'am') {
+            if ($hours === 12) {
+                $hours = 0;
+            }
+        }
+
+        if ($hours < 0 || $hours > 23 || $minutes < 0 || $minutes > 59) {
+            return null;
+        }
+
+        return $hours * 60 + $minutes;
+    }
+
+    private function fileGetById(string $id): ?array
+    {
+        $items = $this->fileGetAll();
+        foreach ($items as $item) {
+            if ((string) ($item['id'] ?? '') === $id) {
+                return $item;
+            }
+        }
+        return null;
     }
 
     private function uuid(): string

@@ -56,29 +56,29 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   };
 
   return (
-    <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 w-full max-w-md md:max-w-xl mx-auto shadow-2xl text-slate-200">
+    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 w-full max-w-md md:max-w-xl mx-auto shadow-[0_8px_30px_rgb(0,0,0,0.8)] text-zinc-200 font-sans tracking-wide">
       
       {/* Header Controls */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-800/80">
         <button 
           onClick={goToday} 
-          className="px-4 py-2 text-xs font-semibold uppercase tracking-wider bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+          className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-500 rounded transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           Today
         </button>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setMonth(prev => prev === 0 ? (setYear(y => y - 1), 11) : prev - 1)}
-            className="p-2 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-all"
+            className="p-1.5 border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 hover:border-zinc-600 rounded transition-all focus:outline-none"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-white font-semibold text-base min-w-[130px] text-center">
-            {MONTHS[month]} {year}
+          <span className="text-zinc-100 font-bold text-lg min-w-[140px] text-center uppercase tracking-wider">
+            {MONTHS[month]} <span className="text-zinc-500 font-light">{year}</span>
           </span>
           <button
             onClick={() => setMonth(prev => prev === 11 ? (setYear(y => y + 1), 0) : prev + 1)}
-            className="p-2 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-all"
+            className="p-1.5 border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 hover:border-zinc-600 rounded transition-all focus:outline-none"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -86,16 +86,16 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
       </div>
 
       {/* Days of the Week Header */}
-      <div className="grid grid-cols-7 mb-2">
+      <div className="grid grid-cols-7 mb-3">
         {DAYS.map(d => (
-          <div key={d} className="py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <div key={d} className="py-2 text-center text-[11px] font-bold uppercase tracking-widest text-zinc-600">
             {d}
           </div>
         ))}
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {cells.map((day, i) => {
           if (day === null) return <div key={`empty-${i}`} className="min-h-[72px]" />;
           
@@ -112,16 +112,19 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           const canSelect = allowAnyDate ? !closed : available && !closed;
 
           // Determine Cell State
-          let cellStyle = "bg-transparent";
-          let cursorStyle = "cursor-not-allowed opacity-50";
+          let cellStyle = "bg-zinc-900/40 border-transparent text-zinc-300";
+          let cursorStyle = "cursor-not-allowed opacity-40 grayscale";
 
           if (closed) {
-            cellStyle = "bg-red-950/20";
+            cellStyle = "bg-red-950/10 border-red-900/30 text-red-500/50";
+            cursorStyle = "cursor-not-allowed opacity-50";
           } else if (canSelect) {
-            cursorStyle = "cursor-pointer hover:bg-slate-800";
+            cursorStyle = "cursor-pointer hover:bg-zinc-800 hover:border-zinc-600";
+            cellStyle = "bg-zinc-900 border-zinc-800/80 text-zinc-100";
             
             if (selected) {
-              cellStyle = "bg-orange-500/20 ring-1 ring-orange-500";
+              cellStyle = "bg-amber-500 border-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)]";
+              cursorStyle = "cursor-default";
             }
           }
 
@@ -130,49 +133,51 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
               key={iso}
               onClick={() => canSelect && onChange(date)}
               disabled={!canSelect}
-              className={`min-h-[72px] p-2 flex flex-col items-center justify-start rounded-xl transition-all ${cellStyle} ${cursorStyle}`}
+              className={`relative min-h-[72px] p-2 flex flex-col items-center justify-start rounded-lg border transition-all duration-200 ${cellStyle} ${cursorStyle}`}
             >
-              {/* Date Number Container */}
-              <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm
-                ${todayIso && !selected ? 'bg-slate-800 text-white font-bold' : ''}
-                ${selected ? 'bg-orange-500 text-white' : ''}
+              {/* Date Number */}
+              <div className={`w-7 h-7 flex items-center justify-center rounded text-sm font-semibold
+                ${todayIso && !selected ? 'text-amber-500 border border-amber-500/30' : ''}
               `}>
                 {day}
               </div>
 
-              {/* Status Indicators (Dots instead of text) */}
-              <div className="mt-1 flex flex-col items-center gap-1 h-6">
+              {/* Status Indicators */}
+              <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center justify-end px-2">
                 {showAvailabilityIndicators && available && !closed && (
                   <>
                     {isFull ? (
-                      <span className="text-[10px] text-red-400 font-medium tracking-tight">Full</span>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider ${selected ? 'text-black/70' : 'text-red-500'}`}>Full</span>
                     ) : (
-                      <span className={`text-[10px] font-medium tracking-tight ${slotsLeft <= 1 ? 'text-yellow-400' : 'text-emerald-400'}`}>
-                        {slotsLeft} left
-                      </span>
+                      <div className="w-full flex items-center gap-1">
+                        <div className={`h-1 flex-1 rounded-sm ${selected ? 'bg-black/20' : slotsLeft <= 1 ? 'bg-amber-500/50' : 'bg-emerald-500/50'}`} />
+                        <span className={`text-[9px] font-bold ${selected ? 'text-black/70' : 'text-zinc-500'}`}>
+                          {slotsLeft}
+                        </span>
+                      </div>
                     )}
                   </>
                 )}
-                {closed && <div className="w-1.5 h-1.5 rounded-full bg-red-500/50 mt-1" />}
+                {closed && <div className="text-[10px] uppercase font-bold tracking-widest text-red-500/50">--</div>}
               </div>
             </button>
           );
         })}
       </div>
 
-      {/* Minimal Legend */}
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-6 pt-4 border-t border-slate-800/50">
+      {/* Technical Legend */}
+      <div className="mt-8 flex flex-wrap items-center justify-between pt-4 border-t border-zinc-800/80 px-2">
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-slate-200" />
-          <span className="text-xs text-slate-400">Available</span>
+          <div className="h-1.5 w-4 rounded-sm bg-zinc-700" />
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Available</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-orange-500" />
-          <span className="text-xs text-slate-400">Selected</span>
+          <div className="h-1.5 w-4 rounded-sm bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+          <span className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">Selected</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-red-500/50" />
-          <span className="text-xs text-slate-400">Closed</span>
+          <div className="h-1.5 w-4 rounded-sm bg-red-900/50" />
+          <span className="text-[10px] uppercase tracking-widest text-zinc-600 font-semibold">Closed</span>
         </div>
       </div>
     </div>
