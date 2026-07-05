@@ -665,7 +665,7 @@ export default function CalendarPanel({ onView }: Props) {
           title="Inquiry Schedule"
           description="View, edit, or delete this inquiry appointment."
           onClose={closeInquiryModal}
-          size="xl"
+          size="2xl"
         >
           <div className="space-y-4">
               <div className="rounded-lg border border-gray-800 bg-gray-900/90 p-4">
