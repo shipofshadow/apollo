@@ -45,19 +45,29 @@ export function ModalShell({
   description,
   onClose,
   children,
+  size = 'lg',
 }: {
   title: string;
   description?: string;
   onClose: () => void;
   children: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }) {
+  const sizeClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-5xl',
+    '2xl': 'max-w-7xl',
+  } satisfies Record<NonNullable<Parameters<typeof ModalShell>[0]['size']>, string>;
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 px-4 py-6"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-lg rounded-xl border border-gray-700 bg-brand-dark shadow-2xl flex flex-col max-h-[90vh]">
+      <div className={`w-full ${sizeClasses[size]} rounded-xl border border-gray-700 bg-brand-dark shadow-2xl flex flex-col max-h-[90vh]`}>
         <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-800 shrink-0">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-widest text-white">{title}</h3>
