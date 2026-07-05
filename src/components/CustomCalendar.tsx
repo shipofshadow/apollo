@@ -60,14 +60,16 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
       
       {/* Header Controls */}
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-800/80">
-        <button 
-          onClick={goToday} 
+        <button
+          type="button"
+          onClick={goToday}
           className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-500 rounded transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           Today
         </button>
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={() => setMonth(prev => prev === 0 ? (setYear(y => y - 1), 11) : prev - 1)}
             className="p-1.5 border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 hover:border-zinc-600 rounded transition-all focus:outline-none"
           >
@@ -77,6 +79,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
             {MONTHS[month]} <span className="text-zinc-500 font-light">{year}</span>
           </span>
           <button
+            type="button"
             onClick={() => setMonth(prev => prev === 11 ? (setYear(y => y + 1), 0) : prev + 1)}
             className="p-1.5 border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 hover:border-zinc-600 rounded transition-all focus:outline-none"
           >
@@ -131,6 +134,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           return (
             <button
               key={iso}
+              type="button"
               onClick={() => canSelect && onChange(date)}
               disabled={!canSelect}
               className={`relative min-h-[72px] p-2 flex flex-col items-center justify-start rounded-lg border transition-all duration-200 ${cellStyle} ${cursorStyle}`}
