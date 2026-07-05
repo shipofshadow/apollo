@@ -6,7 +6,8 @@ import PageSEO from '../components/PageSEO';
 import CustomCalendar from '../components/CustomCalendar';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../config';
-import { deleteInquiryApi } from '../services/api';
+import { deleteInquiryApi, fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi } from '../services/api';
+import type { ShopDayHours } from '../types';
 
 // FontAwesome Icons
 import { 
@@ -129,6 +130,49 @@ const formatTimeForInput = (date: Date | null) => {
   return `${hours}:${minutes}`;
 };
 
+function slotToHour(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  let hour = parseInt(timePart.split(':')[0], 10);
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour;
+}
+
+function slotToMinutes(slot: string): number {
+  const [timePart, ampm] = slot.split(' ');
+  const [hourRaw, minuteRaw] = timePart.split(':').map(Number);
+  let hour = hourRaw;
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + (minuteRaw || 0);
+}
+
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
+  const openDays = shopHours.length
+    ? new Set(shopHours.filter((hour) => hour.isOpen).map((hour) => hour.dayOfWeek))
+    : new Set([1, 2, 3, 4, 5, 6]);
+
+  const dates: Date[] = [];
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+
+  while (dates.length < 14) {
+    const iso = formatDateYMD(cursor);
+    if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) {
+      dates.push(new Date(cursor));
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+}
+
 interface CalendarPageProps {
   isAdminPage?: boolean;
 }
@@ -141,7 +185,14 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const [slotAvailability, setSlotAvailability] = useState<string[]>([]);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  const [slotCapacity, setSlotCapacity] = useState(3);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [shopHours, setShopHours] = useState<ShopDayHours[]>([]);
+  const [shopHoursLoaded, setShopHoursLoaded] = useState(false);
+  const [closedDatesSet, setClosedDatesSet] = useState<Set<string>>(new Set());
+  const [shopDayIsOpen, setShopDayIsOpen] = useState(true);
+  const [closureReason, setClosureReason] = useState<string | null>(null);
+  const [shopCloseTime, setShopCloseTime] = useState('18:00');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -180,7 +231,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
         const mapped = normalized.map((event) => ({
           ...event,
           title: `${event.year ? event.year + ' ' : ''}${event.make} ${event.model} @ ${event.appointmentTime}`,
-          orderLabel: event.productToPurchase || 'Service order',
+          orderLabel: event.productToPurchase || 'Appointment request',
         }));
 
         setEvents(mapped);
@@ -199,13 +250,19 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
     loadEvents();
   }, []);
 
-  const availableDates = useMemo(() => {
+  const eventAvailableDates = useMemo(() => {
     const unique = Array.from(new Set(events.map((event) => event.appointmentDate)));
     unique.sort();
     return unique.map((date) => new Date(date));
   }, [events]);
 
-  const closedDatesSet = useMemo(() => new Set<string>(), []);
+  const availableDates = useMemo(() => {
+    if (isAdminPage) {
+      return eventAvailableDates;
+    }
+
+    return buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
+  }, [isAdminPage, eventAvailableDates, shopHoursLoaded, shopHours, closedDatesSet]);
 
   const eventSlotCounts = useMemo(() => {
     return events.reduce<Record<string, number>>((acc, event) => {
@@ -233,6 +290,22 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   );
 
   useEffect(() => {
+    if (!BACKEND_URL) {
+      setShopHoursLoaded(true);
+      return;
+    }
+
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
+      .then(([{ hours }, closedDatesData]) => {
+        setShopHours(hours);
+        const dates = (closedDatesData as { closedDates: { date: string }[] }).closedDates ?? [];
+        setClosedDatesSet(new Set(dates.map((date) => date.date)));
+      })
+      .catch(() => {})
+      .finally(() => setShopHoursLoaded(true));
+  }, []);
+
+  useEffect(() => {
     if (isAdminPage || !selectedDate || !BACKEND_URL) {
       setAvailabilityLoading(false);
       return;
@@ -245,17 +318,21 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
       setSlotAvailability([]);
       setBookedSlots([]);
       setSlotCounts({});
+      setSlotCapacity(3);
+      setShopDayIsOpen(true);
+      setClosureReason(null);
+      setShopCloseTime('18:00');
 
       try {
-        const response = await fetch(`${BACKEND_URL}/api/inquiries/availability?date=${formatDateYMD(selectedDate)}`);
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || 'Unable to load time slots.');
-        }
+        const response = await fetchInquiryAvailabilityApi(formatDateYMD(selectedDate));
         if (!isMounted) return;
-        setSlotAvailability((data.availableSlots ?? []) as string[]);
-        setBookedSlots((data.bookedSlots ?? []) as string[]);
-        setSlotCounts((data.slotCounts ?? {}) as Record<string, number>);
+        setSlotAvailability(response.availableSlots ?? []);
+        setBookedSlots(response.bookedSlots ?? []);
+        setSlotCounts(response.slotCounts ?? {});
+        setSlotCapacity(response.slotCapacity ?? 3);
+        setShopDayIsOpen(response.isOpen);
+        setClosureReason(response.closureReason ?? null);
+        setShopCloseTime(response.closeTime);
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : 'Unable to load time slots.');
@@ -274,6 +351,17 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   }, [isAdminPage, selectedDate]);
 
   const canManage = hasPermission('bookings:manage') && (isAdminPage ? (user?.role === 'admin' || user?.role === 'owner') : true);
+
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
+  const [closeHour] = shopCloseTime.split(':').map(Number);
+  const visibleSlots = slotAvailability.filter((time) => {
+    const slotTimeMinutes = slotToMinutes(time);
+    return !bookedSlots.includes(time)
+      && slotToHour(time) + 4 <= closeHour
+      && (!isTodaySelected || slotTimeMinutes > nowMinutes);
+  });
 
   const startReschedule = (event: CalendarEvent) => {
     const parsedDate = event.appointmentDate ? new Date(`${event.appointmentDate}T00:00:00`) : null;
@@ -388,12 +476,12 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
           <div>
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight text-white flex items-center gap-3">
               <FaCalendarAlt className="text-brand-orange text-3xl" />
-              {isAdminPage ? 'Order Calendar' : 'Schedule Calendar'}
+              {isAdminPage ? 'Availability Calendar' : 'Availability Calendar'}
             </h1>
             <p className="text-sm text-gray-400 mt-2 font-medium">
               {isAdminPage
-                ? 'Manage incoming orders and reschedule appointments from the admin dashboard.'
-                : 'Browse available appointment dates on the public calendar.'}
+                ? 'Manage available appointment slots and reschedule bookings from the admin dashboard.'
+                : 'Browse open appointment dates and times on the public schedule.'}
             </p>
           </div>
         </div>
@@ -458,7 +546,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between pb-2 border-b border-gray-800">
                   <h2 className="text-2xl font-black text-white tracking-tight">
-                    {selectedDate ? formatHumanDate(selectedDate) : 'Appointments'}
+                    {selectedDate ? formatHumanDate(selectedDate) : 'Scheduled Slots'}
                   </h2>
                   <span className="text-sm font-bold px-4 py-1.5 bg-gray-800 rounded-lg text-gray-300 shadow-sm border border-gray-700">
                     {eventsForSelectedDate.length} {eventsForSelectedDate.length === 1 ? 'Slot' : 'Slots'}
@@ -533,8 +621,8 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                             <div className="mt-3 rounded-2xl border border-gray-700/60 bg-gray-950/70 p-3">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                  <p className="text-sm font-semibold text-white">Manage this order</p>
-                                  <p className="text-xs text-gray-400">Adjust the date or remove it from the calendar.</p>
+                                  <p className="text-sm font-semibold text-white">Manage this appointment</p>
+                                  <p className="text-xs text-gray-400">Adjust the date or remove the slot from the calendar.</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   <button
@@ -590,9 +678,9 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
           <div className="rounded-3xl border border-gray-700/50 bg-gray-800/40 p-6 shadow-xl">
             <div className="mx-auto max-w-5xl">
               <div className="mb-6 text-center">
-                <p className="text-sm font-bold uppercase tracking-widest text-brand-orange">Public booking calendar</p>
-                <h2 className="mt-2 text-2xl font-black text-white">Choose a date and time for your appointment</h2>
-                <p className="mt-2 text-sm text-gray-400">Select a day from the calendar and reserve a slot that is still open.</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-brand-orange">Public schedule calendar</p>
+                <h2 className="mt-2 text-2xl font-black text-white">Choose an open date and time</h2>
+                <p className="mt-2 text-sm text-gray-400">Select a day from the calendar and choose an available time slot.</p>
               </div>
               {loading ? (
                 <div className="animate-pulse h-80 bg-gray-800 rounded-2xl"></div>
@@ -610,7 +698,8 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                       availableDates={availableDates}
                       closedDatesSet={closedDatesSet}
                       slotCounts={slotCounts}
-                      showAvailabilityIndicators={false}
+                      slotCapacity={slotCapacity}
+                      showAvailabilityIndicators
                       allowAnyDate
                     />
                   </div>
@@ -631,16 +720,29 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                           </div>
                         ) : (
                           <>
-                            <div className="mb-4 text-sm text-gray-400">
-                              {slotAvailability.length === 0 ? 'No schedule is available for this day.' : 'Scroll to browse available times.'}
-                            </div>
+                            {!availabilityLoading && !shopDayIsOpen && (
+                              <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-3 text-sm text-amber-300">
+                                {closureReason
+                                  ? `Currently not accepting appointments – ${closureReason}.`
+                                  : 'Currently not accepting appointments for this date.'}
+                              </div>
+                            )}
+
+                            {!availabilityLoading && shopDayIsOpen && (
+                              <div className="mb-4 text-sm text-gray-400">
+                                {visibleSlots.length === 0
+                                  ? 'No available slots for this date.'
+                                  : 'Choose one of the open time slots below.'}
+                              </div>
+                            )}
                             
-                            {/* ADDED: Vertical scrollable grid for time slots instead of horizontal overflow */}
                             <div className="max-h-[400px] overflow-y-auto pr-2 pb-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
                               <div className="grid grid-cols-2 gap-3">
-                                {slotAvailability.map((time) => {
+                                {visibleSlots.map((time) => {
                                   const isTaken = bookedSlots.includes(time);
                                   const isSelected = selectedTime === time;
+                                  const takenCount = slotCounts[time] ?? 0;
+                                  const spotsLeft = Math.max(slotCapacity - takenCount, 0);
                                   return (
                                     <button
                                       key={time}
@@ -657,7 +759,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                                     >
                                       <div className="text-sm font-semibold whitespace-nowrap">{time}</div>
                                       <div className="mt-1 text-[11px] uppercase tracking-widest whitespace-nowrap opacity-80">
-                                        {isTaken ? 'Taken' : `${slotCounts[time] ?? 0} order${(slotCounts[time] ?? 0) === 1 ? '' : 's'}`}
+                                        {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} left` : 'Booked'}
                                       </div>
                                     </button>
                                   );
@@ -674,7 +776,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                               disabled={!selectedTime}
                               className="mt-5 w-full rounded-xl bg-brand-orange px-4 py-3 text-sm font-black uppercase tracking-[0.25em] text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
                             >
-                              Continue to order
+                              Continue to booking request
                             </button>
                           </>
                         )}
