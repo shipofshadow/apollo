@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ChevronLeft, ChevronRight, Calendar, Loader2, CalendarX, Clock } from 'lucide-react';
+import { format } from 'date-fns';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllBookingsAsync } from '../../store/bookingSlice';
 import {
@@ -103,13 +104,7 @@ const parseDateOnly = (value?: string | null): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-function slotToHour(slot: string): number {
-  const [timePart, ampm] = slot.split(' ');
-  let hour = parseInt(timePart.split(':')[0], 10);
-  if (ampm === 'PM' && hour !== 12) hour += 12;
-  if (ampm === 'AM' && hour === 12) hour = 0;
-  return hour;
-}
+
 
 function slotToMinutes(slot: string): number {
   const [timePart, ampm] = slot.split(' ');
@@ -121,10 +116,27 @@ function slotToMinutes(slot: string): number {
 }
 
 function slotCompletionLabel(slot: string, totalHours: number): string {
-  const end = slotToHour(slot) + totalHours;
-  if (end > 12) return `~${end - 12}:00 PM`;
-  if (end === 12) return '~12:00 PM';
-  return `~${end}:00 AM`;
+  const start = slotToMinutes(slot);
+  const endRaw = start + totalHours * 60;
+  if (endRaw >= 24 * 60) {
+    return '11:59 PM';
+  }
+  const h = Math.floor(endRaw / 60) % 24;
+  const m = endRaw % 60;
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return format(d, 'h:mm aa');
+}
+
+function formatCloseTimeString(closeTime: string): string {
+  if (!closeTime) return '';
+  if (closeTime === '00:00' || closeTime === '24:00') return '11:59 PM';
+  const [hStr, mStr] = closeTime.split(':');
+  const h = Number(hStr);
+  const m = Number(mStr || '0');
+  const d = new Date();
+  d.setHours(h === 24 ? 0 : h, m, 0, 0);
+  return format(d, 'h:mm aa');
 }
 
 function isSameLocalDay(a: Date, b: Date): boolean {
@@ -795,20 +807,29 @@ export default function CalendarPanel({ onView }: Props) {
                         )}
 
                         {!availabilityLoading && editDayIsOpen && (() => {
-                          const [closeHour] = editCloseTime.split(':').map(Number);
+                          // compute openMinutes (fallback 6:00) and next-day close handling
+                          let openMinutes = 6 * 60;
+
+                          const [closeHStr, closeMStr] = editCloseTime.split(':');
+                          const closeHNum = Number(closeHStr || '0');
+                          const closeMNum = Number(closeMStr || '0');
+                          let closeMinutes = (closeHNum % 24) * 60 + closeMNum;
+                          if (closeMinutes <= openMinutes) closeMinutes += 24 * 60;
+
                           const now = new Date();
                           const nowMinutes = now.getHours() * 60 + now.getMinutes();
                           const isTodaySelected = !!editDateObj && isSameLocalDay(editDateObj, now);
                           const visibleSlots = availableSlots.filter((time) => {
-                            const slotTimeMinutes = slotToMinutes(time);
-                            return slotToHour(time) + 4 <= closeHour && (!isTodaySelected || slotTimeMinutes > nowMinutes);
+                            let slotTimeMinutes = slotToMinutes(time);
+                            if (slotTimeMinutes < openMinutes) slotTimeMinutes += 24 * 60;
+                            return slotTimeMinutes <= closeMinutes && (!isTodaySelected || slotTimeMinutes > nowMinutes);
                           });
 
                           return (
                             <>
                               <p className="border-b border-gray-800 pb-3 text-xs text-gray-500">
                                 {editDayIsOpen
-                                  ? `We are currently accepting appointments until ${editCloseTime}.`
+                                  ? `We are currently accepting appointments from 6:00 AM to ${formatCloseTimeString(editCloseTime)}.`
                                   : 'We are currently not accepting appointments for this date.'}
                               </p>
                               <div className="grid grid-cols-2 gap-2">
@@ -828,6 +849,7 @@ export default function CalendarPanel({ onView }: Props) {
                                   const takenCount = slotCounts[slot] ?? 0;
                                   const spotsLeft = (slotCapacity ?? 2) - takenCount;
                                   const almostFull = spotsLeft === 1;
+                                  const displayTime = (slot === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : slot;
 
                                   return (
                                     <button
@@ -840,7 +862,7 @@ export default function CalendarPanel({ onView }: Props) {
                                           : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
                                       }`}
                                     >
-                                      <span className="text-sm font-bold tracking-wide">{slot}</span>
+                                      <span className="text-sm font-bold tracking-wide">{displayTime}</span>
                                       <span className={`mt-1 text-[10px] ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
                                         done by {completion}
                                       </span>

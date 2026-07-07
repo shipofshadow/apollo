@@ -27,6 +27,7 @@ import PageSEO from '../components/PageSEO';
 import SignaturePad from '../components/SignaturePad';
 import { formatPrice } from '../utils/formatPrice';
 import TurnstileWidget from '../components/TurnstileWidget';
+import { format } from 'date-fns';
 
 // ── Constants & Helpers ───────────────────────────────────────────────────────
 
@@ -37,12 +38,36 @@ const STEPS = [
   { label: 'Confirmed',   desc: 'All done!' },
 ];
 
-function slotToHour(slot: string): number {
-  const [timePart, ampm] = slot.split(' ');
-  let h = parseInt(timePart.split(':')[0], 10);
-  if (ampm === 'PM' && h !== 12) h += 12;
-  if (ampm === 'AM' && h === 12) h = 0;
-  return h;
+
+
+function formatCloseTimeString(closeTime: string, openMinutes?: number): string {
+  if (!closeTime) return '';
+  // parse raw close minutes
+  const [hStr, mStr] = closeTime.split(':');
+  const h = Number(hStr || '0');
+  const m = Number(mStr || '0');
+  const closeRaw = (h % 24) * 60 + m;
+
+  // If no openMinutes provided, keep legacy behavior: treat 00:00 as 11:59 PM
+  if (openMinutes === undefined) {
+    if (closeRaw === 0) return '11:59 PM';
+    const d = new Date();
+    d.setHours(h === 24 ? 0 : h, m, 0, 0);
+    return format(d, 'h:mm aa');
+  }
+
+  // If close is less-or-equal than open, it's next-day close.
+  if (closeRaw <= openMinutes) {
+    // show as 12:00 AM (next day) when exactly midnight, otherwise format next-day time
+    if (closeRaw === 0) return '12:00 AM (next day)';
+    const d = new Date();
+    d.setHours(h === 24 ? 0 : h, m, 0, 0);
+    return `${format(d, 'h:mm aa')} (next day)`;
+  }
+
+  const d = new Date();
+  d.setHours(h === 24 ? 0 : h, m, 0, 0);
+  return format(d, 'h:mm aa');
 }
 
 function parseDurationMax(duration: string): number {
@@ -52,10 +77,16 @@ function parseDurationMax(duration: string): number {
 }
 
 function slotCompletionLabel(slot: string, totalHours: number): string {
-  const end = slotToHour(slot) + totalHours;
-  if (end > 12) return `~${end - 12}:00 PM`;
-  if (end === 12) return `~12:00 PM`;
-  return `~${end}:00 AM`;
+  const start = slotToMinutes(slot);
+  const endRaw = start + totalHours * 60;
+  if (endRaw >= 24 * 60) {
+    return '11:59 PM';
+  }
+  const h = Math.floor(endRaw / 60) % 24;
+  const m = endRaw % 60;
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return format(d, 'h:mm aa');
 }
 
 function formatDateYMD(date: Date): string {
@@ -677,20 +708,41 @@ export default function BookingPage() {
                           )}
 
                           {!availabilityLoading && shopDayIsOpen && (() => {
-                            const [closeH] = shopCloseTime.split(':').map(Number);
+                            // determine shop open minutes for the selectedDate (fallback to 6:00 AM)
+                            let openMinutes = 6 * 60;
+                            if (selectedDate && shopHours.length) {
+                              const day = shopHours.find(h => h.dayOfWeek === selectedDate.getDay());
+                              if (day?.openTime && day.isOpen) {
+                                const [oh, om] = day.openTime.split(':').map(Number);
+                                openMinutes = (oh % 24) * 60 + (om || 0);
+                              }
+                            }
+
+                            // parse close minutes and treat as next-day when <= openMinutes
+                            const [closeHStr, closeMStr] = shopCloseTime.split(':');
+                            const closeHNum = Number(closeHStr || '0');
+                            const closeMNum = Number(closeMStr || '0');
+                            let closeMinutes = (closeHNum % 24) * 60 + closeMNum;
+                            if (closeMinutes <= openMinutes) closeMinutes += 24 * 60;
+
                             const now = new Date();
                             const nowMinutes = now.getHours() * 60 + now.getMinutes();
                             const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
-                            const visibleSlots = availableSlots.filter(time =>
-                              !bookedSlots.includes(time)
-                              && slotToHour(time) + totalMaxHours <= closeH
-                              && (!isTodaySelected || slotToMinutes(time) > nowMinutes)
-                            );
+                            const visibleSlots = availableSlots.filter(time => {
+                              if (bookedSlots.includes(time)) return false;
+                              let slotStart = slotToMinutes(time);
+                              // if slot is before open, it's probably after midnight -> shift to next day
+                              if (slotStart < openMinutes) slotStart += 24 * 60;
+                              const slotEnd = slotStart + (totalMaxHours * 60);
+                              if (slotEnd > closeMinutes) return false;
+                              if (isTodaySelected && slotStart <= nowMinutes) return false;
+                              return true;
+                            });
                             return (
                               <>
                                 <p className="text-xs text-gray-500 mb-4 pb-4 border-b border-gray-800">
                                   {shopDayIsOpen
-                                    ? `We are currently accepting appointments until ${shopCloseTime}.`
+                                    ? `We are currently accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`
                                     : 'We are currently not accepting appointments for this date.'}
                                 </p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -747,7 +799,8 @@ export default function BookingPage() {
                                     const takenCount  = slotCounts[time] ?? 0;
                                     const spotsLeft   = slotCapacity - takenCount;
                                     const almostFull  = spotsLeft === 1;
-                                    
+                                    const displayTime = (time === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : time;
+
                                     return (
                                       <button
                                         key={time}
@@ -759,7 +812,7 @@ export default function BookingPage() {
                                             : 'bg-black/20 border-gray-700 text-gray-300 hover:border-brand-orange/70 hover:text-white hover:bg-black/40'
                                         }`}
                                       >
-                                        <span className="text-sm font-bold tracking-wide">{time}</span>
+                                        <span className="text-sm font-bold tracking-wide">{displayTime}</span>
                                         <span className={`text-[10px] mt-1 ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
                                           done by {completion}
                                         </span>

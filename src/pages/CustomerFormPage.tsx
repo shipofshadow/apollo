@@ -49,6 +49,28 @@ function isSameLocalDay(a: Date, b: Date): boolean {
     && a.getDate() === b.getDate();
 }
 
+function formatCloseTimeString(closeTime: string, openMinutes?: number): string {
+  if (!closeTime) return '';
+  const [hStr, mStr] = closeTime.split(':');
+  const h = Number(hStr || '0');
+  const m = Number(mStr || '0');
+  const closeRaw = (h % 24) * 60 + m;
+  if (openMinutes === undefined) {
+    if (closeRaw === 0) return '11:59 PM';
+    const d = new Date();
+    d.setHours(h === 24 ? 0 : h, m, 0, 0);
+    return format(d, 'h:mm aa');
+  }
+  if (closeRaw <= openMinutes) {
+    if (closeRaw === 0) return '12:00 AM (next day)';
+    const d = new Date();
+    d.setHours(h === 24 ? 0 : h, m, 0, 0);
+    return `${format(d, 'h:mm aa')} (next day)`;
+  }
+  const d = new Date();
+  d.setHours(h === 24 ? 0 : h, m, 0, 0);
+  return format(d, 'h:mm aa');
+}
 function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter((hour) => hour.isOpen).map((hour) => hour.dayOfWeek))
@@ -436,19 +458,39 @@ export default function CustomerFormPage() {
                           )}
 
                           {!availabilityLoading && shopDayIsOpen && (() => {
+                            // determine shop open minutes for the selectedDate (fallback to 6:00 AM)
+                            let openMinutes = 6 * 60;
+                            if (selectedDate && shopHours.length) {
+                              const day = shopHours.find(h => h.dayOfWeek === selectedDate.getDay());
+                              if (day?.openTime && day.isOpen) {
+                                const [oh, om] = day.openTime.split(':').map(Number);
+                                openMinutes = (oh % 24) * 60 + (om || 0);
+                              }
+                            }
+
+                            const [closeHStr, closeMStr] = shopCloseTime.split(':');
+                            const closeHNum = Number(closeHStr || '0');
+                            const closeMNum = Number(closeMStr || '0');
+                            let closeMinutes = (closeHNum % 24) * 60 + closeMNum;
+                            if (closeMinutes <= openMinutes) closeMinutes += 24 * 60;
+
                             const now = new Date();
                             const nowMinutes = now.getHours() * 60 + now.getMinutes();
                             const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
-                            const visibleSlots = availableSlots.filter((time) =>
-                              !bookedSlots.includes(time)
-                              && (!isTodaySelected || slotToMinutes(time) > nowMinutes)
-                            );
+                            const visibleSlots = availableSlots.filter((time) => {
+                              if (bookedSlots.includes(time)) return false;
+                              let slotStart = slotToMinutes(time);
+                              if (slotStart < openMinutes) slotStart += 24 * 60;
+                              if (slotStart > closeMinutes) return false;
+                              if (isTodaySelected && slotStart <= nowMinutes) return false;
+                              return true;
+                            });
 
                             return (
                               <>
                                 <p className="mb-4 border-b border-gray-800 pb-4 text-xs text-gray-500">
                                   {shopDayIsOpen
-                                    ? `We are currently accepting appointments until ${shopCloseTime}.`
+                                    ? `We are currently accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`
                                     : 'We are currently not accepting appointments for this date.'}
                                 </p>
                                 <div className="grid grid-cols-2 gap-3">
@@ -503,6 +545,7 @@ export default function CustomerFormPage() {
                                     const takenCount = slotCounts[time] ?? 0;
                                     const spotsLeft = slotCapacity - takenCount;
                                     const almostFull = spotsLeft === 1;
+                                    const displayTime = (time === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : time;
 
                                     return (
                                       <button
@@ -515,7 +558,7 @@ export default function CustomerFormPage() {
                                             : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
                                         }`}
                                       >
-                                        <span className="text-sm font-bold tracking-wide">{time}</span>
+                                        <span className="text-sm font-bold tracking-wide">{displayTime}</span>
                                         {spotsLeft > 0 && (
                                           <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
                                             {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}

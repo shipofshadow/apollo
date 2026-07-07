@@ -356,12 +356,17 @@ class ShopHoursService
         $stepMinutes  = $dayHours['slotIntervalH'] * 60;
 
         $slots = [];
-        for ($m = $openMinutes; $m < $closeMinutes; $m += $stepMinutes) {
+       for ($m = $openMinutes; $m < $closeMinutes; $m += $stepMinutes) {
             $h    = intdiv($m, 60);
             $min  = $m % 60;
             $ampm = $h < 12 ? 'AM' : 'PM';
             $h12  = $h === 0 ? 12 : ($h > 12 ? $h - 12 : $h);
+
             $slots[] = sprintf('%02d:%02d %s', $h12, $min, $ampm);
+        }
+
+        if ($dayHours['closeTime'] === '23:59') {
+            $slots[] = '12:00 AM';
         }
 
         return $slots;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -130,12 +131,17 @@ const formatTimeForInput = (date: Date | null) => {
   return `${hours}:${minutes}`;
 };
 
-function slotToHour(slot: string): number {
-  const [timePart, ampm] = slot.split(' ');
-  let hour = parseInt(timePart.split(':')[0], 10);
-  if (ampm === 'PM' && hour !== 12) hour += 12;
-  if (ampm === 'AM' && hour === 12) hour = 0;
-  return hour;
+// removed unused slotToHour helper (was causing unused-variable errors)
+
+function formatCloseTimeString(closeTime: string): string {
+  if (!closeTime) return '';
+  if (closeTime === '00:00' || closeTime === '24:00') return '11:59 PM';
+  const [hStr, mStr] = closeTime.split(':');
+  const h = Number(hStr);
+  const m = Number(mStr || '0');
+  const d = new Date();
+  d.setHours(h === 24 ? 0 : h, m, 0, 0);
+  return format(d, 'h:mm aa');
 }
 
 function slotToMinutes(slot: string): number {
@@ -355,13 +361,27 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
-  const [closeHour] = shopCloseTime.split(':').map(Number);
-  const visibleSlots = slotAvailability.filter((time) => {
-    const slotTimeMinutes = slotToMinutes(time);
-    return !bookedSlots.includes(time)
-      && slotToHour(time) + 4 <= closeHour
-      && (!isTodaySelected || slotTimeMinutes > nowMinutes);
-  });
+    // compute open and close minutes for the selectedDate (fallback open 6:00)
+    let openMinutes = 6 * 60;
+    if (selectedDate && shopHours.length) {
+      const day = shopHours.find(h => h.dayOfWeek === selectedDate.getDay());
+      if (day?.openTime && day.isOpen) {
+        const [oh, om] = day.openTime.split(':').map(Number);
+        openMinutes = (oh % 24) * 60 + (om || 0);
+      }
+    }
+
+    const [closeHStr, closeMStr] = shopCloseTime.split(':');
+    const closeHNum = Number(closeHStr || '0');
+    const closeMNum = Number(closeMStr || '0');
+    let closeMinutes = (closeHNum % 24) * 60 + closeMNum;
+    if (closeMinutes <= openMinutes) closeMinutes += 24 * 60;
+
+    const visibleSlots = slotAvailability.filter((time) => {
+      let slotTimeMinutes = slotToMinutes(time);
+      if (slotTimeMinutes < openMinutes) slotTimeMinutes += 24 * 60;
+      return !bookedSlots.includes(time) && slotTimeMinutes <= closeMinutes && (!isTodaySelected || slotTimeMinutes > nowMinutes);
+    });
 
   const startReschedule = (event: CalendarEvent) => {
     const parsedDate = event.appointmentDate ? new Date(`${event.appointmentDate}T00:00:00`) : null;
@@ -729,11 +749,16 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                             )}
 
                             {!availabilityLoading && shopDayIsOpen && (
-                              <div className="mb-4 text-sm text-gray-400">
-                                {visibleSlots.length === 0
-                                  ? 'No available slots for this date.'
-                                  : 'Choose one of the open time slots below.'}
-                              </div>
+                              <>
+                                <p className="mb-4 text-sm text-gray-400">
+                                  {`We are currently accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`}
+                                </p>
+                                <div className="mb-2 text-sm text-gray-400">
+                                  {visibleSlots.length === 0
+                                    ? 'No available slots for this date.'
+                                    : 'Choose one of the open time slots below.'}
+                                </div>
+                              </>
                             )}
                             
                             <div className="max-h-[400px] overflow-y-auto pr-2 pb-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
@@ -743,6 +768,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                                   const isSelected = selectedTime === time;
                                   const takenCount = slotCounts[time] ?? 0;
                                   const spotsLeft = Math.max(slotCapacity - takenCount, 0);
+                                  const displayTime = (time === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : time;
                                   return (
                                     <button
                                       key={time}
@@ -757,7 +783,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                                             : 'border-gray-700 bg-gray-800/70 text-gray-200 hover:border-brand-orange/50 hover:bg-gray-800'
                                       }`}
                                     >
-                                      <div className="text-sm font-semibold whitespace-nowrap">{time}</div>
+                                      <div className="text-sm font-semibold whitespace-nowrap">{displayTime}</div>
                                       <div className="mt-1 text-[11px] uppercase tracking-widest whitespace-nowrap opacity-80">
                                         {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} left` : 'Booked'}
                                       </div>
