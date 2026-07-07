@@ -541,37 +541,42 @@ export default function CustomerFormPage() {
                                     </p>
                                   )}
                                   {visibleSlots.length > 0 && (
-                                    <div className="mt-2 max-h-72 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 [&::-webkit-scrollbar-thumb]:shadow-[0_0_10px_rgba(249,115,22,0.3)] hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
-                                      <div className="grid grid-cols-3 gap-3">
-                                        {visibleSlots.map((time) => {
-                                          const isSelected = selectedTime === time;
-                                          const takenCount = slotCounts[time] ?? 0;
-                                          const spotsLeft = slotCapacity - takenCount;
-                                          const almostFull = spotsLeft === 1;
-                                          const displayTime = time;
-
-                                          return (
-                                            <button
-                                              key={time}
-                                              type="button"
-                                              onClick={() => handleTimeSelect(time)}
-                                              className={`flex min-h-[84px] w-full flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200 focus:outline-none ${
-                                                isSelected
-                                                  ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
-                                                  : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
-                                              }`}
-                                            >
-                                              <span className="text-sm font-bold tracking-wide">{displayTime}</span>
-                                              {spotsLeft > 0 && (
-                                                <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
-                                                  {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
-                                                </span>
-                                              )}
-                                            </button>
-                                          );
-                                        })}
+                                    <>
+                                      <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-800 bg-gray-950/70 px-3 py-2 text-xs text-gray-400 sm:hidden">
+                                        <span className="font-semibold text-brand-orange">Scroll</span> to see more appointment times.
                                       </div>
-                                    </div>
+                                      <div className="mt-2 max-h-72 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 [&::-webkit-scrollbar-thumb]:shadow-[0_0_10px_rgba(249,115,22,0.3)] hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
+                                        <div className="grid grid-cols-3 gap-3">
+                                          {visibleSlots.map((time) => {
+                                            const isSelected = selectedTime === time;
+                                            const takenCount = slotCounts[time] ?? 0;
+                                            const spotsLeft = slotCapacity - takenCount;
+                                            const almostFull = spotsLeft === 1;
+                                            const displayTime = time;
+
+                                            return (
+                                              <button
+                                                key={time}
+                                                type="button"
+                                                onClick={() => handleTimeSelect(time)}
+                                                className={`flex min-h-[84px] w-full flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200 focus:outline-none ${
+                                                  isSelected
+                                                    ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
+                                                    : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
+                                                }`}
+                                              >
+                                                <span className="text-sm font-bold tracking-wide">{displayTime}</span>
+                                                {spotsLeft > 0 && (
+                                                  <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
+                                                    {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
+                                                  </span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </>
                                   )}
                                 </div>
                               </>

@@ -760,6 +760,9 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                               </>
                             )}
                             
+                            <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-950/70 px-3 py-2 text-xs text-gray-400 sm:hidden">
+                              <span className="font-semibold text-brand-orange">Scroll</span> to see more time slots.
+                            </div>
                             <div className="mt-2 flex-1 overflow-y-auto pb-2 pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 [&::-webkit-scrollbar-thumb]:shadow-[0_0_10px_rgba(249,115,22,0.3)] hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
                               <div className="grid grid-cols-3 gap-3">
                                 {visibleSlots.map((time) => {
