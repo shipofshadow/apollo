@@ -34,14 +34,6 @@ function formatDateYMD(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function slotToHour(slot: string): number {
-  const [timePart, ampm] = slot.split(' ');
-  let hour = parseInt(timePart.split(':')[0], 10);
-  if (ampm === 'PM' && hour !== 12) hour += 12;
-  if (ampm === 'AM' && hour === 12) hour = 0;
-  return hour;
-}
-
 function slotToMinutes(slot: string): number {
   const [timePart, ampm] = slot.split(' ');
   const [hourRaw, minuteRaw] = timePart.split(':').map(Number);
@@ -49,13 +41,6 @@ function slotToMinutes(slot: string): number {
   if (ampm === 'PM' && hour !== 12) hour += 12;
   if (ampm === 'AM' && hour === 12) hour = 0;
   return hour * 60 + (minuteRaw || 0);
-}
-
-function slotCompletionLabel(slot: string, totalHours: number): string {
-  const end = slotToHour(slot) + totalHours;
-  if (end > 12) return `~${end - 12}:00 PM`;
-  if (end === 12) return '~12:00 PM';
-  return `~${end}:00 AM`;
 }
 
 function isSameLocalDay(a: Date, b: Date): boolean {
@@ -116,7 +101,6 @@ export default function CustomerFormPage() {
   const [waitlistJoined, setWaitlistJoined] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
-  const totalMaxHours = 4;
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -452,13 +436,11 @@ export default function CustomerFormPage() {
                           )}
 
                           {!availabilityLoading && shopDayIsOpen && (() => {
-                            const [closeHour] = shopCloseTime.split(':').map(Number);
                             const now = new Date();
                             const nowMinutes = now.getHours() * 60 + now.getMinutes();
                             const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
                             const visibleSlots = availableSlots.filter((time) =>
                               !bookedSlots.includes(time)
-                              && slotToHour(time) + totalMaxHours <= closeHour
                               && (!isTodaySelected || slotToMinutes(time) > nowMinutes)
                             );
 
@@ -518,7 +500,6 @@ export default function CustomerFormPage() {
                                   )}
                                   {visibleSlots.map((time) => {
                                     const isSelected = selectedTime === time;
-                                    const completion = slotCompletionLabel(time, totalMaxHours);
                                     const takenCount = slotCounts[time] ?? 0;
                                     const spotsLeft = slotCapacity - takenCount;
                                     const almostFull = spotsLeft === 1;
@@ -535,9 +516,6 @@ export default function CustomerFormPage() {
                                         }`}
                                       >
                                         <span className="text-sm font-bold tracking-wide">{time}</span>
-                                        <span className={`mt-1 text-[10px] ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                                          done by {completion}
-                                        </span>
                                         {spotsLeft > 0 && (
                                           <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
                                             {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
