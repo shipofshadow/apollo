@@ -135,7 +135,6 @@ const formatTimeForInput = (date: Date | null) => {
 
 function formatCloseTimeString(closeTime: string): string {
   if (!closeTime) return '';
-  if (closeTime === '00:00' || closeTime === '24:00') return '11:59 PM';
   const [hStr, mStr] = closeTime.split(':');
   const h = Number(hStr);
   const m = Number(mStr || '0');
@@ -707,8 +706,8 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
               ) : error ? (
                 <p className="text-sm text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20">{error}</p>
               ) : (
-                <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-                  <div className="mx-auto w-full max-w-2xl">
+                <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-stretch">
+                  <div className="mx-auto w-full max-w-2xl self-stretch">
                     <CustomCalendar
                       value={selectedDate}
                       onChange={(date) => {
@@ -724,7 +723,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                     />
                   </div>
 
-                  <div className="rounded-2xl border border-gray-700/60 bg-gray-900/70 p-5">
+                  <div className="flex h-full flex-col rounded-2xl border border-gray-700/60 bg-gray-900/70 p-5 lg:min-h-[34rem]">
                     {selectedDate ? (
                       <>
                         <div className="mb-4">
@@ -761,21 +760,21 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
                               </>
                             )}
                             
-                            <div className="max-h-[400px] overflow-y-auto pr-2 pb-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700 hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
-                              <div className="grid grid-cols-2 gap-3">
+                            <div className="mt-2 flex-1 overflow-y-auto pb-2 pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 [&::-webkit-scrollbar-thumb]:shadow-[0_0_10px_rgba(249,115,22,0.3)] hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
+                              <div className="grid grid-cols-3 gap-3">
                                 {visibleSlots.map((time) => {
                                   const isTaken = bookedSlots.includes(time);
                                   const isSelected = selectedTime === time;
                                   const takenCount = slotCounts[time] ?? 0;
                                   const spotsLeft = Math.max(slotCapacity - takenCount, 0);
-                                  const displayTime = (time === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : time;
+                                  const displayTime = time;
                                   return (
                                     <button
                                       key={time}
                                       type="button"
                                       disabled={isTaken}
                                       onClick={() => setSelectedTime(time)}
-                                      className={`rounded-xl border px-3 py-3 text-left transition ${
+                                      className={`min-h-[84px] w-full rounded-xl border px-3 py-3 text-left transition ${
                                         isTaken
                                           ? 'cursor-not-allowed border-red-500/20 bg-red-500/10 text-red-400/50'
                                           : isSelected

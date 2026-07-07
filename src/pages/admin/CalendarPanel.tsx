@@ -119,7 +119,9 @@ function slotCompletionLabel(slot: string, totalHours: number): string {
   const start = slotToMinutes(slot);
   const endRaw = start + totalHours * 60;
   if (endRaw >= 24 * 60) {
-    return '11:59 PM';
+    const d = new Date();
+    d.setHours(23, 59, 0, 0);
+    return format(d, 'h:mm aa');
   }
   const h = Math.floor(endRaw / 60) % 24;
   const m = endRaw % 60;
@@ -130,7 +132,6 @@ function slotCompletionLabel(slot: string, totalHours: number): string {
 
 function formatCloseTimeString(closeTime: string): string {
   if (!closeTime) return '';
-  if (closeTime === '00:00' || closeTime === '24:00') return '11:59 PM';
   const [hStr, mStr] = closeTime.split(':');
   const h = Number(hStr);
   const m = Number(mStr || '0');
@@ -849,7 +850,7 @@ export default function CalendarPanel({ onView }: Props) {
                                   const takenCount = slotCounts[slot] ?? 0;
                                   const spotsLeft = (slotCapacity ?? 2) - takenCount;
                                   const almostFull = spotsLeft === 1;
-                                  const displayTime = (slot === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : slot;
+                                  const displayTime = slot;
 
                                   return (
                                     <button

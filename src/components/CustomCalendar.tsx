@@ -56,7 +56,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 w-full max-w-md md:max-w-xl mx-auto shadow-[0_8px_30px_rgb(0,0,0,0.8)] text-zinc-200 font-sans tracking-wide">
+    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 w-full h-full shadow-[0_8px_30px_rgb(0,0,0,0.8)] text-zinc-200 font-sans tracking-wide">
       
       {/* Header Controls */}
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-800/80">

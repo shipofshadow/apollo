@@ -42,31 +42,23 @@ const STEPS = [
 
 function formatCloseTimeString(closeTime: string, openMinutes?: number): string {
   if (!closeTime) return '';
-  // parse raw close minutes
   const [hStr, mStr] = closeTime.split(':');
   const h = Number(hStr || '0');
   const m = Number(mStr || '0');
   const closeRaw = (h % 24) * 60 + m;
 
-  // If no openMinutes provided, keep legacy behavior: treat 00:00 as 11:59 PM
+  const d = new Date();
+  d.setHours(h === 24 ? 0 : h, m, 0, 0);
+
   if (openMinutes === undefined) {
-    if (closeRaw === 0) return '11:59 PM';
-    const d = new Date();
-    d.setHours(h === 24 ? 0 : h, m, 0, 0);
     return format(d, 'h:mm aa');
   }
 
-  // If close is less-or-equal than open, it's next-day close.
   if (closeRaw <= openMinutes) {
-    // show as 12:00 AM (next day) when exactly midnight, otherwise format next-day time
     if (closeRaw === 0) return '12:00 AM (next day)';
-    const d = new Date();
-    d.setHours(h === 24 ? 0 : h, m, 0, 0);
     return `${format(d, 'h:mm aa')} (next day)`;
   }
 
-  const d = new Date();
-  d.setHours(h === 24 ? 0 : h, m, 0, 0);
   return format(d, 'h:mm aa');
 }
 
@@ -79,9 +71,6 @@ function parseDurationMax(duration: string): number {
 function slotCompletionLabel(slot: string, totalHours: number): string {
   const start = slotToMinutes(slot);
   const endRaw = start + totalHours * 60;
-  if (endRaw >= 24 * 60) {
-    return '11:59 PM';
-  }
   const h = Math.floor(endRaw / 60) % 24;
   const m = endRaw % 60;
   const d = new Date();
@@ -657,22 +646,25 @@ export default function BookingPage() {
               <p className="text-sm text-gray-400 mb-8">Select a day from the calendar, then pick an available time slot.</p>
               
               {/* 2-Column Layout on Desktop */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 lg:items-stretch">
                 
                 {/* Left Col: Calendar */}
-                <div className="lg:col-span-7">
-                  <div className="bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm">
+                <div className="lg:col-span-7 self-stretch">
+                  <div className="h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm">
                     <p className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest text-brand-orange mb-6">
                       <CalendarIcon className="w-4 h-4" /> Available Dates
                     </p>
-                    <CustomCalendar
+                    <div className="flex-1">
+                      <CustomCalendar
                       value={selectedDate}
                       onChange={handleDateSelect}
                       availableDates={availableDates}
                       closedDatesSet={closedDatesSet}
                       slotCounts={slotCounts}
                       slotCapacity={slotCapacity}
-                    />
+                      />
+                    </div>
+                    
                   </div>
                 </div>
 
@@ -745,16 +737,14 @@ export default function BookingPage() {
                                     ? `We are currently accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`
                                     : 'We are currently not accepting appointments for this date.'}
                                 </p>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <div className="w-full">
                                   {visibleSlots.length === 0 && !isTodaySelected && (
-                                    <div className="col-span-full py-6 text-center bg-brand-orange/5 border border-brand-orange/10 rounded-sm space-y-3 px-4">
-                                      <p className="text-sm text-brand-orange/80">
-                                        No available slots for this date.
-                                      </p>
+                                    <div className="space-y-3 rounded-sm border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center">
+                                      <p className="text-sm text-brand-orange/80">No available slots for this date.</p>
                                       {(() => {
                                         const slotKey = `${selectedDate ? selectedDate.toISOString().slice(0,10) : ''}|all`;
                                         if (waitlistJoined === slotKey) {
-                                          return <p className="text-xs text-green-400 font-semibold">✓ You're on the waitlist! We'll notify you if a slot opens.</p>;
+                                          return <p className="text-xs font-semibold text-green-400">✓ You're on the waitlist! We'll notify you if a slot opens.</p>;
                                         }
                                         return (
                                           <button
@@ -779,7 +769,7 @@ export default function BookingPage() {
                                                 setWaitlistJoining(false);
                                               }
                                             }}
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-orange text-white text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
+                                            className="inline-flex items-center gap-2 rounded-sm bg-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
                                           >
                                             <Bell className="w-3.5 h-3.5" />
                                             {waitlistJoining ? 'Joining…' : 'Join Waitlist'}
@@ -789,41 +779,47 @@ export default function BookingPage() {
                                     </div>
                                   )}
                                   {visibleSlots.length === 0 && isTodaySelected && (
-                                    <p className="col-span-full text-sm text-brand-orange/80 py-6 text-center bg-brand-orange/5 border border-brand-orange/10 rounded-sm">
+                                    <p className="rounded-sm border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center text-sm text-brand-orange/80">
                                       No available slots left for today.
                                     </p>
                                   )}
-                                  {visibleSlots.map(time => {
-                                    const isSelected  = selectedTime === time;
-                                    const completion  = slotCompletionLabel(time, totalMaxHours);
-                                    const takenCount  = slotCounts[time] ?? 0;
-                                    const spotsLeft   = slotCapacity - takenCount;
-                                    const almostFull  = spotsLeft === 1;
-                                    const displayTime = (time === '12:00 AM' && typeof closeMinutes !== 'undefined' && closeMinutes > 1439) ? '11:59 PM' : time;
+                                  {visibleSlots.length > 0 && (
+                                    <div className="mt-2 max-h-72 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 [&::-webkit-scrollbar-thumb]:shadow-[0_0_10px_rgba(249,115,22,0.3)] hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
+                                      <div className="grid grid-cols-3 gap-3">
+                                        {visibleSlots.map(time => {
+                                          const isSelected  = selectedTime === time;
+                                          const completion  = slotCompletionLabel(time, totalMaxHours);
+                                          const takenCount  = slotCounts[time] ?? 0;
+                                          const spotsLeft   = slotCapacity - takenCount;
+                                          const almostFull  = spotsLeft === 1;
+                                          const displayTime = time;
 
-                                    return (
-                                      <button
-                                        key={time}
-                                        type="button"
-                                        onClick={() => setSelectedTime(time)}
-                                        className={`flex flex-col items-center justify-center p-3 rounded-sm border transition-all duration-200 focus:outline-none ${
-                                            isSelected
-                                            ? 'bg-brand-orange border-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
-                                            : 'bg-black/20 border-gray-700 text-gray-300 hover:border-brand-orange/70 hover:text-white hover:bg-black/40'
-                                        }`}
-                                      >
-                                        <span className="text-sm font-bold tracking-wide">{displayTime}</span>
-                                        <span className={`text-[10px] mt-1 ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                                          done by {completion}
-                                        </span>
-                                        {spotsLeft > 0 && (
-                                          <span className={`text-[10px] font-semibold mt-1 ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
-                                            {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
-                                          </span>
-                                        )}
-                                      </button>
-                                    );
-                                  })}
+                                          return (
+                                            <button
+                                              key={time}
+                                              type="button"
+                                              onClick={() => setSelectedTime(time)}
+                                              className={`flex min-h-[84px] w-full flex-col items-center justify-center rounded-sm border p-3 text-center transition-all duration-200 focus:outline-none ${
+                                                  isSelected
+                                                  ? 'bg-brand-orange border-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
+                                                  : 'bg-black/20 border-gray-700 text-gray-300 hover:border-brand-orange/70 hover:text-white hover:bg-black/40'
+                                              }`}
+                                            >
+                                              <span className="text-sm font-bold tracking-wide">{displayTime}</span>
+                                              <span className={`mt-1 text-[10px] ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                                                done by {completion}
+                                              </span>
+                                              {spotsLeft > 0 && (
+                                                <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
+                                                  {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
+                                                </span>
+                                              )}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </>
                             );

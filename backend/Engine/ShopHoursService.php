@@ -351,22 +351,28 @@ class ShopHoursService
         [$openH,  $openM]  = array_map('intval', explode(':', $dayHours['openTime']));
         [$closeH, $closeM] = array_map('intval', explode(':', $dayHours['closeTime']));
 
-        $openMinutes  = $openH  * 60 + $openM;
-        $closeMinutes = $closeH * 60 + $closeM;
-        $stepMinutes  = $dayHours['slotIntervalH'] * 60;
+       $openMinutes  = $openH * 60 + $openM;
+       $closeMinutes = $closeH * 60 + $closeM;
 
-        $slots = [];
-       for ($m = $openMinutes; $m < $closeMinutes; $m += $stepMinutes) {
-            $h    = intdiv($m, 60);
-            $min  = $m % 60;
-            $ampm = $h < 12 ? 'AM' : 'PM';
-            $h12  = $h === 0 ? 12 : ($h > 12 ? $h - 12 : $h);
-
-            $slots[] = sprintf('%02d:%02d %s', $h12, $min, $ampm);
+        // Midnight means the end of the business day (24:00)
+        if ($closeMinutes === 0) {
+            $closeMinutes = 24 * 60;
         }
 
-        if ($dayHours['closeTime'] === '23:59') {
-            $slots[] = '12:00 AM';
+        $stepMinutes = $dayHours['slotIntervalH'] * 60;
+
+       $slots = [];
+
+        for ($m = $openMinutes; $m <= $closeMinutes; $m += $stepMinutes) {
+            $display = $m % (24 * 60);
+
+            $h = intdiv($display, 60);
+            $min = $display % 60;
+
+            $ampm = $h < 12 ? 'AM' : 'PM';
+            $h12 = $h === 0 ? 12 : ($h > 12 ? $h - 12 : $h);
+
+            $slots[] = sprintf('%02d:%02d %s', $h12, $min, $ampm);
         }
 
         return $slots;
