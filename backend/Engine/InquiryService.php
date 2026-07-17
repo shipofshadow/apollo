@@ -34,6 +34,7 @@ class InquiryService
             'contactNumber' => $normalized['contactNumber'],
             'emailAddress' => $normalized['emailAddress'],
             'facebookName' => $normalized['facebookName'],
+            'plateNumber' => $normalized['plateNumber'],
             'make' => $normalized['make'],
             'model' => $normalized['model'],
             'yearModel' => $normalized['yearModel'],
@@ -295,6 +296,7 @@ class InquiryService
             'contactNumber' => $getValue($data, ['contactNumber', 'contact_number', 'Contact Number']),
             'emailAddress' => $getValue($data, ['emailAddress', 'email_address', 'Email address', 'Email Address']),
             'facebookName' => $getValue($data, ['facebookName', 'facebook_name', 'Facebook Name']),
+            'plateNumber' => $getValue($data, ['plateNumber', 'plate_number', 'Plate Number']),
             'make' => $getValue($data, ['make', 'Car Make']),
             'model' => $getValue($data, ['model', 'Car Model']),
             'yearModel' => $getValue($data, ['yearModel', 'year_model', 'Year Model']),
@@ -342,11 +344,11 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO customer_inquiries (
-                id, full_name, address, contact_number, email_address, facebook_name,
+                id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, created_at, updated_at
             ) VALUES (
-                :id, :full_name, :address, :contact_number, :email_address, :facebook_name,
+                :id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
                 :make, :model, :year_model, :product_to_purchase, :appointment_date,
                 :appointment_time, :status, :created_at, :updated_at
             )'
@@ -363,6 +365,7 @@ class InquiryService
             ':model' => (string) $inquiry['model'],
             ':year_model' => (string) $inquiry['yearModel'],
             ':product_to_purchase' => (string) $inquiry['productToPurchase'],
+            ':plate_number' => (string) ($inquiry['plateNumber'] ?? ''),
             ':appointment_date' => (string) $inquiry['appointmentDate'],
             ':appointment_time' => (string) $inquiry['appointmentTime'],
             ':status' => (string) $inquiry['status'],
@@ -378,10 +381,10 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->query(
-            'SELECT id, full_name, address, contact_number, email_address, facebook_name,
+                'SELECT id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, created_at
-             FROM customer_inquiries
+                 FROM customer_inquiries
              ORDER BY appointment_date ASC, appointment_time ASC, created_at DESC'
         );
 
@@ -415,6 +418,10 @@ class InquiryService
             $fields[] = 'appointment_time = :appointment_time';
             $params[':appointment_time'] = $appointmentTime;
         }
+        // allow updating plate number as part of details update
+        if (array_key_exists(':plate_number', $params) || array_key_exists('plateNumber', $params)) {
+            // noop here; update route will need to pass plateNumber explicitly when needed
+        }
 
         $stmt = $db->prepare(
             'UPDATE customer_inquiries
@@ -446,9 +453,9 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            'SELECT id, full_name, address, contact_number, email_address, facebook_name,
-                    make, model, year_model, product_to_purchase, appointment_date,
-                    appointment_time, status, created_at
+            'SELECT id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                make, model, year_model, product_to_purchase, appointment_date,
+                appointment_time, status, created_at
              FROM customer_inquiries
              WHERE id = :id
              LIMIT 1'
@@ -471,6 +478,7 @@ class InquiryService
             'contactNumber' => (string) ($row['contact_number'] ?? ''),
             'emailAddress' => (string) ($row['email_address'] ?? ''),
             'facebookName' => (string) ($row['facebook_name'] ?? ''),
+            'plateNumber' => (string) ($row['plate_number'] ?? ''),
             'make' => (string) ($row['make'] ?? ''),
             'model' => (string) ($row['model'] ?? ''),
             'yearModel' => (string) ($row['year_model'] ?? ''),

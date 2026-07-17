@@ -78,6 +78,7 @@ class NotificationService
         $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
         $rawAddress = str_replace(["\r", "\n"], '', (string) ($inquiry['address'] ?? ''));
         $rawFacebook = str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? ''));
+        $rawPlate = str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? ''));
 
         $name = htmlspecialchars($rawName);
         $email = htmlspecialchars($rawEmail);
@@ -98,6 +99,7 @@ class NotificationService
             'model' => $model !== '' ? $model : '—',
             'year' => $year !== '' ? $year : '—',
             'address' => $address !== '' ? $address : '—',
+            'plate' => $rawPlate !== '' ? htmlspecialchars($rawPlate) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
         ]);
 

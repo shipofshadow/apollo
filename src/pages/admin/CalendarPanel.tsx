@@ -648,6 +648,9 @@ export default function CalendarPanel({ onView }: Props) {
                         <div className="rounded-2xl border border-gray-800 bg-brand-dark p-2.5">
                           <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500">Product</p>
                           <p className="mt-2 text-sm font-bold text-white">{event.productToPurchase || 'Service inquiry'}</p>
+                          {event.plateNumber && (
+                            <p className="text-xs text-gray-400 mt-1">Plate: {event.plateNumber}</p>
+                          )}
                         </div>
                       )}
                       {event.eventType === 'booking' && (
@@ -692,6 +695,9 @@ export default function CalendarPanel({ onView }: Props) {
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Vehicle</p>
                 <p className="mt-1 text-sm font-bold text-white">{viewingEvent.make} {viewingEvent.model}{viewingEvent.year ? ` ${viewingEvent.year}` : ''}</p>
                 <p className="text-xs text-gray-400 mt-1">{viewingEvent.productToPurchase || 'Service inquiry'}</p>
+                {viewingEvent.plateNumber && (
+                  <p className="text-xs text-gray-400 mt-1">Plate: {viewingEvent.plateNumber}</p>
+                )}
               </div>
               <div className="rounded-lg border border-gray-800 bg-gray-900/80 p-3 flex flex-col justify-center">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Status</p>

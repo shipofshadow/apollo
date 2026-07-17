@@ -21,6 +21,7 @@ import {
   FaClock, 
   FaWrench, 
   FaPaperPlane,
+  FaIdBadge,
   FaBell
 } from 'react-icons/fa';
 import { Loader2 } from 'lucide-react';
@@ -94,6 +95,7 @@ const INITIAL_FORM_STATE = {
   make: '',
   model: '',
   yearModel: '',
+  plateNumber: '',
   appointmentDate: '', // Will store as YYYY-MM-DD
   appointmentTime: '', // Will store as h:mm aa (e.g. 2:30 PM)
   productToPurchase: ''
@@ -227,6 +229,7 @@ export default function CustomerFormPage() {
           'Contact Number': formData.contactNumber,
           'Email address': formData.emailAddress,
           'Facebook Name': formData.facebookName,
+          'Plate Number': formData.plateNumber,
           'Car Make': formData.make,
           'Car Model': formData.model,
           'Year Model': formData.yearModel,
@@ -266,7 +269,7 @@ export default function CustomerFormPage() {
   return (
     <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <PageSEO
-        title="Inquiry Form | 1625 Autolab"
+        title="1625 Autolab Schedule Request | 1625 Autolab"
         description="Fill out this form to order products or schedule a service with 1625 Autolab."
       />
 
@@ -340,7 +343,17 @@ export default function CustomerFormPage() {
                     placeholder="juan@example.com"
                   />
                 </div>
-
+                <div className="space-y-1.5">
+                  <label htmlFor="plateNumber" className="flex items-center gap-2 text-sm font-bold text-gray-400">
+                    <FaIdBadge /> Plate Number
+                  </label>
+                  <input
+                    type="text" id="plateNumber" name="plateNumber"
+                    value={formData.plateNumber} onChange={handleChange}
+                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
+                    placeholder="ABC-1234"
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <label htmlFor="facebookName" className="flex items-center gap-2 text-sm font-bold text-gray-400">
                     <FaFacebook /> Facebook Profile *

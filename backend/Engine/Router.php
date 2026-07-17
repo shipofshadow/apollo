@@ -1229,6 +1229,7 @@ class Router
             'contactNumber' => (string) ($inquiry['contactNumber'] ?? ''),
             'emailAddress' => (string) ($inquiry['emailAddress'] ?? ''),
             'facebookName' => (string) ($inquiry['facebookName'] ?? ''),
+            'plateNumber' => (string) ($inquiry['plateNumber'] ?? ''),
             'appointmentDate' => (string) ($inquiry['appointmentDate'] ?? ''),
             'appointmentTime' => (string) ($inquiry['appointmentTime'] ?? ''),
             'make' => (string) ($inquiry['make'] ?? ''),
