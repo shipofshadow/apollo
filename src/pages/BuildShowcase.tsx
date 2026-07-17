@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchBuildShowcaseApi } from '../services/api';
+import PageSEO from '../components/PageSEO';
 import type { PortfolioItem } from '../types';
 
 interface BuildUpdate {
@@ -129,6 +130,11 @@ export default function BuildShowcase() {
 
   return (
     <div className="min-h-screen bg-[#0f0f10] text-white">
+      <PageSEO
+        title={build.title || 'Build Showcase'}
+        description={build.description || 'View this automotive build showcase on 1625 Autolab.'}
+        image={leadImage || undefined}
+      />
 
       {/* ── Lightbox ── */}
       {lightbox && (

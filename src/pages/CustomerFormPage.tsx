@@ -269,9 +269,10 @@ export default function CustomerFormPage() {
   return (
     <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <PageSEO
-        title="1625 Autolab Schedule Request | 1625 Autolab"
+        title="1625 Autolab Schedule Request"
         description="Fill out this form to order products or schedule a service with 1625 Autolab."
-        image="https://cdn.1625autolab.com/1625autolab/logos/39d95275-6d4a-4661-a6f2-6a6063efcd53.jfif"
+        image="https://cdn.1625autolab.com/1625autolab/logos/order.png"
+        appendSiteName={true}
       />
 
       <div className="max-w-6xl mx-auto">

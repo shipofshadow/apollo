@@ -6,6 +6,7 @@ import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import { SkeletonCard } from '../components/Skeleton';
 import { formatPrice } from '../utils/formatPrice';
+import PageSEO from '../components/PageSEO';
 
 export default function Products() {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,6 +38,10 @@ export default function Products() {
 
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-darker relative overflow-hidden">
+      <PageSEO
+        title="Products"
+        description="Browse our collection of high-quality automotive components and kits tested and approved by 1625 Autolab."
+      />
       <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 bg-brand-orange/10 blur-3xl" />
       <div className="pointer-events-none absolute top-[28rem] -left-24 w-72 h-72 bg-white/[0.04] blur-3xl" />
       <div className="container mx-auto px-4 md:px-6">

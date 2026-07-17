@@ -489,7 +489,7 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
 
   return (
     <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8 font-sans text-gray-200">
-      <PageSEO title="Calendar | 1625 Autolab" description="View scheduled inquiry appointments in a calendar layout." />
+      <PageSEO title="Calendar" description="View scheduled inquiry appointments in a calendar layout." />
 
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-800 pb-5">

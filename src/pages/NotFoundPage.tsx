@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Home, ArrowLeft, Wrench, ShoppingBag, Mail } from 'lucide-react';
+import PageSEO from '../components/PageSEO';
 
 export default function NotFoundPage() {
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 text-center">
+      <PageSEO
+        title="Page Not Found"
+        description="The page you're looking for doesn't exist. Return to 1625 Autolab home."
+        appendSiteName={true}
+      />
       <div className="mb-6 inline-flex items-center justify-center w-20 h-20 bg-brand-dark border border-gray-800 rounded-sm">
         <AlertTriangle className="w-10 h-10 text-brand-orange" />
       </div>
