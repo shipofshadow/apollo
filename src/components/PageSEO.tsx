@@ -14,6 +14,12 @@ interface PageSEOProps {
   type?: 'website' | 'article';
   /** When false the title is used as-is; when true (default) " | 1625 Autolab" is appended. */
   appendSiteName?: boolean;
+  /** Optional JSON-LD schema markup to be injected for rich results. */
+  schemaMarkup?: Record<string, unknown> | null;
+  /** Override the canonical URL for this page. */
+  canonicalUrl?: string;
+  /** Override the default robots policy for this page. */
+  robots?: string;
 }
 
 /**
@@ -28,11 +34,14 @@ export default function PageSEO({
   keywords = 'automotive retrofitting, projector headlights, HID conversion, LED conversion, car customization, 1625 Autolab',
   type = 'website',
   appendSiteName = true,
+  schemaMarkup = null,
+  canonicalUrl,
+  robots = 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1',
 }: PageSEOProps) {
   const { pathname } = useLocation();
 
   const fullTitle = appendSiteName ? `${title} | ${SITE_NAME}` : title;
-  const canonicalUrl = `${SITE_URL}${pathname}`;
+  const resolvedCanonicalUrl = canonicalUrl ?? `${SITE_URL}${pathname === '/' ? '' : pathname}`;
 
   return (
     <Helmet>
@@ -40,14 +49,16 @@ export default function PageSEO({
       <meta name="description" content={description} />
       <meta name="keywords" content={keywords} />
       <meta name="theme-color" content={THEME_COLOR} />
+      <meta name="robots" content={robots} />
       
       {/* Open Graph */}
       <meta property="og:type" content={type} />
-      <meta property="og:url" content={canonicalUrl} />
+      <meta property="og:url" content={resolvedCanonicalUrl} />
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={image} />
+      <meta property="og:image:alt" content={fullTitle} />
       <meta property="og:locale" content="en_PH" />
       
       {/* Twitter Card */}
@@ -57,7 +68,13 @@ export default function PageSEO({
       <meta name="twitter:image" content={image} />
       
       {/* Canonical */}
-      <link rel="canonical" href={canonicalUrl} />
+      <link rel="canonical" href={resolvedCanonicalUrl} />
+
+      {schemaMarkup && (
+        <script type="application/ld+json">
+          {JSON.stringify(schemaMarkup)}
+        </script>
+      )}
     </Helmet>
   );
 }

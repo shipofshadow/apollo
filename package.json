@@ -35,7 +35,8 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.13.1",
     "react-turnstile": "^1.1.5",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "vite-plugin-sitemap": "^0.8.2"
   },
   "optionalDependencies": {
     "react-select": "^5.8.0"
