@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Provider } from 'react-redux';
+import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { store } from './store';
 import { AuthProvider } from './context/AuthContext';
@@ -160,16 +161,18 @@ function AppInner() {
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <Router>
-        <ToastProvider>
-          <AuthProvider>
-            <ScrollToTop />
-            <ToastContainer />
-            <AppInner />
-          </AuthProvider>
-        </ToastProvider>
-      </Router>
-    </Provider>
+    <HelmetProvider>
+      <Provider store={store}>
+        <Router>
+          <ToastProvider>
+            <AuthProvider>
+              <ScrollToTop />
+              <ToastContainer />
+              <AppInner />
+            </AuthProvider>
+          </ToastProvider>
+        </Router>
+      </Provider>
+    </HelmetProvider>
   );
 }

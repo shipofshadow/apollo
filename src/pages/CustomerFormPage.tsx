@@ -271,6 +271,7 @@ export default function CustomerFormPage() {
       <PageSEO
         title="1625 Autolab Schedule Request | 1625 Autolab"
         description="Fill out this form to order products or schedule a service with 1625 Autolab."
+        image="https://cdn.1625autolab.com/1625autolab/logos/39d95275-6d4a-4661-a6f2-6a6063efcd53.jfif"
       />
 
       <div className="max-w-6xl mx-auto">

@@ -37,6 +37,7 @@ interface InquiryEvent {
   contactNumber?: string;
   emailAddress?: string;
   facebookName?: string;
+  plateNumber?: string;
 }
 
 interface CalendarEvent extends InquiryEvent {

@@ -51,6 +51,7 @@ interface InquiryEvent {
   contactNumber?: string;
   emailAddress?: string;
   facebookName?: string;
+  plateNumber?: string;
 }
 
 type CalendarEventItem = (Booking & { eventType: 'booking' }) | (InquiryEvent & { eventType: 'inquiry' });
