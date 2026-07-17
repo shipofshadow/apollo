@@ -42,8 +42,9 @@ export const ROUTE_SEO: Record<string, RouteSEO> = {
     description: 'Get in touch with 1625 Autolab for bookings, inquiries, and consultations.',
   },
   '/order': {
-    title: 'Order Inquiry | 1625 Autolab',
+    title: '1625 Autolab Schedule Request | 1625 Autolab',
     description: 'Submit an order inquiry for retrofitting, lighting upgrades, and custom automotive work.',
+    image: 'https://cdn.1625autolab.com/1625autolab/logos/order.png'
   },
   '/calendar': {
     title: 'Calendar | 1625 Autolab',
