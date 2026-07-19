@@ -221,7 +221,7 @@ export default function CustomerFormPage() {
     try {
       // 1. Fire Google Sheets Webhook (Isolated so a failure here doesn't block the DB)
       try {
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbzhS1M8GX-4A-N6oEDR0ZVIkBARF2krKoDthjC1o54cHHPJUBs1YGSW0ZZLEp1LuzRh/exec';
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbw4NEjTuEpdTxsZ5DrYuw0L4x7r91ToXcfeQoYbF2mmoUPjrhQsfMaPEL3rKaF4WfUP_A/exec';
         const googleData = new URLSearchParams({
           'Timestamp': new Date().toLocaleString(),
           'Full Name': formData.fullName,
