@@ -1,7 +1,7 @@
 <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;padding:24px;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:12px">
   <div style="margin-bottom:20px">
-    <h2 style="margin:0 0 8px 0;color:#fff;font-size:24px">New Customer Inquiry</h2>
-    <p style="margin:0;color:#9ca3af">A customer submitted a new inquiry through the order form.</p>
+    <h2 style="margin:0 0 8px 0;color:#fff;font-size:24px">New Customer Order</h2>
+    <p style="margin:0;color:#9ca3af">A customer submitted a new order through the order form.</p>
   </div>
 
   <div style="background:#1f2937;border:1px solid #374151;border-radius:10px;padding:16px 18px;margin-bottom:16px">
@@ -9,7 +9,6 @@
     <p style="margin:4px 0;color:#f9fafb"><strong>Name:</strong> {{ name }}</p>
     <p style="margin:4px 0;color:#f9fafb"><strong>Email:</strong> {{ email }}</p>
     <p style="margin:4px 0;color:#f9fafb"><strong>Phone:</strong> {{ phone }}</p>
-    <p style="margin:4px 0;color:#f9fafb"><strong>Plate Number:</strong> {{ plate }}</p>
     <p style="margin:4px 0;color:#f9fafb"><strong>Address:</strong> {{ address }}</p>
     <p style="margin:4px 0;color:#f9fafb"><strong>Facebook:</strong> {{ facebook }}</p>
   </div>
@@ -19,6 +18,13 @@
     <p style="margin:4px 0;color:#f9fafb"><strong>Make:</strong> {{ make }}</p>
     <p style="margin:4px 0;color:#f9fafb"><strong>Model:</strong> {{ model }}</p>
     <p style="margin:4px 0;color:#f9fafb"><strong>Year:</strong> {{ year }}</p>
+    <p style="margin:4px 0;color:#f9fafb"><strong>Plate Number:</strong> {{ plate }}</p>
+  </div>
+
+  <div style="background:#1f2937;border:1px solid #374151;border-radius:10px;padding:16px 18px;margin-bottom:16px">
+    <p style="margin:0 0 8px 0;color:#f97316;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Schedule Details</p>
+    <p style="margin:4px 0;color:#f9fafb"><strong>Date:</strong> {{ booking_date }}</p>
+    <p style="margin:4px 0;color:#f9fafb"><strong>Time:</strong> {{ booking_time }}</p>
   </div>
 
   <div style="background:#1f2937;border:1px solid #374151;border-radius:10px;padding:16px 18px">

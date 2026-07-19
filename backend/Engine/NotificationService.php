@@ -80,6 +80,10 @@ class NotificationService
         $rawFacebook = str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? ''));
         $rawPlate = str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? ''));
 
+        $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
+        $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+
+
         $name = htmlspecialchars($rawName);
         $email = htmlspecialchars($rawEmail);
         $phone = htmlspecialchars($rawPhone);
@@ -89,6 +93,9 @@ class NotificationService
         $year = htmlspecialchars($rawYear);
         $address = htmlspecialchars($rawAddress);
         $facebook = htmlspecialchars($rawFacebook);
+        $appointmentDate = htmlspecialchars($rawAppointmentDate !== '' ? $this->formatAppointmentDate($rawAppointmentDate) : '—');
+        $appointmentTime = htmlspecialchars($rawAppointmentTime !== '' ? $rawAppointmentTime : '—');
+
 
         $body = $this->render('customer-inquiry-admin', [
             'name' => $name,
@@ -101,6 +108,9 @@ class NotificationService
             'address' => $address !== '' ? $address : '—',
             'plate' => $rawPlate !== '' ? htmlspecialchars($rawPlate) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
+            'booking_date' => $appointmentDate,
+            'booking_time' => $appointmentTime,
+
         ]);
 
         $this->sendToRecipients($recipients, 'New Customer Inquiry | 1625 Autolab', $body, 'Admin');
@@ -130,6 +140,7 @@ class NotificationService
         $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
         $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
         $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        $rawPlate = str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? ''));
 
         $name = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
         $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : '—');
@@ -147,6 +158,7 @@ class NotificationService
             'year' => $year,
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
+            'plate' => $rawPlate !== '' ? htmlspecialchars($rawPlate) : '—',
         ]);
 
         $subject = 'Thanks for your inquiry | 1625 Autolab';
