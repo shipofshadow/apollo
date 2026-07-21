@@ -25,7 +25,6 @@ import OffersPanel          from './admin/OffersPanel';
 import BeforeAfterPanel     from './admin/BeforeAfterPanel';
 import ReviewsPanel         from './admin/ReviewsPanel';
 import CalendarPanel        from './admin/CalendarPanel';
-import OrderCalendarPage     from './CalendarPage';
 import ManageUsersPanel     from './admin/ManageUsersPanel';
 import ManageClientsPanel   from './admin/ManageClientsPanel';
 import ManageRolesPanel     from './admin/ManageRolesPanel';
@@ -44,7 +43,6 @@ const TAB_PATHS: Record<string, string> = {
   analytics: '/admin/dashboard',
   appointments: '/admin/bookings',
   calendar: '/admin/calendar',
-  'order-calendar': '/admin/order-calendar',
   reviews: '/admin/reviews',
   'chatbot-conversations': '/chatbot/conversations',
   'chatbot-flow': '/chatbot/flow-editor',
@@ -161,9 +159,7 @@ export default function AdminPage() {
       return hasPermission('products:manage');
     }
 
-    if (key === 'order-calendar') {
-      return isAdmin;
-    }
+ 
 
     if (key === 'marketing-campaigns') {
       return hasPermission('settings:manage');
@@ -204,7 +200,6 @@ export default function AdminPage() {
     { key: 'analytics',    label: 'Analytics',  icon: BarChart3 },
     { key: 'appointments', label: 'Bookings',   icon: Calendar },
     { key: 'calendar',     label: 'Calendar',   icon: CalendarDays },
-    { key: 'order-calendar', label: 'Order Calendar', icon: CalendarDays },
     { key: 'reviews',      label: 'Reviews',    icon: Star },
     {
       isGroup: true, key: 'chatbot', label: 'Chatbot', icon: MessageSquare,
@@ -277,7 +272,6 @@ export default function AdminPage() {
       case 'before-after':  return <BeforeAfterPanel />;
       case 'content':       return <ContentPanel />;
       case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.appointments); }} />;
-      case 'order-calendar': return <OrderCalendarPage isAdminPage />;
       case 'reviews':       return <ReviewsPanel />;
       case 'chatbot-conversations': return <ConversationsPage />;
       case 'chatbot-flow':  return <FlowEditorPage />;
