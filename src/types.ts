@@ -864,6 +864,7 @@ export interface NotificationPreferences {
   inappSecurityAlert: boolean;
   inappSlotAvailable: boolean;
   smsNewBooking:      boolean;
+  smsNewInquiry:      boolean;
   smsAssignment:      boolean;
   smsStatusChanged:   boolean;
 }

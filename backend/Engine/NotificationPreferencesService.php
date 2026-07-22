@@ -69,6 +69,7 @@ class NotificationPreferencesService
             'inapp_security_alert',
             'inapp_slot_available',
             'sms_new_booking',
+            'sms_new_inquiry',
             'sms_assignment',
             'sms_status_changed',
         ];
@@ -94,6 +95,7 @@ class NotificationPreferencesService
             'inappSecurityAlert' => 'inapp_security_alert',
             'inappSlotAvailable' => 'inapp_slot_available',
             'smsNewBooking' => 'sms_new_booking',
+            'smsNewInquiry' => 'sms_new_inquiry',
             'smsAssignment' => 'sms_assignment',
             'smsStatusChanged' => 'sms_status_changed',
         ];
@@ -156,7 +158,7 @@ class NotificationPreferencesService
             'inapp_new_order', 'inapp_order_created', 'inapp_order_status', 'inapp_order_tracking',
             'inapp_status_changed', 'inapp_build_update', 'inapp_parts_update',
             'inapp_new_booking', 'inapp_assignment', 'inapp_security_alert', 'inapp_slot_available',
-            'sms_new_booking', 'sms_assignment', 'sms_status_changed',
+            'sms_new_booking', 'sms_new_inquiry', 'sms_assignment', 'sms_status_changed',
         ];
         if (!in_array($col, $allowed, true)) {
             return true; // default on for unknown types
@@ -208,6 +210,7 @@ class NotificationPreferencesService
             'inappSecurityAlert' => (bool) ($row['inapp_security_alert'] ?? 1),
             'inappSlotAvailable' => (bool) ($row['inapp_slot_available'] ?? 1),
             'smsNewBooking'      => (bool) ($row['sms_new_booking']      ?? 1),
+            'smsNewInquiry'      => (bool) ($row['sms_new_inquiry']      ?? 1),
             'smsAssignment'      => (bool) ($row['sms_assignment']       ?? 1),
             'smsStatusChanged'   => (bool) ($row['sms_status_changed']   ?? 1),
         ];

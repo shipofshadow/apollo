@@ -104,29 +104,30 @@ public function customerInquiryAdmin(array $inquiry): void
 
     $vehicle = trim($make . ' ' . ($model === 'Other Model' ? $otherModel : $model));
 
-    $message = "🚨 NEW CUSTOMER INQUIRY\n\n"
-        . "👤 Customer\n"
+    $message = "NEW CUSTOMER INQUIRY\n\n"
+        . "Customer\n"
         . "Name: {$name}\n"
         . ($customerPhone !== '' ? "Phone: {$customerPhone}\n" : '')
         . ($email !== '' ? "Email: {$email}\n" : '')
         . ($facebook !== '' ? "Facebook: {$facebook}\n" : '')
         . ($address !== '' ? "Address: {$address}\n" : '')
-        . "\n🚗 Vehicle\n"
+        . "\nVehicle\n"
         . ($vehicle !== '' ? "Vehicle: {$vehicle}\n" : '')
         . ($year !== '' ? "Year: {$year}\n" : '')
         . ($plate !== '' ? "Plate: {$plate}\n" : '')
-        . "\n🔧 Inquiry\n"
+        . "\nInquiry\n"
         . ($product !== '' ? "Product/Service: {$product}\n" : '')
         . ($date !== '' ? "Preferred Date: {$date}\n" : '')
         . ($time !== '' ? "Preferred Time: {$time}\n" : '')
         . "\nPlease follow up with the customer.\n\n"
         . "- 1625 Autolab";
 
-
     foreach ($this->fetchAlertRecipients('new_inquiry') as $recipientPhone) {
         $this->send($recipientPhone, $message);
     }
-}    /**
+}
+
+    /**
      * Send a confirmation SMS to the customer who submitted an inquiry.
      *
      * @param array<string, mixed> $inquiry
@@ -354,11 +355,18 @@ public function customerInquiryAdmin(array $inquiry): void
      */
     private function send(string $to, string $body): void
     {
-        if (!$this->enabled) return;
+        if (!$this->enabled) {
+            return;
+        }
 
         try {
-            $client = new \GuzzleHttp\Client(['timeout' => 10]);
-            $client->post(self::API_URL, [
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 10,
+                'http_errors' => false,
+                'headers' => ['Accept' => 'application/json'],
+            ]);
+
+            $response = $client->post(self::API_URL, [
                 'form_params' => [
                     'apikey'     => $this->apiKey,
                     'number'     => $to,
@@ -366,6 +374,24 @@ public function customerInquiryAdmin(array $inquiry): void
                     'sendername' => $this->senderName,
                 ],
             ]);
+
+            $statusCode = $response->getStatusCode();
+            if ($statusCode < 200 || $statusCode >= 300) {
+                $responseBody = (string) $response->getBody();
+                $decoded = json_decode($responseBody, true);
+                $errorMessage = '';
+                if (is_array($decoded) && isset($decoded['message']) && is_string($decoded['message'])) {
+                    $errorMessage = trim($decoded['message']);
+                }
+                if ($errorMessage === '') {
+                    $errorMessage = trim($responseBody) !== '' ? $responseBody : 'Unknown Semaphore error';
+                }
+
+                error_log(
+                    '[SmsService] Semaphore SMS failed for ' . substr($to, 0, 4) . '****' .
+                    ' with status ' . $statusCode . ': ' . $errorMessage
+                );
+            }
         } catch (\Throwable $e) {
             error_log('[SmsService] Failed to send SMS to ' . substr($to, 0, 4) . '****' . ': ' . $e->getMessage());
         }
