@@ -79,31 +79,54 @@ class SmsService
         }
     }
 
-    /**
-     * Send a customer-inquiry alert SMS to admins/owners.
-     *
-     * @param array<string, mixed> $inquiry
-     */
-    public function customerInquiryAdmin(array $inquiry): void
-    {
-        $name = (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer');
-        $product = (string) ($inquiry['productToPurchase'] ?? '');
-        $make = (string) ($inquiry['make'] ?? '');
-        $model = (string) ($inquiry['model'] ?? '');
-        $otherModel = (string) ($inquiry['otherModel'] ?? '');
-        $vehicle = trim($make . ' ' . ($model === 'Other Model' ? $otherModel : $model));
-        $vehicle = trim($vehicle);
+/**
+ * Send a customer-inquiry alert SMS to admins/owners.
+ *
+ * @param array<string, mixed> $inquiry
+ */
+public function customerInquiryAdmin(array $inquiry): void
+{
+    $name = (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer');
+    $email = trim((string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? ''));
+    $customerPhone = $this->normalisePhone((string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
 
-        $message = 'New inquiry from ' . $name . ($product !== '' ? ' for ' . $product : '')
-            . ($vehicle !== '' ? ' (' . $vehicle . ')' : '')
-            . '. - 1625 Auto Lab';
+    $product = (string) ($inquiry['productToPurchase'] ?? '');
+    $make = (string) ($inquiry['make'] ?? '');
+    $model = (string) ($inquiry['model'] ?? '');
+    $otherModel = (string) ($inquiry['otherModel'] ?? '');
+    $year = trim((string) ($inquiry['yearModel'] ?? ''));
+    $plate = trim((string) ($inquiry['plateNumber'] ?? ''));
+    $address = trim((string) ($inquiry['address'] ?? ''));
+    $facebook = trim((string) ($inquiry['facebookName'] ?? ''));
 
-        foreach ($this->fetchAlertRecipients('new_inquiry') as $phone) {
-            $this->send($phone, $message);
-        }
+    $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
+    $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
+
+    $vehicle = trim($make . ' ' . ($model === 'Other Model' ? $otherModel : $model));
+
+    $message = "🚨 NEW CUSTOMER INQUIRY\n\n"
+        . "👤 Customer\n"
+        . "Name: {$name}\n"
+        . ($customerPhone !== '' ? "Phone: {$customerPhone}\n" : '')
+        . ($email !== '' ? "Email: {$email}\n" : '')
+        . ($facebook !== '' ? "Facebook: {$facebook}\n" : '')
+        . ($address !== '' ? "Address: {$address}\n" : '')
+        . "\n🚗 Vehicle\n"
+        . ($vehicle !== '' ? "Vehicle: {$vehicle}\n" : '')
+        . ($year !== '' ? "Year: {$year}\n" : '')
+        . ($plate !== '' ? "Plate: {$plate}\n" : '')
+        . "\n🔧 Inquiry\n"
+        . ($product !== '' ? "Product/Service: {$product}\n" : '')
+        . ($date !== '' ? "Preferred Date: {$date}\n" : '')
+        . ($time !== '' ? "Preferred Time: {$time}\n" : '')
+        . "\nPlease follow up with the customer.\n\n"
+        . "- 1625 Autolab";
+
+
+    foreach ($this->fetchAlertRecipients('new_inquiry') as $recipientPhone) {
+        $this->send($recipientPhone, $message);
     }
-
-    /**
+}    /**
      * Send a confirmation SMS to the customer who submitted an inquiry.
      *
      * @param array<string, mixed> $inquiry

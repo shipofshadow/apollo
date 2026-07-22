@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, Filter, Loader2, LockIcon, Trash2, UserPlus, Users } from 'lucide-react';
+import { Ban, CheckCircle2, Filter, Loader2, LockIcon, Pencil, Save, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -7,6 +7,7 @@ import {
   deleteAdminUserApi,
   fetchAdminRolesApi,
   fetchAdminUsersApi,
+  updateAdminUserInfoApi,
   updateAdminUserRoleApi,
   updateAdminUserStatusApi,
   type AdminManagedUser,
@@ -45,6 +46,9 @@ export default function ManageUsersPanel() {
   const [updatingRoleId, setUpdatingRoleId] = useState<number | null>(null);
   const [togglingStatusId, setTogglingStatusId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [savingUserId, setSavingUserId] = useState<number | null>(null);
+  const [userEditDraft, setUserEditDraft] = useState<{ name: string; email: string; phone: string }>({ name: '', email: '', phone: '' });
 
   const [usersPage, setUsersPage] = useState(1);
   const [userSearch, setUserSearch] = useState('');
@@ -175,6 +179,45 @@ export default function ManageUsersPanel() {
       message: `${label} will be moved from ${currentRole} to ${nextRole}.`,
       confirmLabel: 'Change Role',
       onConfirm: async () => performRoleChange(id, nextRole),
+    });
+  };
+
+  const performSaveUserEdit = async (id: number) => {
+    if (!token || !canManageUsers) return;
+    setSavingUserId(id);
+    try {
+      const { user: updated } = await updateAdminUserInfoApi(token, id, {
+        name: userEditDraft.name.trim(),
+        email: userEditDraft.email.trim(),
+        phone: userEditDraft.phone.trim(),
+      });
+      setUsers(prev => prev.map(item => (item.id === id ? updated : item)));
+      setEditingUserId(null);
+      setUserEditDraft({ name: '', email: '', phone: '' });
+      showToast('User info updated.', 'success');
+    } catch (e) {
+      showToast((e as Error).message ?? 'Failed to update user info.', 'error');
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleEditUser = (user: AdminManagedUser) => {
+    setEditingUserId(user.id);
+    setUserEditDraft({ name: user.name, email: user.email, phone: user.phone ?? '' });
+  };
+
+  const handleCancelUserEdit = () => {
+    setEditingUserId(null);
+    setUserEditDraft({ name: '', email: '', phone: '' });
+  };
+
+  const handleSaveUserEdit = (id: number, name: string) => {
+    requestConfirmation({
+      title: 'Save user changes?',
+      message: `Updates to ${name}'s account will be applied.`,
+      confirmLabel: 'Save Changes',
+      onConfirm: async () => performSaveUserEdit(id),
     });
   };
 
@@ -382,6 +425,16 @@ export default function ManageUsersPanel() {
                         </td>
                         <td className="py-2.5 px-3 md:px-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              disabled={isProtected || savingUserId === item.id}
+                              onClick={() => handleEditUser(item)}
+                              title={isProtected ? 'Only the owner can edit admin and owner accounts' : undefined}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              Edit Details
+                            </button>
                             <button type="button"
                               disabled={isProtected || togglingStatusId === item.id}
                               onClick={() => handleToggleStatus(item.id, isActive, item.name)}
@@ -532,6 +585,74 @@ export default function ManageUsersPanel() {
         </ModalShell>
       )}
 
+      {editingUserId !== null && (() => {
+        const editingUser = users.find(item => item.id === editingUserId);
+        const isSavingThis = savingUserId === editingUserId;
+        return (
+          <ModalShell
+            title="Edit User Details"
+            description="Update the user's name, email, and phone number. Changes will be saved to their account."
+            onClose={() => { if (!isSavingThis) handleCancelUserEdit(); }}
+          >
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Full Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={userEditDraft.name}
+                  onChange={e => setUserEditDraft(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Jane Smith"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  value={userEditDraft.email}
+                  onChange={e => setUserEditDraft(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="e.g. jane@example.com"
+                  type="email"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Phone Number <span className="text-gray-600">(optional)</span>
+                </label>
+                <input
+                  value={userEditDraft.phone}
+                  onChange={e => setUserEditDraft(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Phone number"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+                <button
+                  type="button"
+                  onClick={handleCancelUserEdit}
+                  disabled={isSavingThis}
+                  className="px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingThis}
+                  onClick={() => handleSaveUserEdit(editingUserId, editingUser?.name ?? '')}
+                  className="flex items-center gap-2 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+                >
+                  {isSavingThis
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving...</>
+                    : <><Save className="w-3.5 h-3.5" />Save Changes</>}
+                </button>
+              </div>
+            </div>
+          </ModalShell>
+        );
+      })()}
       {confirmDialog && (
         <ConfirmDialog
           dialog={confirmDialog}
