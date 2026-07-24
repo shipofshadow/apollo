@@ -14,8 +14,8 @@ export default function Home() {
   return (
     <main className="bg-brand-dark">
       <PageSEO
-        title="1625 Auto Lab | Automotive Retrofitting"
-        description="1625 Auto Lab — your trusted automotive retrofitting and customization workshop. Projector headlights, HID/LED conversions, suspension upgrades, and more."
+        title="1625 Autolab | Headlight Retrofit | Android Headunit"
+        description="Specializing in custom headlight retrofit and android headunit. We don't just fix cars; we upgrade them."
         appendSiteName={false}
       />
       <Hero />

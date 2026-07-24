@@ -6,8 +6,8 @@ export interface RouteSEO {
 
 export const ROUTE_SEO: Record<string, RouteSEO> = {
   '/': {
-    title: '1625 Autolab',
-    description: 'Automotive retrofitting, projector headlights, HID/LED conversion and car customization.',
+    title: '1625 Autolab | Headlight Retrofit | Android Headunit',
+    description: 'Specializing in custom headlight retrofit and android headunit. We don\'t just fix cars; we upgrade them.',
   },
   '/services': {
     title: 'Services | 1625 Autolab',
