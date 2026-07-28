@@ -181,6 +181,106 @@ class NotificationService
     }
 
     /**
+     * Send a 3-hour prior appointment reminder email to the customer.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function appointmentReminder3hCustomer(array $data): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = strtolower(trim((string) ($data['emailAddress'] ?? $data['email'] ?? '')));
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $rawName = str_replace(["\r", "\n"], '', (string) ($data['fullName'] ?? $data['name'] ?? ''));
+        $rawProduct = str_replace(["\r", "\n"], '', (string) ($data['productToPurchase'] ?? $data['serviceName'] ?? $data['service_name'] ?? 'Appointment'));
+        $rawMake = str_replace(["\r", "\n"], '', (string) ($data['make'] ?? ''));
+        $rawModel = str_replace(["\r", "\n"], '', (string) ($data['model'] ?? ''));
+        $rawVehicle = str_replace(["\r", "\n"], '', (string) ($data['vehicleInfo'] ?? $data['vehicle'] ?? ''));
+
+        if ($rawVehicle === '' && ($rawMake !== '' || $rawModel !== '')) {
+            $rawVehicle = trim($rawMake . ' ' . $rawModel);
+        }
+
+        $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($data['appointmentDate'] ?? $data['appointment_date'] ?? ''));
+        $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? ''));
+
+        $name = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
+        $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : 'Appointment Service');
+        $vehicle = htmlspecialchars($rawVehicle !== '' ? $rawVehicle : '—');
+        $appointmentDate = htmlspecialchars($rawAppointmentDate !== '' ? $this->formatAppointmentDate($rawAppointmentDate) : '—');
+        $appointmentTime = htmlspecialchars($rawAppointmentTime !== '' ? $rawAppointmentTime : '—');
+
+        $body = $this->render('appointment-reminder-3h-customer', [
+            'name' => $name,
+            'vehicle' => $vehicle,
+            'product' => $product,
+            'booking_date' => $appointmentDate,
+            'booking_time' => $appointmentTime,
+        ]);
+
+        $subject = 'Appointment Reminder: Your appointment is in 3 hours | 1625 Autolab';
+        $this->send($customerEmail, $name, $subject, $body);
+    }
+
+    /**
+     * Send a 3-hour prior appointment reminder email to admins/owners.
+     *
+     * @param array<string, mixed> $data
+     * @param array<int, string> $recipients
+     */
+    public function appointmentReminder3hAdmin(array $data, array $recipients = []): void
+    {
+        if (count($recipients) === 0) {
+            $recipients = $this->adminRecipients();
+            if (count($recipients) === 0) {
+                $recipients = ['1625autolab@gmail.com'];
+            }
+        }
+
+        $rawName = str_replace(["\r", "\n"], '', (string) ($data['fullName'] ?? $data['name'] ?? 'Customer'));
+        $rawEmail = str_replace(["\r", "\n"], '', (string) ($data['emailAddress'] ?? $data['email'] ?? ''));
+        $rawPhone = str_replace(["\r", "\n"], '', (string) ($data['contactNumber'] ?? $data['phone'] ?? ''));
+        $rawProduct = str_replace(["\r", "\n"], '', (string) ($data['productToPurchase'] ?? $data['serviceName'] ?? $data['service_name'] ?? 'Appointment'));
+        $rawMake = str_replace(["\r", "\n"], '', (string) ($data['make'] ?? ''));
+        $rawModel = str_replace(["\r", "\n"], '', (string) ($data['model'] ?? ''));
+        $rawVehicle = str_replace(["\r", "\n"], '', (string) ($data['vehicleInfo'] ?? $data['vehicle'] ?? ''));
+
+        if ($rawVehicle === '' && ($rawMake !== '' || $rawModel !== '')) {
+            $rawVehicle = trim($rawMake . ' ' . $rawModel);
+        }
+
+        $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($data['appointmentDate'] ?? $data['appointment_date'] ?? ''));
+        $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? ''));
+
+        $name = htmlspecialchars($rawName);
+        $email = htmlspecialchars($rawEmail !== '' ? $rawEmail : '—');
+        $phone = htmlspecialchars($rawPhone !== '' ? $rawPhone : '—');
+        $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : 'Appointment Service');
+        $vehicle = htmlspecialchars($rawVehicle !== '' ? $rawVehicle : '—');
+        $appointmentDate = htmlspecialchars($rawAppointmentDate !== '' ? $this->formatAppointmentDate($rawAppointmentDate) : '—');
+        $appointmentTime = htmlspecialchars($rawAppointmentTime !== '' ? $rawAppointmentTime : '—');
+
+        $body = $this->render('appointment-reminder-3h-admin', [
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+            'vehicle' => $vehicle,
+            'product' => $product,
+            'booking_date' => $appointmentDate,
+            'booking_time' => $appointmentTime,
+        ]);
+
+        $subject = 'Upcoming Appointment Reminder (In 3 Hours) | 1625 Autolab';
+        $this->sendToRecipients($recipients, $subject, $body, 'Admin');
+    }
+
+
+    /**
      * Send a booking-confirmation email to the customer and a copy to the admin
      * inbox (if MAIL_ADMIN is set).
      *

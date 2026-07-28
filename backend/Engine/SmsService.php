@@ -217,6 +217,50 @@ public function customerInquiryAdmin(array $inquiry): void
     }
 
     /**
+     * Send 3-hour prior appointment reminder SMS to customer.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function appointmentReminder3hCustomer(array $data): void
+    {
+        $phone = $this->normalisePhone((string) ($data['contactNumber'] ?? $data['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $name    = (string) ($data['fullName'] ?? $data['name'] ?? 'po');
+        $service = (string) ($data['productToPurchase'] ?? $data['serviceName'] ?? $data['service_name'] ?? 'your appointment');
+        $time    = (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? '');
+
+        $this->send(
+            $phone,
+            "Hello {$name}! Reminder: Your appointment for {$service}"
+          . ($time !== '' ? " is scheduled in 3 hours at {$time}" : " is in 3 hours")
+          . ". See you at 1625 Auto Lab!"
+        );
+    }
+
+    /**
+     * Send 3-hour prior appointment reminder SMS to admin/owner.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function appointmentReminder3hAdmin(array $data): void
+    {
+        $recipients = $this->adminPhones();
+        if (count($recipients) === 0) return;
+
+        $name = (string) ($data['fullName'] ?? $data['name'] ?? 'A customer');
+        $time = (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? '');
+
+        $message = "1625 Autolab: Reminder - {$name} has an appointment scheduled in 3 hours"
+          . ($time !== '' ? " at {$time}." : ".");
+
+        foreach ($recipients as $adminPhone) {
+            $this->send($adminPhone, $message);
+        }
+    }
+
+
+    /**
      * Notify a waitlisted customer that a slot has become available.
      *
      * @param array<string, mixed> $data  Keys: name, phone, date, time

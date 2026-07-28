@@ -1206,7 +1206,16 @@ class Router
     {
         $data = $this->jsonBody();
         $inquiry = (new InquiryService())->create($data);
-        (new NotificationJobQueueService())->dispatch('customer_inquiry', ['data' => $data]);
+        $queue = new NotificationJobQueueService();
+        $queue->dispatch('customer_inquiry', ['data' => $data]);
+
+        $date = (string) ($inquiry['appointmentDate'] ?? $data['appointmentDate'] ?? '');
+        $time = (string) ($inquiry['appointmentTime'] ?? $data['appointmentTime'] ?? '');
+        $runAfter = NotificationJobQueueService::calculateReminderRunAfter($date, $time, 3);
+        if ($runAfter !== null) {
+            $queue->dispatch('appointment_reminder_3h', ['data' => $inquiry], $runAfter);
+        }
+
         http_response_code(201);
         echo json_encode(['inquiry' => $inquiry]);
     }

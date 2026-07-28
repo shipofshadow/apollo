@@ -21,29 +21,60 @@ class NotificationJobQueueService
     }
 
     /** @param array<string, mixed> $payload */
-    public function dispatch(string $event, array $payload): void
+    public function dispatch(string $event, array $payload, ?string $runAfter = null): void
     {
         if (!$this->queueEnabled || $this->db === null) {
+            if ($runAfter !== null && strtotime($runAfter) > time()) {
+                return;
+            }
             $this->handleNow($event, $payload);
             return;
         }
 
         $stmt = $this->db->prepare(
             'INSERT INTO notification_jobs (event, payload, status, run_after)
-             VALUES (:event, :payload, "queued", NOW())'
+             VALUES (:event, :payload, "queued", COALESCE(:run_after, NOW()))'
         );
         $stmt->execute([
             ':event' => $event,
             ':payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ':run_after' => $runAfter,
         ]);
 
-        if (PHP_SAPI !== 'cli') {
+        if (PHP_SAPI !== 'cli' && ($runAfter === null || strtotime($runAfter) <= time())) {
             try {
                 $this->processPending(1);
             } catch (\Throwable $e) {
                 error_log('[NotificationJobQueueService] Immediate queue processing failed: ' . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Calculate 3-hour prior run_after timestamp for an appointment date and time.
+     */
+    public static function calculateReminderRunAfter(string $dateStr, string $timeStr, int $hoursPrior = 3): ?string
+    {
+        $dateStr = trim($dateStr);
+        $timeStr = trim($timeStr);
+        if ($dateStr === '' || $timeStr === '') {
+            return null;
+        }
+
+        try {
+            $dateTimeStr = $dateStr . ' ' . $timeStr;
+            $dt = new \DateTimeImmutable($dateTimeStr, new \DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila'));
+            $reminderDt = $dt->modify("-{$hoursPrior} hours");
+
+            $runAfter = $reminderDt->format('Y-m-d H:i:s');
+            if (strtotime($runAfter) > time()) {
+                return $runAfter;
+            }
+        } catch (\Throwable $e) {
+            error_log('[NotificationJobQueueService] Failed to parse appointment datetime: ' . $e->getMessage());
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $payload */
@@ -642,6 +673,52 @@ class NotificationJobQueueService
                     }
                 } catch (\Throwable $e) {
                     error_log('[NotificationJobQueueService] customer inquiry customer notification failed: ' . $e->getMessage());
+                }
+                return;
+
+            case 'appointment_reminder_3h':
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : (is_array($payload['booking'] ?? null) ? $payload['booking'] : []);
+                if (empty($data)) {
+                    return;
+                }
+
+                // Send email & SMS to Customer
+                try {
+                    (new NotificationService())->appointmentReminder3hCustomer($data);
+                    (new SmsService())->appointmentReminder3hCustomer($data);
+                } catch (\Throwable $e) {
+                    error_log('[NotificationJobQueueService] 3h appointment reminder customer failed: ' . $e->getMessage());
+                }
+
+                // Send email, SMS, and in-app to Admins / Owners
+                try {
+                    $adminUsers = $this->usersForPermissionOrRoles('bookings:manage', ['owner', 'admin']);
+                    $emailRecipients = [];
+                    foreach ($adminUsers as $user) {
+                        $adminEmail = strtolower(trim((string) ($user['email'] ?? '')));
+                        if ($adminEmail !== '' && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+                            $emailRecipients[] = $adminEmail;
+                        }
+                    }
+
+                    (new NotificationService())->appointmentReminder3hAdmin($data, $emailRecipients);
+                    (new SmsService())->appointmentReminder3hAdmin($data);
+
+                    $customerName = (string) ($data['fullName'] ?? $data['name'] ?? 'A customer');
+                    $appointmentTime = (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? '');
+                    $appointmentDate = (string) ($data['appointmentDate'] ?? $data['appointment_date'] ?? '');
+                    $message = "Reminder: Appointment for {$customerName} is scheduled in 3 hours ({$appointmentDate} at {$appointmentTime}).";
+
+                    $this->notifyUsersInApp(
+                        $adminUsers,
+                        'appointment_reminder',
+                        'appointment_reminder',
+                        'Upcoming Appointment Reminder (In 3 Hours)',
+                        $message,
+                        ['inquiry' => $data]
+                    );
+                } catch (\Throwable $e) {
+                    error_log('[NotificationJobQueueService] 3h appointment reminder admin failed: ' . $e->getMessage());
                 }
                 return;
 

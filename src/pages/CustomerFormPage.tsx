@@ -255,7 +255,7 @@ export default function CustomerFormPage() {
         throw new Error(result?.detail ?? 'Unable to submit inquiry to the database.');
       }
 
-      showToast('Form submitted successfully! We will contact you soon.', 'success');
+      showToast('Form submitted successfully! A confirmation notification and a 3-hour prior appointment reminder have been scheduled.', 'success');
       setFormData(INITIAL_FORM_STATE);
 
     } catch (error) {

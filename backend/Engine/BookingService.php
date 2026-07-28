@@ -150,9 +150,17 @@ class BookingService
             (string) $booking['createdAt']
         );
 
-        (new NotificationJobQueueService())->dispatch('booking_created', [
+        $queue = new NotificationJobQueueService();
+        $queue->dispatch('booking_created', [
             'booking' => $booking,
         ]);
+
+        $date = (string) ($booking['appointmentDate'] ?? $booking['appointment_date'] ?? '');
+        $time = (string) ($booking['appointmentTime'] ?? $booking['appointment_time'] ?? '');
+        $runAfter = NotificationJobQueueService::calculateReminderRunAfter($date, $time, 3);
+        if ($runAfter !== null) {
+            $queue->dispatch('appointment_reminder_3h', ['data' => $booking], $runAfter);
+        }
 
         if ($waitlistClaimToken !== '') {
             try {
