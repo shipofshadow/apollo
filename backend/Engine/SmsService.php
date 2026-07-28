@@ -230,11 +230,14 @@ public function customerInquiryAdmin(array $inquiry): void
         $service = (string) ($data['productToPurchase'] ?? $data['serviceName'] ?? $data['service_name'] ?? 'your appointment');
         $time    = (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? '');
 
+        $timeStr = $time !== '' ? $time : 'scheduled time';
+
         $this->send(
             $phone,
-            "Hello {$name}! Reminder: Your appointment for {$service}"
-          . ($time !== '' ? " is scheduled in 3 hours at {$time}" : " is in 3 hours")
-          . ". See you at 1625 Auto Lab!"
+            "Hi {$name}!\n\n"
+          . "This is a friendly reminder from 1625 AutoLab: Your appointment is at {$timeStr} today, which is 3 hours from now.\n"
+          . "Please arrive on time or message us on our facebook page if you need to reschedule.\n\n"
+          . "Thank you!"
         );
     }
 
@@ -248,11 +251,19 @@ public function customerInquiryAdmin(array $inquiry): void
         $recipients = $this->adminPhones();
         if (count($recipients) === 0) return;
 
-        $name = (string) ($data['fullName'] ?? $data['name'] ?? 'A customer');
-        $time = (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? '');
+        $make    = (string) ($data['make'] ?? '');
+        $model   = (string) ($data['model'] ?? '');
+        $vehicle = (string) ($data['vehicleInfo'] ?? $data['vehicle'] ?? '');
+        if ($vehicle === '' && ($make !== '' || $model !== '')) {
+            $vehicle = trim($make . ' ' . $model);
+        }
+        if ($vehicle === '') {
+            $vehicle = 'Vehicle';
+        }
 
-        $message = "1625 Autolab: Reminder - {$name} has an appointment scheduled in 3 hours"
-          . ($time !== '' ? " at {$time}." : ".");
+        $timeStr = $time !== '' ? $time : 'scheduled time';
+
+        $message = "Appointment Reminder: {$name} - {$vehicle} is scheduled for {$timeStr} today (in 3 hrs). Please ensure the team and materials are ready.";
 
         foreach ($recipients as $adminPhone) {
             $this->send($adminPhone, $message);
