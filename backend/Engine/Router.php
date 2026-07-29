@@ -132,6 +132,7 @@ class Router
             $r->addRoute('GET',   '/api/inquiries',                 'handleInquiryList');
             $r->addRoute('GET',   '/api/inquiries/calendar',        'handleInquiryCalendar');
             $r->addRoute('GET',   '/api/inquiries/availability',   'handleInquiryAvailability');
+            $r->addRoute('GET',   '/api/inquiries/{id}',             'handleInquiryGet');
             $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
             $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
@@ -1226,6 +1227,19 @@ class Router
         $this->requirePermission('bookings:manage');
         $inquiries = (new InquiryService())->getAll();
         echo json_encode(['inquiries' => $inquiries]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryGet(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $id = $vars['id'] ?? '';
+        if ($id === '') throw new RuntimeException('Inquiry ID is required.', 400);
+
+        $inquiry = (new InquiryService())->getById($id);
+        if (!$inquiry) throw new RuntimeException('Inquiry not found.', 404);
+
+        echo json_encode(['inquiry' => $inquiry]);
     }
 
     /** @param array<string, string> $vars */

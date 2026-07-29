@@ -1878,3 +1878,7 @@ export const updateAdminOrderPaymentApi = (token: string, id: number, paymentSta
     method: 'PATCH',
     body: JSON.stringify({ paymentStatus }),
   }, token);
+
+export const fetchInquiryByIdApi = (token: string, id: number | string) =>
+  apiFetch<{ inquiry: any }>(`/api/inquiries/${id}`, {}, token);
+

@@ -276,7 +276,7 @@ public function customerInquiryAdmin(array $inquiry): void
      */
     public function appointmentReminder3hAdmin(array $data): void
     {
-        $recipients = $this->adminPhones();
+        $recipients = $this->fetchAlertRecipients('new_booking');
         if (count($recipients) === 0) return;
 
         $name    = (string) ($data['fullName'] ?? $data['name'] ?? 'A customer');

@@ -12,6 +12,7 @@ import NotificationBell from '../components/NotificationBell';
 import AnalyticsPanel       from './admin/AnalyticsPanel';
 import BookingsPanel        from './admin/BookingsPanel';
 import AdminBookingDetail   from './admin/AdminBookingDetail';
+import AdminInquiryDetail   from './admin/AdminInquiryDetail';
 import ServicesPanel        from './admin/ServicesPanel';
 import ContentPanel         from './admin/ContentPanel';
 import ProductsPanel        from './admin/ProductsPanel';
@@ -277,6 +278,14 @@ export default function AdminPage() {
       case 'chatbot-flow':  return <FlowEditorPage />;
       case 'appointments':
         if (selectedBookingId) {
+          if (selectedBookingId.startsWith('inq-')) {
+            return (
+              <AdminInquiryDetail
+                inquiryId={selectedBookingId}
+                onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
+              />
+            );
+          }
           return (
             <AdminBookingDetail
               bookingId={selectedBookingId}
