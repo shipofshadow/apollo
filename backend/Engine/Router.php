@@ -4325,8 +4325,10 @@ class Router
     private function handleCustomerInquiry(array $vars = []): void
     {
         $data = $this->jsonBody();
+        $this->validateTurnstile($data);
         $name    = trim((string) ($data['fullName']    ?? ''));
         $email   = trim((string) ($data['emailAddress'] ?? ''));
+
         $phone   = trim((string) ($data['contactNumber'] ?? ''));
         $product = trim((string) ($data['productToPurchase'] ?? ''));
         $make    = trim((string) ($data['make'] ?? ''));

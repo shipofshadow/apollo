@@ -8,6 +8,7 @@ import { BACKEND_URL } from '../config';
 import { fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, joinWaitlistApi } from '../services/api';
 import type { ShopDayHours } from '../types';
 import CustomCalendar from '../components/CustomCalendar';
+import TurnstileWidget from '../components/TurnstileWidget';
 
 // Icons
 import { 
@@ -121,6 +122,8 @@ export default function CustomerFormPage() {
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [waitlistJoining, setWaitlistJoining] = useState(false);
   const [waitlistJoined, setWaitlistJoined] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileKey,   setTurnstileKey]   = useState(0);
   const [searchParams] = useSearchParams();
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
@@ -247,7 +250,7 @@ export default function CustomerFormPage() {
       const response = await fetch(`${BACKEND_URL}/api/inquiries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, 'cf-turnstile-response': turnstileToken }),
       });
 
       const result = await response.json().catch(() => null);
@@ -263,6 +266,8 @@ export default function CustomerFormPage() {
       showToast(error instanceof Error ? error.message : 'An error occurred. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
+      setTurnstileToken('');
+      setTurnstileKey(k => k + 1);
     }
   };
 
@@ -619,9 +624,17 @@ export default function CustomerFormPage() {
 
             {/* Submit Section */}
             <div className="pt-6">
+              <div className="mb-6 flex justify-center">
+                <TurnstileWidget
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken('')}
+                  resetKey={turnstileKey}
+                />
+              </div>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !turnstileToken}
+                title={!turnstileToken ? 'Please complete the CAPTCHA' : undefined}
                 className="w-full bg-brand-orange hover:bg-orange-600 text-white font-black uppercase tracking-wider text-lg py-4 px-8 rounded-xl transition-all transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 shadow-lg hover:shadow-brand-orange/20"
               >
                 {isSubmitting ? (
