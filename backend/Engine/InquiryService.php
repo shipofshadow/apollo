@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 class InquiryService
 {
-    private const SLOT_CAPACITY = 2;
+    private const SLOT_CAPACITY = 3;
     private const SLOT_WINDOW_MINUTES = 5 * 60;
 
     private bool $useDb;

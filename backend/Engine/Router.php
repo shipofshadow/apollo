@@ -1305,6 +1305,42 @@ class Router
             $appointmentDate,
             $appointmentTime
         );
+
+        // Re-queue the 3-hour appointment reminder when the schedule or status changes.
+        try {
+            $queue = new NotificationJobQueueService();
+            $newStatus = strtolower(trim((string) ($inquiry['status'] ?? '')));
+            $isTerminal = in_array($newStatus, ['cancelled', 'completed'], true);
+
+            // Cancel any existing queued/retry reminder for this inquiry
+            if (DB_NAME !== '') {
+                $db = Database::getInstance();
+                // Mark old pending reminder jobs for this inquiry as done so they are not fired
+                $cancelStmt = $db->prepare(
+                    "UPDATE notification_jobs
+                        SET status = 'done',
+                            last_error = 'superseded by inquiry update',
+                            processed_at = NOW()
+                      WHERE event = 'appointment_reminder_3h'
+                        AND status IN ('queued', 'retry')
+                        AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.id')) = :inquiry_id"
+                );
+                $cancelStmt->execute([':inquiry_id' => $id]);
+            }
+
+            // Dispatch a fresh reminder only if the appointment is still upcoming
+            if (!$isTerminal) {
+                $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
+                $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
+                $runAfter = NotificationJobQueueService::calculateReminderRunAfter($date, $time, 3);
+                if ($runAfter !== null) {
+                    $queue->dispatch('appointment_reminder_3h', ['data' => $inquiry], $runAfter);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[handleInquiryUpdate] Failed to re-queue appointment reminder: ' . $e->getMessage());
+        }
+
         echo json_encode(['inquiry' => $inquiry]);
     }
 
