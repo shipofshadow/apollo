@@ -309,6 +309,107 @@ class NotificationService
     }
 
     /**
+     * Notify the customer that their service-request (inquiry) status has changed.
+     *
+     * Inquiry records use different field names than bookings
+     * (emailAddress / fullName / contactNumber / make / model / productToPurchase).
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function inquiryStatusChanged(array $inquiry): void
+    {
+        if (MAIL_FROM === '') {
+            return;
+        }
+
+        $customerEmail = strtolower(trim((string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? '')));
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $rawName    = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'Customer'));
+        $rawPhone   = str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
+        $rawMake    = str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? ''));
+        $rawModel   = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
+        $rawYear    = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
+        $rawProduct = str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? ''));
+        $rawDate    = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
+        $rawTime    = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        $status     = strtolower(trim((string) ($inquiry['status'] ?? 'pending')));
+
+        $name    = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
+        $phone   = htmlspecialchars($rawPhone);
+        $vehicle = htmlspecialchars(trim($rawMake . ' ' . $rawModel . ($rawYear !== '' ? ' (' . $rawYear . ')' : '')));
+        $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : '—');
+        $date    = htmlspecialchars($rawDate !== '' ? $this->formatAppointmentDate($rawDate) : '—');
+        $time    = htmlspecialchars($rawTime !== '' ? $rawTime : '—');
+
+        $statusMessages = [
+            'confirmed'   => 'Your appointment is <strong style="color:#4ade80">confirmed</strong>. We look forward to seeing you!',
+            'in_progress' => 'Our team has <strong style="color:#60a5fa">started working on your vehicle</strong>. We\'ll keep you posted.',
+            'completed'   => 'Your service is <strong style="color:#34d399">complete</strong>! Thank you for trusting 1625 Autolab.',
+            'cancelled'   => 'Your service request has been <strong style="color:#f87171">cancelled</strong>. If this was a mistake, feel free to reach out.',
+            'pending'     => 'Your service request is currently <strong style="color:#fbbf24">pending review</strong>. We\'ll confirm your schedule shortly.',
+        ];
+        $statusMessage = $statusMessages[$status] ?? 'Your service request status has been updated. Contact us for details.';
+
+        $statusColors = [
+            'confirmed'   => '#4ade80',
+            'in_progress' => '#60a5fa',
+            'completed'   => '#34d399',
+            'cancelled'   => '#f87171',
+            'pending'     => '#fbbf24',
+        ];
+        $badgeColor = $statusColors[$status] ?? '#94a3b8';
+        $statusLabel = ucwords(str_replace('_', ' ', $status));
+
+        $phoneRow = $phone !== ''
+            ? '<tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:140px">Phone</td>'
+              . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">'
+              . '<a href="tel:' . $phone . '" style="color:#f97316;text-decoration:none">' . $phone . '</a></td></tr>'
+            : '';
+
+        $vehicleRow = trim(str_replace('()', '', $vehicle)) !== ''
+            ? '<tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Vehicle</td>'
+              . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $vehicle . '</td></tr>'
+            : '';
+
+        $body = '
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#0f172a;color:#e2e8f0;padding:24px;border-radius:12px">
+          <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700">1625 Autolab</p>
+          <h2 style="margin:0 0 6px;font-size:24px;color:#ffffff">Service Request Update</h2>
+          <p style="margin:0 0 20px;color:#94a3b8;font-size:14px">Hi ' . $name . ', here is an update on your service request.</p>
+
+          <div style="background:#111827;border:1px solid #1e3a5f;border-radius:8px;padding:16px 20px;margin-bottom:24px">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#64748b">Status</p>
+            <span style="display:inline-block;background:' . $badgeColor . '22;color:' . $badgeColor . ';border:1px solid ' . $badgeColor . '44;padding:4px 14px;border-radius:999px;font-size:13px;font-weight:700">'
+              . $statusLabel . '</span>
+            <p style="margin:12px 0 0;color:#cbd5e1;font-size:14px;line-height:1.6">' . $statusMessage . '</p>
+          </div>
+
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                 style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#111827;margin-bottom:24px">
+            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:140px">Service / Product</td>
+                <td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $product . '</td></tr>
+            ' . $vehicleRow . '
+            ' . $phoneRow . '
+            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Date</td>
+                <td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $date . '</td></tr>
+            <tr><td style="padding:10px 16px;color:#64748b;font-size:13px">Time</td>
+                <td style="padding:10px 16px;color:#f1f5f9">' . $time . '</td></tr>
+          </table>
+
+          <p style="margin:0;color:#94a3b8;font-size:13px;line-height:1.6">
+            Questions? Reply to this email or message us on Facebook. We\'re happy to help.
+          </p>
+          <p style="margin:16px 0 0;color:#475569;font-size:12px">— 1625 Autolab Team</p>
+        </div>';
+
+        $subject = 'Service Request Update: ' . $statusLabel . ' | 1625 Autolab';
+        $this->send($customerEmail, $rawName !== '' ? $rawName : 'Customer', $subject, $body);
+    }
+
+    /**
      * Notify the customer that their booking status has changed.
      *
      * @param array<string, mixed> $booking

@@ -153,6 +153,34 @@ public function customerInquiryAdmin(array $inquiry): void
     }
 
     /**
+     * Send a status-change SMS to the customer whose inquiry was updated.
+     *
+     * Uses contactNumber (inquiry field) instead of booking's phone.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function inquiryStatusChanged(array $inquiry): void
+    {
+        $phone = $this->normalisePhone((string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $name    = trim((string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'there'));
+        $product = trim((string) ($inquiry['productToPurchase'] ?? ''));
+        $status  = ucwords(str_replace('_', ' ', trim((string) ($inquiry['status'] ?? ''))));
+        $date    = trim((string) ($inquiry['appointmentDate'] ?? ''));
+        $time    = trim((string) ($inquiry['appointmentTime'] ?? ''));
+
+        $dateStr = $date !== '' ? " on {$date}" . ($time !== '' ? " at {$time}" : '') : '';
+        $serviceStr = $product !== '' ? " for {$product}" : '';
+
+        $this->send(
+            $phone,
+            "Hi {$name}! Your service request{$serviceStr}{$dateStr} status is now: {$status}. "
+          . "Questions? Message us on Facebook. - 1625 Autolab"
+        );
+    }
+
+    /**
      * Send a booking confirmation SMS to the client.
      *
      * @param array<string, mixed> $booking

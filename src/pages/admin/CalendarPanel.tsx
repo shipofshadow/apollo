@@ -22,6 +22,7 @@ import CustomCalendar from '../../components/CustomCalendar';
 const STATUS_DOT: Record<Booking['status'] | string, string> = {
   pending:        'bg-yellow-400',
   confirmed:      'bg-green-400',
+  in_progress:    'bg-sky-400',
   completed:      'bg-blue-400',
   cancelled:      'bg-gray-500',
   awaiting_parts: 'bg-purple-400',
@@ -57,12 +58,16 @@ interface InquiryEvent {
 type CalendarEventItem = (Booking & { eventType: 'booking' }) | (InquiryEvent & { eventType: 'inquiry' });
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30',
-  confirmed: 'bg-green-500/10 text-green-300 border border-green-500/30',
-  completed: 'bg-blue-500/10 text-sky-300 border border-blue-500/30',
-  cancelled: 'bg-gray-700 text-gray-300 border border-gray-600',
+  pending:        'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30',
+  confirmed:      'bg-green-500/10 text-green-300 border border-green-500/30',
+  in_progress:    'bg-sky-500/10 text-sky-300 border border-sky-500/30',
+  completed:      'bg-blue-500/10 text-blue-300 border border-blue-500/30',
+  cancelled:      'bg-gray-700 text-gray-300 border border-gray-600',
   awaiting_parts: 'bg-purple-500/10 text-purple-300 border border-purple-500/30',
 };
+
+// Statuses that apply to inquiries only — awaiting_parts is booking-only.
+const INQUIRY_STATUSES = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'] as const;
 
 const TYPE_BADGE: Record<'booking' | 'inquiry', string> = {
   booking: 'bg-sky-500/10 text-sky-300 border border-sky-500/20',
@@ -714,7 +719,7 @@ export default function CalendarPanel({ onView }: Props) {
                   </button>
                   {showStatusMenu && (
                     <div className="absolute right-0 mt-2 w-44 rounded-md border border-gray-800 bg-gray-950 z-50 shadow-lg overflow-hidden">
-                      {Object.keys(STATUS_BADGE).map((s) => (
+                      {INQUIRY_STATUSES.map((s) => (
                         <button
                           key={s}
                           type="button"

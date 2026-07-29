@@ -2,6 +2,7 @@
 const STATUS_LABELS: Record<string, string> = {
   pending:        'Pending',
   confirmed:      'Confirmed',
+  in_progress:    'In Progress',
   completed:      'Completed',
   cancelled:      'Cancelled',
   awaiting_parts: 'Awaiting Parts',

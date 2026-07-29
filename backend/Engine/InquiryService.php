@@ -89,7 +89,7 @@ class InquiryService
     {
         $status = $status === null ? null : trim($status);
         if ($status !== null) {
-            $allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
+            $allowed = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
             if (!in_array($status, $allowed, true)) {
                 throw new RuntimeException('Invalid inquiry status.', 422);
             }

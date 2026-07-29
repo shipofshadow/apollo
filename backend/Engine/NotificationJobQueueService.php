@@ -482,6 +482,15 @@ class NotificationJobQueueService
                 }
                 return;
 
+            case 'inquiry_status_changed':
+                $inquiry = is_array($payload['inquiry'] ?? null) ? $payload['inquiry'] : [];
+                if (empty($inquiry)) {
+                    return;
+                }
+                (new NotificationService())->inquiryStatusChanged($inquiry);
+                (new SmsService())->inquiryStatusChanged($inquiry);
+                return;
+
             case 'booking_awaiting_parts':
                 $booking = is_array($payload['booking'] ?? null) ? $payload['booking'] : [];
                 (new NotificationService())->bookingAwaitingParts($booking);
