@@ -20,12 +20,11 @@ import {
   FaCar, 
   FaCalendarAlt, 
   FaClock, 
-  FaWrench, 
-  FaPaperPlane,
+  FaWrench,
   FaIdBadge,
   FaBell
 } from 'react-icons/fa';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowRight } from 'lucide-react';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -71,6 +70,7 @@ function formatCloseTimeString(closeTime: string, openMinutes?: number): string 
 
   return format(d, 'h:mm aa');
 }
+
 function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter((hour) => hour.isOpen).map((hour) => hour.dayOfWeek))
@@ -101,6 +101,8 @@ const INITIAL_FORM_STATE = {
   appointmentTime: '', // Will store as h:mm aa (e.g. 2:30 PM)
   productToPurchase: ''
 };
+
+const inputClass = "w-full bg-black/20 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all rounded-sm text-sm";
 
 export default function CustomerFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -260,6 +262,8 @@ export default function CustomerFormPage() {
 
       showToast('Form submitted successfully! A confirmation notification and a 3-hour prior appointment reminder have been scheduled.', 'success');
       setFormData(INITIAL_FORM_STATE);
+      setSelectedDate(null);
+      setSelectedTime('');
 
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -272,7 +276,7 @@ export default function CustomerFormPage() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+    <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
       <PageSEO
         title="1625 Autolab Schedule Request"
         description="Fill out this form to order products or schedule a service with 1625 Autolab."
@@ -280,379 +284,422 @@ export default function CustomerFormPage() {
         appendSiteName={true}
       />
 
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-white mb-4">
-            Service <span className="text-brand-orange">Request</span>
+      <div className="container mx-auto px-4 md:px-6 max-w-7xl">
+        <div className="text-center mb-12">
+          <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-3">Service Request</span>
+          <h1 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter mb-4">
+            Request <span className="text-brand-orange">Schedule</span>
           </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto font-medium">
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Lock in your spot on the floor. Drop your details below and our team will confirm your schedule.
           </p>
         </div>
 
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl shadow-2xl p-6 md:p-10 relative overflow-hidden backdrop-blur-sm">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Column (8 columns) */}
+          <div className="lg:col-span-8 space-y-8">
+            <div className="bg-brand-dark border border-gray-800 p-6 md:p-8 rounded-sm shadow-2xl space-y-10">
+              
+              {/* Personal Information */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-2 flex items-center gap-2 border-b border-gray-800 pb-4">
+                  <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaUser /></span>
+                  Client Details
+                </h3>
 
-          <form onSubmit={handleSubmit} className="relative z-10 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label htmlFor="fullName" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      <FaUser className="text-gray-500"/> Full Name *
+                    </label>
+                    <input
+                      type="text" id="fullName" name="fullName" required
+                      value={formData.fullName} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="Juan Dela Cruz"
+                    />
+                  </div>
 
-            {/* Personal Information */}
-            <div className="space-y-5">
-              <h3 className="text-lg font-black uppercase tracking-widest text-brand-orange border-b border-gray-800/80 pb-2">Client Details</h3>
+                  <div className="space-y-2">
+                    <label htmlFor="contactNumber" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      <FaPhone className="text-gray-500"/> Contact Number *
+                    </label>
+                    <input
+                      type="tel" id="contactNumber" name="contactNumber" required
+                      value={formData.contactNumber} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="0912 345 6789"
+                    />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label htmlFor="fullName" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                    <FaUser /> Full Name *
+                <div className="space-y-2">
+                  <label htmlFor="address" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                    <FaMapMarkerAlt className="text-gray-500"/> Complete Address *
                   </label>
                   <input
-                    type="text" id="fullName" name="fullName" required
-                    value={formData.fullName} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="Juan Dela Cruz"
+                    type="text" id="address" name="address" required
+                    value={formData.address} onChange={handleChange}
+                    className={inputClass}
+                    placeholder="Block, Lot, Street, City"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="contactNumber" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                    <FaPhone /> Contact Number *
-                  </label>
-                  <input
-                    type="tel" id="contactNumber" name="contactNumber" required
-                    value={formData.contactNumber} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="0912 345 6789"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label htmlFor="emailAddress" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      <FaEnvelope className="text-gray-500"/> Email Address *
+                    </label>
+                    <input
+                      type="email" id="emailAddress" name="emailAddress" required
+                      value={formData.emailAddress} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="juan@example.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="facebookName" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      <FaFacebook className="text-gray-500"/> Facebook Profile *
+                    </label>
+                    <input
+                      type="text" id="facebookName" name="facebookName" required
+                      value={formData.facebookName} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="Profile Name or URL link"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="address" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                  <FaMapMarkerAlt /> Complete Address *
-                </label>
-                <input
-                  type="text" id="address" name="address" required
-                  value={formData.address} onChange={handleChange}
-                  className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                  placeholder="Block, Lot, Street, City"
-                />
-              </div>
+              {/* Vehicle Information */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-2 flex items-center gap-2 border-b border-gray-800 pb-4">
+                  <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaCar /></span>
+                  Vehicle Specs
+                </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label htmlFor="emailAddress" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                    <FaEnvelope /> Email Address *
-                  </label>
-                  <input
-                    type="email" id="emailAddress" name="emailAddress" required
-                    value={formData.emailAddress} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="juan@example.com"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="plateNumber" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                    <FaIdBadge /> Plate Number
-                  </label>
-                  <input
-                    type="text" id="plateNumber" name="plateNumber"
-                    value={formData.plateNumber} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="ABC-1234"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="facebookName" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                    <FaFacebook /> Facebook Profile *
-                  </label>
-                  <input
-                    type="text" id="facebookName" name="facebookName" required
-                    value={formData.facebookName} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="Profile Name or URL link"
-                  />
-                </div>
-              </div>
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label htmlFor="plateNumber" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      <FaIdBadge className="text-gray-500"/> Plate Number
+                    </label>
+                    <input
+                      type="text" id="plateNumber" name="plateNumber"
+                      value={formData.plateNumber} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="ABC-1234"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="yearModel" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                      Year *
+                    </label>
+                    <select
+                      id="yearModel" name="yearModel" required
+                      value={formData.yearModel} onChange={handleChange}
+                      className={`${inputClass} appearance-none cursor-pointer`}
+                    >
+                      <option value="" disabled>Select Year</option>
+                      {YEARS.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="make" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">Make *</label>
+                    <input
+                      type="text" id="make" name="make" required
+                      value={formData.make} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="e.g. Honda"
+                    />
+                  </div>
 
-            {/* Vehicle Information */}
-            <div className="space-y-5 pt-2">
-              <h3 className="text-lg font-black uppercase tracking-widest text-brand-orange border-b border-gray-800/80 pb-2 flex items-center gap-2">
-                <FaCar /> Vehicle Specs
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                <div className="space-y-1.5">
-                  <label htmlFor="make" className="block text-sm font-bold text-gray-400">Make *</label>
-                  <input
-                    type="text" id="make" name="make" required
-                    value={formData.make} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="e.g. Honda"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="model" className="block text-sm font-bold text-gray-400">Model *</label>
-                  <input
-                    type="text" id="model" name="model" required
-                    value={formData.model} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all placeholder-gray-600 outline-none"
-                    placeholder="e.g. Civic RS"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="yearModel" className="block text-sm font-bold text-gray-400">Year *</label>
-                  <select
-                    id="yearModel" name="yearModel" required
-                    value={formData.yearModel} onChange={handleChange}
-                    className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all appearance-none cursor-pointer outline-none"
-                  >
-                    <option value="" disabled>Select Year</option>
-                    {YEARS.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <label htmlFor="model" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">Model *</label>
+                    <input
+                      type="text" id="model" name="model" required
+                      value={formData.model} onChange={handleChange}
+                      className={inputClass}
+                      placeholder="e.g. Civic RS"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Appointment Details */}
-            <div className="space-y-5 pt-2">
-              <h3 className="text-lg font-black uppercase tracking-widest text-brand-orange border-b border-gray-800/80 pb-2">Scheduling & Request</h3>
+              {/* Appointment Details */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-2 flex items-center gap-2 border-b border-gray-800 pb-4">
+                  <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaCalendarAlt /></span>
+                  Scheduling & Request
+                </h3>
 
-              <div className="space-y-4">
-                <div className="rounded-xl border border-gray-800 bg-gray-950/50 p-4 text-sm text-gray-400">
-                  <p className="font-semibold text-gray-300">
-                    Selected appointment: {formData.appointmentDate ? format(new Date(`${formData.appointmentDate}T00:00:00`), 'EEE, MMM d, yyyy') : 'Choose a date'}
-                    {formData.appointmentTime ? ` at ${formData.appointmentTime}` : ''}
-                  </p>
+                <div className="space-y-2">
+                  <label htmlFor="productToPurchase" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                    <FaWrench className="text-gray-500"/> Required Services or Products *
+                  </label>
+                  <textarea
+                    id="productToPurchase" name="productToPurchase" required rows={3}
+                    value={formData.productToPurchase} onChange={handleChange}
+                    className={`${inputClass} resize-none`}
+                    placeholder="Tell us what needs doing..."
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 lg:items-stretch">
-                  <div className="lg:col-span-7 self-stretch">
-                    <div className="h-full flex flex-col rounded-xl border border-gray-800 bg-black/20 p-4 md:p-6">
-                      <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-brand-orange">
-                        <FaCalendarAlt /> Available Dates
-                      </p>
-                      <div className="flex-1">
-                        <CustomCalendar
-                        value={selectedDate}
-                        onChange={handleDateSelect}
-                        availableDates={availableDates}
-                        closedDatesSet={closedDatesSet}
-                        slotCounts={slotCounts}
-                        slotCapacity={slotCapacity}
-                        />
-                      </div>
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-stretch pt-2">
+                  <div className="xl:col-span-7 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm">
+                    <p className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest text-brand-orange mb-6">
+                      <FaCalendarAlt className="w-4 h-4" /> Available Dates
+                    </p>
+                    <div className="flex-1">
+                      <CustomCalendar
+                      value={selectedDate}
+                      onChange={handleDateSelect}
+                      availableDates={availableDates}
+                      closedDatesSet={closedDatesSet}
+                      slotCounts={slotCounts}
+                      slotCapacity={slotCapacity}
+                      />
                     </div>
                   </div>
 
-                  <div className="lg:col-span-5">
-                    <div className="flex h-full flex-col rounded-xl border border-gray-800 bg-black/20 p-4 md:p-6">
-                      <div className="mb-4 flex items-center justify-between">
-                        <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-brand-orange">
-                          <FaClock /> Appointment Time *
-                        </label>
-                        {availabilityLoading && (
-                          <span className="flex items-center gap-1 text-xs text-gray-500">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Checking…
-                          </span>
-                        )}
-                      </div>
+                  <div className="xl:col-span-5 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <label className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                        <FaClock className="w-4 h-4" /> Appointment Time *
+                      </label>
+                      {availabilityLoading && (
+                        <span className="text-gray-500 text-xs flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Checking…
+                        </span>
+                      )}
+                    </div>
 
-                      {!selectedDate ? (
-                        <div className="flex flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-800 bg-black/10 p-8 text-center">
-                          <FaCalendarAlt className="mb-3 text-4xl text-gray-700" />
-                          <p className="text-sm text-gray-500">Select a date from the calendar to view the available time slots.</p>
-                        </div>
-                      ) : (
-                        <div className="flex-1">
-                          {!availabilityLoading && !shopDayIsOpen && (
-                            <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-300">
+                    {!selectedDate ? (
+                      <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-800 rounded-sm p-8 text-center bg-black/10">
+                        <FaCalendarAlt className="mb-3 text-4xl text-gray-700" />
+                        <p className="text-gray-500 text-sm">Select a date to view available time slots.</p>
+                      </div>
+                    ) : (
+                      <div className="flex-1">
+                        {!availabilityLoading && !shopDayIsOpen && (
+                          <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-3 rounded-sm text-center">
+                            <p className="text-sm text-amber-300">
                               {closureReason
                                 ? `Currently not accepting appointments – ${closureReason}.`
                                 : 'Currently not accepting appointments for this date.'}
-                            </div>
-                          )}
+                            </p>
+                          </div>
+                        )}
 
-                          {!availabilityLoading && shopDayIsOpen && (() => {
-                            // determine shop open minutes for the selectedDate (fallback to 6:00 AM)
-                            let openMinutes = 6 * 60;
-                            if (selectedDate && shopHours.length) {
-                              const day = shopHours.find(h => h.dayOfWeek === selectedDate.getDay());
-                              if (day?.openTime && day.isOpen) {
-                                const [oh, om] = day.openTime.split(':').map(Number);
-                                openMinutes = (oh % 24) * 60 + (om || 0);
-                              }
+                        {!availabilityLoading && shopDayIsOpen && (() => {
+                          let openMinutes = 6 * 60;
+                          if (selectedDate && shopHours.length) {
+                            const day = shopHours.find(h => h.dayOfWeek === selectedDate.getDay());
+                            if (day?.openTime && day.isOpen) {
+                              const [oh, om] = day.openTime.split(':').map(Number);
+                              openMinutes = (oh % 24) * 60 + (om || 0);
                             }
+                          }
 
-                            const [closeHStr, closeMStr] = shopCloseTime.split(':');
-                            const closeHNum = Number(closeHStr || '0');
-                            const closeMNum = Number(closeMStr || '0');
-                            let closeMinutes = (closeHNum % 24) * 60 + closeMNum;
-                            if (closeMinutes <= openMinutes) closeMinutes += 24 * 60;
+                          const [closeHStr, closeMStr] = shopCloseTime.split(':');
+                          const closeHNum = Number(closeHStr || '0');
+                          const closeMNum = Number(closeMStr || '0');
+                          let closeMinutes = (closeHNum % 24) * 60 + closeMNum;
+                          if (closeMinutes <= openMinutes) closeMinutes += 24 * 60;
 
-                            const now = new Date();
-                            const nowMinutes = now.getHours() * 60 + now.getMinutes();
-                            const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
-                            const visibleSlots = availableSlots.filter((time) => {
-                              if (bookedSlots.includes(time)) return false;
-                              let slotStart = slotToMinutes(time);
-                              if (slotStart < openMinutes) slotStart += 24 * 60;
-                              if (slotStart > closeMinutes) return false;
-                              if (isTodaySelected && slotStart <= nowMinutes) return false;
-                              return true;
-                            });
+                          const now = new Date();
+                          const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                          const isTodaySelected = !!selectedDate && isSameLocalDay(selectedDate, now);
+                          const visibleSlots = availableSlots.filter((time) => {
+                            if (bookedSlots.includes(time)) return false;
+                            let slotStart = slotToMinutes(time);
+                            if (slotStart < openMinutes) slotStart += 24 * 60;
+                            if (slotStart > closeMinutes) return false;
+                            if (isTodaySelected && slotStart <= nowMinutes) return false;
+                            return true;
+                          });
 
-                            return (
-                              <>
-                                <p className="mb-4 border-b border-gray-800 pb-4 text-xs text-gray-500">
-                                  {shopDayIsOpen
-                                    ? `We are currently accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`
-                                    : 'We are currently not accepting appointments for this date.'}
-                                </p>
-                                <div className="w-full">
-                                  {visibleSlots.length === 0 && !isTodaySelected && (
-                                    <div className="space-y-3 rounded-lg border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center">
-                                      <p className="text-sm text-brand-orange/80">No available slots for this date.</p>
-                                      {(() => {
-                                        const slotKey = `${selectedDate ? formatDateYMD(selectedDate) : ''}|all`;
-                                        if (waitlistJoined === slotKey) {
-                                          return <p className="text-xs font-semibold text-green-400">✓ You&apos;re on the waitlist. We&apos;ll notify you if a slot opens.</p>;
-                                        }
-                                        return (
-                                          <button
-                                            type="button"
-                                            disabled={waitlistJoining}
-                                            onClick={async () => {
-                                              const dateStr = selectedDate ? formatDateYMD(selectedDate) : '';
-                                              setWaitlistJoining(true);
-                                              try {
-                                                await joinWaitlistApi({
-                                                  slotDate: dateStr,
-                                                  slotTime: 'any',
-                                                  name: formData.fullName || user?.name || '',
-                                                  email: formData.emailAddress || user?.email || '',
-                                                  phone: formData.contactNumber || user?.phone || '',
-                                                  serviceIds: '',
-                                                }, token);
-                                                setWaitlistJoined(slotKey);
-                                                showToast("You've joined the waitlist!", 'success');
-                                              } catch (error) {
-                                                showToast(error instanceof Error ? error.message : 'Could not join waitlist.', 'error');
-                                              } finally {
-                                                setWaitlistJoining(false);
-                                              }
-                                            }}
-                                            className="inline-flex items-center gap-2 rounded-sm bg-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
-                                          >
-                                            <FaBell className="h-3.5 w-3.5" />
-                                            {waitlistJoining ? 'Joining…' : 'Join Waitlist'}
-                                          </button>
-                                        );
-                                      })()}
+                          return (
+                            <>
+                              <p className="text-xs text-gray-500 mb-4 pb-4 border-b border-gray-800">
+                                {shopDayIsOpen
+                                  ? `Accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`
+                                  : 'Not accepting appointments for this date.'}
+                              </p>
+                              <div className="w-full">
+                                {visibleSlots.length === 0 && !isTodaySelected && (
+                                  <div className="space-y-3 rounded-sm border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center">
+                                    <p className="text-sm text-brand-orange/80">No available slots for this date.</p>
+                                    {(() => {
+                                      const slotKey = `${selectedDate ? formatDateYMD(selectedDate) : ''}|all`;
+                                      if (waitlistJoined === slotKey) {
+                                        return <p className="text-xs font-semibold text-green-400">✓ On waitlist.</p>;
+                                      }
+                                      return (
+                                        <button
+                                          type="button"
+                                          disabled={waitlistJoining}
+                                          onClick={async () => {
+                                            const dateStr = selectedDate ? formatDateYMD(selectedDate) : '';
+                                            setWaitlistJoining(true);
+                                            try {
+                                              await joinWaitlistApi({
+                                                slotDate: dateStr,
+                                                slotTime: 'any',
+                                                name: formData.fullName || user?.name || '',
+                                                email: formData.emailAddress || user?.email || '',
+                                                phone: formData.contactNumber || user?.phone || '',
+                                                serviceIds: '',
+                                              }, token);
+                                              setWaitlistJoined(slotKey);
+                                              showToast("You've joined the waitlist!", 'success');
+                                            } catch (error) {
+                                              showToast(error instanceof Error ? error.message : 'Could not join waitlist.', 'error');
+                                            } finally {
+                                              setWaitlistJoining(false);
+                                            }
+                                          }}
+                                          className="inline-flex items-center gap-2 rounded-sm bg-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+                                        >
+                                          <FaBell className="w-3.5 h-3.5" />
+                                          {waitlistJoining ? 'Joining…' : 'Join Waitlist'}
+                                        </button>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                                {visibleSlots.length === 0 && isTodaySelected && (
+                                  <p className="rounded-sm border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center text-sm text-brand-orange/80">
+                                    No slots left for today.
+                                  </p>
+                                )}
+                                {visibleSlots.length > 0 && (
+                                  <>
+                                    <div className="mb-2 flex items-center gap-2 rounded-sm border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-400 xl:hidden">
+                                      <span className="font-semibold text-brand-orange">Scroll</span> to see more available times.
                                     </div>
-                                  )}
-                                  {visibleSlots.length === 0 && isTodaySelected && (
-                                    <p className="rounded-lg border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center text-sm text-brand-orange/80">
-                                      No available slots left for today.
-                                    </p>
-                                  )}
-                                  {visibleSlots.length > 0 && (
-                                    <>
-                                      <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-800 bg-gray-950/70 px-3 py-2 text-xs text-gray-400 sm:hidden">
-                                        <span className="font-semibold text-brand-orange">Scroll</span> to see more appointment times.
-                                      </div>
-                                      <div className="mt-2 max-h-72 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 [&::-webkit-scrollbar-thumb]:shadow-[0_0_10px_rgba(249,115,22,0.3)] hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
-                                        <div className="grid grid-cols-3 gap-3">
-                                          {visibleSlots.map((time) => {
-                                            const isSelected = selectedTime === time;
-                                            const takenCount = slotCounts[time] ?? 0;
-                                            const spotsLeft = slotCapacity - takenCount;
-                                            const almostFull = spotsLeft === 1;
-                                            const displayTime = time;
+                                    <div className="max-h-72 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-2 gap-3">
+                                        {visibleSlots.map((time) => {
+                                          const isSelected = selectedTime === time;
+                                          const takenCount = slotCounts[time] ?? 0;
+                                          const spotsLeft = slotCapacity - takenCount;
+                                          const almostFull = spotsLeft === 1;
 
-                                            return (
-                                              <button
-                                                key={time}
-                                                type="button"
-                                                onClick={() => handleTimeSelect(time)}
-                                                className={`flex min-h-[84px] w-full flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200 focus:outline-none ${
-                                                  isSelected
-                                                    ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
-                                                    : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
-                                                }`}
-                                              >
-                                                <span className="text-sm font-bold tracking-wide">{displayTime}</span>
-                                                {spotsLeft > 0 && (
-                                                  <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
-                                                    {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
-                                                  </span>
-                                                )}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
+                                          return (
+                                            <button
+                                              key={time}
+                                              type="button"
+                                              onClick={() => handleTimeSelect(time)}
+                                              className={`flex min-h-[84px] w-full flex-col items-center justify-center rounded-sm border p-3 text-center transition-all duration-200 focus:outline-none ${
+                                                isSelected
+                                                  ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
+                                                  : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
+                                              }`}
+                                            >
+                                              <span className="text-sm font-bold tracking-wide">{time}</span>
+                                              {spotsLeft > 0 && (
+                                                <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
+                                                  {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
+                                                </span>
+                                              )}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
-                                    </>
-                                  )}
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5 pt-2">
-                <label htmlFor="productToPurchase" className="flex items-center gap-2 text-sm font-bold text-gray-400">
-                  <FaWrench /> Required Services or Products *
-                </label>
-                <textarea
-                  id="productToPurchase" name="productToPurchase" required rows={3}
-                  value={formData.productToPurchase} onChange={handleChange}
-                  className="w-full bg-gray-950/50 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-orange focus:border-brand-orange transition-all resize-none placeholder-gray-600 outline-none"
-                  placeholder="Tell us what needs doing..."
-                />
-              </div>
             </div>
+          </div>
 
-            {/* Submit Section */}
-            <div className="pt-6">
-              <div className="mb-6 flex justify-center">
+          {/* Right Column (4 columns) - Inquiry Summary */}
+          <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
+            <div className="bg-brand-dark border border-brand-orange/30 p-6 md:p-8 rounded-sm shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+              
+              <h3 className="text-lg font-display font-bold uppercase tracking-widest text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-4">
+                Inquiry Summary
+              </h3>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Client</span>
+                  <span className="text-white text-sm font-medium">{formData.fullName || <span className="text-gray-600 italic">Not provided</span>}</span>
+                  {formData.contactNumber && <span className="text-gray-400 text-xs">{formData.contactNumber}</span>}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Vehicle</span>
+                  <span className="text-white text-sm font-medium">
+                    {formData.yearModel || formData.make || formData.model 
+                      ? `${formData.yearModel} ${formData.make} ${formData.model}`.trim()
+                      : <span className="text-gray-600 italic">Not provided</span>}
+                  </span>
+                  {formData.plateNumber && <span className="text-gray-400 text-xs uppercase">{formData.plateNumber}</span>}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Services Requested</span>
+                  <span className="text-white text-sm font-medium">
+                    {formData.productToPurchase || <span className="text-gray-600 italic">Not provided</span>}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Schedule</span>
+                  <span className="text-white text-sm font-medium">
+                    {formData.appointmentDate 
+                      ? format(new Date(`${formData.appointmentDate}T00:00:00`), 'EEE, MMM d, yyyy') 
+                      : <span className="text-gray-600 italic">Date not selected</span>}
+                  </span>
+                  <span className="text-brand-orange text-sm font-bold">
+                    {formData.appointmentTime || <span className="text-gray-600 font-medium italic">Time not selected</span>}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mb-6 flex justify-center relative z-10">
                 <TurnstileWidget
                   onVerify={setTurnstileToken}
                   onExpire={() => setTurnstileToken('')}
                   resetKey={turnstileKey}
                 />
               </div>
+
               <button
                 type="submit"
                 disabled={isSubmitting || !turnstileToken}
                 title={!turnstileToken ? 'Please complete the CAPTCHA' : undefined}
-                className="w-full bg-brand-orange hover:bg-orange-600 text-white font-black uppercase tracking-wider text-lg py-4 px-8 rounded-xl transition-all transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3 shadow-lg hover:shadow-brand-orange/20"
+                className="w-full relative z-10 bg-brand-orange text-white px-8 py-4 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-orange-600 transition-colors flex items-center justify-center gap-3 rounded-sm shadow-[0_0_15px_rgba(255,102,0,0.2)] hover:shadow-[0_0_20px_rgba(255,102,0,0.4)]"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                     <span>Processing...</span>
                   </>
                 ) : (
                   <>
-                    <FaPaperPlane /> Request Booking
+                    Submit Inquiry <ArrowRight className="w-5 h-5" />
                   </>
                 )}
               </button>
             </div>
-
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );
-}
+}
