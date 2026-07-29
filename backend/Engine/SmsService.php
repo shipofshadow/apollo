@@ -251,6 +251,8 @@ public function customerInquiryAdmin(array $inquiry): void
         $recipients = $this->adminPhones();
         if (count($recipients) === 0) return;
 
+        $name    = (string) ($data['fullName'] ?? $data['name'] ?? 'A customer');
+        $time    = (string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? '');
         $make    = (string) ($data['make'] ?? '');
         $model   = (string) ($data['model'] ?? '');
         $vehicle = (string) ($data['vehicleInfo'] ?? $data['vehicle'] ?? '');

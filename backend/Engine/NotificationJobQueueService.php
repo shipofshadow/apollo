@@ -682,6 +682,33 @@ class NotificationJobQueueService
                     return;
                 }
 
+                // Staleness guard: skip if the appointment is too close to send a
+                // meaningful "3 hours" reminder. With a 5-minute cron cycle the max
+                // processing delay is ~5 min, so anything under 2 hours remaining
+                // means this job is stale (e.g. a failed job being replayed late).
+                // Threshold: 120 min — gives a 1-hour tolerance window around the
+                // intended 3-hour mark while catching truly late replays.
+                $apptDateStr = trim((string) ($data['appointmentDate'] ?? $data['appointment_date'] ?? ''));
+                $apptTimeStr = trim((string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? ''));
+                if ($apptDateStr !== '' && $apptTimeStr !== '') {
+                    try {
+                        $apptDt = new \DateTimeImmutable(
+                            $apptDateStr . ' ' . $apptTimeStr,
+                            new \DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila')
+                        );
+                        $minutesUntilAppt = (int) round(($apptDt->getTimestamp() - time()) / 60);
+                        if ($minutesUntilAppt < 120) {
+                            error_log(
+                                '[NotificationJobQueueService] Skipping stale appointment_reminder_3h job: '
+                                . "appointment is {$minutesUntilAppt} min away (threshold: 120 min)."
+                            );
+                            return;
+                        }
+                    } catch (\Throwable $e) {
+                        error_log('[NotificationJobQueueService] Could not parse appointment datetime for staleness check: ' . $e->getMessage());
+                    }
+                }
+
                 // Send email & SMS to Customer
                 try {
                     (new NotificationService())->appointmentReminder3hCustomer($data);
