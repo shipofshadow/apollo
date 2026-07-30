@@ -133,6 +133,7 @@ class Router
             $r->addRoute('GET',   '/api/inquiries/calendar',        'handleInquiryCalendar');
             $r->addRoute('GET',   '/api/inquiries/availability',   'handleInquiryAvailability');
             $r->addRoute('GET',   '/api/inquiries/{id}',             'handleInquiryGet');
+            $r->addRoute('GET',   '/api/inquiries/{id}/activity',    'handleInquiryActivity');
             $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
             $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
@@ -1243,6 +1244,17 @@ class Router
     }
 
     /** @param array<string, string> $vars */
+    private function handleInquiryActivity(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $id = $vars['id'] ?? '';
+        if ($id === '') throw new RuntimeException('Inquiry ID is required.', 400);
+
+        $activities = (new InquiryActivityService())->getForInquiry($id);
+        echo json_encode($activities);
+    }
+
+    /** @param array<string, string> $vars */
     private function handleInquiryCalendar(array $vars = []): void
     {
         $inquiries = (new InquiryService())->getAll();
@@ -1317,7 +1329,8 @@ class Router
             $id,
             $status !== '' ? $status : null,
             $appointmentDate,
-            $appointmentTime
+            $appointmentTime,
+            (int) ($payload['sub'] ?? 0) ?: null
         );
 
         // Re-queue the 3-hour appointment reminder when the schedule or status changes.

@@ -114,6 +114,13 @@ export default function BookingsPanel({ onView }: Props) {
   const [viewingInquiry, setViewingInquiry] = useState<InquiryEvent | null>(null);
   const [isEditingInquiry, setIsEditingInquiry] = useState(false);
   const [editDate, setEditDate] = useState<string>('');
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [closedDates, setClosedDates] = useState<{ date: string; reason: string | null; isYearly: boolean }[]>([]);
+  const [editDayIsOpen, setEditDayIsOpen] = useState(true);
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  const [slotCapacity, setSlotCapacity] = useState<number | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   useEffect(() => {
     if (token) {
       dispatch(fetchAllBookingsAsync(token));
@@ -194,7 +201,7 @@ export default function BookingsPanel({ onView }: Props) {
         await deleteInquiryApi(token, deleteTarget.id);
         setInquiries(prev => prev.filter(i => i.id !== deleteTarget.id));
         if (viewingInquiry?.id === deleteTarget.id) {
-          closeInquiryModal();
+          setViewingInquiry(null);
         }
       }
       showToast('Record deleted.', 'success');
@@ -380,7 +387,7 @@ export default function BookingsPanel({ onView }: Props) {
                   <tr
                     key={`${item.eventType}-${item.id}`}
                     className="hover:bg-white/[0.02] transition-colors cursor-pointer group"
-                    onClick={() => item.eventType === 'booking' ? onView(item.id) : openInquiryModal(item)}
+                    onClick={() => item.eventType === 'booking' ? onView(item.id) : onView('inq-' + item.id)}
                   >
                     {/* Client */}
                     <td className="px-5 py-4">
@@ -451,7 +458,7 @@ export default function BookingsPanel({ onView }: Props) {
                     {/* Actions */}
                     <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => item.eventType === 'booking' ? onView(item.id) : openInquiryModal(item)}
+                        <button onClick={() => item.eventType === 'booking' ? onView(item.id) : onView('inq-' + item.id)}
                           title="View Details"
                           className="flex items-center justify-center w-8 h-8 bg-[#181818] border border-gray-700 hover:border-brand-orange hover:text-brand-orange text-gray-400 rounded transition-colors"
                         >
@@ -500,7 +507,7 @@ export default function BookingsPanel({ onView }: Props) {
               <div
                 key={`${item.eventType}-${item.id}`}
                 className="p-5 hover:bg-white/[0.02] transition-colors cursor-pointer"
-                onClick={() => item.eventType === 'booking' ? onView(item.id) : openInquiryModal(item)}
+                onClick={() => item.eventType === 'booking' ? onView(item.id) : onView('inq-' + item.id)}
               >
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>

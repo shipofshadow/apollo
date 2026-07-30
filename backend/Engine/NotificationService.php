@@ -1494,10 +1494,16 @@ class NotificationService
 
         $fromName = MAIL_FROM_NAME;
         $from     = MAIL_FROM;
+        
+        $domain   = isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== '' ? $_SERVER['SERVER_NAME'] : 'apollo.local';
+        $messageId = sprintf('<%s.%s@%s>', uniqid('', true), time(), $domain);
 
         $headers  = implode("\r\n", [
             "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$from>",
             "Reply-To: $from",
+            "Message-ID: $messageId",
+            "List-Unsubscribe: <mailto:$from>",
+            "Precedence: bulk",
             'MIME-Version: 1.0',
             'Content-Type: text/html; charset=UTF-8',
             'X-Mailer: 1625-AutoLab',
@@ -1576,6 +1582,11 @@ class NotificationService
                 $mail->SMTPSecure = '';
                 $mail->SMTPAutoTLS = false;
             }
+
+            $domain = isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== '' ? $_SERVER['SERVER_NAME'] : 'apollo.local';
+            $mail->MessageID = sprintf('<%s.%s@%s>', uniqid('', true), time(), $domain);
+            $mail->addCustomHeader('List-Unsubscribe', '<mailto:' . MAIL_FROM . '>');
+            $mail->addCustomHeader('Precedence', 'bulk');
 
             $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
             $mail->addAddress($to, $toName);

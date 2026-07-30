@@ -1882,3 +1882,5 @@ export const updateAdminOrderPaymentApi = (token: string, id: number, paymentSta
 export const fetchInquiryByIdApi = (token: string, id: number | string) =>
   apiFetch<{ inquiry: any }>(`/api/inquiries/${id}`, {}, token);
 
+export const fetchInquiryActivityApi = (token: string, id: number | string) =>
+  apiFetch<any[]>(`/api/inquiries/${id}/activity`, {}, token);

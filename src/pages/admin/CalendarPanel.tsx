@@ -63,6 +63,15 @@ const TYPE_BADGE: Record<'booking' | 'inquiry', string> = {
   inquiry: 'bg-brand-orange/10 text-brand-orange border border-brand-orange/20',
 };
 
+const STATUS_DOT: Record<string, string> = {
+  pending:        'bg-yellow-500',
+  confirmed:      'bg-green-500',
+  in_progress:    'bg-sky-500',
+  completed:      'bg-blue-500',
+  cancelled:      'bg-gray-500',
+  awaiting_parts: 'bg-purple-500',
+};
+
 const formatAppointmentTime = (value?: string | null) => {
   if (!value) {
     return { time: '--:--', suffix: '' };
@@ -142,10 +151,11 @@ export default function CalendarPanel({ onView }: Props) {
   const [modalError, setModalError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  
-
-  
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [closedDates, setClosedDates] = useState<{ date: string; reason: string | null; isYearly: boolean }[]>([]);
+  const [editDayIsOpen, setEditDayIsOpen] = useState(true);
 
   const loadAvailability = async (date: string) => {
     if (!date) {
@@ -189,12 +199,6 @@ export default function CalendarPanel({ onView }: Props) {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [showStatusMenu]);
-
-  
-
-  
-
-  
 
   useEffect(() => {
     if (token) dispatch(fetchAllBookingsAsync(token));

@@ -8,6 +8,7 @@ class InquiryService
     private const SLOT_WINDOW_MINUTES = 5 * 60;
 
     private bool $useDb;
+    private InquiryActivityService $activity;
 
     private static string $storageFile = __DIR__ . '/../storage/inquiries.json';
     private static string $occupancyStorageFile = __DIR__ . '/../storage/inquiry_slot_occupancy.json';
@@ -15,6 +16,7 @@ class InquiryService
     public function __construct()
     {
         $this->useDb = DB_NAME !== '';
+        $this->activity = new InquiryActivityService();
     }
 
     /**
@@ -53,6 +55,15 @@ class InquiryService
 
         $this->syncOccupancyForInquiry($inquiry);
 
+        $this->activity->add(
+            $inquiry['id'],
+            'created',
+            'Inquiry submitted',
+            null,
+            null,
+            'client' // Typically created by client
+        );
+
         return $inquiry;
     }
 
@@ -83,9 +94,10 @@ class InquiryService
      * @param string|null $status
      * @param string|null $appointmentDate
      * @param string|null $appointmentTime
+     * @param int|null $actorUserId
      * @return array<string, mixed>
      */
-    public function updateDetails(string $id, ?string $status = null, ?string $appointmentDate = null, ?string $appointmentTime = null): array
+    public function updateDetails(string $id, ?string $status = null, ?string $appointmentDate = null, ?string $appointmentTime = null, ?int $actorUserId = null): array
     {
         $status = $status === null ? null : trim($status);
         if ($status !== null) {
@@ -134,6 +146,14 @@ class InquiryService
                 throw new RuntimeException('Inquiry not found.', 404);
             }
             $this->syncOccupancyForInquiry($inquiry);
+
+            if ($status !== null) {
+                $this->activity->add($id, 'status_updated', "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+            }
+            if ($isScheduleChange) {
+                $this->activity->add($id, 'rescheduled', "Rescheduled to {$appointmentDate} at {$appointmentTime}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+            }
+
             return $inquiry;
         }
 
@@ -168,6 +188,13 @@ class InquiryService
         }
         if (!is_array($updated)) {
             throw new RuntimeException('Inquiry not found.', 404);
+        }
+
+        if ($status !== null) {
+            $this->activity->add($id, 'status_updated', "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+        }
+        if ($isScheduleChange) {
+            $this->activity->add($id, 'rescheduled', "Rescheduled to {$appointmentDate} at {$appointmentTime}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
         }
 
         return $updated;
