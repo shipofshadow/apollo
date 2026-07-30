@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import PageSEO from '../components/PageSEO';
 import { useToast } from '../context/ToastContext';
@@ -24,7 +24,7 @@ import {
   FaIdBadge,
   FaBell
 } from 'react-icons/fa';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle } from 'lucide-react';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -107,6 +107,9 @@ const inputClass = "w-full bg-black/20 border border-gray-700 text-white px-4 py
 export default function CustomerFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [step, setStep] = useState(1);
+  const [submittedData, setSubmittedData] = useState<typeof formData | null>(null);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
   const { showToast } = useToast();
   const { user, token } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -249,9 +252,14 @@ export default function CustomerFormPage() {
       }
 
       // 2. Main Backend API Push
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      // Include auth token when available so the backend links the inquiry
+      // directly to the logged-in user's account on creation.
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const response = await fetch(`${BACKEND_URL}/api/inquiries`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ ...formData, 'cf-turnstile-response': turnstileToken }),
       });
 
@@ -261,9 +269,14 @@ export default function CustomerFormPage() {
       }
 
       showToast('Form submitted successfully! A confirmation notification and a 3-hour prior appointment reminder have been scheduled.', 'success');
+      
+      setSubmittedData({ ...formData });
+      setSubmittedId(result?.inquiry?.id ?? null);
+      
       setFormData(INITIAL_FORM_STATE);
       setSelectedDate(null);
       setSelectedTime('');
+      setStep(2);
 
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -285,16 +298,19 @@ export default function CustomerFormPage() {
       />
 
       <div className="container mx-auto px-4 md:px-6 max-w-7xl">
-        <div className="text-center mb-12">
-          <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-3">Service Request</span>
-          <h1 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter mb-4">
-            Request <span className="text-brand-orange">Schedule</span>
-          </h1>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Lock in your spot on the floor. Drop your details below and our team will confirm your schedule.
-          </p>
-        </div>
+        {step === 1 && (
+          <div className="text-center mb-12">
+            <span className="text-brand-orange font-bold uppercase tracking-widest text-sm block mb-3">Service Request</span>
+            <h1 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter mb-4">
+              Request <span className="text-brand-orange">Schedule</span>
+            </h1>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Lock in your spot on the floor. Drop your details below and our team will confirm your schedule.
+            </p>
+          </div>
+        )}
 
+        {step === 1 && (
         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Left Column (8 columns) */}
@@ -699,6 +715,91 @@ export default function CustomerFormPage() {
             </div>
           </div>
         </form>
+        )}
+
+        {step === 2 && submittedData && (
+          <div className="text-center py-16 animate-in zoom-in-95 duration-500">
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-brand-orange/10 mb-8 shadow-[0_0_30px_rgba(255,102,0,0.2)]">
+              <CheckCircle className="w-12 h-12 text-brand-orange" />
+            </div>
+            
+            <h2 className="text-3xl md:text-5xl font-display font-black text-white uppercase tracking-tight mb-4">
+              You're All Set!
+            </h2>
+            
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-12">
+              Your inquiry has been successfully submitted. We've sent a confirmation to <strong className="text-white">{submittedData.emailAddress}</strong>. Our team will review your request and confirm your schedule shortly.
+            </p>
+
+            <div className="bg-brand-dark/50 border border-gray-800 rounded-sm p-6 md:p-8 max-w-2xl mx-auto mb-12 text-left space-y-4">
+              <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-6 border-b border-gray-800 pb-4">
+                Inquiry Details
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Name</span>
+                  <span className="text-white">{submittedData.fullName}</span>
+                </div>
+                <div>
+                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Vehicle</span>
+                  <span className="text-white">{submittedData.yearModel} {submittedData.make} {submittedData.model}</span>
+                </div>
+                <div>
+                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Schedule</span>
+                  <span className="text-white">
+                    {submittedData.appointmentDate ? format(new Date(`${submittedData.appointmentDate}T00:00:00`), 'MMM d, yyyy') : 'N/A'} at {submittedData.appointmentTime || 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Service Requested</span>
+                  <span className="text-white">{submittedData.productToPurchase}</span>
+                </div>
+                {submittedId && (
+                  <div className="col-span-2 pt-2 border-t border-gray-800/60">
+                    <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Reference ID</span>
+                    <span className="text-gray-400 font-mono text-xs">{submittedId}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Guest: explain email-match linking before CTA */}
+            {!user && (
+              <div className="max-w-2xl mx-auto mb-8 rounded-xl border border-brand-orange/30 bg-brand-orange/5 px-6 py-5 text-left">
+                <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-2">💡 Track your inquiry</p>
+                <p className="text-sm text-gray-300 leading-relaxed">
+                  Create a free account using <strong className="text-white">{submittedData.emailAddress}</strong> — the same email you used for this inquiry — and it will <strong className="text-white">automatically appear on your dashboard</strong> so you can follow the status in real time.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              {user ? (
+                <Link
+                  to="/client/inquiries"
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-4 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm shadow-[0_0_15px_rgba(255,102,0,0.2)] hover:shadow-[0_0_20px_rgba(255,102,0,0.4)]"
+                >
+                  View My Inquiries
+                </Link>
+              ) : (
+                <Link
+                  to={`/register?redirect=/client/inquiries&source=inquiry&name=${encodeURIComponent(submittedData.fullName)}&email=${encodeURIComponent(submittedData.emailAddress)}`}
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-4 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm shadow-[0_0_15px_rgba(255,102,0,0.2)] hover:shadow-[0_0_20px_rgba(255,102,0,0.4)]"
+                >
+                  Create Account to Track Inquiry
+                </Link>
+              )}
+
+              <button
+                onClick={() => setStep(1)}
+                className="w-full sm:w-auto bg-transparent border-2 border-gray-700 text-white px-8 py-4 font-bold uppercase tracking-widest hover:border-gray-500 hover:bg-gray-800/50 transition-all flex items-center justify-center gap-2 rounded-sm"
+              >
+                Submit Another
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

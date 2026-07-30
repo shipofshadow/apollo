@@ -130,6 +130,7 @@ class Router
             $r->addRoute('POST',  '/api/booking/external',          'handleBookingExternalCreate');
             $r->addRoute('POST',  '/api/inquiries',                 'handleInquiryCreate');
             $r->addRoute('GET',   '/api/inquiries',                 'handleInquiryList');
+            $r->addRoute('GET',   '/api/inquiries/mine',            'handleInquiryMine');
             $r->addRoute('GET',   '/api/inquiries/calendar',        'handleInquiryCalendar');
             $r->addRoute('GET',   '/api/inquiries/availability',   'handleInquiryAvailability');
             $r->addRoute('GET',   '/api/inquiries/{id}',             'handleInquiryGet');
@@ -301,6 +302,7 @@ class Router
             $r->addRoute('POST', '/api/admin/cron/notification-queue', 'handleAdminCronNotificationQueue');
             $r->addRoute('POST', '/api/admin/cron/waitlist-autofill', 'handleAdminCronWaitlistAutofill');
             $r->addRoute('POST', '/api/admin/cron/appointment-reminders', 'handleAdminCronAppointmentReminders');
+            $r->addRoute('POST', '/api/admin/inquiries/link-guests', 'handleAdminInquiryLinkGuests');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
             $r->addRoute('GET',    '/api/admin/users',            'handleAdminUserList');
@@ -813,6 +815,20 @@ class Router
                     (new PrivacyService())->recordConsent((int) $result['user']['id'], '1.0');
                 } catch (\Throwable) { /* non-blocking */ }
             }
+
+            // Link existing guest inquiries
+            if (isset($result['user']['id'], $result['user']['email'])) {
+                try {
+                    if (DB_NAME !== '') {
+                        $db = Database::getInstance();
+                        $stmt = $db->prepare('UPDATE customer_inquiries SET user_id = :uid WHERE email_address = :email AND user_id IS NULL');
+                        $stmt->execute([
+                            ':uid' => (string) $result['user']['id'],
+                            ':email' => (string) $result['user']['email']
+                        ]);
+                    }
+                } catch (\Throwable $e) { /* non-blocking */ }
+            }
         }
         http_response_code(201);
         echo json_encode($result);
@@ -1207,6 +1223,23 @@ class Router
     private function handleInquiryCreate(array $vars = []): void
     {
         $data = $this->jsonBody();
+
+        // If the request includes a valid auth token, link this inquiry to the
+        // authenticated user immediately (so it appears on their dashboard right away).
+        // Guest submissions (no token) fall through silently — user_id stays null
+        // and gets linked at registration time via email-match.
+        if (!isset($data['userId']) || $data['userId'] === null) {
+            try {
+                $authPayload = Auth::user();
+                $authUserId = (int) ($authPayload['sub'] ?? 0);
+                if ($authUserId > 0) {
+                    $data['userId'] = $authUserId;
+                }
+            } catch (\Throwable) {
+                // No valid token — treat as guest submission, which is expected.
+            }
+        }
+
         $inquiry = (new InquiryService())->create($data);
         $queue = new NotificationJobQueueService();
         $queue->dispatch('customer_inquiry', ['data' => $data]);
@@ -1227,6 +1260,14 @@ class Router
     {
         $this->requirePermission('bookings:manage');
         $inquiries = (new InquiryService())->getAll();
+        echo json_encode(['inquiries' => $inquiries]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryMine(array $vars = []): void
+    {
+        $session = $this->requireAuth();
+        $inquiries = (new InquiryService())->getAllForUser($session['sub']);
         echo json_encode(['inquiries' => $inquiries]);
     }
 
@@ -1394,6 +1435,50 @@ class Router
 
         (new InquiryService())->delete($id);
         echo json_encode(['deleted' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminInquiryLinkGuests(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+
+        if (DB_NAME === '') {
+            throw new RuntimeException('Database not configured.', 500);
+        }
+
+        $db = Database::getInstance();
+
+        // Find all guest inquiries that have a matching registered user by email
+        $select = $db->query(
+            "SELECT ci.id AS inquiry_id, u.id AS user_id
+               FROM customer_inquiries ci
+               INNER JOIN users u
+                  ON LOWER(TRIM(ci.email_address)) = LOWER(TRIM(u.email))
+              WHERE ci.user_id IS NULL"
+        );
+        $matches = $select->fetchAll(PDO::FETCH_ASSOC);
+
+        $linked  = 0;
+        $skipped = 0;
+
+        foreach ($matches as $row) {
+            $update = $db->prepare(
+                'UPDATE customer_inquiries SET user_id = :uid WHERE id = :id AND user_id IS NULL'
+            );
+            $update->execute([':uid' => (string) $row['user_id'], ':id' => (string) $row['inquiry_id']]);
+            if ($update->rowCount() > 0) {
+                $linked++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        echo json_encode([
+            'linked'          => $linked,
+            'skipped'         => $skipped,
+            'totalCandidates' => count($matches),
+            'message'         => "{$linked} guest inquiry/inquiries successfully linked to user accounts.",
+        ]);
     }
 
     /**

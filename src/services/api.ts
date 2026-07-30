@@ -401,6 +401,9 @@ export const submitBookingApi = (payload: BookingPayload & { 'cf-turnstile-respo
 export const fetchMyBookingsApi = (token: string) =>
   apiFetch<{ bookings: Booking[] }>('/api/bookings/mine', {}, token);
 
+export const fetchMyInquiriesApi = (token: string) =>
+  apiFetch<{ inquiries: any[] }>('/api/inquiries/mine', {}, token);
+
 export const fetchAllBookingsApi = (token: string) =>
   apiFetch<{ bookings: Booking[] }>('/api/bookings', {}, token);
 

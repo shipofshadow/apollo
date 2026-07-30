@@ -100,7 +100,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1.5">
         {cells.map((day, i) => {
-          if (day === null) return <div key={`empty-${i}`} className="min-h-[72px]" />;
+          if (day === null) return <div key={`empty-${i}`} className="aspect-square" />;
           
           const date = new Date(year, month, day);
           const iso = formatDateYMD(date);
@@ -137,32 +137,44 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
               type="button"
               onClick={() => canSelect && onChange(date)}
               disabled={!canSelect}
-              className={`relative min-h-[72px] p-2 flex flex-col items-center justify-start rounded-lg border transition-all duration-200 ${cellStyle} ${cursorStyle}`}
+              className={`aspect-square p-1.5 flex flex-col items-center rounded-lg border transition-all duration-200 ${cellStyle} ${cursorStyle}`}
             >
-              {/* Date Number */}
-              <div className={`w-7 h-7 flex items-center justify-center rounded text-sm font-semibold
-                ${todayIso && !selected ? 'text-amber-500 border border-amber-500/30' : ''}
-              `}>
-                {day}
+              {/* Date number — grows to fill available space, centered */}
+              <div className="flex-1 flex items-center justify-center">
+                <div className={`w-7 h-7 flex items-center justify-center rounded text-sm font-semibold
+                  ${todayIso && !selected ? 'text-amber-500 border border-amber-500/30' : ''}
+                `}>
+                  {day}
+                </div>
               </div>
 
-              {/* Status Indicators */}
-              <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center justify-end px-2">
+              {/* Bottom indicator row — fixed height so it never overlaps the number */}
+              <div className="h-4 w-full flex items-center justify-center px-1.5">
                 {showAvailabilityIndicators && available && !closed && (
-                  <>
-                    {isFull ? (
-                      <span className={`text-[9px] font-bold uppercase tracking-wider ${selected ? 'text-black/70' : 'text-red-500'}`}>Full</span>
-                    ) : (
-                      <div className="w-full flex items-center gap-1">
-                        <div className={`h-1 flex-1 rounded-sm ${selected ? 'bg-black/20' : slotsLeft <= 1 ? 'bg-amber-500/50' : 'bg-emerald-500/50'}`} />
-                        <span className={`text-[9px] font-bold ${selected ? 'text-black/70' : 'text-zinc-500'}`}>
-                          {slotsLeft}
-                        </span>
-                      </div>
-                    )}
-                  </>
+                  isFull ? (
+                    <span className={`text-[8px] font-bold uppercase tracking-wider leading-none ${selected ? 'text-black/60' : 'text-red-500'}`}>
+                      Full
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: Math.min(slotsLeft, slotCapacity) }).map((_, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-1 h-1 rounded-full ${
+                            selected
+                              ? 'bg-black/30'
+                              : slotsLeft <= 1
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500/70'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )
                 )}
-                {closed && <div className="text-[10px] uppercase font-bold tracking-widest text-red-500/50">--</div>}
+                {closed && (
+                  <div className="w-4 h-0.5 rounded-full bg-red-700/40" />
+                )}
               </div>
             </button>
           );

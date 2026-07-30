@@ -23,7 +23,6 @@ const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const Portfolio = lazy(() => import('./pages/Portfolio'));
 const About = lazy(() => import('./pages/About'));
-const BookingPage = lazy(() => import('./pages/BookingPage'));
 const Blog = lazy(() => import('./pages/Blog'));
 const BlogPostDetail = lazy(() => import('./pages/BlogPostDetail'));
 const FaqPage = lazy(() => import('./pages/Faq'));
@@ -36,6 +35,7 @@ const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const ClientLayout = lazy(() => import('./pages/client/ClientLayout'));
 const ClientDashboard = lazy(() => import('./pages/client/ClientDashboard'));
 const MyBookings = lazy(() => import('./pages/client/MyBookings'));
+const MyInquiries = lazy(() => import('./pages/client/MyInquiries'));
 const BookingDetail = lazy(() => import('./pages/client/BookingDetail'));
 const MyGarage = lazy(() => import('./pages/client/MyGarage'));
 const Profile = lazy(() => import('./pages/client/Profile'));
@@ -94,7 +94,7 @@ function AppInner() {
             <Route path="/faq" element={<FaqPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/about" element={<About />} />
-            <Route path="/booking" element={<BookingPage />} />
+            <Route path="/booking" element={<Navigate to="/order" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -116,6 +116,7 @@ function AppInner() {
           >
             <Route path="dashboard" element={<ClientDashboard />} />
             <Route path="bookings" element={<MyBookings />} />
+            <Route path="inquiries" element={<MyInquiries />} />
             <Route path="bookings/:id" element={<BookingDetail />} />
             <Route path="orders" element={<MyOrders />} />
             <Route path="garage" element={<MyGarage />} />

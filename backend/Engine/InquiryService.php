@@ -31,6 +31,7 @@ class InquiryService
 
         $inquiry = [
             'id' => $this->uuid(),
+            'user_id' => $data['userId'] ?? null,
             'fullName' => $normalized['fullName'],
             'address' => $normalized['address'],
             'contactNumber' => $normalized['contactNumber'],
@@ -73,6 +74,30 @@ class InquiryService
     public function getAll(): array
     {
         return $this->useDb ? $this->dbGetAll() : $this->fileGetAll();
+    }
+
+    /**
+     * @param string|int $userId
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAllForUser($userId): array
+    {
+        if (!$this->useDb) {
+            // Not implemented for file storage
+            return [];
+        }
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+                'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                    make, model, year_model, product_to_purchase, appointment_date,
+                    appointment_time, status, created_at
+                 FROM customer_inquiries
+                 WHERE user_id = :user_id
+             ORDER BY appointment_date ASC, appointment_time ASC, created_at DESC'
+        );
+        $stmt->execute([':user_id' => (string) $userId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return array_map(fn (array $row): array => $this->mapDbRow($row), $rows);
     }
 
     /**
@@ -371,11 +396,11 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO customer_inquiries (
-                id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, created_at, updated_at
             ) VALUES (
-                :id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
+                :id, :user_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
                 :make, :model, :year_model, :product_to_purchase, :appointment_date,
                 :appointment_time, :status, :created_at, :updated_at
             )'
@@ -383,6 +408,7 @@ class InquiryService
 
         $stmt->execute([
             ':id' => (string) $inquiry['id'],
+            ':user_id' => $inquiry['user_id'] ? (string) $inquiry['user_id'] : null,
             ':full_name' => (string) $inquiry['fullName'],
             ':address' => (string) $inquiry['address'],
             ':contact_number' => (string) $inquiry['contactNumber'],
@@ -408,7 +434,7 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->query(
-                'SELECT id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, created_at
                  FROM customer_inquiries
@@ -480,7 +506,7 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            'SELECT id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+            'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, created_at
              FROM customer_inquiries
@@ -500,6 +526,7 @@ class InquiryService
     {
         return [
             'id' => (string) ($row['id'] ?? ''),
+            'userId' => $row['user_id'] ? (string) $row['user_id'] : null,
             'fullName' => (string) ($row['full_name'] ?? ''),
             'address' => (string) ($row['address'] ?? ''),
             'contactNumber' => (string) ($row['contact_number'] ?? ''),

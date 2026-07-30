@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { UserPlus, Eye, EyeOff, AlertCircle, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import TurnstileWidget from '../../components/TurnstileWidget';
@@ -25,6 +25,7 @@ export default function RegisterPage() {
   const navigate  = useNavigate();
   const [params]  = useSearchParams();
   const redirect  = params.get('redirect') ?? '';
+  const isInquiryFlow = params.get('source') === 'inquiry';
 
   const { user, status, error, register, clearError } = useAuth();
   const { showToast } = useToast();
@@ -104,10 +105,26 @@ export default function RegisterPage() {
           <h1 className="text-4xl font-display font-black text-white uppercase tracking-tighter mb-2">
             Create <span className="text-brand-orange">Account</span>
           </h1>
-          <p className="text-gray-400">Register to book services and track your appointments.</p>
+          <p className="text-gray-400">
+            {isInquiryFlow
+              ? 'Register to link your inquiry and track it from your dashboard.'
+              : 'Register to book services and track your appointments.'}
+          </p>
         </div>
 
         <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 shadow-2xl">
+          {/* Inquiry linking context banner */}
+          {isInquiryFlow && (
+            <div className="flex items-start gap-3 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange rounded-sm px-4 py-3 mb-6 text-sm">
+              <ClipboardList className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold mb-0.5">Inquiry Linking Active</p>
+                <p className="text-orange-200/80 text-xs leading-relaxed">
+                  Register using the <strong>same email</strong> from your inquiry and it will automatically appear in your <strong>My Inquiries</strong> tab.
+                </p>
+              </div>
+            </div>
+          )}
           {displayError && (
             <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm mb-6 text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
