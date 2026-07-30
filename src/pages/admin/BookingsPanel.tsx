@@ -126,16 +126,6 @@ export default function BookingsPanel({ onView }: Props) {
     }
   }, [token, dispatch]);
 
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (showStatusMenu && statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
-        setShowStatusMenu(false);
-      }
-    }
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [showStatusMenu]);
-
   const loadAvailability = async (date: string) => {
     if (!date) {
       setAvailableSlots([]);
