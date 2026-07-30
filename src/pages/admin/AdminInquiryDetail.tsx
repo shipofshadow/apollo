@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  ArrowLeft, CheckCircle2, Clock, 
+  ArrowLeft, CheckCircle2, Clock,
   Trash2, AlertTriangle, User, Car, Activity,
-  ChevronLeft, ChevronRight, ChevronDown, Calendar
+  ChevronLeft, ChevronRight, Calendar, ClipboardList
 } from 'lucide-react';
 import {
   fetchInquiryByIdApi,
@@ -24,13 +24,6 @@ const STATUS_STYLES: Record<string, string> = {
   'cancelled': 'bg-red-500/10 text-red-500 border border-red-500/20',
 };
 
-const STATUS_DOT: Record<string, string> = {
-  'pending': 'bg-yellow-500',
-  'confirmed': 'bg-green-500',
-  'in_progress': 'bg-blue-500',
-  'completed': 'bg-purple-500',
-  'cancelled': 'bg-red-500',
-};
 
 type InquiryActivityLog = {
   id: number;
@@ -60,25 +53,34 @@ interface Props {
   onBack: () => void;
 }
 
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: 'default' | 'danger';
+};
+
 export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const { token } = useAuth();
   const { showToast } = useToast();
-  
+
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
   const [activityLogs, setActivityLogs] = useState<InquiryActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
+
   const [statusLoading, setStatusLoading] = useState(false);
-  
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
+
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
-  
+
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
 
@@ -100,7 +102,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   };
 
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const id = inquiryId.replace('inq-', '');
 
   const fetchData = async () => {
@@ -128,7 +130,6 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const handleStatusChange = async (newStatus: string) => {
     if (!token || !inquiry) return;
     setStatusLoading(true);
-    setShowStatusMenu(false);
     try {
       const res = await updateInquiryStatusApi(token, inquiry.id, newStatus);
       setInquiry({ ...inquiry, status: res.inquiry.status });
@@ -187,7 +188,6 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
   const handleDelete = async () => {
     if (!token || !inquiry) return;
-    if (!window.confirm('Are you sure you want to delete this inquiry?')) return;
     setIsDeleting(true);
     try {
       await deleteInquiryApi(token, inquiry.id);
@@ -196,6 +196,29 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     } catch (err) {
       showToast((err as Error).message, 'error');
       setIsDeleting(false);
+    }
+  };
+
+  const requestConfirmation = (dialog: ConfirmDialogState, action: () => Promise<void>) => {
+    setConfirmDialog(dialog);
+    setConfirmAction(() => action);
+  };
+
+  const closeConfirmation = () => {
+    if (confirmBusy) return;
+    setConfirmDialog(null);
+    setConfirmAction(null);
+  };
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      await confirmAction();
+      setConfirmDialog(null);
+      setConfirmAction(null);
+    } finally {
+      setConfirmBusy(false);
     }
   };
 
@@ -225,117 +248,97 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
-        <div>
-          <button 
-            onClick={onBack} 
-            className="group flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white transition-colors mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> Back to Appointments
-          </button>
-          <h1 className="text-2xl md:text-4xl font-display font-black text-white uppercase tracking-tight flex items-center gap-3">
-            Inquiry <span className="text-gray-500/50">#{inquiry.id.substring(0, 8)}</span>
-          </h1>
-          <p className="text-gray-400 text-sm mt-2 flex items-center gap-2 font-medium">
-            Submitted by <span className="text-white">{inquiry.fullName}</span>
-          </p>
-        </div>
+      <div className="flex flex-col gap-4 mb-8">
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-orange text-[10px] font-mono uppercase tracking-widest transition-colors w-fit"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Return to Appointments
+        </button>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Status Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowStatusMenu(!showStatusMenu)}
-              disabled={statusLoading}
-              className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs transition-colors shadow-sm ${STATUS_STYLES[inquiry.status] || 'bg-gray-800 text-gray-300'}`}
-            >
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{statusLoading ? 'Updating...' : formatStatus(inquiry.status as any)}</span>
-              <ChevronDown className={`w-4 h-4 shrink-0 opacity-70 transition-transform ${showStatusMenu ? 'rotate-180' : ''}`} />
-            </button>
-            
-            {showStatusMenu && (
-              <div className="absolute right-0 sm:right-auto sm:left-0 mt-2 w-48 rounded-sm border border-gray-700 bg-[#121212] shadow-2xl z-50 overflow-hidden">
-                {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleStatusChange(s)}
-                    className={`w-full text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${s === inquiry.status ? 'bg-black/40 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'} flex items-center gap-2`}
-                  >
-                    <span className={`w-2 h-2 rounded-full shadow-sm ${STATUS_DOT[s] || 'bg-gray-500'}`} />
-                    {formatStatus(s as any)}
-                  </button>
-                ))}
+        <div className="relative border border-gray-800/80 rounded-lg bg-[#121212] overflow-hidden shadow-2xl">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-orange via-brand-orange/50 to-transparent" />
+
+          <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center gap-4">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80">
+                  Inquiry Details
+                </p>
+                <span className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded border ${STATUS_STYLES[inquiry.status] || 'bg-gray-800 text-gray-300'}`}>
+                  {formatStatus(inquiry.status as any)}
+                </span>
               </div>
-            )}
+
+              <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+                Inquiry <span className="text-gray-500/50 text-2xl">#{inquiry.id.substring(0, 8)}</span>
+              </h1>
+
+              <div className="flex items-center gap-3 pt-2 text-xs font-mono">
+                <span className="text-gray-500 bg-[#181818] px-2.5 py-1 rounded border border-gray-800">
+                  Submitted by {inquiry.fullName}
+                </span>
+              </div>
+            </div>
           </div>
-          
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs text-red-400 bg-red-500/5 border border-red-500/20 hover:bg-red-500/20 transition-colors shadow-sm"
-          >
-            <Trash2 className="w-4 h-4" />
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Details */}
         <div className="lg:col-span-8 space-y-8">
-          {/* Customer & Vehicle Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg relative overflow-hidden shadow-xl">
-              <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-                <User className="w-32 h-32" />
-              </div>
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                <User className="w-4 h-4 text-brand-orange" /> Client Details
-              </h3>
-              <div className="space-y-5 relative z-10">
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Full Name</p>
-                  <p className="text-white font-medium text-sm">{inquiry.fullName}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Email Address</p>
-                  <p className="text-white font-medium text-sm">{inquiry.emailAddress || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Contact Number</p>
-                  <p className="text-white font-medium text-sm">{inquiry.contactNumber || 'N/A'}</p>
-                </div>
-                {inquiry.facebookName && (
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Facebook Name</p>
-                    <p className="text-white font-medium text-sm">{inquiry.facebookName}</p>
-                  </div>
-                )}
-              </div>
-            </div>
+          {/* Inquiry Details (Client + Vehicle) */}
+          <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg relative overflow-hidden shadow-xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
 
-            <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg relative overflow-hidden shadow-xl">
-              <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
-                <Car className="w-32 h-32" />
+              {/* Client Column */}
+              <div>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
+                  <User className="w-4 h-4 text-brand-orange" /> Client Details
+                </h3>
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Full Name</p>
+                    <p className="text-white font-medium text-sm">{inquiry.fullName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Email Address</p>
+                    <p className="text-white font-medium text-sm">{inquiry.emailAddress || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Contact Number</p>
+                    <p className="text-white font-medium text-sm">{inquiry.contactNumber || 'N/A'}</p>
+                  </div>
+                  {inquiry.facebookName && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Facebook Name</p>
+                      <p className="text-white font-medium text-sm">{inquiry.facebookName}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                <Car className="w-4 h-4 text-brand-orange" /> Vehicle Info
-              </h3>
-              <div className="space-y-5 relative z-10">
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Make & Model</p>
-                  <p className="text-white font-medium text-sm">{inquiry.make} {inquiry.model} {inquiry.year || ''}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Plate Number</p>
-                  <p className="text-white font-medium text-sm uppercase">{inquiry.plateNumber || 'N/A'}</p>
-                </div>
-                <div className="bg-brand-orange/5 border border-brand-orange/20 rounded p-4 mt-2">
-                  <p className="text-[10px] text-brand-orange/80 uppercase tracking-widest font-mono mb-1">Product / Service</p>
-                  <p className="text-brand-orange font-bold text-sm leading-relaxed">{inquiry.productToPurchase || 'Service inquiry'}</p>
+
+              {/* Vehicle Column */}
+              <div>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
+                  <Car className="w-4 h-4 text-brand-orange" /> Vehicle Info
+                </h3>
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Make & Model</p>
+                    <p className="text-white font-medium text-sm">{inquiry.make} {inquiry.model} {inquiry.year || ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Plate Number</p>
+                    <p className="text-white font-medium text-sm uppercase">{inquiry.plateNumber || 'N/A'}</p>
+                  </div>
+                  <div className="bg-brand-orange/5 border border-brand-orange/20 rounded p-4 mt-2">
+                    <p className="text-[10px] text-brand-orange/80 uppercase tracking-widest font-mono mb-1">Product / Service</p>
+                    <p className="text-brand-orange font-bold text-sm leading-relaxed">{inquiry.productToPurchase || 'Service inquiry'}</p>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
@@ -344,26 +347,26 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
         <div className="lg:col-span-4 space-y-8">
           <div className="bg-black/40 border border-brand-orange/20 p-8 rounded-lg shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-            
+
             <h3 className="text-[10px] font-bold text-brand-orange uppercase tracking-widest mb-6 flex items-center justify-between border-b border-gray-800/80 pb-4">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" /> Schedule
               </div>
             </h3>
-            
+
             {!isEditingSchedule ? (
               <div className="bg-[#121212] rounded-md border border-gray-800/80 p-6 text-center shadow-inner flex flex-col items-center">
                 <p className="text-3xl font-display font-black text-white tracking-tight mb-2">
-                  {inquiry.appointmentDate 
+                  {inquiry.appointmentDate
                     ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
                     : 'No Date'}
                 </p>
                 <p className="text-brand-orange font-bold uppercase tracking-widest text-sm mb-6">
-                  {inquiry.appointmentTime 
+                  {inquiry.appointmentTime
                     ? inquiry.appointmentTime
                     : 'No Time'}
                 </p>
-                <button 
+                <button
                   onClick={() => {
                     handleDateChange(inquiry.appointmentDate);
                     setEditTime(inquiry.appointmentTime);
@@ -386,11 +389,11 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                   <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-2">Date</label>
                   <div className="bg-[#121212] border border-gray-700 rounded-sm overflow-hidden">
                     <div className="flex items-center justify-between p-3 border-b border-gray-700">
-                      <button onClick={prevMonth} className="p-1 hover:text-brand-orange text-gray-400 transition-colors"><ChevronLeft className="w-4 h-4"/></button>
+                      <button onClick={prevMonth} className="p-1 hover:text-brand-orange text-gray-400 transition-colors"><ChevronLeft className="w-4 h-4" /></button>
                       <span className="text-xs font-bold uppercase tracking-widest text-white">
                         {new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long' })} {calendarYear}
                       </span>
-                      <button onClick={nextMonth} className="p-1 hover:text-brand-orange text-gray-400 transition-colors"><ChevronRight className="w-4 h-4"/></button>
+                      <button onClick={nextMonth} className="p-1 hover:text-brand-orange text-gray-400 transition-colors"><ChevronRight className="w-4 h-4" /></button>
                     </div>
                     <div className="grid grid-cols-7 border-b border-gray-700 bg-black/20">
                       {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
@@ -402,17 +405,16 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                         if (!day) return <div key={`empty-${i}`} />;
                         const dateIso = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                         const isSelected = dateIso === editDate;
-                        const isPast = new Date(dateIso + 'T00:00:00') < new Date(new Date().setHours(0,0,0,0));
+                        const isPast = new Date(dateIso + 'T00:00:00') < new Date(new Date().setHours(0, 0, 0, 0));
                         return (
                           <button
                             key={i}
                             disabled={isPast}
                             onClick={() => handleDateChange(dateIso)}
-                            className={`h-8 w-full rounded flex items-center justify-center text-xs font-bold transition-colors ${
-                              isSelected ? 'bg-brand-orange text-white shadow-md shadow-brand-orange/20' : 
-                              isPast ? 'text-gray-700 cursor-not-allowed opacity-50' : 
-                              'text-gray-300 hover:bg-gray-800'
-                            }`}
+                            className={`h-8 w-full rounded flex items-center justify-center text-xs font-bold transition-colors ${isSelected ? 'bg-brand-orange text-white shadow-md shadow-brand-orange/20' :
+                                isPast ? 'text-gray-700 cursor-not-allowed opacity-50' :
+                                  'text-gray-300 hover:bg-gray-800'
+                              }`}
                           >
                             {day}
                           </button>
@@ -460,6 +462,76 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
             )}
           </div>
 
+          {/* Actions */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange/80 mb-6 pb-4 border-b border-gray-800 flex items-center gap-2">
+              <ClipboardList className="w-3.5 h-3.5 text-brand-orange" /> Actions
+            </p>
+
+            <div className="space-y-3">
+              {inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => {
+                if (s === inquiry.status) return null;
+
+                let colorClass = 'border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white';
+
+                if (s === 'confirmed') {
+                  colorClass = 'border-green-500/30 text-green-400 hover:bg-green-500/10';
+                } else if (s === 'in_progress') {
+                  colorClass = 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10';
+                } else if (s === 'completed') {
+                  colorClass = 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10';
+                } else if (s === 'cancelled') {
+                  colorClass = 'border-red-500/30 text-red-400 hover:bg-red-500/10';
+                }
+
+                return (
+                  <button
+                    key={s}
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Update Status?',
+                        message: `Change inquiry status to ${formatStatus(s as any)}?`,
+                        confirmLabel: 'Confirm',
+                        tone: s === 'cancelled' ? 'danger' : 'default',
+                      },
+                      () => handleStatusChange(s)
+                    )}
+                    disabled={statusLoading}
+                    className={`w-full flex justify-between items-center px-4 py-3 bg-[#151515] border ${colorClass} text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group`}
+                  >
+                    <span>Mark as {formatStatus(s as any)}</span>
+                    <CheckCircle2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+                  </button>
+                )
+              })}
+
+              <button
+                onClick={() => requestConfirmation(
+                  {
+                    title: 'Delete Inquiry?',
+                    message: 'This permanently deletes the inquiry and cannot be undone.',
+                    confirmLabel: 'Delete Inquiry',
+                    tone: 'danger',
+                  },
+                  handleDelete
+                )}
+                disabled={isDeleting}
+                className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-red-500/40 text-red-300 hover:bg-red-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
+              >
+                <span>{isDeleting ? 'Deleting...' : 'Delete Inquiry'}</span>
+                {isDeleting ? <Clock className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
+              </button>
+
+              {(inquiry.status === 'completed' || inquiry.status === 'cancelled') && (
+                <div className="bg-[#151515] border border-gray-800 rounded p-3 flex items-center justify-center mt-2">
+                  <p className="text-gray-600 text-[10px] font-mono uppercase tracking-widest">
+                    Status Locked ({formatStatus(inquiry.status as any)})
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Activity Timeline */}
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-8 shadow-xl">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
@@ -486,6 +558,38 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
         </div>
       </div>
+
+      {/* Action Confirmation Modal */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
+            <h3 className={`text-[10px] font-mono font-bold uppercase tracking-widest mb-4 border-b border-gray-800 pb-2 ${confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-brand-orange'}`}>
+              // Auth required
+            </h3>
+            <p className="text-lg font-bold text-white mb-2">{confirmDialog.title}</p>
+            <p className="text-sm text-gray-400 mb-6">{confirmDialog.message}</p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeConfirmation}
+                disabled={confirmBusy}
+                className="px-4 py-2 rounded border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+              >
+                Abort
+              </button>
+              <button
+                type="button"
+                onClick={() => void runConfirmedAction()}
+                disabled={confirmBusy}
+                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white disabled:opacity-30 transition-colors ${confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
+                  }`}
+              >
+                {confirmBusy ? 'Executing...' : confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

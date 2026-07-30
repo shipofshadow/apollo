@@ -103,8 +103,11 @@ export default function BookingsPanel({ onView }: Props) {
   const { appointments, status } = useSelector((s: RootState) => s.booking);
   
   const [inquiries, setInquiries] = useState<InquiryEvent[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | string>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'booking' | 'inquiry'>('all');
+  const [dateFilter, setDateFilter] = useState<string>('');
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
   
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: 'booking' | 'inquiry' } | null>(null);
@@ -252,7 +255,8 @@ export default function BookingsPanel({ onView }: Props) {
   });
 
   const filtered = allItems
-    .filter(item => statusFilter === 'all' || item.status === statusFilter)
+    .filter(item => typeFilter === 'all' || item.eventType === typeFilter)
+    .filter(item => !dateFilter || item.appointmentDate === dateFilter)
     .filter(item => {
       if (term === '') return true;
       if (item.eventType === 'booking') {
@@ -274,14 +278,13 @@ export default function BookingsPanel({ onView }: Props) {
       }
     });
 
-  const filters: Array<{ key: 'all' | string; label: string }> = [
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedItems = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const typeFilters: Array<{ key: 'all' | 'booking' | 'inquiry'; label: string }> = [
     { key: 'all',            label: 'All' },
-    { key: 'pending',        label: 'Pending' },
-    { key: 'confirmed',      label: 'Confirmed' },
-    { key: 'awaiting_parts', label: 'Awaiting Parts' },
-    { key: 'in_progress',    label: 'In Progress' },
-    { key: 'completed',      label: 'Completed' },
-    { key: 'cancelled',      label: 'Cancelled' },
+    { key: 'booking',        label: 'Bookings' },
+    { key: 'inquiry',        label: 'Inquiries' },
   ];
 
   return (
@@ -296,37 +299,59 @@ export default function BookingsPanel({ onView }: Props) {
           <h2 className="text-3xl font-black text-white uppercase tracking-tight">Customer Appointments</h2>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full lg:w-80 shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, phone, vehicle..."
-            className="w-full bg-[#121212] border border-gray-800 text-white text-sm pl-9 pr-8 py-2.5 rounded focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange/50 transition-all placeholder-gray-600 font-mono"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          )}
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0">
+          {/* Date Picker */}
+          <div className="relative w-full sm:w-48 shrink-0">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={e => { setDateFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full bg-[#121212] border border-gray-800 text-white text-sm pl-9 pr-8 py-2.5 rounded focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange/50 transition-all font-mono [color-scheme:dark]"
+            />
+            {dateFilter && (
+              <button
+                onClick={() => { setDateFilter(''); setCurrentPage(1); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Search */}
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+              placeholder="Search by name, phone, vehicle..."
+              className="w-full bg-[#121212] border border-gray-800 text-white text-sm pl-9 pr-8 py-2.5 rounded focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange/50 transition-all placeholder-gray-600 font-mono"
+            />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); setCurrentPage(1); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Filter Matrix */}
       <div className="flex flex-wrap gap-2">
-        {filters.map(({ key, label }) => {
-          const count = key === 'all' ? allItems.length : allItems.filter(b => b.status === key).length;
-          const isActive = statusFilter === key;
+        {typeFilters.map(({ key, label }) => {
+          const count = key === 'all' ? allItems.length : allItems.filter(b => b.eventType === key).length;
+          const isActive = typeFilter === key;
           
           return (
             <button 
               key={key} 
-              onClick={() => setStatusFilter(key)}
+              onClick={() => { setTypeFilter(key as any); setCurrentPage(1); }}
               className={`flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors rounded ${
                 isActive
                   ? 'bg-brand-orange/10 border-brand-orange/50 text-brand-orange'
@@ -356,10 +381,10 @@ export default function BookingsPanel({ onView }: Props) {
       {filtered.length === 0 && status !== 'loading' && (
         <div className="flex flex-col items-center justify-center py-20 border border-gray-800 border-dashed rounded-lg bg-[#121212]">
           <p className="text-gray-500 font-mono text-sm">
-            {term ? `> No records matching query: "${search}"` : `> No records found for status: ${statusFilter}`}
+            {term ? `> No records matching query: "${search}"` : dateFilter ? `> No records on ${dateFilter}` : `> No records found for type: ${typeFilter}`}
           </p>
-          {term && (
-            <button onClick={() => setSearch('')} className="mt-4 px-4 py-2 border border-gray-700 hover:border-brand-orange hover:text-brand-orange text-xs text-gray-400 font-bold uppercase tracking-widest transition-colors rounded">
+          {(term || dateFilter) && (
+            <button onClick={() => { setSearch(''); setDateFilter(''); setCurrentPage(1); }} className="mt-4 px-4 py-2 border border-gray-700 hover:border-brand-orange hover:text-brand-orange text-xs text-gray-400 font-bold uppercase tracking-widest transition-colors rounded">
               Clear Query
             </button>
           )}
@@ -383,7 +408,7 @@ export default function BookingsPanel({ onView }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
-                {filtered.map(item => (
+                {paginatedItems.map(item => (
                   <tr
                     key={`${item.eventType}-${item.id}`}
                     className="hover:bg-white/[0.02] transition-colors cursor-pointer group"
@@ -503,7 +528,7 @@ export default function BookingsPanel({ onView }: Props) {
 
           {/* ── MOBILE: CARD GRID ── */}
           <div className="md:hidden divide-y divide-gray-800/50">
-            {filtered.map(item => (
+            {paginatedItems.map(item => (
               <div
                 key={`${item.eventType}-${item.id}`}
                 className="p-5 hover:bg-white/[0.02] transition-colors cursor-pointer"
@@ -603,6 +628,45 @@ export default function BookingsPanel({ onView }: Props) {
             ))}
           </div>
 
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-gray-800 bg-[#151515] gap-4">
+              <p className="text-xs text-gray-500 font-mono text-center sm:text-left">
+                Showing <span className="text-white font-bold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="text-white font-bold">{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}</span> of <span className="text-white font-bold">{filtered.length}</span> results
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 border border-gray-700 rounded text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Prev
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 rounded text-xs font-bold font-mono transition-colors ${
+                        page === currentPage
+                          ? 'bg-brand-orange text-white'
+                          : 'border border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 border border-gray-700 rounded text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
