@@ -3391,7 +3391,17 @@ class Router
     private function handleAdminStats(array $vars = []): void
     {
         $this->requirePermission('analytics:view');
+        
         $stats = (new BookingService())->getStats();
+        $inquiryStats = (new InquiryService())->getStats();
+        
+        $stats = array_merge($stats, $inquiryStats);
+        
+        $stats['totalAppointments'] = $stats['totalBookings'] + $stats['totalInquiries'];
+        $stats['activeAppointments'] = $stats['activeBookings'] + $stats['activeInquiries'];
+        $stats['todayAppointments'] = $stats['todayBookings'] + $stats['todayInquiries'];
+        $stats['todayActiveAppointments'] = $stats['todayPending'] + $stats['todayPendingInquiries'];
+        
         echo json_encode($stats);
     }
 

@@ -312,6 +312,11 @@ class InquiryService
         ];
     }
 
+    public function getStats(): array
+    {
+        return $this->useDb ? $this->dbGetStats() : $this->fileGetStats();
+    }
+
     /**
      * @param string $id
      * @return array<string, mixed>|null
@@ -425,6 +430,53 @@ class InquiryService
             ':created_at' => (string) $inquiry['createdAt'],
             ':updated_at' => (string) $inquiry['createdAt'],
         ]);
+    }
+
+    private function dbGetStats(): array
+    {
+        $db = Database::getInstance();
+
+        $total = (int) $db->query('SELECT COUNT(*) FROM customer_inquiries')->fetchColumn();
+
+        $byStatus = $db->query(
+            'SELECT status, COUNT(*) AS cnt FROM customer_inquiries GROUP BY status'
+        )->fetchAll(\PDO::FETCH_KEY_PAIR);
+
+        $pending    = (int) ($byStatus['pending']     ?? 0);
+        $confirmed  = (int) ($byStatus['confirmed']   ?? 0);
+        $inProgress = (int) ($byStatus['in_progress'] ?? 0);
+        $completed  = (int) ($byStatus['completed']   ?? 0);
+        $cancelled  = (int) ($byStatus['cancelled']   ?? 0);
+
+        $thisWeek = (int) $db->query(
+            "SELECT COUNT(*) FROM customer_inquiries WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
+        )->fetchColumn();
+
+        $thisMonth = (int) $db->query(
+            "SELECT COUNT(*) FROM customer_inquiries WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        )->fetchColumn();
+
+        $todayInquiries = (int) $db->query(
+            "SELECT COUNT(*) FROM customer_inquiries WHERE appointment_date = CURDATE()"
+        )->fetchColumn();
+
+        $todayPending = (int) $db->query(
+            "SELECT COUNT(*) FROM customer_inquiries WHERE appointment_date = CURDATE() AND status IN ('pending','confirmed','in_progress')"
+        )->fetchColumn();
+
+        return [
+            'totalInquiries'        => $total,
+            'pendingInquiries'      => $pending,
+            'confirmedInquiries'    => $confirmed,
+            'inProgressInquiries'   => $inProgress,
+            'completedInquiries'    => $completed,
+            'cancelledInquiries'    => $cancelled,
+            'activeInquiries'       => $pending + $confirmed + $inProgress,
+            'inquiriesThisWeek'     => $thisWeek,
+            'inquiriesThisMonth'    => $thisMonth,
+            'todayInquiries'        => $todayInquiries,
+            'todayPendingInquiries' => $todayPending,
+        ];
     }
 
     /**
@@ -793,6 +845,63 @@ class InquiryService
         $items = $this->fileGetAll();
         $items[] = $inquiry;
         file_put_contents(self::$storageFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    private function fileGetStats(): array
+    {
+        $all = $this->fileGetAll();
+
+        $weekAgo    = new \DateTime('-7 days');
+        $monthStart = new \DateTime('first day of this month midnight');
+
+        $pending   = 0;
+        $confirmed = 0;
+        $inProgress= 0;
+        $completed = 0;
+        $cancelled = 0;
+        $thisWeek  = 0;
+        $thisMonth = 0;
+        $todayInquiries = 0;
+        $todayPending  = 0;
+        $todayIso = (new \DateTime('today'))->format('Y-m-d');
+
+        foreach ($all as $b) {
+            $status = (string) ($b['status'] ?? '');
+
+            switch ($status) {
+                case 'pending':     $pending++;     break;
+                case 'confirmed':   $confirmed++;   break;
+                case 'in_progress': $inProgress++;  break;
+                case 'completed':   $completed++;   break;
+                case 'cancelled':   $cancelled++;   break;
+            }
+
+            $created = new \DateTime($b['createdAt'] ?? 'now');
+            if ($created >= $weekAgo)    $thisWeek++;
+            if ($created >= $monthStart) $thisMonth++;
+
+            $appointmentDate = (string) ($b['appointmentDate'] ?? '');
+            if ($appointmentDate === $todayIso) {
+                $todayInquiries++;
+                if (in_array($status, ['pending', 'confirmed', 'in_progress'], true)) {
+                    $todayPending++;
+                }
+            }
+        }
+
+        return [
+            'totalInquiries'        => count($all),
+            'pendingInquiries'      => $pending,
+            'confirmedInquiries'    => $confirmed,
+            'inProgressInquiries'   => $inProgress,
+            'completedInquiries'    => $completed,
+            'cancelledInquiries'    => $cancelled,
+            'activeInquiries'       => $pending + $confirmed + $inProgress,
+            'inquiriesThisWeek'     => $thisWeek,
+            'inquiriesThisMonth'    => $thisMonth,
+            'todayInquiries'        => $todayInquiries,
+            'todayPendingInquiries' => $todayPending,
+        ];
     }
 
     /**

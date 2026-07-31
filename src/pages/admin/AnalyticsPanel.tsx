@@ -36,10 +36,10 @@ export default function AnalyticsPanel() {
   );
 
   const topCards = [
-    { label: 'Total Bookings',  value: stats?.totalBookings     ?? 0, icon: Calendar,     color: 'text-gray-400'      },
-    { label: 'Active Bookings', value: stats?.activeBookings    ?? 0, icon: Activity,     color: 'text-green-400'     },
-    { label: 'Completed',       value: stats?.completedBookings ?? 0, icon: CheckCircle2, color: 'text-blue-400'      },
-    { label: 'New This Month',  value: stats?.bookingsThisMonth ?? 0, icon: TrendingUp,   color: 'text-brand-orange'  },
+    { label: 'Total Appointments',  value: stats?.totalAppointments ?? 0, icon: Calendar,     color: 'text-gray-400'      },
+    { label: 'Active Appointments', value: stats?.activeAppointments ?? 0, icon: Activity,     color: 'text-green-400'     },
+    { label: 'Completed',       value: (stats?.completedBookings ?? 0) + (stats?.completedInquiries ?? 0), icon: CheckCircle2, color: 'text-blue-400'      },
+    { label: 'New This Month',  value: (stats?.bookingsThisMonth ?? 0) + (stats?.inquiriesThisMonth ?? 0), icon: TrendingUp,   color: 'text-brand-orange'  },
   ];
 
   const topServices  = stats?.topServices  ?? [];
@@ -48,10 +48,11 @@ export default function AnalyticsPanel() {
   const reviewCount  = stats?.reviewCount ?? 0;
 
   const statusRows = [
-    { label: 'Pending',   value: stats?.pendingBookings   ?? 0 },
-    { label: 'Confirmed', value: stats?.confirmedBookings ?? 0 },
-    { label: 'Completed', value: stats?.completedBookings ?? 0 },
-    { label: 'Cancelled', value: stats?.cancelledBookings ?? 0 },
+    { label: 'Pending',   value: (stats?.pendingBookings ?? 0) + (stats?.pendingInquiries ?? 0) },
+    { label: 'Confirmed', value: (stats?.confirmedBookings ?? 0) + (stats?.confirmedInquiries ?? 0) },
+    { label: 'In Progress', value: stats?.inProgressInquiries ?? 0 },
+    { label: 'Completed', value: (stats?.completedBookings ?? 0) + (stats?.completedInquiries ?? 0) },
+    { label: 'Cancelled', value: (stats?.cancelledBookings ?? 0) + (stats?.cancelledInquiries ?? 0) },
   ];
 
   const commonAxisLabelStyle = {
@@ -148,7 +149,7 @@ export default function AnalyticsPanel() {
       foreColor: '#d1d5db',
     },
     labels: statusRows.map(row => row.label),
-    colors: ['#fbbf24', '#22c55e', '#3b82f6', '#6b7280'],
+    colors: ['#fbbf24', '#22c55e', '#a855f7', '#3b82f6', '#6b7280'],
     legend: {
       position: 'bottom',
       labels: { colors: '#9ca3af' },
@@ -169,7 +170,7 @@ export default function AnalyticsPanel() {
               show: true,
               label: 'Total',
               color: '#9ca3af',
-              formatter: () => String(stats?.totalBookings ?? 0),
+              formatter: () => String(stats?.totalAppointments ?? 0),
             },
           },
         },
@@ -193,10 +194,10 @@ export default function AnalyticsPanel() {
             </span>
           </div>
           <p className="text-4xl font-display font-bold text-brand-orange">
-            {stats?.todayBookings ?? 0}
+            {stats?.todayAppointments ?? 0}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {stats?.todayPending ?? 0} active (pending/confirmed)
+            {stats?.todayActiveAppointments ?? 0} active (pending/confirmed/in-progress)
           </p>
         </div>
 
@@ -282,7 +283,7 @@ export default function AnalyticsPanel() {
 
       <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Bookings by Status</h3>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Appointments by Status</h3>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Distribution</span>
         </div>
         <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-5 items-center">

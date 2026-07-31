@@ -879,15 +879,37 @@ export const deletePortfolioCategoryApi = (token: string, id: number) =>
 
 export interface AdminStats {
   totalBookings: number;
+  totalInquiries: number;
+  totalAppointments: number;
+
   pendingBookings: number;
   confirmedBookings: number;
   completedBookings: number;
   cancelledBookings: number;
   activeBookings: number;
+
+  pendingInquiries: number;
+  confirmedInquiries: number;
+  inProgressInquiries: number;
+  completedInquiries: number;
+  cancelledInquiries: number;
+  activeInquiries: number;
+
+  activeAppointments: number;
+
   bookingsThisWeek: number;
   bookingsThisMonth: number;
+  inquiriesThisWeek: number;
+  inquiriesThisMonth: number;
+
   todayBookings: number;
+  todayInquiries: number;
+  todayAppointments: number;
+
   todayPending: number;
+  todayPendingInquiries: number;
+  todayActiveAppointments: number;
+
   topServices: { name: string; count: number }[];
   peakHours: { time: string; count: number }[];
   reviewCount: number;
