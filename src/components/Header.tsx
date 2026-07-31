@@ -21,6 +21,7 @@ export default function Header() {
   const [cartItemsCount, setCartItemsCount] = useState(0);
   const [buildSearch, setBuildSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
 
 
@@ -29,6 +30,18 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Close mobile menu when clicking outside the header
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isMobileMenuOpen]);
 
 
   useEffect(() => {
@@ -112,7 +125,7 @@ export default function Header() {
   };
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+    <header ref={mobileMenuRef} className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled || isMobileMenuOpen 
         ? 'bg-brand-darker/95 backdrop-blur-md py-3 shadow-lg border-b border-gray-800' 
         : 'bg-transparent py-5'
@@ -260,6 +273,7 @@ export default function Header() {
         <div className="px-4 py-6 flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-60px)]">
           {navLinks.map(link => (
             <Link key={link.name} to={link.href}
+              onClick={() => setIsMobileMenuOpen(false)}
               className={`text-base font-bold uppercase tracking-widest transition-colors py-3 px-2 border-b border-gray-800/50 ${
                 location.pathname === link.href ? 'text-brand-orange' : 'text-gray-300 hover:text-brand-orange'
               }`}>
@@ -271,6 +285,7 @@ export default function Header() {
           {!user ? (
             <div className="flex flex-col gap-3 mt-6">
               <Link to="/login"
+                onClick={() => setIsMobileMenuOpen(false)}
                 className="text-center border border-gray-700 text-white font-bold uppercase tracking-widest px-6 py-3 rounded-sm hover:border-brand-orange transition-colors">
                 Login
               </Link>
@@ -282,12 +297,13 @@ export default function Header() {
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-500">{user.name}</p>
               </div>
               {user.role !== 'client' ? (
-                <Link to="/admin" className="flex items-center gap-3 px-2 py-3 text-sm text-gray-300 hover:text-brand-orange transition-colors font-bold uppercase tracking-widest">
+                <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-2 py-3 text-sm text-gray-300 hover:text-brand-orange transition-colors font-bold uppercase tracking-widest">
                   <LayoutDashboard className="w-5 h-5" /> Admin Panel
                 </Link>
               ) : (
                 clientMenu.map(({ label, href, icon: Icon }) => (
                   <Link key={href} to={href}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-2 py-3 text-sm text-gray-300 hover:text-brand-orange transition-colors font-bold uppercase tracking-widest">
                     <Icon className="w-5 h-5" /> {label}
                   </Link>
