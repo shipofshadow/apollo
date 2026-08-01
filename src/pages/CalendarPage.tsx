@@ -7,7 +7,7 @@ import PageSEO from '../components/PageSEO';
 import CustomCalendar from '../components/CustomCalendar';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../config';
-import { deleteInquiryApi, fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi } from '../services/api';
+import { deleteInquiryApi, fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, fetchInquiryCalendarApi } from '../services/api';
 import type { ShopDayHours } from '../types';
 
 // FontAwesome Icons
@@ -226,12 +226,9 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
       setError(null);
 
       try {
-        const response = await fetch(`${BACKEND_URL}/api/inquiries/calendar`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.detail || 'Unable to load calendar events.');
-        }
+        if (!token) throw new Error('Not authenticated.');
+        
+        const data = await fetchInquiryCalendarApi(token);
 
         const normalized = (data.events ?? []) as InquiryEvent[];
         const mapped = normalized.map((event) => ({

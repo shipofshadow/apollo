@@ -63,7 +63,8 @@ export default function ClientLayout() {
     };
   }, [hasCustomSidebarPref]);
 
-  const handleLogout = async () => {
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     await logout();
     navigate('/', { replace: true });
   };
@@ -90,7 +91,7 @@ export default function ClientLayout() {
           <div className="w-px h-5 bg-gray-700" />
           <NotificationBell />
           <div className="w-px h-5 bg-gray-700" />
-          <button
+          <button type="button"
             onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors"
           >
@@ -172,7 +173,7 @@ export default function ClientLayout() {
 
           {/* Logout (mobile only — desktop uses topbar) */}
           <div className="md:hidden p-2 border-t border-gray-800">
-            <button
+            <button type="button"
               onClick={handleLogout}
               title="Sign Out"
               className="w-full flex items-center justify-center gap-3 px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors"

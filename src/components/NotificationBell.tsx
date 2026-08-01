@@ -14,38 +14,40 @@ import type { AppNotification, NotificationType } from '../types';
 // ── Icon map per notification type ───────────────────────────────────────────
 
 const TYPE_ICON: Record<NotificationType, React.ElementType> = {
-  new_booking:    CalendarCheck2,
-  new_order:      Package,
-  order_created:  Package,
-  order_status:   CheckCheck,
+  new_booking: CalendarCheck2,
+  new_order: Package,
+  order_created: Package,
+  order_status: CheckCheck,
   order_tracking: Package,
   status_changed: CheckCheck,
-  build_update:   Wrench,
-  parts_update:   Package,
-  assignment:     UserCheck,
+  build_update: Wrench,
+  parts_update: Package,
+  assignment: UserCheck,
   slot_available: Clock3,
   security_alert: ShieldAlert,
+  inquiry: UserCheck,
 };
 
 const TYPE_COLOR: Record<NotificationType, string> = {
-  new_booking:    'text-brand-orange',
-  new_order:      'text-brand-orange',
-  order_created:  'text-brand-orange',
-  order_status:   'text-green-400',
+  new_booking: 'text-brand-orange',
+  new_order: 'text-brand-orange',
+  order_created: 'text-brand-orange',
+  order_status: 'text-green-400',
   order_tracking: 'text-cyan-400',
   status_changed: 'text-green-400',
-  build_update:   'text-blue-400',
-  parts_update:   'text-yellow-400',
-  assignment:     'text-cyan-400',
+  build_update: 'text-blue-400',
+  parts_update: 'text-yellow-400',
+  assignment: 'text-cyan-400',
   slot_available: 'text-lime-400',
   security_alert: 'text-red-400',
+  inquiry: 'text-brand-orange',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)   return 'just now';
+  if (diff < 60) return 'just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
@@ -137,6 +139,14 @@ export default function NotificationBell({ className = '' }: Props) {
       return;
     }
 
+    if (n.type === 'inquiry') {
+      const inquiryId = n.data?.inquiryId ?? n.data?.inquiry_id;
+      if (inquiryId) {
+        navigate('/admin/appointments', { state: { openBookingId: `inq-${inquiryId}` } });
+      }
+      return;
+    }
+
     // Navigate to the related booking
     const bookingId = resolveBookingId(n.data);
     if (!bookingId) return;
@@ -211,15 +221,14 @@ export default function NotificationBell({ className = '' }: Props) {
               </div>
             ) : (
               items.map(n => {
-                const Icon  = TYPE_ICON[n.type]  ?? AlertCircle;
+                const Icon = TYPE_ICON[n.type] ?? AlertCircle;
                 const color = TYPE_COLOR[n.type] ?? 'text-gray-400';
                 return (
                   <div
                     key={n.id}
                     onClick={() => { void handleNotificationClick(n); }}
-                    className={`group relative flex gap-3 px-4 py-3 border-b border-gray-800 cursor-pointer transition-colors hover:bg-gray-800/60 ${
-                      !n.isRead ? 'bg-brand-orange/5' : ''
-                    }`}
+                    className={`group relative flex gap-3 px-4 py-3 border-b border-gray-800 cursor-pointer transition-colors hover:bg-gray-800/60 ${!n.isRead ? 'bg-brand-orange/5' : ''
+                      }`}
                   >
                     {/* Unread dot */}
                     {!n.isRead && (

@@ -210,7 +210,7 @@ export default function CalendarPanel({ onView }: Props) {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchInquiryCalendarApi();
+        const data = await fetchInquiryCalendarApi(token ?? '');
         setInquiries(data.events ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load inquiry calendar.');

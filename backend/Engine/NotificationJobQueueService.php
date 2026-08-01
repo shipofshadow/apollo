@@ -683,6 +683,17 @@ class NotificationJobQueueService
                 } catch (\Throwable $e) {
                     error_log('[NotificationJobQueueService] customer inquiry customer notification failed: ' . $e->getMessage());
                 }
+
+                try {
+                    (new UserNotificationService())->createForAdmin(
+                        'inquiry',
+                        'New Customer Inquiry',
+                        'A new inquiry has been submitted by ' . ($data['fullName'] ?? $data['name'] ?? 'a customer') . '.',
+                        ['inquiryId' => $data['id'] ?? null]
+                    );
+                } catch (\Throwable $e) {
+                    error_log('[NotificationJobQueueService] customer inquiry in-app notification failed: ' . $e->getMessage());
+                }
                 return;
 
             case 'appointment_reminder_3h':

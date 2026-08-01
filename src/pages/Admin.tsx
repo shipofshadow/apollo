@@ -257,7 +257,8 @@ export default function AdminPage() {
     navigate(TAB_PATHS[fallback] || TAB_PATHS.analytics, { replace: true });
   }, [activeTab, role, user, navigate, canAccessTab]);
 
-  const handleLogout = async () => {
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     await logout();
     navigate('/login', { replace: true });
   };
@@ -381,7 +382,7 @@ export default function AdminPage() {
             />
           </button>
           <div className="w-px h-5 bg-gray-700" />
-          <button onClick={handleLogout}
+          <button type="button" onClick={handleLogout}
             className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sign Out</span>
@@ -532,7 +533,7 @@ export default function AdminPage() {
             </button>
 
             {/* Mobile logout */}
-            <button onClick={handleLogout}
+            <button type="button" onClick={handleLogout}
               title="Sign Out"
               className="md:hidden w-full flex items-center gap-2 px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 transition-colors">
               <LogOut className="w-4 h-4 shrink-0" />

@@ -52,10 +52,10 @@ import { getDicebearAvatarDataUri } from '../../utils/avatar';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
-  confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
-  completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
-  cancelled:      'bg-[#1a1a1a]     text-gray-500    border-gray-800',
+  pending: 'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
+  confirmed: 'bg-green-500/10  text-green-400   border-green-500/30',
+  completed: 'bg-blue-500/10   text-blue-400    border-blue-500/30',
+  cancelled: 'bg-[#1a1a1a]     text-gray-500    border-gray-800',
   awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 
@@ -93,18 +93,18 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
   const dispatch = useDispatch<AppDispatch>();
   const { showToast } = useToast();
 
-  const [shopHours,   setShopHours]   = useState<ShopDayHours[]>([]);
+  const [shopHours, setShopHours] = useState<ShopDayHours[]>([]);
   const [closedDatesSet, setClosedDatesSet] = useState<Set<string>>(new Set());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  const [bookedSlots,    setBookedSlots]    = useState<string[]>([]);
-  const [slotCounts,     setSlotCounts]     = useState<Record<string, number>>({});
-  const [slotCapacity,   setSlotCapacity]   = useState(3);
-  const [shopDayIsOpen,  setShopDayIsOpen]  = useState(true);
-  const [slotsLoading,   setSlotsLoading]   = useState(false);
-  const [saveBusy,       setSaveBusy]       = useState(false);
-  const [confirmOpen,    setConfirmOpen]    = useState(false);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  const [slotCapacity, setSlotCapacity] = useState(3);
+  const [shopDayIsOpen, setShopDayIsOpen] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -115,7 +115,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
         const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
         setClosedDatesSet(new Set(cd.map(d => d.date)));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const availableDates = buildDateList(shopHours, closedDatesSet);
@@ -191,11 +191,10 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
                   key={i}
                   type="button"
                   onClick={() => handleDateSelect(date)}
-                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded relative ${
-                    active
+                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded relative ${active
                       ? 'border-brand-orange bg-brand-orange/10'
                       : 'border-gray-800 hover:border-gray-600 bg-[#181818]'
-                  }`}
+                    }`}
                 >
                   <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">
                     {date.toLocaleDateString('en-PH', { weekday: 'short' })}
@@ -223,7 +222,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
         </div>
         {selectedDate && (
           <p className="text-[10px] font-mono uppercase tracking-widest text-brand-orange mt-3">
-             Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+            Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         )}
       </div>
@@ -251,24 +250,22 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {openSlots.map(slot => {
                 const isSelected = selectedTime === slot;
-                const spotsLeft  = slotCapacity - (slotCounts[slot] ?? 0);
+                const spotsLeft = slotCapacity - (slotCounts[slot] ?? 0);
                 const almostFull = spotsLeft === 1;
                 return (
                   <button
                     key={slot}
                     type="button"
                     onClick={() => setSelectedTime(slot)}
-                    className={`flex flex-col items-center justify-center p-3 rounded border font-mono transition-all ${
-                      isSelected
+                    className={`flex flex-col items-center justify-center p-3 rounded border font-mono transition-all ${isSelected
                         ? 'bg-brand-orange/20 border-brand-orange text-brand-orange shadow-[inset_0_0_10px_rgba(249,115,22,0.2)]'
                         : 'bg-[#181818] border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="text-sm font-bold">{slot}</span>
                     {spotsLeft > 0 && (
-                      <span className={`text-[9px] uppercase tracking-wider mt-1.5 ${
-                        isSelected ? 'text-brand-orange' : almostFull ? 'text-yellow-500' : 'text-gray-600'
-                      }`}>
+                      <span className={`text-[9px] uppercase tracking-wider mt-1.5 ${isSelected ? 'text-brand-orange' : almostFull ? 'text-yellow-500' : 'text-gray-600'
+                        }`}>
                         {almostFull ? 'Critical' : `CAP: ${spotsLeft}`}
                       </span>
                     )}
@@ -353,15 +350,15 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   const { token, hasPermission } = useAuth();
   const { showToast } = useToast();
   const appointments = useSelector((s: RootState) => s.booking.appointments);
-  const siteSettings  = useSelector((s: RootState) => s.siteSettings.settings);
+  const siteSettings = useSelector((s: RootState) => s.siteSettings.settings);
 
   const booking = appointments.find(b => b.id === bookingId) ?? null;
 
-  const [lightboxUrl,   setLightboxUrl]   = useState<string | null>(null);
-  const [rescheduling,  setRescheduling]  = useState(false);
-  const [partsOpen,     setPartsOpen]     = useState(false);
-  const [partsNotes,    setPartsNotes]    = useState('');
-  const [partsBusy,     setPartsBusy]     = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [partsOpen, setPartsOpen] = useState(false);
+  const [partsNotes, setPartsNotes] = useState('');
+  const [partsBusy, setPartsBusy] = useState(false);
   const [partRequirements, setPartRequirements] = useState<BookingPartRequirement[]>([]);
   const [partReqLoading, setPartReqLoading] = useState(false);
   const [partReqSaving, setPartReqSaving] = useState(false);
@@ -374,42 +371,42 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     supplierId: 0,
     note: '',
   });
-  const [statusBusy,    setStatusBusy]    = useState<string | null>(null);
-  const [deleteBusy,    setDeleteBusy]    = useState(false);
-  const [activityLogs,  setActivityLogs]  = useState<BookingActivityLog[]>([]);
+  const [statusBusy, setStatusBusy] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<BookingActivityLog[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AdminManagedUser[]>([]);
   const [selectedTechValue, setSelectedTechValue] = useState('');
   const [assignTechBusy, setAssignTechBusy] = useState(false);
 
   // Internal notes state
-  const [internalNotes,     setInternalNotes]     = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [calibration, setCalibration] = useState({ beamAngle: '', luxOutput: '', notes: '' });
   const [calibSaving, setCalibSaving] = useState(false);
-  const [notesEditing,      setNotesEditing]      = useState(false);
-  const [notesBusy,         setNotesBusy]         = useState(false);
+  const [notesEditing, setNotesEditing] = useState(false);
+  const [notesBusy, setNotesBusy] = useState(false);
 
   // Customer loyalty stats
-  const [customerStats,     setCustomerStats]     = useState<CustomerStats | null>(null);
+  const [customerStats, setCustomerStats] = useState<CustomerStats | null>(null);
   const [customerProfile, setCustomerProfile] = useState<Customer360Data | null>(null);
   const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
   const [customerProfileError, setCustomerProfileError] = useState<string | null>(null);
 
   // Build updates state
-  const [buildUpdates,      setBuildUpdates]      = useState<BuildUpdate[]>([]);
-  const [buildUpdateOpen,   setBuildUpdateOpen]   = useState(false);
-  const [buildUpdateNote,   setBuildUpdateNote]   = useState('');
+  const [buildUpdates, setBuildUpdates] = useState<BuildUpdate[]>([]);
+  const [buildUpdateOpen, setBuildUpdateOpen] = useState(false);
+  const [buildUpdateNote, setBuildUpdateNote] = useState('');
   const [buildUpdatePhotos, setBuildUpdatePhotos] = useState<string[]>([]);
-  const [buildUpdateBusy,   setBuildUpdateBusy]   = useState(false);
-  const [photoUploading,    setPhotoUploading]    = useState(false);
+  const [buildUpdateBusy, setBuildUpdateBusy] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const buildPhotoInputRef = useRef<HTMLInputElement>(null);
-  const [beforePhotos,      setBeforePhotos]      = useState<string[]>([]);
-  const [afterPhotos,       setAfterPhotos]       = useState<string[]>([]);
-  const [qaUploadingStage,  setQaUploadingStage]  = useState<'before' | 'after' | null>(null);
-  const [qaSavingStage,     setQaSavingStage]     = useState<'before' | 'after' | null>(null);
-  const [checkInOpen,       setCheckInOpen]       = useState(false);
-  const [checkInBusy,       setCheckInBusy]       = useState(false);
-  const [completeOpen,      setCompleteOpen]      = useState(false);
-  const [completeBusy,      setCompleteBusy]      = useState(false);
+  const [beforePhotos, setBeforePhotos] = useState<string[]>([]);
+  const [afterPhotos, setAfterPhotos] = useState<string[]>([]);
+  const [qaUploadingStage, setQaUploadingStage] = useState<'before' | 'after' | null>(null);
+  const [qaSavingStage, setQaSavingStage] = useState<'before' | 'after' | null>(null);
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkInBusy, setCheckInBusy] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completeBusy, setCompleteBusy] = useState(false);
   const beforePhotoInputRef = useRef<HTMLInputElement>(null);
   const afterPhotoInputRef = useRef<HTMLInputElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -470,7 +467,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     if (token && booking.userId) {
       fetchCustomerStatsApi(token, booking.userId)
         .then(r => setCustomerStats(r.stats))
-        .catch(() => {});
+        .catch(() => { });
       setCustomerProfileLoading(true);
       setCustomerProfileError(null);
       fetchAdminCustomer360Api(token, booking.userId, 10)
@@ -501,7 +498,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     if (!token || !bookingId) return;
     fetchBuildUpdatesApi(token, bookingId)
       .then(({ updates }) => setBuildUpdates(updates))
-      .catch(() => {});
+      .catch(() => { });
   }, [token, bookingId]);
 
   const reloadPartRequirements = async () => {
@@ -658,7 +655,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
     } catch (e: unknown) {
       showToast((e as Error).message ?? 'Failed to save parts info.', 'error');
     } finally {
-      setPartsBusy(false); }
+      setPartsBusy(false);
+    }
   };
 
   const handleCreatePartRequirement = async () => {
@@ -847,10 +845,10 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
   }
 
   const canModify = booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'awaiting_parts';
-  const canConfirm  = booking.status === 'pending';
+  const canConfirm = booking.status === 'pending';
   const canComplete = booking.status === 'confirmed';
-  const canResume   = booking.status === 'awaiting_parts';
-  const canCancel   = canModify;
+  const canResume = booking.status === 'awaiting_parts';
+  const canCancel = canModify;
   const canAssignTechnician = hasPermission('bookings:assign-tech');
   const isFinalized = booking.status === 'completed' || booking.status === 'cancelled';
   const hasBeforePhotos = beforePhotos.length > 0;
@@ -919,22 +917,22 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
         <div className="relative border border-gray-800/80 rounded-lg bg-[#121212] overflow-hidden shadow-2xl">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-orange via-brand-orange/50 to-transparent" />
-          
+
           <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div className="space-y-3 flex-1">
               <div className="flex items-center gap-4">
-                  <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80">
                   Booking Details
                 </p>
                 <span className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded border ${STATUS_STYLES[booking.status]}`}>
                   {formatStatus(booking.status)}
                 </span>
               </div>
-              
+
               <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
                 {booking.name}
               </h1>
-              
+
               <div className="flex items-center gap-3 pt-2 text-xs font-mono">
                 {booking.referenceNumber && (
                   <span className="text-brand-orange bg-brand-orange/10 px-2.5 py-1 rounded border border-brand-orange/20 font-bold">
@@ -951,13 +949,13 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* ── LEFT COLUMN (Core Payload & Execution) ── */}
         <div className="lg:col-span-2 flex flex-col gap-6">
 
           {/* Core Specs Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 border border-gray-800/80 rounded-lg overflow-hidden">
-            
+
             {/* Payload (Service & Variations) */}
             <div className="bg-[#121212] p-6">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
@@ -1028,7 +1026,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
           {/* Dispatch Logic (Time & Operator) */}
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              
+
               {/* Schedule */}
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -1131,7 +1129,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
           {/* Context Blocks (Notes & Parts) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 border border-gray-800/80 rounded-lg overflow-hidden">
-            
+
             {/* Customer Notes */}
             <div className="bg-[#121212] p-6">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
@@ -1344,14 +1342,14 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800/50 rounded overflow-hidden">
-              
+
               {/* Before */}
               <div className="bg-[#151515] p-5">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Before Service</p>
                   <span className="text-[10px] text-gray-600 font-mono">COUNT:{beforePhotos.length}</span>
                 </div>
-                
+
                 <input
                   ref={beforePhotoInputRef}
                   type="file"
@@ -1360,7 +1358,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   className="hidden"
                   onChange={(e) => void handleQaPhotoUpload('before', e)}
                 />
-                
+
                 <div className="flex gap-2 mb-4">
                   <button
                     type="button"
@@ -1409,7 +1407,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">After Service</p>
                   <span className="text-[10px] text-gray-600 font-mono">COUNT:{afterPhotos.length}</span>
                 </div>
-                
+
                 <input
                   ref={afterPhotoInputRef}
                   type="file"
@@ -1418,7 +1416,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   className="hidden"
                   onChange={(e) => void handleQaPhotoUpload('after', e)}
                 />
-                
+
                 <div className="flex gap-2 mb-4">
                   <button
                     type="button"
@@ -1500,7 +1498,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                   disabled={isFinalized}
                   onChange={handleBuildPhotoUpload}
                 />
-                
+
                 <div className="flex items-center gap-3 mb-4">
                   <button
                     type="button"
@@ -1597,7 +1595,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               </div>
             </div>
           </div>
-          
+
         </div>
 
         {/* ── RIGHT COLUMN (Telemetry & Execution Controls) ── */}
@@ -1711,7 +1709,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange/80 mb-6 pb-4 border-b border-gray-800 flex items-center gap-2">
               <ClipboardList className="w-3.5 h-3.5 text-brand-orange" /> Actions
             </p>
-            
+
             <div className="space-y-3">
               {booking.status !== 'cancelled' && (
                 <button
@@ -1804,13 +1802,13 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 <span>{deleteBusy ? 'Deleting...' : 'Delete Booking'}</span>
                 {deleteBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
               </button>
-              
+
               {!canModify && (
                 <div className="bg-[#151515] border border-gray-800 rounded p-3 flex items-center justify-center">
                   <p className="text-gray-600 text-[10px] font-mono uppercase tracking-widest">Actions Locked ({formatStatus(booking.status)})</p>
                 </div>
               )}
-              
+
               <div className="pt-2 space-y-1">
                 {canConfirm && !hasBeforePhotos && (
                   <p className="text-[9px] font-mono text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20">! Ingest photos required prior to Auth.</p>
@@ -2018,9 +2016,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 type="button"
                 onClick={() => void runConfirmedAction()}
                 disabled={confirmBusy}
-                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white disabled:opacity-30 transition-colors ${
-                  confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
-                }`}
+                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white disabled:opacity-30 transition-colors ${confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
+                  }`}
               >
                 {confirmBusy ? 'Executing...' : confirmDialog.confirmLabel}
               </button>
@@ -2044,7 +2041,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Stage 1: Ingest Photos</p>
                 <span className="text-[10px] text-gray-600 font-mono">COUNT:{beforePhotos.length}</span>
               </div>
-              
+
               <input
                 ref={beforePhotoInputRef}
                 type="file"
@@ -2053,7 +2050,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 className="hidden"
                 onChange={(e) => void handleQaPhotoUpload('before', e)}
               />
-              
+
               <button
                 type="button"
                 onClick={() => beforePhotoInputRef.current?.click()}
@@ -2124,7 +2121,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Stage 2: Egest Photos</p>
                 <span className="text-[10px] text-gray-600 font-mono">COUNT:{afterPhotos.length}</span>
               </div>
-              
+
               <input
                 ref={afterPhotoInputRef}
                 type="file"
@@ -2133,7 +2130,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 className="hidden"
                 onChange={(e) => void handleQaPhotoUpload('after', e)}
               />
-              
+
               <button
                 type="button"
                 onClick={() => afterPhotoInputRef.current?.click()}

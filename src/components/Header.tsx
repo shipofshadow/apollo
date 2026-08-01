@@ -85,7 +85,8 @@ export default function Header() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
     await logout();
@@ -234,7 +235,7 @@ export default function Header() {
                       ))
                     )}
                     <div className="border-t border-gray-800 mt-1">
-                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 hover:text-red-400 transition-colors">
+                      <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 hover:text-red-400 transition-colors">
                         <LogOut className="w-4 h-4" /> Sign Out
                       </button>
                     </div>
@@ -318,8 +319,9 @@ export default function Header() {
                   </Link>
                 ))
               )}
-              <button onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-2 py-3 mt-2 text-sm text-gray-400 hover:text-red-400 transition-colors font-bold uppercase tracking-widest">
+              <button type="button" onClick={(e) => { e.preventDefault(); handleLogout(); }}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 mt-4 text-sm font-bold uppercase tracking-widest bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 transition-colors rounded-sm"
+              >
                 <LogOut className="w-5 h-5" /> Sign Out
               </button>
             </div>

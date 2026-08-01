@@ -127,7 +127,7 @@ export default function BookingsPanel({ onView }: Props) {
   useEffect(() => {
     if (token) {
       dispatch(fetchAllBookingsAsync(token));
-      fetchInquiryCalendarApi()
+      fetchInquiryCalendarApi(token ?? '')
         .then(data => setInquiries(data.events ?? []))
         .catch(err => console.error(err));
       fetchShopClosedDatesApi()

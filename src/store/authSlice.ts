@@ -31,32 +31,14 @@ function clearStorage(): void {
   } catch { /* ignore */ }
 }
 
-function decodeJwtPayload(token: string): { exp?: number } {
-  const parts = token.split('.');
-  if (parts.length < 2) throw new Error('Invalid token');
-
-  const payloadPart = parts[1]
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-
-  // JWT payload uses base64url; pad to valid base64 length before decoding.
-  const paddedPayload = payloadPart + '='.repeat((4 - (payloadPart.length % 4)) % 4);
-  return JSON.parse(atob(paddedPayload)) as { exp?: number };
-}
-
 function loadFromStorage(): { token: string | null; refreshToken: string | null; user: User | null } {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     const raw = localStorage.getItem(USER_KEY);
-    if (!token || !refreshToken || !raw) return { token: null, refreshToken: null, user: null };
-
-    // Decode the JWT payload (middle segment) to check expiry without a lib
-    const payload = decodeJwtPayload(token);
-    if ((payload.exp ?? 0) * 1000 < Date.now()) {
-      // Token expired but we have refresh token
-      return { token: null, refreshToken, user: null };
-    }
+    
+    // We only strictly need token and raw for Sanctum
+    if (!token || !raw) return { token: null, refreshToken: null, user: null };
 
     return { token, refreshToken, user: JSON.parse(raw) as User };
   } catch {
@@ -178,9 +160,9 @@ const authSlice = createSlice({
       state.token  = action.payload.token;
       state.refreshToken = (action.payload as any).refresh_token || null;
       state.user   = action.payload.user;
-      if (state.refreshToken) {
-        saveToStorage(action.payload.token, state.refreshToken, action.payload.user);
-      }
+      
+      // Save to localStorage regardless of refreshToken existence
+      saveToStorage(action.payload.token, state.refreshToken || '', action.payload.user);
     });
     builder.addCase(loginAsync.rejected, (state, action) => {
       state.status = 'error';

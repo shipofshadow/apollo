@@ -13,10 +13,10 @@ import { getDicebearAvatarDataUri } from '../../utils/avatar';
 import { StatusBadge, Breadcrumbs, Pager, TABLE_PAGE_SIZE } from './_sharedComponents';
 
 const BOOKING_STATUS_STYLES: Record<Booking['status'], string> = {
-  pending:        'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
-  confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
-  completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
-  cancelled:      'bg-[#1a1a1a]     text-gray-500    border-gray-800',
+  pending: 'bg-yellow-500/10 text-yellow-500  border-yellow-500/30',
+  confirmed: 'bg-green-500/10  text-green-400   border-green-500/30',
+  completed: 'bg-blue-500/10   text-blue-400    border-blue-500/30',
+  cancelled: 'bg-[#1a1a1a]     text-gray-500    border-gray-800',
   awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
 };
 

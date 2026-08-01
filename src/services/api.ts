@@ -76,6 +76,20 @@ async function safeJson(response: Response): Promise<unknown> {
   }
 }
 
+function getApiErrorMessage(data: unknown, fallback: string): string {
+  if (!data || typeof data !== 'object') return fallback;
+
+  const payload = data as { detail?: string; message?: string; errors?: Record<string, string[] | string> };
+  if (payload.detail) return payload.detail;
+  if (payload.message) return payload.message;
+
+  const firstError = payload.errors ? Object.values(payload.errors)[0] : undefined;
+  if (Array.isArray(firstError) && firstError[0]) return firstError[0];
+  if (typeof firstError === 'string') return firstError;
+
+  return fallback;
+}
+
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -131,7 +145,7 @@ async function apiFetch<T>(
     const data = await safeJson(response);
     if (!response.ok) {
       if (response.status === 401) notifyAuthExpired();
-      throw new Error((data as { detail?: string } | null)?.detail ?? `Request failed (${response.status})`);
+      throw new Error(getApiErrorMessage(data, `Request failed (${response.status})`));
     }
 
     markApiOnline();
@@ -196,7 +210,7 @@ export const uploadProfileAvatarApi = async (token: string, file: File): Promise
   const data = await safeJson(response) as { url?: string; detail?: string } | null;
   if (!response.ok) {
     if (response.status === 401) notifyAuthExpired();
-    throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+    throw new Error(getApiErrorMessage(data, `Upload failed (${response.status})`));
   }
   return (data as { url: string }).url;
 };
@@ -219,7 +233,7 @@ export const forgotPasswordApi = (email: string, cfTurnstileToken: string) =>
 export const resetPasswordApi = (token: string, password: string, passwordConfirm: string, cfTurnstileToken: string) =>
   apiFetch<{ message: string }>('/api/auth/reset-password', {
     method: 'POST',
-    body: JSON.stringify({ token, password, passwordConfirm, 'cf-turnstile-response': cfTurnstileToken }),
+    body: JSON.stringify({ token, password, password_confirmation: passwordConfirm, 'cf-turnstile-response': cfTurnstileToken }),
   });
 
 export const fetchAuthSessionsApi = (token: string) =>
@@ -278,7 +292,7 @@ export const exportSecurityAuditCsvApi = async (token: string, limit = 1000): Pr
 
   if (!response.ok) {
     const data = await safeJson(response) as { detail?: string } | null;
-    throw new Error(data?.detail ?? `Request failed (${response.status})`);
+    throw new Error(getApiErrorMessage(data, `Request failed (${response.status})`));
   }
 
   return response.blob();
@@ -417,8 +431,8 @@ export const fetchInquiryAvailabilityApi = (date: string) =>
     `/api/inquiries/availability?date=${encodeURIComponent(date)}`
   );
 
-export const fetchInquiryCalendarApi = () =>
-  apiFetch<{ events: Array<{ id: string; fullName: string; contactNumber: string; emailAddress: string; facebookName: string; plateNumber?: string; appointmentDate: string; appointmentTime: string; make: string; model: string; productToPurchase: string; status: string }> }>('/api/inquiries/calendar');
+export const fetchInquiryCalendarApi = (token: string) =>
+  apiFetch<{ events: Array<{ id: string; fullName: string; contactNumber: string; emailAddress: string; facebookName: string; plateNumber?: string; appointmentDate: string; appointmentTime: string; make: string; model: string; productToPurchase: string; status: string }> }>('/api/inquiries/calendar', {}, token);
 
 export const deleteInquiryApi = (token: string, id: string) =>
   apiFetch<{ deleted: boolean }>(`/api/inquiries/${encodeURIComponent(id)}`, {
@@ -466,7 +480,7 @@ export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> =>
     throw new Error('API is offline.');
   }
   const data = await safeJson(response) as { urls?: string[]; detail?: string } | null;
-  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  if (!response.ok) throw new Error(getApiErrorMessage(data, `Upload failed (${response.status})`));
   return (data as { urls: string[] }).urls;
 };
 
@@ -491,7 +505,7 @@ export const uploadAdminImageApi = async (
     throw new Error('API is offline.');
   }
   const data = await safeJson(response) as { url?: string; detail?: string } | null;
-  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  if (!response.ok) throw new Error(getApiErrorMessage(data, `Upload failed (${response.status})`));
   return (data as { url: string }).url;
 };
 
@@ -617,7 +631,7 @@ export const uploadBuildUpdateMediaApi = async (
     throw new Error('API is offline.');
   }
   const data = await safeJson(response) as { urls?: string[]; detail?: string } | null;
-  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  if (!response.ok) throw new Error(getApiErrorMessage(data, `Upload failed (${response.status})`));
   return (data as { urls: string[] }).urls;
 };
 
@@ -1583,7 +1597,7 @@ export const fetchFacebookPosts = async (after?: string, limit = 100): Promise<F
   }
 
   const data = await safeJson(response) as FacebookPostsResponse | null;
-  if (!response.ok) throw new Error(data?.detail ?? 'Failed to fetch Facebook posts.');
+  if (!response.ok) throw new Error(getApiErrorMessage(data, 'Failed to fetch Facebook posts.'));
 
   const nextCursor: string | null = data?.paging?.cursors?.after ?? null;
   const hasNext: boolean = Boolean(data?.paging?.next);
@@ -1748,7 +1762,7 @@ export const uploadMyVehicleImageApi = async (token: string, file: File): Promis
   }
 
   const data = await safeJson(response) as { url?: string; detail?: string } | null;
-  if (!response.ok) throw new Error(data?.detail ?? `Upload failed (${response.status})`);
+  if (!response.ok) throw new Error(getApiErrorMessage(data, `Upload failed (${response.status})`));
   return (data as { url: string }).url;
 };
 
@@ -1787,7 +1801,7 @@ export const exportMyDataApi = async (token: string): Promise<void> => {
   }
   if (!response.ok) {
     const d = await response.json().catch(() => ({}));
-    throw new Error((d as { detail?: string }).detail ?? `Export failed (${response.status})`);
+    throw new Error(getApiErrorMessage(d, `Export failed (${response.status})`));
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

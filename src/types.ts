@@ -805,7 +805,8 @@ export type NotificationType =
   | 'parts_update'
   | 'assignment'
   | 'slot_available'
-  | 'security_alert';
+  | 'security_alert'
+  | 'inquiry';
 
 export interface AppNotification {
   id: number;

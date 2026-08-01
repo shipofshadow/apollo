@@ -439,11 +439,10 @@ export default function ManageUsersPanel() {
                               disabled={isProtected || togglingStatusId === item.id}
                               onClick={() => handleToggleStatus(item.id, isActive, item.name)}
                               title={isProtected ? 'Only the owner can change status of admin/owner accounts' : undefined}
-                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors ${
-                                isActive
+                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors ${isActive
                                   ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
                                   : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
-                              }`}>
+                                }`}>
                               {togglingStatusId === item.id
                                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
                                 : isActive
