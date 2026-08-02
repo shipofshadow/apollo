@@ -1121,8 +1121,8 @@ class Router
         $data     = $this->jsonBody();
         $this->validateTurnstile($data);
         $token    = trim((string) ($data['token']    ?? ''));
-        $password = (string) ($data['password']       ?? '');
-        $confirm  = (string) ($data['passwordConfirm'] ?? '');
+        $password = (string) ($data['password'] ?? '');
+        $confirm  = (string) ($data['password_confirmation'] ?? '');
 
         if ($token === '') {
             throw new RuntimeException('Reset token is required.', 422);
