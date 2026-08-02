@@ -136,7 +136,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       showToast('Status updated.', 'success');
       // Refresh activities
       const activitiesRes = await fetchInquiryActivityApi(token, String(id));
-      setActivityLogs((activitiesRes as any).activities as InquiryActivityLog[]);
+      setActivityLogs(((activitiesRes as any).activities as InquiryActivityLog[]) || []);
     } catch (err) {
       showToast((err as Error).message, 'error');
     } finally {
@@ -178,7 +178,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       showToast('Inquiry rescheduled.', 'success');
       // Refresh activities
       const activitiesRes = await fetchInquiryActivityApi(token, String(id));
-      setActivityLogs((activitiesRes as any).activities as InquiryActivityLog[]);
+      setActivityLogs(((activitiesRes as any).activities as InquiryActivityLog[]) || []);
     } catch (err) {
       showToast((err as Error).message, 'error');
     } finally {
