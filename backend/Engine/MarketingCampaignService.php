@@ -278,7 +278,7 @@ class MarketingCampaignService
                         'type' => (string) ($campaign['type'] ?? ''),
                     ];
 
-                    (new NotificationJobQueueService())->dispatch('marketing_campaign_message', $payload);
+                    (new NotificationJobQueueService())->dispatch('marketing_campaign_message', $payload, null, false);
 
                     $recipientInsert->execute([
                         ':run_id' => $runId,

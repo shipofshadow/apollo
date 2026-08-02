@@ -21,7 +21,7 @@ class NotificationJobQueueService
     }
 
     /** @param array<string, mixed> $payload */
-    public function dispatch(string $event, array $payload, ?string $runAfter = null): void
+    public function dispatch(string $event, array $payload, ?string $runAfter = null, bool $immediate = true): void
     {
         if (!$this->queueEnabled || $this->db === null) {
             if ($runAfter !== null && strtotime($runAfter) > time()) {
@@ -41,7 +41,7 @@ class NotificationJobQueueService
             ':run_after' => $runAfter,
         ]);
 
-        if (PHP_SAPI !== 'cli' && ($runAfter === null || strtotime($runAfter) <= time())) {
+        if ($immediate && PHP_SAPI !== 'cli' && ($runAfter === null || strtotime($runAfter) <= time())) {
             try {
                 $this->processPending(1);
             } catch (\Throwable $e) {
@@ -144,6 +144,14 @@ class NotificationJobQueueService
                 );
                 $done->execute([':id' => $jobId]);
                 $stats['processed']++;
+                
+                // Delay between emails/jobs to prevent hitting hostinger rate limits
+                $sleepSecs = defined('NOTIFICATION_QUEUE_SLEEP_SECONDS') 
+                    ? (int) NOTIFICATION_QUEUE_SLEEP_SECONDS 
+                    : 15;
+                if ($sleepSecs > 0) {
+                    sleep($sleepSecs);
+                }
             } catch (\Throwable $e) {
                 if ($attempts >= $maxAttempts) {
                     $fail = $this->db->prepare(

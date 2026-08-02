@@ -25,7 +25,8 @@ class NotificationService
      */
     public function contactMessage(array $data): void
     {
-        $to      = '1625autolab@gmail.com';
+        $adminEmail = defined('MAIL_ADMIN') ? MAIL_ADMIN : '1625autolab@gmail.com';
+        $to      = explode(',', $adminEmail)[0];
         // Strip CRLF from values used in email headers to prevent header injection
         $rawName    = str_replace(["\r", "\n"], '', $data['name']    ?? '');
         $rawEmail   = str_replace(["\r", "\n"], '', $data['email']   ?? '');
@@ -65,48 +66,34 @@ class NotificationService
     {
         $recipients = $this->adminRecipients();
         if (count($recipients) === 0) {
-            $recipients = ['1625autolab@gmail.com'];
+            $recipients = defined('MAIL_ADMIN') ? explode(',', MAIL_ADMIN) : ['1625autolab@gmail.com'];
         }
 
-        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? ''));
-        $rawEmail = str_replace(["\r", "\n"], '', (string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? ''));
-        $rawPhone = str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
-        $rawProduct = str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? ''));
-        $rawMake = str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? ''));
-        $rawModel = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
-        $rawOtherModel = str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? ''));
-        $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
-        $rawAddress = str_replace(["\r", "\n"], '', (string) ($inquiry['address'] ?? ''));
-        $rawFacebook = str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? ''));
-        $rawPlate = str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? ''));
+        $s = $this->sanitizeInquiryData($inquiry);
 
-        $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
-        $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
-
-
-        $name = htmlspecialchars($rawName);
-        $email = htmlspecialchars($rawEmail);
-        $phone = htmlspecialchars($rawPhone);
-        $product = htmlspecialchars($rawProduct);
-        $make = htmlspecialchars($rawMake);
-        $model = htmlspecialchars($rawModel === 'Other Model' ? $rawOtherModel : $rawModel);
-        $year = htmlspecialchars($rawYear);
-        $address = htmlspecialchars($rawAddress);
-        $facebook = htmlspecialchars($rawFacebook);
-        $appointmentDate = htmlspecialchars($rawAppointmentDate !== '' ? $this->formatAppointmentDate($rawAppointmentDate) : '—');
-        $appointmentTime = htmlspecialchars($rawAppointmentTime !== '' ? $rawAppointmentTime : '—');
+        $name = htmlspecialchars($s['rawName']);
+        $email = htmlspecialchars($s['rawEmail']);
+        $phone = htmlspecialchars($s['rawPhone']);
+        $product = htmlspecialchars($s['rawProduct']);
+        $make = htmlspecialchars($s['rawMake']);
+        $model = htmlspecialchars($s['rawModel'] === 'Other Model' ? $s['rawOtherModel'] : $s['rawModel']);
+        $year = htmlspecialchars($s['rawYear']);
+        $address = htmlspecialchars($s['rawAddress']);
+        $facebook = htmlspecialchars($s['rawFacebook']);
+        $appointmentDate = htmlspecialchars($s['rawDate'] !== '' ? $this->formatAppointmentDate($s['rawDate']) : '—');
+        $appointmentTime = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
 
         $body = $this->render('customer-inquiry-admin', [
             'name' => $name,
             'email' => $email,
-            'phone' => $phone !== '' ? '<a href="tel:' . htmlspecialchars($rawPhone) . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>' : '—',
+            'phone' => $phone !== '' ? '<a href="tel:' . htmlspecialchars($s['rawPhone']) . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>' : '—',
             'product' => $product !== '' ? $product : '—',
             'make' => $make !== '' ? $make : '—',
             'model' => $model !== '' ? $model : '—',
             'year' => $year !== '' ? $year : '—',
             'address' => $address !== '' ? $address : '—',
-            'plate' => $rawPlate !== '' ? htmlspecialchars($rawPlate) : '—',
+            'plate' => $s['rawPlate'] !== '' ? htmlspecialchars($s['rawPlate']) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
@@ -132,45 +119,31 @@ class NotificationService
             return;
         }
 
-        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? ''));
-        $rawEmail = str_replace(["\r", "\n"], '', (string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? ''));
-        $rawPhone = str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
-        $rawProduct = str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? ''));
-        $rawMake = str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? ''));
-        $rawModel = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
-        $rawOtherModel = str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? ''));
-        $rawYear = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
-        $rawAddress = str_replace(["\r", "\n"], '', (string) ($inquiry['address'] ?? ''));
-        $rawFacebook = str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? ''));
-        $rawPlate = str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? ''));
+        $s = $this->sanitizeInquiryData($inquiry);
 
-        $rawAppointmentDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
-        $rawAppointmentTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
-
-
-        $name = htmlspecialchars($rawName);
-        $email = htmlspecialchars($rawEmail);
-        $phone = htmlspecialchars($rawPhone);
-        $product = htmlspecialchars($rawProduct);
-        $make = htmlspecialchars($rawMake);
-        $model = htmlspecialchars($rawModel === 'Other Model' ? $rawOtherModel : $rawModel);
-        $year = htmlspecialchars($rawYear);
-        $address = htmlspecialchars($rawAddress);
-        $facebook = htmlspecialchars($rawFacebook);
-        $appointmentDate = htmlspecialchars($rawAppointmentDate !== '' ? $this->formatAppointmentDate($rawAppointmentDate) : '—');
-        $appointmentTime = htmlspecialchars($rawAppointmentTime !== '' ? $rawAppointmentTime : '—');
+        $name = htmlspecialchars($s['rawName']);
+        $email = htmlspecialchars($s['rawEmail']);
+        $phone = htmlspecialchars($s['rawPhone']);
+        $product = htmlspecialchars($s['rawProduct']);
+        $make = htmlspecialchars($s['rawMake']);
+        $model = htmlspecialchars($s['rawModel'] === 'Other Model' ? $s['rawOtherModel'] : $s['rawModel']);
+        $year = htmlspecialchars($s['rawYear']);
+        $address = htmlspecialchars($s['rawAddress']);
+        $facebook = htmlspecialchars($s['rawFacebook']);
+        $appointmentDate = htmlspecialchars($s['rawDate'] !== '' ? $this->formatAppointmentDate($s['rawDate']) : '—');
+        $appointmentTime = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
 
         $body = $this->render('customer-inquiry-customer', [
            'name' => $name,
             'email' => $email,
-            'phone' => $phone !== '' ? '<a href="tel:' . htmlspecialchars($rawPhone) . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>' : '—',
+            'phone' => $phone !== '' ? '<a href="tel:' . htmlspecialchars($s['rawPhone']) . '" style="color:#f97316;text-decoration:none">' . $phone . '</a>' : '—',
             'product' => $product !== '' ? $product : '—',
             'make' => $make !== '' ? $make : '—',
             'model' => $model !== '' ? $model : '—',
             'year' => $year !== '' ? $year : '—',
             'address' => $address !== '' ? $address : '—',
-            'plate' => $rawPlate !== '' ? htmlspecialchars($rawPlate) : '—',
+            'plate' => $s['rawPlate'] !== '' ? htmlspecialchars($s['rawPlate']) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
@@ -238,7 +211,7 @@ class NotificationService
         if (count($recipients) === 0) {
             $recipients = $this->adminRecipients();
             if (count($recipients) === 0) {
-                $recipients = ['1625autolab@gmail.com'];
+                $recipients = defined('MAIL_ADMIN') ? explode(',', MAIL_ADMIN) : ['1625autolab@gmail.com'];
             }
         }
 
@@ -327,22 +300,15 @@ class NotificationService
             return;
         }
 
-        $rawName    = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'Customer'));
-        $rawPhone   = str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
-        $rawMake    = str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? ''));
-        $rawModel   = str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? ''));
-        $rawYear    = str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? ''));
-        $rawProduct = str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? ''));
-        $rawDate    = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
-        $rawTime    = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        $s = $this->sanitizeInquiryData($inquiry);
         $status     = strtolower(trim((string) ($inquiry['status'] ?? 'pending')));
 
-        $name    = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
-        $phone   = htmlspecialchars($rawPhone);
-        $vehicle = htmlspecialchars(trim($rawMake . ' ' . $rawModel . ($rawYear !== '' ? ' (' . $rawYear . ')' : '')));
-        $product = htmlspecialchars($rawProduct !== '' ? $rawProduct : '—');
-        $date    = htmlspecialchars($rawDate !== '' ? $this->formatAppointmentDate($rawDate) : '—');
-        $time    = htmlspecialchars($rawTime !== '' ? $rawTime : '—');
+        $name    = htmlspecialchars($s['rawName'] !== '' ? $s['rawName'] : 'Customer');
+        $phone   = htmlspecialchars($s['rawPhone']);
+        $vehicle = htmlspecialchars(trim($s['rawMake'] . ' ' . $s['rawModel'] . ($s['rawYear'] !== '' ? ' (' . $s['rawYear'] . ')' : '')));
+        $product = htmlspecialchars($s['rawProduct'] !== '' ? $s['rawProduct'] : '—');
+        $date    = htmlspecialchars($s['rawDate'] !== '' ? $this->formatAppointmentDate($s['rawDate']) : '—');
+        $time    = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
         $statusMessages = [
             'confirmed'   => 'Your appointment is <strong style="color:#4ade80">confirmed</strong>. We look forward to seeing you!',
@@ -374,36 +340,17 @@ class NotificationService
               . '<td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $vehicle . '</td></tr>'
             : '';
 
-        $body = '
-        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#0f172a;color:#e2e8f0;padding:24px;border-radius:12px">
-          <p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700">1625 Autolab</p>
-          <h2 style="margin:0 0 6px;font-size:24px;color:#ffffff">Service Request Update</h2>
-          <p style="margin:0 0 20px;color:#94a3b8;font-size:14px">Hi ' . $name . ', here is an update on your service request.</p>
-
-          <div style="background:#111827;border:1px solid #1e3a5f;border-radius:8px;padding:16px 20px;margin-bottom:24px">
-            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#64748b">Status</p>
-            <span style="display:inline-block;background:' . $badgeColor . '22;color:' . $badgeColor . ';border:1px solid ' . $badgeColor . '44;padding:4px 14px;border-radius:999px;font-size:13px;font-weight:700">'
-              . $statusLabel . '</span>
-            <p style="margin:12px 0 0;color:#cbd5e1;font-size:14px;line-height:1.6">' . $statusMessage . '</p>
-          </div>
-
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-                 style="border:1px solid #334155;border-radius:8px;overflow:hidden;background:#111827;margin-bottom:24px">
-            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px;width:140px">Service / Product</td>
-                <td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $product . '</td></tr>
-            ' . $vehicleRow . '
-            ' . $phoneRow . '
-            <tr><td style="padding:10px 16px;border-bottom:1px solid #334155;color:#64748b;font-size:13px">Date</td>
-                <td style="padding:10px 16px;border-bottom:1px solid #334155;color:#f1f5f9">' . $date . '</td></tr>
-            <tr><td style="padding:10px 16px;color:#64748b;font-size:13px">Time</td>
-                <td style="padding:10px 16px;color:#f1f5f9">' . $time . '</td></tr>
-          </table>
-
-          <p style="margin:0;color:#94a3b8;font-size:13px;line-height:1.6">
-            Questions? Reply to this email or message us on Facebook. We\'re happy to help.
-          </p>
-          <p style="margin:16px 0 0;color:#475569;font-size:12px">— 1625 Autolab Team</p>
-        </div>';
+        $body = $this->render('inquiry-status-changed', [
+            'name' => $name,
+            'badge_color' => $badgeColor,
+            'status_label' => $statusLabel,
+            'status_message' => $statusMessage,
+            'product' => $product,
+            'vehicle_row_html' => $vehicleRow,
+            'phone_row_html' => $phoneRow,
+            'date' => $date,
+            'time' => $time,
+        ]);
 
         $subject = 'Service Request Update: ' . $statusLabel . ' | 1625 Autolab';
         $this->send($customerEmail, $rawName !== '' ? $rawName : 'Customer', $subject, $body);
@@ -421,13 +368,11 @@ class NotificationService
         $customerEmail = strtolower(trim((string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? '')));
         if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) return;
 
-        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'Customer'));
-        $name    = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
-        $rawDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
-        $rawTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        $s = $this->sanitizeInquiryData($inquiry);
+        $name    = htmlspecialchars($s['rawName'] !== '' ? $s['rawName'] : 'Customer');
         
-        $date = htmlspecialchars($rawDate !== '' ? $this->formatAppointmentDate($rawDate) : '—');
-        $time = htmlspecialchars($rawTime !== '' ? $rawTime : '—');
+        $date = htmlspecialchars($s['rawDate'] !== '' ? $this->formatAppointmentDate($s['rawDate']) : '—');
+        $time = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
         $body = $this->render('inquiry-rescheduled-customer', [
             'name' => $name,
@@ -449,13 +394,11 @@ class NotificationService
     {
         if (MAIL_FROM === '' || count($adminEmails) === 0) return;
 
-        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer'));
-        $name    = htmlspecialchars($rawName !== '' ? $rawName : 'A customer');
-        $rawDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
-        $rawTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        $s = $this->sanitizeInquiryData($inquiry);
+        $name    = htmlspecialchars($s['rawName'] !== '' ? $s['rawName'] : 'A customer');
         
-        $date = htmlspecialchars($rawDate !== '' ? $this->formatAppointmentDate($rawDate) : '—');
-        $time = htmlspecialchars($rawTime !== '' ? $rawTime : '—');
+        $date = htmlspecialchars($s['rawDate'] !== '' ? $this->formatAppointmentDate($s['rawDate']) : '—');
+        $time = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
         $body = $this->render('inquiry-rescheduled-admin', [
             'name' => $name,
@@ -727,14 +670,12 @@ class NotificationService
             ? '<p style="margin-top:24px"><a href="' . $safeCta . '" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:700">Claim Offer</a></p>'
             : '';
 
-        $body = '
-        <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:12px">
-          <p style="margin:0 0 12px 0;color:#9ca3af">Hi ' . $safeName . ',</p>
-          <h2 style="margin:0 0 14px 0;color:#fff">' . $safeTitle . '</h2>
-                    <div style="line-height:1.6;color:#d1d5db">' . ($safeMessageHtml !== '' ? $safeMessageHtml : $safeMessage) . '</div>
-          ' . $ctaBlock . '
-          <p style="margin-top:24px;color:#9ca3af;font-size:12px">1625 Autolab</p>
-        </div>';
+        $body = $this->render('marketing-campaign-message', [
+            'name' => $safeName,
+            'title' => $safeTitle,
+            'message' => $safeMessageHtml !== '' ? $safeMessageHtml : $safeMessage,
+            'cta_block' => $ctaBlock,
+        ]);
 
         $this->send($email, $safeName, $safeTitle . ' | 1625 Autolab', $body);
     }
@@ -794,24 +735,13 @@ class NotificationService
         $safeClaimUrl = htmlspecialchars($claimUrl);
         $claimWindow = max(5, $claimWindowMinutes);
 
-        $body = "
-        <div style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>
-          <h2 style='color:#f36f21'>Slot Available! 🔥</h2>
-          <p>Hi {$safeName},</p>
-          <p>Great news! A slot you've been waiting for has just opened up:</p>
-          <div style='background:#f5f5f5;padding:16px;border-radius:8px;margin:20px 0'>
-            <strong>Date:</strong> {$safeDate}<br/>
-            <strong>Time:</strong> {$safeTime}
-          </div>
-                    <p>This slot is being held for you for the next <strong>{$claimWindow} minutes</strong>.</p>
-          <p>
-                        <a href='{$safeClaimUrl}'
-               style='background:#f36f21;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold'>
-                            Claim & Book Now
-            </a>
-          </p>
-          <p style='color:#888;font-size:12px;margin-top:32px'>– 1625 Autolab</p>
-        </div>";
+        $body = $this->render('waitlist-slot-available', [
+            'name' => $safeName,
+            'date' => $safeDate,
+            'time' => $safeTime,
+            'claim_window' => $claimWindow,
+            'claim_url' => $safeClaimUrl,
+        ]);
 
         $this->send($email, $name, "Slot Available: {$date} at {$time} | 1625 Autolab", $body);
     }
@@ -1693,5 +1623,29 @@ class NotificationService
             
             return $char;
         }, $text);
+    }
+    /**
+     * Sanitizes common inquiry fields.
+     *
+     * @param array<string, mixed> $inquiry
+     * @return array<string, string>
+     */
+    private function sanitizeInquiryData(array $inquiry): array
+    {
+        return [
+            'rawName'    => str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'Customer')),
+            'rawEmail'   => str_replace(["\r", "\n"], '', (string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? '')),
+            'rawPhone'   => str_replace(["\r", "\n"], '', (string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? '')),
+            'rawMake'    => str_replace(["\r", "\n"], '', (string) ($inquiry['make'] ?? '')),
+            'rawModel'   => str_replace(["\r", "\n"], '', (string) ($inquiry['model'] ?? '')),
+            'rawYear'    => str_replace(["\r", "\n"], '', (string) ($inquiry['yearModel'] ?? '')),
+            'rawProduct' => str_replace(["\r", "\n"], '', (string) ($inquiry['productToPurchase'] ?? '')),
+            'rawDate'    => str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? '')),
+            'rawTime'    => str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? '')),
+            'rawAddress' => str_replace(["\r", "\n"], '', (string) ($inquiry['address'] ?? '')),
+            'rawFacebook'=> str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? '')),
+            'rawPlate'   => str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? '')),
+            'rawOtherModel'=> str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? '')),
+        ];
     }
 }

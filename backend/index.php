@@ -73,7 +73,11 @@ function runAutoCronWorkersOnRequest(): void
 	}
 }
 
-runAutoCronWorkersOnRequest();
-
 $router = new Router();
 $router->dispatch();
+
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+}
+
+runAutoCronWorkersOnRequest();
