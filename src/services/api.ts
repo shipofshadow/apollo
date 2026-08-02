@@ -1204,8 +1204,8 @@ export const deleteAdminRoleApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
-export const fetchAdminStatsApi = (token: string) =>
-  apiFetch<AdminStats>('/api/admin/stats', {}, token);
+export const fetchAdminStatsApi = (token: string, timeframe: string = 'all_time') =>
+  apiFetch<AdminStats>(`/api/admin/stats?timeframe=${encodeURIComponent(timeframe)}`, {}, token);
 
 export const fetchSemaphoreAccountApi = (token: string, refresh = false) => {
   const qs = refresh ? '?refresh=true' : '';

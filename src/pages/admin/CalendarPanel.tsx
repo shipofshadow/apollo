@@ -18,10 +18,10 @@ import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatStatus } from '../../utils/formatStatus';
 
-const DAYS   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 interface Props {
@@ -48,27 +48,27 @@ interface InquiryEvent {
 type CalendarEventItem = (Booking & { eventType: 'booking' }) | (InquiryEvent & { eventType: 'inquiry' });
 
 const STATUS_BADGE: Record<string, string> = {
-  pending:        'bg-yellow-500/10 text-yellow-300 border border-yellow-500/30',
-  confirmed:      'bg-green-500/10 text-green-300 border border-green-500/30',
-  in_progress:    'bg-sky-500/10 text-sky-300 border border-sky-500/30',
-  completed:      'bg-blue-500/10 text-blue-300 border border-blue-500/30',
-  cancelled:      'bg-gray-700 text-gray-300 border border-gray-600',
-  awaiting_parts: 'bg-purple-500/10 text-purple-300 border border-purple-500/30',
+  pending: 'bg-transparent text-yellow-500 border border-yellow-500/40',
+  confirmed: 'bg-transparent text-green-500 border border-green-500/40',
+  in_progress: 'bg-transparent text-sky-500 border border-sky-500/40',
+  completed: 'bg-transparent text-blue-500 border border-blue-500/40',
+  cancelled: 'bg-transparent text-gray-400 border border-gray-700',
+  awaiting_parts: 'bg-transparent text-purple-500 border border-purple-500/40',
 };
 
 // Statuses that apply to inquiries only — awaiting_parts is booking-only.
 
 const TYPE_BADGE: Record<'booking' | 'inquiry', string> = {
-  booking: 'bg-sky-500/10 text-sky-300 border border-sky-500/20',
-  inquiry: 'bg-brand-orange/10 text-brand-orange border border-brand-orange/20',
+  booking: 'bg-transparent text-sky-400 border border-sky-400/40',
+  inquiry: 'bg-transparent text-[#f97316] border border-[#f97316]/40',
 };
 
 const STATUS_DOT: Record<string, string> = {
-  pending:        'bg-yellow-500',
-  confirmed:      'bg-green-500',
-  in_progress:    'bg-sky-500',
-  completed:      'bg-blue-500',
-  cancelled:      'bg-gray-500',
+  pending: 'bg-yellow-500',
+  confirmed: 'bg-green-500',
+  in_progress: 'bg-sky-500',
+  completed: 'bg-blue-500',
+  cancelled: 'bg-gray-500',
   awaiting_parts: 'bg-purple-500',
 };
 
@@ -134,7 +134,7 @@ export default function CalendarPanel({ onView }: Props) {
   const { appointments, status } = useSelector((s: RootState) => s.booking);
 
   const today = new Date();
-  const [year,  setYear]  = useState(today.getFullYear());
+  const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<InquiryEvent[]>([]);
@@ -204,7 +204,7 @@ export default function CalendarPanel({ onView }: Props) {
     if (token) dispatch(fetchAllBookingsAsync(token));
     fetchShopClosedDatesApi()
       .then(data => setClosedDates((data as { closedDates: { date: string; reason: string | null; isYearly: boolean }[] }).closedDates ?? []))
-      .catch(() => {});
+      .catch(() => { });
 
     const loadInquiries = async () => {
       setLoading(true);
@@ -272,8 +272,8 @@ export default function CalendarPanel({ onView }: Props) {
   };
 
   // Build calendar grid
-  const firstDay  = new Date(year, month, 1).getDay();  // 0=Sun
-  const daysInMo  = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();  // 0=Sun
+  const daysInMo = new Date(year, month + 1, 0).getDate();
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMo }, (_, i) => i + 1),
@@ -377,19 +377,17 @@ export default function CalendarPanel({ onView }: Props) {
                 <div
                   key={iso}
                   onClick={() => setSelectedDate(iso === selectedDate ? null : iso)}
-                  className={`min-h-[64px] border-r border-b border-gray-800 p-1 cursor-pointer transition-colors hover:bg-gray-800/60 ${
-                    isSelected ? 'bg-brand-orange/10 border-brand-orange' : closure ? 'bg-red-500/5 border-red-500/30' : ''
-                  }`}
+                  className={`min-h-[64px] border-r border-b border-gray-800 p-1 cursor-pointer transition-colors hover:bg-gray-800/60 ${isSelected ? 'bg-brand-orange/10 border-brand-orange' : closure ? 'bg-red-500/5 border-red-500/30' : ''
+                    }`}
                 >
-                  <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold mb-1 ${
-                    isToday
-                      ? 'bg-brand-orange text-white'
-                      : closure
+                  <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold mb-1 ${isToday
+                    ? 'bg-brand-orange text-white'
+                    : closure
                       ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                       : isSelected
-                      ? 'text-brand-orange'
-                      : 'text-gray-400'
-                  }`}>
+                        ? 'text-brand-orange'
+                        : 'text-gray-400'
+                    }`}>
                     {day}
                   </div>
 
@@ -442,9 +440,9 @@ export default function CalendarPanel({ onView }: Props) {
             <span className="text-sm font-bold text-white uppercase tracking-widest">
               {selectedDate
                 ? (() => {
-                    const [y, m, d] = selectedDate.split('-').map(Number);
-                    return new Date(y, m - 1, d).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' });
-                  })()
+                  const [y, m, d] = selectedDate.split('-').map(Number);
+                  return new Date(y, m - 1, d).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' });
+                })()
                 : 'Select a day'}
             </span>
           </div>
@@ -486,62 +484,56 @@ export default function CalendarPanel({ onView }: Props) {
                     <div
                       key={`${event.eventType}-${event.id}`}
                       onClick={() => event.eventType === 'inquiry' ? onView?.('inq-' + event.id) : onView?.(event.id)}
-                      className="group flex flex-col gap-2 rounded-2xl border border-gray-800 bg-brand-dark p-2.5 transition-colors hover:border-brand-orange/50 hover:bg-brand-darker cursor-pointer"
+                      className="group relative flex flex-col gap-3 rounded-[20px] border border-gray-800 bg-[#14161a] p-4 transition-colors hover:border-brand-orange/50 hover:bg-[#1a1c22] cursor-pointer overflow-hidden"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className={`shrink-0 w-1.5 self-stretch rounded-full ${STATUS_DOT[event.status]}`} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                            <span className={`text-[10px] uppercase tracking-[0.25em] px-2 py-1 rounded-full ${TYPE_BADGE[event.eventType]}`}>
-                              {event.eventType === 'booking' ? 'Booking' : 'Inquiry'}
-                            </span>
-                            <span className={`text-[10px] uppercase tracking-[0.25em] px-2 py-1 rounded-full ${STATUS_BADGE[event.status] ?? 'bg-gray-900 text-gray-300 border border-gray-700'}`}>
-                              {formatStatus(event.status)}
-                            </span>
-                          </div>
-                          <h3 className="text-sm font-black text-white truncate leading-tight">
-                            {event.eventType === 'booking'
-                              ? event.serviceName
-                              : `${event.make} ${event.model}${event.year ? ` ${event.year}` : ''}`}
-                          </h3>
-                          <p className="text-gray-400 text-xs truncate">
-                            {event.eventType === 'booking'
-                              ? event.name
-                              : event.fullName}
-                          </p>
+                      {/* Left Accent Bar */}
+                      <div className={`absolute left-3 top-4 bottom-4 w-1.5 rounded-full ${STATUS_DOT[event.status]}`} />
+
+                      <div className="pl-6 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          <span className={`text-[9px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full ${TYPE_BADGE[event.eventType]}`}>
+                            {event.eventType === 'booking' ? 'Booking' : 'Inquiry'}
+                          </span>
+                          <span className={`text-[9px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full ${STATUS_BADGE[event.status] ?? 'bg-transparent text-gray-300 border border-gray-700'}`}>
+                            {formatStatus(event.status)}
+                          </span>
                         </div>
+                        <h3 className="text-[16px] font-black uppercase text-white truncate leading-none mb-1 font-display tracking-wide">
+                          {event.eventType === 'booking'
+                            ? event.serviceName
+                            : `${event.make} ${event.model}${event.year ? ` ${event.year}` : ''}`}
+                        </h3>
+                        <p className="text-gray-400 text-[13px] truncate">
+                          {event.eventType === 'booking'
+                            ? event.name
+                            : event.fullName}
+                        </p>
+                        <p className="text-gray-500 text-[12px] mt-0.5 truncate">
+                          {event.eventType === 'booking'
+                            ? `${event.email} • ${event.phone}`
+                            : `${event.emailAddress || 'No email'}${event.contactNumber ? ` • ${event.contactNumber}` : ''}`}
+                        </p>
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="rounded-2xl border border-gray-800 bg-gray-950 p-2.5">
-                          <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500">Time</p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <p className="text-sm font-bold text-white">{formatAppointmentTime(event.appointmentTime).time} {formatAppointmentTime(event.appointmentTime).suffix}</p>
-                            {slotCapacity !== null && event.appointmentTime && (
-                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-800/60 border border-gray-700 text-gray-200">{Math.max(slotCapacity - (slotCounts[event.appointmentTime] ?? 0), 0)} left</span>
-                            )}
-                          </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2 pl-6">
+                        <div className="rounded-[12px] border border-gray-800/60 bg-[#0d1015] p-4 flex flex-col items-start">
+                          <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500 mb-3">Time</p>
+                          <p className="text-[16px] font-black text-white leading-tight">{formatAppointmentTime(event.appointmentTime).time}</p>
+                          <p className="text-[16px] font-black text-white leading-tight">{formatAppointmentTime(event.appointmentTime).suffix}</p>
                         </div>
-                        <div className="rounded-2xl border border-gray-800 bg-gray-950 p-2.5">
-                          <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500">Contact</p>
-                          <p className="mt-2 text-sm text-white break-words">
-                            {event.eventType === 'booking'
-                              ? `${event.email} • ${event.phone}`
-                              : `${event.emailAddress ?? 'No email'}${event.contactNumber ? ` • ${event.contactNumber}` : ''}`}
+                        <div className="rounded-[12px] border border-gray-800/60 bg-[#0d1015] p-4 flex flex-col items-start min-w-0">
+                          <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500 mb-3">
+                            {event.eventType === 'booking' ? 'Details' : 'Product'}
                           </p>
-                        </div>
-                      </div>
-                      {event.eventType === 'inquiry' && (
-                        <div className="rounded-2xl border border-gray-800 bg-brand-dark p-2.5">
-                          <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500">Product</p>
-                          <p className="mt-2 text-sm font-bold text-white">{event.productToPurchase || 'Service inquiry'}</p>
+                          <p className="text-[14px] font-bold text-white leading-snug break-words w-full">
+                            {event.eventType === 'booking' ? 'Booking Details' : (event.productToPurchase || 'Service inquiry')}
+                          </p>
                           {event.plateNumber && (
-                            <p className="text-xs text-gray-400 mt-1">Plate: {event.plateNumber}</p>
+                            <p className="text-[12px] text-gray-400 mt-auto pt-4">Plate: {event.plateNumber}</p>
                           )}
                         </div>
-                      )}
-                      {event.eventType === 'booking' && (
-                        <p className="text-[10px] uppercase tracking-[0.35em] text-gray-500">Details</p>
-                      )}
+                      </div>
+
                     </div>
                   ))}
                 </>

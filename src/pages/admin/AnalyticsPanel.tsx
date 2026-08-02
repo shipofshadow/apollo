@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Activity, TrendingUp, Calendar, CheckCircle2,
-  AlertCircle, Loader2, Sun, Star, Wrench,
+  AlertCircle, Loader2, Sun, Star, Wrench, PieChart, Download, Info
 } from 'lucide-react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
@@ -14,14 +14,16 @@ export default function AnalyticsPanel() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
+  const [timeframe, setTimeframe] = useState<string>('all_time');
+
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    fetchAdminStatsApi(token)
+    fetchAdminStatsApi(token, timeframe)
       .then(setStats)
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, timeframe]);
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -180,6 +182,20 @@ export default function AnalyticsPanel() {
 
   const statusDonutSeries = statusRows.map(row => row.value);
 
+  const handleExport = () => {
+    if (!stats) return;
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      "Status,Count\n" +
+      statusRows.map(row => `${row.label},${row.value}`).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `appointments_by_status_${timeframe}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide">Dashboard Overview</h2>
@@ -282,9 +298,35 @@ export default function AnalyticsPanel() {
       </div>
 
       <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Appointments by Status</h3>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-600">Distribution</span>
+        <div className="px-5 py-3 border-b border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+              <PieChart className="w-3.5 h-3.5" /> Appointments by Status
+            </h3>
+            <div className="group relative flex items-center">
+              <Info className="w-3.5 h-3.5 text-gray-600 cursor-help" />
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-900 border border-gray-700 text-[10px] text-gray-300 rounded shadow-xl z-10 text-center">
+                Includes all bookings and inquiries combined.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-brand-orange bg-brand-orange/10 px-2 py-0.5 rounded-full">
+              Total: {stats?.totalAppointments ?? 0}
+            </span>
+            <select 
+              className="bg-transparent text-[10px] font-semibold uppercase tracking-widest text-gray-400 focus:outline-none cursor-pointer border-none p-0 focus:ring-0"
+              value={timeframe}
+              onChange={e => setTimeframe(e.target.value)}
+            >
+              <option value="all_time">All Time</option>
+              <option value="this_month">This Month</option>
+              <option value="this_week">This Week</option>
+            </select>
+            <button className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 hover:text-white transition-colors flex items-center gap-1" onClick={handleExport}>
+              <Download className="w-3 h-3" /> Export
+            </button>
+          </div>
         </div>
         <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-5 items-center">
           <div className="lg:col-span-2">

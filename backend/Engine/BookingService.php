@@ -206,9 +206,9 @@ class BookingService
      *
      * @return array<string, mixed>
      */
-    public function getStats(): array
+    public function getStats(?string $timeframe = null): array
     {
-        return $this->useDb ? $this->dbGetStats() : $this->fileGetStats();
+        return $this->useDb ? $this->dbGetStats($timeframe) : $this->fileGetStats();
     }
 
     /**
@@ -1456,14 +1456,21 @@ class BookingService
     // -------------------------------------------------------------------------
 
     /** @return array<string, mixed> */
-    private function dbGetStats(): array
+    private function dbGetStats(?string $timeframe = null): array
     {
         $db = Database::getInstance();
 
-        $total = (int) $db->query('SELECT COUNT(*) FROM bookings')->fetchColumn();
+        $whereClause = "";
+        if ($timeframe === 'this_week') {
+            $whereClause = "WHERE YEARWEEK(appointment_date, 1) = YEARWEEK(CURDATE(), 1)";
+        } elseif ($timeframe === 'this_month') {
+            $whereClause = "WHERE YEAR(appointment_date) = YEAR(CURDATE()) AND MONTH(appointment_date) = MONTH(CURDATE())";
+        }
+
+        $total = (int) $db->query("SELECT COUNT(*) FROM bookings $whereClause")->fetchColumn();
 
         $byStatus = $db->query(
-            'SELECT status, COUNT(*) AS cnt FROM bookings GROUP BY status'
+            "SELECT status, COUNT(*) AS cnt FROM bookings $whereClause GROUP BY status"
         )->fetchAll(\PDO::FETCH_KEY_PAIR);
 
         $pending   = (int) ($byStatus['pending']   ?? 0);
@@ -1488,20 +1495,24 @@ class BookingService
         )->fetchColumn();
 
         // Top 5 most-booked services
+        $topServicesWhere = str_replace("appointment_date", "b.appointment_date", $whereClause);
         $topServices = $db->query(
             "SELECT s.title AS service_name, COUNT(*) AS cnt
                FROM bookings b
                JOIN services s ON s.id = b.service_id
+               $topServicesWhere
               GROUP BY b.service_id, s.title
               ORDER BY cnt DESC
               LIMIT 5"
         )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
         // Peak appointment hours by volume (completed and active bookings).
+        $peakWhere = $whereClause ? str_replace("WHERE", "AND", $whereClause) : "";
         $peakHours = $db->query(
             "SELECT appointment_time AS hour_label, COUNT(*) AS cnt
                FROM bookings
               WHERE status IN ('pending', 'confirmed', 'completed')
+              $peakWhere
               GROUP BY appointment_time
               ORDER BY cnt DESC
               LIMIT 8"

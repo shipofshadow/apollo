@@ -3403,8 +3403,10 @@ class Router
     {
         $this->requirePermission('analytics:view');
         
-        $stats = (new BookingService())->getStats();
-        $inquiryStats = (new InquiryService())->getStats();
+        $timeframe = $_GET['timeframe'] ?? null;
+        
+        $stats = (new BookingService())->getStats($timeframe);
+        $inquiryStats = (new InquiryService())->getStats($timeframe);
         
         $stats = array_merge($stats, $inquiryStats);
         

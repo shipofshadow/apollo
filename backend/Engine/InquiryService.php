@@ -312,9 +312,9 @@ class InquiryService
         ];
     }
 
-    public function getStats(): array
+    public function getStats(?string $timeframe = null): array
     {
-        return $this->useDb ? $this->dbGetStats() : $this->fileGetStats();
+        return $this->useDb ? $this->dbGetStats($timeframe) : $this->fileGetStats();
     }
 
     /**
@@ -432,14 +432,21 @@ class InquiryService
         ]);
     }
 
-    private function dbGetStats(): array
+    private function dbGetStats(?string $timeframe = null): array
     {
         $db = Database::getInstance();
 
-        $total = (int) $db->query('SELECT COUNT(*) FROM customer_inquiries')->fetchColumn();
+        $whereClause = "";
+        if ($timeframe === 'this_week') {
+            $whereClause = "WHERE YEARWEEK(appointment_date, 1) = YEARWEEK(CURDATE(), 1)";
+        } elseif ($timeframe === 'this_month') {
+            $whereClause = "WHERE YEAR(appointment_date) = YEAR(CURDATE()) AND MONTH(appointment_date) = MONTH(CURDATE())";
+        }
+
+        $total = (int) $db->query("SELECT COUNT(*) FROM customer_inquiries $whereClause")->fetchColumn();
 
         $byStatus = $db->query(
-            'SELECT status, COUNT(*) AS cnt FROM customer_inquiries GROUP BY status'
+            "SELECT status, COUNT(*) AS cnt FROM customer_inquiries $whereClause GROUP BY status"
         )->fetchAll(\PDO::FETCH_KEY_PAIR);
 
         $pending    = (int) ($byStatus['pending']     ?? 0);
