@@ -181,6 +181,52 @@ public function customerInquiryAdmin(array $inquiry): void
     }
 
     /**
+     * Send a reschedule SMS to the customer.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function inquiryRescheduledCustomer(array $inquiry): void
+    {
+        $phone = $this->normalisePhone((string) ($inquiry['contactNumber'] ?? $inquiry['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $name    = trim((string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'there'));
+        $date    = trim((string) ($inquiry['appointmentDate'] ?? ''));
+        $time    = trim((string) ($inquiry['appointmentTime'] ?? ''));
+
+        $dateStr = $date !== '' ? " on {$date}" . ($time !== '' ? " at {$time}" : '') : '';
+
+        $this->send(
+            $phone,
+            "Hi {$name}! Your appointment has been rescheduled to{$dateStr}. "
+          . "If you have questions, please message us on Facebook. - 1625 Autolab"
+        );
+    }
+
+    /**
+     * Send a reschedule SMS to admin/owner.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function inquiryRescheduledAdmin(array $inquiry): void
+    {
+        $recipients = $this->fetchAlertRecipients('new_booking');
+        if (count($recipients) === 0) return;
+
+        $name    = trim((string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer'));
+        $date    = trim((string) ($inquiry['appointmentDate'] ?? ''));
+        $time    = trim((string) ($inquiry['appointmentTime'] ?? ''));
+
+        $dateStr = $date !== '' ? "{$date}" . ($time !== '' ? " at {$time}" : '') : '';
+
+        $message = "Reschedule Alert: Inquiry for {$name} has been rescheduled to {$dateStr}.";
+
+        foreach ($recipients as $adminPhone) {
+            $this->send($adminPhone, $message);
+        }
+    }
+
+    /**
      * Send a booking confirmation SMS to the client.
      *
      * @param array<string, mixed> $booking
@@ -198,7 +244,7 @@ public function customerInquiryAdmin(array $inquiry): void
         $this->send(
             $phone,
             "Hi {$name}! Your booking for {$service} on {$date} at {$time} has been CONFIRMED. "
-          . "- 1625 Auto Lab"
+          . "- 1625 Autolab"
         );
     }
 

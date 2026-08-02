@@ -1409,7 +1409,7 @@ class Router
             error_log('[handleInquiryUpdate] Failed to re-queue appointment reminder: ' . $e->getMessage());
         }
 
-        // Notify the customer via email when the status has changed.
+        // Notify the customer via email/sms when the status has changed.
         if ($status !== '') {
             try {
                 (new NotificationJobQueueService())->dispatch('inquiry_status_changed', [
@@ -1417,6 +1417,17 @@ class Router
                 ]);
             } catch (\Throwable $e) {
                 error_log('[handleInquiryUpdate] Failed to dispatch inquiry_status_changed notification: ' . $e->getMessage());
+            }
+        }
+
+        // Notify the customer and admins if the appointment was rescheduled
+        if ($appointmentDate !== null || $appointmentTime !== null) {
+            try {
+                (new NotificationJobQueueService())->dispatch('inquiry_rescheduled', [
+                    'inquiry' => $inquiry,
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[handleInquiryUpdate] Failed to dispatch inquiry_rescheduled notification: ' . $e->getMessage());
             }
         }
 

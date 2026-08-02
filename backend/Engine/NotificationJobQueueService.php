@@ -491,6 +491,53 @@ class NotificationJobQueueService
                 (new SmsService())->inquiryStatusChanged($inquiry);
                 return;
 
+            case 'inquiry_rescheduled':
+                $inquiry = is_array($payload['inquiry'] ?? null) ? $payload['inquiry'] : [];
+                if (empty($inquiry)) {
+                    return;
+                }
+                
+                // Notify Customer (Email & SMS)
+                try {
+                    (new NotificationService())->inquiryRescheduledCustomer($inquiry);
+                    (new SmsService())->inquiryRescheduledCustomer($inquiry);
+                } catch (\Throwable $e) {
+                    error_log('[NotificationJobQueueService] inquiry reschedule customer notification failed: ' . $e->getMessage());
+                }
+
+                // Notify Admins (Email, SMS, & In-App)
+                try {
+                    $adminUsers = $this->usersForPermissionOrRoles('bookings:manage', ['owner', 'admin']);
+                    
+                    $emailRecipients = [];
+                    foreach ($adminUsers as $user) {
+                        $adminEmail = strtolower(trim((string) ($user['email'] ?? '')));
+                        if ($adminEmail !== '' && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+                            $emailRecipients[] = $adminEmail;
+                        }
+                    }
+                    
+                    (new NotificationService())->inquiryRescheduledAdmin($inquiry, $emailRecipients);
+                    (new SmsService())->inquiryRescheduledAdmin($inquiry);
+                    
+                    $customerName = (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer');
+                    $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
+                    $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
+                    $dateStr = $date !== '' ? "{$date}" . ($time !== '' ? " at {$time}" : '') : '';
+                    
+                    $this->notifyUsersInApp(
+                        $adminUsers,
+                        'appointment_rescheduled',
+                        'appointment_rescheduled',
+                        'Appointment Rescheduled',
+                        "Inquiry for {$customerName} has been rescheduled to {$dateStr}.",
+                        ['inquiryId' => $inquiry['id'] ?? null]
+                    );
+                } catch (\Throwable $e) {
+                    error_log('[NotificationJobQueueService] inquiry reschedule admin notification failed: ' . $e->getMessage());
+                }
+                return;
+
             case 'booking_awaiting_parts':
                 $booking = is_array($payload['booking'] ?? null) ? $payload['booking'] : [];
                 (new NotificationService())->bookingAwaitingParts($booking);

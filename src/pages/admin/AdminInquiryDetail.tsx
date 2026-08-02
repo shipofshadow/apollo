@@ -30,6 +30,7 @@ type InquiryActivityLog = {
   action: string;
   detail: string | null;
   createdAt: string;
+  actorName?: string | null;
 };
 
 type Inquiry = {
@@ -546,7 +547,12 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     <p className="text-[10px] text-brand-orange mb-1.5">
                       {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 19)}
                     </p>
-                    <p className="text-xs text-gray-300 uppercase font-bold tracking-wide"> {entry.action}</p>
+                    <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
+                      {entry.action}
+                      {entry.actorName && (
+                        <span className="text-gray-500 font-normal lowercase tracking-normal ml-1"> by {entry.actorName}</span>
+                      )}
+                    </p>
                     {entry.detail && (
                       <p className="text-[11px] text-gray-500 mt-2 pl-3 border-l-2 border-gray-700 leading-relaxed">{entry.detail}</p>
                     )}

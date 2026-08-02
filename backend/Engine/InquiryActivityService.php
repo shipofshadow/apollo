@@ -24,10 +24,11 @@ class InquiryActivityService
         }
 
         $stmt = Database::getInstance()->prepare(
-            'SELECT id, inquiry_id, actor_user_id, actor_role, event_type, action, detail, created_at
-             FROM inquiry_activity_logs
-             WHERE inquiry_id = :inquiry_id
-             ORDER BY created_at ASC, id ASC'
+            'SELECT a.id, a.inquiry_id, a.actor_user_id, a.actor_role, a.event_type, a.action, a.detail, a.created_at, u.name AS actor_name
+             FROM inquiry_activity_logs a
+             LEFT JOIN users u ON a.actor_user_id = u.id
+             WHERE a.inquiry_id = :inquiry_id
+             ORDER BY a.created_at ASC, a.id ASC'
         );
         $stmt->execute([':inquiry_id' => $inquiryId]);
 
@@ -87,6 +88,7 @@ class InquiryActivityService
             'action'      => (string) $row['action'],
             'detail'      => $row['detail'] !== null ? (string) $row['detail'] : null,
             'createdAt'   => (string) $row['created_at'],
+            'actorName'   => $row['actor_name'] ?? null,
         ];
     }
 }

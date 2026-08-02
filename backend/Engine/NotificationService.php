@@ -410,6 +410,66 @@ class NotificationService
     }
 
     /**
+     * Send an email to the customer when their inquiry is rescheduled.
+     *
+     * @param array<string, mixed> $inquiry
+     */
+    public function inquiryRescheduledCustomer(array $inquiry): void
+    {
+        if (MAIL_FROM === '') return;
+
+        $customerEmail = strtolower(trim((string) ($inquiry['emailAddress'] ?? $inquiry['email'] ?? '')));
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) return;
+
+        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'Customer'));
+        $name    = htmlspecialchars($rawName !== '' ? $rawName : 'Customer');
+        $rawDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
+        $rawTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        
+        $date = htmlspecialchars($rawDate !== '' ? $this->formatAppointmentDate($rawDate) : '—');
+        $time = htmlspecialchars($rawTime !== '' ? $rawTime : '—');
+
+        $body = $this->render('inquiry-rescheduled-customer', [
+            'name' => $name,
+            'date' => $date,
+            'time' => $time,
+        ]);
+
+        $subject = 'Appointment Rescheduled | 1625 Autolab';
+        $this->send($customerEmail, $name, $subject, $body);
+    }
+
+    /**
+     * Send an email to the admin when an inquiry is rescheduled.
+     *
+     * @param array<string, mixed> $inquiry
+     * @param array<string> $adminEmails
+     */
+    public function inquiryRescheduledAdmin(array $inquiry, array $adminEmails): void
+    {
+        if (MAIL_FROM === '' || count($adminEmails) === 0) return;
+
+        $rawName = str_replace(["\r", "\n"], '', (string) ($inquiry['fullName'] ?? $inquiry['name'] ?? 'A customer'));
+        $name    = htmlspecialchars($rawName !== '' ? $rawName : 'A customer');
+        $rawDate = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentDate'] ?? ''));
+        $rawTime = str_replace(["\r", "\n"], '', (string) ($inquiry['appointmentTime'] ?? ''));
+        
+        $date = htmlspecialchars($rawDate !== '' ? $this->formatAppointmentDate($rawDate) : '—');
+        $time = htmlspecialchars($rawTime !== '' ? $rawTime : '—');
+
+        $body = $this->render('inquiry-rescheduled-admin', [
+            'name' => $name,
+            'date' => $date,
+            'time' => $time,
+        ]);
+
+        $subject = '[Admin Alert] Appointment Rescheduled: ' . $name;
+        foreach ($adminEmails as $email) {
+            $this->send($email, 'Admin', $subject, $body);
+        }
+    }
+
+    /**
      * Notify the customer that their booking status has changed.
      *
      * @param array<string, mixed> $booking
