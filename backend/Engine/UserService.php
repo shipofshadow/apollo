@@ -47,9 +47,8 @@ class UserService
      */
     public function register(array $data): array
     {
-        Auth::register($data);
+        $userId = Auth::register($data);
 
-        $userId = (int) $this->db->lastInsertId();
         $user = $this->findById($userId);
 
         $this->issueEmailVerificationForUser($user);
@@ -1063,6 +1062,10 @@ class UserService
         }
         $this->db->prepare(
             'UPDATE bookings SET user_id = :uid WHERE email = :email AND user_id IS NULL'
+        )->execute([':uid' => $userId, ':email' => $email]);
+        
+        $this->db->prepare(
+            'UPDATE customer_inquiries SET user_id = :uid WHERE email_address = :email AND user_id IS NULL'
         )->execute([':uid' => $userId, ':email' => $email]);
     }
 }

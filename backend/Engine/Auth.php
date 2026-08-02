@@ -220,13 +220,13 @@ class Auth
 
     /**
      * Validate registration fields, hash the password, and insert the new
-     * user record.  The caller is responsible for retrieving the created row
-     * (e.g. via Database::getInstance()->lastInsertId()).
+     * user record.
      *
      * @param  array<string, mixed> $data  Registration fields.
+     * @return int The ID of the newly created user.
      * @throws RuntimeException  On validation failure or DB errors.
      */
-    public static function register(array $data): void
+    public static function register(array $data): int
     {
         if (empty(trim((string) ($data['name'] ?? '')))) {
             throw new RuntimeException('Name is required.', 422);
@@ -268,6 +268,8 @@ class Auth
                 'email' => $email,
             ]
         );
+
+        return $createdUserId;
     }
 
     /**
