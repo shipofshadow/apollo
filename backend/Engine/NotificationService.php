@@ -353,7 +353,7 @@ class NotificationService
         ]);
 
         $subject = 'Service Request Update: ' . $statusLabel . ' | 1625 Autolab';
-        $this->send($customerEmail, $rawName !== '' ? $rawName : 'Customer', $subject, $body);
+        $this->send($customerEmail, $s['rawName'] !== '' ? $s['rawName'] : 'Customer', $subject, $body);
     }
 
     /**
