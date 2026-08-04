@@ -336,7 +336,7 @@ export default function InventoryPanel() {
           {lowStockOnly ? 'Showing Low Stock' : 'Show Low Stock'}
         </button>
         <div className="flex gap-2">
-          <button onClick={() => exportCsv(items.map(i => ({ sku: i.sku, name: i.name, category: i.category, qty: i.qtyOnHand, reorder: i.reorderPoint, cost: i.unitCost })), 'inventory_items.csv')} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-sm border border-gray-700 text-gray-500 hover:text-white text-xs font-bold uppercase tracking-wide transition-all">
+          <button onClick={() => exportCsv(items.map(i => ({ sku: i.sku, name: i.name, linkedProducts: i.linkedProducts || '', category: i.category, qty: i.qtyOnHand, reorder: i.reorderPoint, cost: i.unitCost })), 'inventory_items.csv')} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-sm border border-gray-700 text-gray-500 hover:text-white text-xs font-bold uppercase tracking-wide transition-all">
             <Download className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -388,7 +388,14 @@ export default function InventoryPanel() {
                     {items.map(item => (
                       <tr key={item.id} className={`group hover:bg-white/[0.02] transition-colors ${item.qtyOnHand === 0 ? 'bg-red-950/10' : item.qtyOnHand <= item.reorderPoint ? 'bg-amber-950/10' : ''}`}>
                         <td className="px-4 py-3 font-mono text-xs text-gray-400">{item.sku}</td>
-                        <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-white font-medium">{item.name}</p>
+                          {item.linkedProducts && (
+                            <p className="text-[10px] text-gray-500 mt-0.5 truncate max-w-[200px]" title={item.linkedProducts}>
+                              Links: <span className="text-gray-400">{item.linkedProducts}</span>
+                            </p>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{item.category || '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`text-base font-bold ${item.qtyOnHand === 0 ? 'text-red-400' : item.qtyOnHand <= item.reorderPoint ? 'text-amber-400' : 'text-white'}`}>
