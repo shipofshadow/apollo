@@ -231,7 +231,19 @@ class ProductService
                  VALUES
                  (:uuid, :name, :description, :price, :category, :image_url, :features, :sort_order, :is_active, :track_stock, :inventory_item_id)'
             );
-            $stmt->execute($params);
+            $stmt->execute([
+                ':uuid'               => $params[':uuid'],
+                ':name'               => $params[':name'],
+                ':description'        => $params[':description'],
+                ':price'              => $params[':price'],
+                ':category'           => $params[':category'],
+                ':image_url'          => $params[':image_url'],
+                ':features'           => $params[':features'],
+                ':sort_order'         => $params[':sort_order'],
+                ':is_active'          => $params[':is_active'],
+                ':track_stock'        => $params[':track_stock'],
+                ':inventory_item_id'  => $params[':inventory_item_id'],
+            ]);
         } elseif ($this->hasProductColumn('uuid') && $this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
             $stmt = $db->prepare(
                 'INSERT INTO products

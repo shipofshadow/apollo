@@ -258,9 +258,8 @@ export default function ProductsPanel() {
               <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Inventory Item</label>
               <select
                 value={form.inventoryItemId || ''}
-                disabled={!form.trackStock}
                 onChange={e => setForm(p => ({ ...p, inventoryItemId: e.target.value ? parseInt(e.target.value, 10) : null }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm disabled:opacity-50"
+                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
               >
                 <option value="">-- Select Inventory Item --</option>
                 {inventoryItems.map(item => (
