@@ -145,15 +145,11 @@ export default function CustomerFormPage() {
     }
   }, [productsStatus, dispatch]);
 
-  const activeProducts = products.filter(p => p.isActive);
-  const productOptions = activeProducts.map(p => {
-    const isOutOfStock = p.trackStock && (p.stockQty ?? 0) <= 0;
-    return {
-      value: String(p.id),
-      label: isOutOfStock ? `${p.name} (Out of Stock)` : p.name,
-      isDisabled: isOutOfStock
-    };
-  });
+  const activeProducts = products.filter(p => p.isActive && (!p.trackStock || (p.stockQty ?? 0) > 0));
+  const productOptions = activeProducts.map(p => ({
+    value: String(p.id),
+    label: p.name
+  }));
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
 

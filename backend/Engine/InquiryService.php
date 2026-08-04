@@ -166,18 +166,19 @@ class InquiryService
             throw new RuntimeException('No changes were provided.', 422);
         }
 
-        $existing = $this->useDb ? $this->dbGetById($id) : $this->fileGetById($id);
-        if ($existing === null) {
-            throw new RuntimeException('Inquiry not found.', 404);
-        }
-
         $targetDate = $appointmentDate;
         $targetTime = $appointmentTime;
-        if ($targetDate === null) {
-            $targetDate = (string) ($existing['appointmentDate'] ?? '');
-        }
-        if ($targetTime === null) {
-            $targetTime = (string) ($existing['appointmentTime'] ?? '');
+        if ($targetDate === null || $targetTime === null) {
+            $existing = $this->useDb ? $this->dbGetById($id) : $this->fileGetById($id);
+            if ($existing === null) {
+                throw new RuntimeException('Inquiry not found.', 404);
+            }
+            if ($targetDate === null) {
+                $targetDate = (string) ($existing['appointmentDate'] ?? '');
+            }
+            if ($targetTime === null) {
+                $targetTime = (string) ($existing['appointmentTime'] ?? '');
+            }
         }
 
         $isScheduleChange = $appointmentDate !== null || $appointmentTime !== null;
@@ -190,13 +191,10 @@ class InquiryService
             $inquiry = $this->dbGetById($id);
             if ($inquiry === null) {
                 throw new RuntimeException('Inquiry not found.', 404);
+            }
             $this->syncOccupancyForInquiry($inquiry);
 
             if ($status !== null) {
-                $oldStatus = $existing['status'] ?? 'pending';
-                if ($oldStatus !== $status) {
-                    $this->handleStockAdjustments($existing, $oldStatus, $status, $actorUserId);
-                }
                 $this->activity->add($id, 'status_updated', "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
             }
             if ($isScheduleChange) {
@@ -1085,54 +1083,6 @@ class InquiryService
             }
         }
         return null;
-    }
-
-    private function handleStockAdjustments(array $inquiry, string $oldStatus, string $newStatus, ?int $actorUserId): void
-    {
-        if (!class_exists('ProductService') || !class_exists('InventoryService')) {
-            return;
-        }
-
-        $productId = $inquiry['productId'] ?? null;
-        if ($productId === null) {
-            return;
-        }
-
-        try {
-            $productService = new ProductService();
-            $product = $productService->getById((string) $productId);
-            if ($product === null) {
-                return;
-            }
-
-            $inventoryItemId = $product['inventoryItemId'] ?? null;
-            $trackStock = $product['trackStock'] ?? false;
-            
-            if (!$inventoryItemId || !$trackStock) {
-                return;
-            }
-
-            $delta = 0;
-
-            if ($newStatus === 'confirmed' && $oldStatus !== 'confirmed') {
-                $delta = -1;
-            }
-            elseif ($oldStatus === 'confirmed' && in_array($newStatus, ['cancelled', 'pending'], true)) {
-                $delta = 1;
-            }
-
-            if ($delta !== 0) {
-                $inventoryService = new InventoryService();
-                $note = $delta < 0 ? "Reserved for Inquiry #{$inquiry['id']}" : "Restored from Inquiry #{$inquiry['id']}";
-                $inventoryService->adjustStock([
-                    'itemId' => (int) $inventoryItemId,
-                    'quantityDelta' => (float) $delta,
-                    'note' => $note
-                ], $actorUserId);
-            }
-        } catch (\Throwable $e) {
-            error_log('[InquiryService] Stock adjustment failed: ' . $e->getMessage());
-        }
     }
 
     private function uuid(): string
