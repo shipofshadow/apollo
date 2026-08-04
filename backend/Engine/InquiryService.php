@@ -27,6 +27,26 @@ class InquiryService
     {
         $normalized = $this->normalizePayload($data);
         $this->validatePayload($normalized);
+
+        if ($normalized['productId']) {
+            require_once __DIR__ . '/ProductService.php';
+            $productService = new ProductService();
+            try {
+                $product = $productService->getById((int)$normalized['productId'], true);
+                if ($product['trackStock'] && $product['stockQty'] <= 0) {
+                    throw new RuntimeException('The selected product is currently out of stock.', 422);
+                }
+                if (trim($normalized['productToPurchase']) === '') {
+                    $normalized['productToPurchase'] = $product['name'];
+                }
+            } catch (RuntimeException $e) {
+                if ($e->getCode() === 404) {
+                    throw new RuntimeException('The selected product does not exist or is inactive.', 422);
+                }
+                throw $e;
+            }
+        }
+
         $this->assertSlotCapacity($normalized['appointmentDate'], $normalized['appointmentTime']);
 
         $inquiry = [
@@ -41,7 +61,9 @@ class InquiryService
             'make' => $normalized['make'],
             'model' => $normalized['model'],
             'yearModel' => $normalized['yearModel'],
+            'productId' => $normalized['productId'] !== '' ? (int)$normalized['productId'] : null,
             'productToPurchase' => $normalized['productToPurchase'],
+            'additionalInfo' => $normalized['additionalInfo'],
             'appointmentDate' => $normalized['appointmentDate'],
             'appointmentTime' => $normalized['appointmentTime'],
             'status' => 'pending',
@@ -89,7 +111,7 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
                 'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
-                    make, model, year_model, product_to_purchase, appointment_date,
+                    make, model, year_model, product_id, product_to_purchase, additional_info, appointment_date,
                     appointment_time, status, created_at
                  FROM customer_inquiries
                  WHERE user_id = :user_id
@@ -357,7 +379,9 @@ class InquiryService
             'make' => $getValue($data, ['make', 'Car Make']),
             'model' => $getValue($data, ['model', 'Car Model']),
             'yearModel' => $getValue($data, ['yearModel', 'year_model', 'Year Model']),
+            'productId' => $getValue($data, ['productId', 'product_id']),
             'productToPurchase' => $getValue($data, ['productToPurchase', 'product_to_purchase', 'Product to Purchase']),
+            'additionalInfo' => $getValue($data, ['additionalInfo', 'additional_info']),
             'appointmentDate' => $getValue($data, ['appointmentDate', 'appointment_date', 'Appointment Date', 'bookingDate', 'booking_date']),
             'appointmentTime' => $getValue($data, ['appointmentTime', 'appointment_time', 'Appointment Time', 'bookingTime', 'booking_time']),
         ];
@@ -388,6 +412,10 @@ class InquiryService
             }
         }
 
+        if (trim((string) ($inquiry['productToPurchase'] ?? '')) === '' && trim((string) ($inquiry['productId'] ?? '')) === '') {
+            throw new RuntimeException('Product or service is required.', 422);
+        }
+
         if (!filter_var($inquiry['emailAddress'], FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('A valid email address is required.', 422);
         }
@@ -402,11 +430,11 @@ class InquiryService
         $stmt = $db->prepare(
             'INSERT INTO customer_inquiries (
                 id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
-                make, model, year_model, product_to_purchase, appointment_date,
+                make, model, year_model, product_id, product_to_purchase, additional_info, appointment_date,
                 appointment_time, status, created_at, updated_at
             ) VALUES (
                 :id, :user_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
-                :make, :model, :year_model, :product_to_purchase, :appointment_date,
+                :make, :model, :year_model, :product_id, :product_to_purchase, :additional_info, :appointment_date,
                 :appointment_time, :status, :created_at, :updated_at
             )'
         );
@@ -422,7 +450,9 @@ class InquiryService
             ':make' => (string) $inquiry['make'],
             ':model' => (string) $inquiry['model'],
             ':year_model' => (string) $inquiry['yearModel'],
+            ':product_id' => $inquiry['productId'] !== null ? (int)$inquiry['productId'] : null,
             ':product_to_purchase' => (string) $inquiry['productToPurchase'],
+            ':additional_info' => $inquiry['additionalInfo'] !== '' ? (string)$inquiry['additionalInfo'] : null,
             ':plate_number' => (string) ($inquiry['plateNumber'] ?? ''),
             ':appointment_date' => (string) $inquiry['appointmentDate'],
             ':appointment_time' => (string) $inquiry['appointmentTime'],
@@ -494,7 +524,7 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->query(
                 'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
-                    make, model, year_model, product_to_purchase, appointment_date,
+                    make, model, year_model, product_id, product_to_purchase, additional_info, appointment_date,
                     appointment_time, status, created_at
                  FROM customer_inquiries
              ORDER BY appointment_date ASC, appointment_time ASC, created_at DESC'
@@ -566,7 +596,7 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
-                make, model, year_model, product_to_purchase, appointment_date,
+                make, model, year_model, product_id, product_to_purchase, additional_info, appointment_date,
                 appointment_time, status, created_at
              FROM customer_inquiries
              WHERE id = :id
@@ -595,7 +625,9 @@ class InquiryService
             'make' => (string) ($row['make'] ?? ''),
             'model' => (string) ($row['model'] ?? ''),
             'yearModel' => (string) ($row['year_model'] ?? ''),
+            'productId' => $row['product_id'] !== null ? (int)$row['product_id'] : null,
             'productToPurchase' => (string) ($row['product_to_purchase'] ?? ''),
+            'additionalInfo' => (string) ($row['additional_info'] ?? ''),
             'appointmentDate' => (string) ($row['appointment_date'] ?? ''),
             'appointmentTime' => (string) ($row['appointment_time'] ?? ''),
             'status' => (string) ($row['status'] ?? 'pending'),

@@ -101,6 +101,7 @@ public function customerInquiryAdmin(array $inquiry): void
 
     $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
     $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
+    $additionalInfo = trim((string) ($inquiry['additionalInfo'] ?? $inquiry['additional_info'] ?? ''));
 
     $vehicle = trim($make . ' ' . ($model === 'Other Model' ? $otherModel : $model));
 
@@ -117,6 +118,7 @@ public function customerInquiryAdmin(array $inquiry): void
         . ($plate !== '' ? "Plate: {$plate}\n" : '')
         . "\nInquiry\n"
         . ($product !== '' ? "Product/Service: {$product}\n" : '')
+        . ($additionalInfo !== '' ? "Notes: {$additionalInfo}\n" : '')
         . ($date !== '' ? "Preferred Date: {$date}\n" : '')
         . ($time !== '' ? "Preferred Time: {$time}\n" : '')
         . "\nPlease follow up with the customer.\n\n"
@@ -486,6 +488,11 @@ public function customerInquiryAdmin(array $inquiry): void
      */
     private function send(string $to, string $body): void
     {
+        if (defined('DISABLE_NOTIFICATIONS') && DISABLE_NOTIFICATIONS) {
+            error_log("[SmsService] Sending disabled by config. Skipped SMS to $to");
+            return;
+        }
+
         if (!$this->enabled) {
             return;
         }

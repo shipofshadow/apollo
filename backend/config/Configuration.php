@@ -80,6 +80,7 @@ define('SMTP_PASSWORD',  (string) ($_ENV['SMTP_PASSWORD'] ?? ''));
 define('SMTP_ENCRYPTION', strtolower(trim((string) ($_ENV['SMTP_ENCRYPTION'] ?? 'tls'))));
 define('SMTP_AUTH',      filter_var($_ENV['SMTP_AUTH'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
 define('SMTP_TIMEOUT',   (int) ($_ENV['SMTP_TIMEOUT'] ?? 10));
+define('DISABLE_NOTIFICATIONS', filter_var($_ENV['DISABLE_NOTIFICATIONS'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
 
 // ---------------------------------------------------------------------------
 // CarAPI – vehicle make / model / trim data

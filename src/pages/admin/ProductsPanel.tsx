@@ -8,7 +8,7 @@ import {
 } from '../../store/productsSlice';
 import { uploadAdminImageApi } from '../../services/api';
 import type { AppDispatch, RootState } from '../../store';
-import type { Product, ProductVariation } from '../../types';
+import type { Product, ProductVariation, InventoryItem } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import VariationsManager from '../../components/VariationsManager';
 import { formatPrice } from '../../utils/formatPrice';
@@ -30,13 +30,14 @@ interface ProductForm {
   sortOrder: number;
   isActive: boolean;
   trackStock: boolean;
+  inventoryItemId: number | null;
   stockQty: number;
 }
 
 const EMPTY_PRODUCT_FORM: ProductForm = {
   name: '', description: '', price: '', category: '',
   imageUrl: '', features: '', sortOrder: 0, isActive: true,
-  trackStock: true, stockQty: 0,
+  trackStock: true, stockQty: 0, inventoryItemId: null,
 };
 
 function productToForm(p: Product): ProductForm {
@@ -50,6 +51,7 @@ function productToForm(p: Product): ProductForm {
     sortOrder:   p.sortOrder,
     isActive:    p.isActive,
     trackStock:  p.trackStock ?? true,
+    inventoryItemId: p.inventoryItemId ?? null,
     stockQty:    p.stockQty ?? 0,
   };
 }
@@ -65,6 +67,7 @@ function productFormToPayload(f: ProductForm): Partial<Omit<Product, 'id' | 'cre
     sortOrder:   f.sortOrder,
     isActive:    f.isActive,
     trackStock:  f.trackStock,
+    inventoryItemId: f.inventoryItemId,
     stockQty:    Math.max(0, f.stockQty),
   };
 }
@@ -82,10 +85,21 @@ export default function ProductsPanel() {
   const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
   const [variations,   setVariations]   = useState<ProductVariation[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const editingProduct = editId !== null ? products.find((p) => p.id === editId) : null;
 
   useEffect(() => {
-    if (token) dispatch(fetchProductsAsync(token));
+    if (token) {
+      dispatch(fetchProductsAsync(token));
+      fetch(`${import.meta.env.VITE_API_URL}/api/admin/inventory/items`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.items) setInventoryItems(data.items);
+      })
+      .catch(console.error);
+    }
   }, [token, dispatch]);
 
   const openNew  = () => { setForm(EMPTY_PRODUCT_FORM); setEditId(null); setSaveError(null); setVariations([]); setEditing(true); };
@@ -241,15 +255,21 @@ export default function ProductsPanel() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Stock Quantity</label>
-              <input
-                type="number"
-                min={0}
-                value={form.stockQty}
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Inventory Item</label>
+              <select
+                value={form.inventoryItemId || ''}
                 disabled={!form.trackStock}
-                onChange={e => setForm(p => ({ ...p, stockQty: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                onChange={e => setForm(p => ({ ...p, inventoryItemId: e.target.value ? parseInt(e.target.value, 10) : null }))}
                 className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm disabled:opacity-50"
-              />
+              >
+                <option value="">-- Select Inventory Item --</option>
+                {inventoryItems.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} ({item.qtyOnHand} in stock)
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest">Maps product stock to internal inventory.</p>
             </div>
 
             <div className="flex items-center gap-3 pt-6">

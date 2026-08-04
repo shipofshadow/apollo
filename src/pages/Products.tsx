@@ -6,6 +6,7 @@ import type { AppDispatch, RootState } from '../store';
 import { fetchProductsAsync } from '../store/productsSlice';
 import { SkeletonCard } from '../components/Skeleton';
 import { formatPrice } from '../utils/formatPrice';
+import { getStockStatus, getStockBadgeConfig } from '../utils/stockUtils';
 import PageSEO from '../components/PageSEO';
 
 export default function Products() {
@@ -131,6 +132,18 @@ export default function Products() {
                   className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
                   referrerPolicy="no-referrer"
                 />
+                {(() => {
+                  const status = getStockStatus(product.stockQty, product.trackStock);
+                  if (status !== 'IN_STOCK') {
+                    const badge = getStockBadgeConfig(status);
+                    return (
+                      <div className={`absolute bottom-4 left-4 border text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-sm z-10 backdrop-blur-sm ${badge.className}`}>
+                        {badge.label}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div className="p-6 flex flex-col flex-grow">
                 <h3 className="text-white font-bold uppercase tracking-wider mb-2 text-lg line-clamp-2 group-hover:text-brand-orange transition-colors">{product.name}</h3>

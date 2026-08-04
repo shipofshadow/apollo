@@ -9,6 +9,10 @@ import { fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi
 import type { ShopDayHours } from '../types';
 import CustomCalendar from '../components/CustomCalendar';
 import TurnstileWidget from '../components/TurnstileWidget';
+import Select from 'react-select';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../store';
+import { fetchProductsAsync } from '../store/productsSlice';
 
 // Icons
 import { 
@@ -99,7 +103,9 @@ const INITIAL_FORM_STATE = {
   plateNumber: '',
   appointmentDate: '', // Will store as YYYY-MM-DD
   appointmentTime: '', // Will store as h:mm aa (e.g. 2:30 PM)
-  productToPurchase: ''
+  productToPurchase: '',
+  productId: '',
+  additionalInfo: ''
 };
 
 const inputClass = "w-full bg-black/20 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all rounded-sm text-sm";
@@ -130,6 +136,20 @@ export default function CustomerFormPage() {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileKey,   setTurnstileKey]   = useState(0);
   const [searchParams] = useSearchParams();
+  const dispatch = useDispatch<AppDispatch>();
+  const { items: products, status: productsStatus } = useSelector((s: RootState) => s.products);
+
+  useEffect(() => {
+    if (productsStatus === 'idle') {
+      dispatch(fetchProductsAsync(null));
+    }
+  }, [productsStatus, dispatch]);
+
+  const activeProducts = products.filter(p => p.isActive && (!p.trackStock || (p.stockQty ?? 0) > 0));
+  const productOptions = activeProducts.map(p => ({
+    value: String(p.id),
+    label: p.name
+  }));
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
 
@@ -243,7 +263,8 @@ export default function CustomerFormPage() {
           'Year Model': formData.yearModel,
           'Appointment Date': formData.appointmentDate,
           'Appointment Time': formData.appointmentTime,
-          'Product to Purchase': formData.productToPurchase
+          'Product to Purchase': formData.productToPurchase || formData.productId,
+          'Additional Info': formData.additionalInfo
         });
 
         await fetch(scriptURL, { method: 'POST', body: googleData, mode: 'no-cors' });
@@ -452,14 +473,78 @@ export default function CustomerFormPage() {
                 </h3>
 
                 <div className="space-y-2">
-                  <label htmlFor="productToPurchase" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                  <label htmlFor="productId" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
                     <FaWrench className="text-gray-500"/> Required Services or Products *
                   </label>
+                  {/* @ts-ignore - React-Select types can be problematic without explicit prop interfaces */}
+                  <Select
+                    id="productId"
+                    name="productId"
+                    options={productOptions}
+                    placeholder="Search and select..."
+                    isClearable
+                    value={productOptions.find(o => o.value === formData.productId) || null}
+                    onChange={(selected: any) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        productId: selected?.value || '',
+                        productToPurchase: selected?.label || ''
+                      }));
+                    }}
+                    styles={{
+                      control: (base: any, state: any) => ({
+                        ...base,
+                        background: 'rgba(0,0,0,0.2)',
+                        borderColor: state.isFocused ? '#f97316' : '#374151',
+                        borderRadius: '0.125rem',
+                        minHeight: '46px',
+                        boxShadow: state.isFocused ? '0 0 0 1px #f97316' : 'none',
+                        '&:hover': {
+                          borderColor: '#f97316'
+                        }
+                      }),
+                      menu: (base: any) => ({
+                        ...base,
+                        background: '#111827',
+                        border: '1px solid #374151',
+                      }),
+                      option: (base: any, state: any) => ({
+                        ...base,
+                        background: state.isSelected ? '#f97316' : state.isFocused ? 'rgba(255,255,255,0.05)' : 'transparent',
+                        color: state.isSelected ? '#fff' : '#d1d5db',
+                        cursor: 'pointer',
+                        '&:active': {
+                          background: '#ea580c'
+                        }
+                      }),
+                      singleValue: (base: any) => ({
+                        ...base,
+                        color: '#fff',
+                        fontSize: '0.875rem'
+                      }),
+                      input: (base: any) => ({
+                        ...base,
+                        color: '#fff',
+                        fontSize: '0.875rem'
+                      }),
+                      placeholder: (base: any) => ({
+                        ...base,
+                        color: '#9ca3af',
+                        fontSize: '0.875rem'
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <label htmlFor="additionalInfo" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                    Additional Information
+                  </label>
                   <textarea
-                    id="productToPurchase" name="productToPurchase" required rows={3}
-                    value={formData.productToPurchase} onChange={handleChange}
+                    id="additionalInfo" name="additionalInfo" rows={3}
+                    value={formData.additionalInfo} onChange={handleChange}
                     className={`${inputClass} resize-none`}
-                    placeholder="Tell us what needs doing..."
+                    placeholder="Tell us what needs doing or any extra requests..."
                   />
                 </div>
 

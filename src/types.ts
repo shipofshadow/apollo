@@ -491,6 +491,7 @@ export interface Product {
   sortOrder: number;
   isActive: boolean;
   trackStock?: boolean;
+  inventoryItemId?: number | null;
   stockQty?: number;
   createdAt: string;
   updatedAt: string;

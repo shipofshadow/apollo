@@ -95,6 +95,7 @@ class NotificationService
             'address' => $address !== '' ? $address : '—',
             'plate' => $s['rawPlate'] !== '' ? htmlspecialchars($s['rawPlate']) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
+            'additional_info' => $s['rawAdditionalInfo'] !== '' ? nl2br(htmlspecialchars($s['rawAdditionalInfo'])) : '—',
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
 
@@ -145,6 +146,7 @@ class NotificationService
             'address' => $address !== '' ? $address : '—',
             'plate' => $s['rawPlate'] !== '' ? htmlspecialchars($s['rawPlate']) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
+            'additional_info' => $s['rawAdditionalInfo'] !== '' ? nl2br(htmlspecialchars($s['rawAdditionalInfo'])) : '—',
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
         ]);
@@ -1477,6 +1479,11 @@ class NotificationService
 
     private function send(string $to, string $toName, string $subject, string $htmlBody): void
     {
+        if (defined('DISABLE_NOTIFICATIONS') && DISABLE_NOTIFICATIONS) {
+            error_log("[NotificationService] Sending disabled by config. Skipped email to $to");
+            return;
+        }
+
         if ($this->smtpConfigured()) {
             $this->sendViaSmtp($to, $toName, $subject, $htmlBody);
             return;
@@ -1646,6 +1653,7 @@ class NotificationService
             'rawFacebook'=> str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? '')),
             'rawPlate'   => str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? '')),
             'rawOtherModel'=> str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? '')),
+            'rawAdditionalInfo'=> (string) ($inquiry['additionalInfo'] ?? ''),
         ];
     }
 }

@@ -143,9 +143,12 @@ class ProductService
     /** @return array<int, array<string, mixed>> */
     private function dbGetAll(bool $includeInactive): array
     {
-        $where = $includeInactive ? '' : 'WHERE is_active = 1 ';
+        $where = $includeInactive ? '' : 'WHERE p.is_active = 1 ';
         $stmt  = Database::getInstance()->query(
-            "SELECT * FROM products {$where}ORDER BY sort_order ASC, id ASC"
+            "SELECT p.*, i.qty_on_hand as inventory_stock 
+             FROM products p
+             LEFT JOIN inventory_items i ON p.inventory_item_id = i.id
+             {$where}ORDER BY p.sort_order ASC, p.id ASC"
         );
         $rows       = $stmt->fetchAll();
         $variations = $this->dbFetchAllVariations();
@@ -158,9 +161,12 @@ class ProductService
     /** @return array<string, mixed> */
     private function dbGetById(int $id, bool $requireActive): array
     {
-        $cond = $requireActive ? 'AND is_active = 1' : '';
+        $cond = $requireActive ? 'AND p.is_active = 1' : '';
         $stmt = Database::getInstance()->prepare(
-            "SELECT * FROM products WHERE id = :id $cond LIMIT 1"
+            "SELECT p.*, i.qty_on_hand as inventory_stock 
+             FROM products p
+             LEFT JOIN inventory_items i ON p.inventory_item_id = i.id
+             WHERE p.id = :id $cond LIMIT 1"
         );
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
@@ -177,9 +183,12 @@ class ProductService
             throw new RuntimeException('Product not found.', 404);
         }
 
-        $cond = $requireActive ? 'AND is_active = 1' : '';
+        $cond = $requireActive ? 'AND p.is_active = 1' : '';
         $stmt = Database::getInstance()->prepare(
-            "SELECT * FROM products WHERE uuid = :uuid $cond LIMIT 1"
+            "SELECT p.*, i.qty_on_hand as inventory_stock 
+             FROM products p
+             LEFT JOIN inventory_items i ON p.inventory_item_id = i.id
+             WHERE p.uuid = :uuid $cond LIMIT 1"
         );
         $stmt->execute([':uuid' => $uuid]);
         $row = $stmt->fetch();
@@ -215,7 +224,15 @@ class ProductService
     {
         $db   = Database::getInstance();
         $params = $this->bindParams($data);
-        if ($this->hasProductColumn('uuid') && $this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
+        if ($this->hasProductColumn('inventory_item_id')) {
+            $stmt = $db->prepare(
+                'INSERT INTO products
+                 (uuid, name, description, price, category, image_url, features, sort_order, is_active, track_stock, inventory_item_id)
+                 VALUES
+                 (:uuid, :name, :description, :price, :category, :image_url, :features, :sort_order, :is_active, :track_stock, :inventory_item_id)'
+            );
+            $stmt->execute($params);
+        } elseif ($this->hasProductColumn('uuid') && $this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
             $stmt = $db->prepare(
                 'INSERT INTO products
                  (uuid, name, description, price, category, image_url, features, sort_order, is_active, track_stock, stock_qty)
@@ -280,10 +297,24 @@ class ProductService
             'isActive'    => $current['isActive'],
                         'trackStock'  => $current['trackStock'] ?? true,
                         'stockQty'    => $current['stockQty'] ?? 0,
+                        'inventoryItemId' => $current['inventoryItemId'] ?? null,
         ], $data);
 
-                $sql = $this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')
-                        ? 'UPDATE products SET
+                if ($this->hasProductColumn('inventory_item_id')) {
+                    $sql = 'UPDATE products SET
+                             name        = :name,
+                             description = :description,
+                             price       = :price,
+                             category    = :category,
+                             image_url   = :image_url,
+                             features    = :features,
+                             sort_order  = :sort_order,
+                             is_active   = :is_active,
+                             track_stock = :track_stock,
+                             inventory_item_id = :inventory_item_id
+                         WHERE id = :id';
+                } elseif ($this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
+                    $sql = 'UPDATE products SET
                              name        = :name,
                              description = :description,
                              price       = :price,
@@ -294,8 +325,9 @@ class ProductService
                              is_active   = :is_active,
                              track_stock = :track_stock,
                              stock_qty   = :stock_qty
-                         WHERE id = :id'
-                        : 'UPDATE products SET
+                         WHERE id = :id';
+                } else {
+                    $sql = 'UPDATE products SET
                              name        = :name,
                              description = :description,
                              price       = :price,
@@ -305,11 +337,26 @@ class ProductService
                              sort_order  = :sort_order,
                              is_active   = :is_active
                          WHERE id = :id';
+                }
 
                 $stmt = Database::getInstance()->prepare($sql);
         $params        = $this->bindParams($merged);
         $params[':id'] = $id;
-                if ($this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
+                if ($this->hasProductColumn('inventory_item_id')) {
+                    $stmt->execute([
+                        ':id'          => $params[':id'],
+                        ':name'        => $params[':name'],
+                        ':description' => $params[':description'],
+                        ':price'       => $params[':price'],
+                        ':category'    => $params[':category'],
+                        ':image_url'   => $params[':image_url'],
+                        ':features'    => $params[':features'],
+                        ':sort_order'  => $params[':sort_order'],
+                        ':is_active'   => $params[':is_active'],
+                        ':track_stock' => $params[':track_stock'],
+                        ':inventory_item_id' => $params[':inventory_item_id'],
+                    ]);
+                } elseif ($this->hasProductColumn('track_stock') && $this->hasProductColumn('stock_qty')) {
                     $stmt->execute([
                         ':id'          => $params[':id'],
                         ':name'        => $params[':name'],
@@ -632,7 +679,9 @@ class ProductService
             'sortOrder'   => (int)  $row['sort_order'],
             'isActive'    => (bool) $row['is_active'],
             'trackStock'  => isset($row['track_stock']) ? ((int) $row['track_stock'] === 1) : true,
-            'stockQty'    => isset($row['stock_qty']) ? (int) $row['stock_qty'] : 0,
+            'inventoryItemId' => isset($row['inventory_item_id']) ? (int) $row['inventory_item_id'] : null,
+            'stockQty'    => isset($row['inventory_stock']) ? (int) $row['inventory_stock'] : (isset($row['stock_qty']) ? (int) $row['stock_qty'] : 0),
+            'stockQty'    => (int) ($row['inventory_stock'] ?? ($row['stock_qty'] ?? 0)),
             'createdAt'   =>        $row['created_at'],
             'updatedAt'   =>        $row['updated_at'],
         ];
@@ -645,19 +694,21 @@ class ProductService
         if (is_string($features)) {
             $features = json_decode($features, true) ?? [];
         }
+        $invItemId = $data['inventoryItemId'] ?? ($data['inventory_item_id'] ?? null);
 
         return [
             ':uuid'        => $data['uuid']        ?? $this->uuid(),
             ':name'        => $data['name']        ?? '',
             ':description' => $data['description'] ?? '',
-            ':price'       => (float) ($data['price'] ?? 0),
+            ':price'       => $data['price']       ?? 0,
             ':category'    => $data['category']    ?? '',
             ':image_url'   => $data['imageUrl']    ?? ($data['image_url'] ?? ''),
-            ':features'    => json_encode(array_values($features)),
+            ':features'    => json_encode($features),
             ':sort_order'  => (int) ($data['sortOrder'] ?? ($data['sort_order'] ?? 0)),
-            ':is_active'   => (int) ($data['isActive']  ?? ($data['is_active']  ?? 1)),
+            ':is_active'   => (int) ($data['isActive'] ?? ($data['is_active'] ?? 1)),
             ':track_stock' => (int) ($data['trackStock'] ?? ($data['track_stock'] ?? 1)),
             ':stock_qty'   => max(0, (int) ($data['stockQty'] ?? ($data['stock_qty'] ?? 0))),
+            ':inventory_item_id' => $invItemId ? (int) $invItemId : null,
         ];
     }
 

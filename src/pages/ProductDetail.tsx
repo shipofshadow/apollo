@@ -10,6 +10,7 @@ import { formatPrice } from '../utils/formatPrice';
 import PageSEO from '../components/PageSEO';
 import { addToCart } from '../utils/cart';
 import { useToast } from '../context/ToastContext';
+import { getStockStatus, getStockBadgeConfig } from '../utils/stockUtils';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +77,10 @@ export default function ProductDetail() {
     setSelectedColor(null);
   }, []);
 
+  const stockStatus = product ? getStockStatus(product.stockQty, product.trackStock) : 'IN_STOCK';
+  const isSoldOut = stockStatus === 'SOLD_OUT';
+  const badgeConfig = getStockBadgeConfig(stockStatus);
+
   const handleAddToCart = () => {
     const unitPrice = selectedVariation?.price ? Number(selectedVariation.price) : product.price;
     addToCart({
@@ -132,12 +137,17 @@ export default function ProductDetail() {
         {/* Title + meta — bottom of hero */}
         <div className="absolute bottom-0 left-0 right-0">
           <div className="container mx-auto px-4 md:px-8 pb-10">
-            {/* Eyebrow */}
+            {/* Eyebrow and badge */}
             <div className="flex items-center gap-3 mb-3 animate-fadeInUp">
               <span className="block w-5 h-px bg-brand-orange" />
               <span className="text-brand-orange font-bold uppercase tracking-[0.18em] text-[0.65rem]">
                 {product.category}
               </span>
+              {stockStatus !== 'IN_STOCK' && badgeConfig && (
+                <span className={`ml-3 border text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-sm backdrop-blur-sm ${badgeConfig.className}`}>
+                  {badgeConfig.label}
+                </span>
+              )}
             </div>
 
             {/* Title */}
@@ -205,10 +215,17 @@ export default function ProductDetail() {
                 Price
               </div>
               <Link
-                to="/booking"
-                className="block w-full bg-brand-orange hover:bg-orange-500 text-white font-display font-bold uppercase tracking-widest text-sm px-5 py-3 rounded-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(243,111,33,0.4)] mb-3"
+                to={isSoldOut ? '#' : '/booking'}
+                className={`block w-full font-display font-bold uppercase tracking-widest text-sm px-5 py-3 rounded-sm transition-all mb-3 ${
+                  isSoldOut
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-brand-orange hover:bg-orange-500 text-white hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(243,111,33,0.4)]'
+                }`}
+                onClick={e => {
+                  if (isSoldOut) e.preventDefault();
+                }}
               >
-                Inquire Now
+                {isSoldOut ? 'Out of Stock' : 'Inquire Now'}
               </Link>
               <div className="flex items-center gap-2 mb-3">
                 <input
@@ -221,9 +238,14 @@ export default function ProductDetail() {
                 <button
                   type="button"
                   onClick={handleAddToCart}
-                  className="flex-1 inline-flex items-center justify-center gap-2 border border-brand-orange/40 text-brand-orange hover:text-white hover:bg-brand-orange px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-colors"
+                  disabled={isSoldOut}
+                  className={`flex-1 inline-flex items-center justify-center gap-2 border px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-colors ${
+                    isSoldOut
+                      ? 'border-gray-800 text-gray-600 bg-black/10 cursor-not-allowed'
+                      : 'border-brand-orange/40 text-brand-orange hover:text-white hover:bg-brand-orange'
+                  }`}
                 >
-                  <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
+                  <ShoppingCart className="w-3.5 h-3.5" /> {isSoldOut ? 'Out of Stock' : 'Add to Cart'}
                 </button>
               </div>
               <Link to="/cart" className="text-xs text-gray-400 hover:text-white uppercase tracking-widest font-bold transition-colors">
