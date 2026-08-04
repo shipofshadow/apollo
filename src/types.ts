@@ -270,6 +270,7 @@ export interface InventoryItem {
   supplierId: number | null;
   supplierName: string | null;
   isActive: boolean;
+  linkedProducts?: string | null;
   createdAt: string;
   updatedAt: string;
 }

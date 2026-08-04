@@ -19,7 +19,8 @@ class InventoryService
         $search = trim((string) ($filters['search'] ?? ''));
         $lowStockOnly = (bool) ($filters['lowStockOnly'] ?? false);
 
-        $sql = 'SELECT i.*, s.name AS supplier_name
+        $sql = 'SELECT i.*, s.name AS supplier_name,
+                (SELECT GROUP_CONCAT(p.name SEPARATOR \', \') FROM products p WHERE p.inventory_item_id = i.id) as linked_products
                 FROM inventory_items i
                 LEFT JOIN suppliers s ON s.id = i.supplier_id
                 WHERE i.is_active = 1';
@@ -647,7 +648,8 @@ class InventoryService
     /** @return array<string, mixed> */
     private function getItemById(int $id, bool $forUpdate = false): array
     {
-        $sql = 'SELECT i.*, s.name AS supplier_name
+        $sql = 'SELECT i.*, s.name AS supplier_name,
+                (SELECT GROUP_CONCAT(p.name SEPARATOR \', \') FROM products p WHERE p.inventory_item_id = i.id) as linked_products
                 FROM inventory_items i
                 LEFT JOIN suppliers s ON s.id = i.supplier_id
                 WHERE i.id = :id
@@ -683,6 +685,7 @@ class InventoryService
             'supplierId' => isset($row['supplier_id']) ? (int) $row['supplier_id'] : null,
             'supplierName' => isset($row['supplier_name']) ? (string) $row['supplier_name'] : null,
             'isActive' => ((int) ($row['is_active'] ?? 1)) === 1,
+            'linkedProducts' => isset($row['linked_products']) ? (string) $row['linked_products'] : null,
             'createdAt' => (string) ($row['created_at'] ?? ''),
             'updatedAt' => (string) ($row['updated_at'] ?? ''),
         ];
