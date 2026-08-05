@@ -1947,3 +1947,9 @@ export const fetchInquiryByIdApi = (token: string, id: number | string) =>
 
 export const fetchInquiryActivityApi = (token: string, id: number | string) =>
   apiFetch<any[]>(`/api/inquiries/${id}/activity`, {}, token);
+
+export const updateInquiryInternalNotesApi = (token: string, id: string | number, notes: string) =>
+  apiFetch<{ inquiry: any }>(`/api/inquiries/${id}/notes`, {
+    method: 'PATCH',
+    body: JSON.stringify({ internalNotes: notes }),
+  }, token);

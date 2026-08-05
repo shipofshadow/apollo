@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import {
   ArrowLeft, CheckCircle2, Clock,
   Trash2, AlertTriangle, User, Car, Activity,
-  ChevronLeft, ChevronRight, Calendar, ClipboardList
+  ChevronLeft, ChevronRight, Calendar, ClipboardList,
+  StickyNote, FileText, Printer, Save, X
 } from 'lucide-react';
 import {
   fetchInquiryByIdApi,
@@ -10,8 +11,10 @@ import {
   updateInquiryStatusApi,
   rescheduleInquiryApi,
   fetchInquiryActivityApi,
-  fetchInquiryAvailabilityApi
+  fetchInquiryAvailabilityApi,
+  updateInquiryInternalNotesApi
 } from '../../services/api';
+import { generateInquiryReportPDF } from '../../utils/generateInquiryReportPDF';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -28,6 +31,7 @@ const STATUS_STYLES: Record<string, string> = {
 type InquiryActivityLog = {
   id: number;
   action: string;
+  eventType?: string;
   detail: string | null;
   createdAt: string;
   actorName?: string | null;
@@ -47,6 +51,7 @@ type Inquiry = {
   year?: string;
   productToPurchase: string;
   status: string;
+  internalNotes?: string | null;
 };
 
 interface Props {
@@ -104,6 +109,12 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editNotes, setEditNotes] = useState('');
+  const [notesLoading, setNotesLoading] = useState(false);
+
+  const lastNoteUpdate = activityLogs.slice().reverse().find(log => log.eventType === 'inquiry_internal_notes_updated');
+
   const id = inquiryId.replace('inq-', '');
 
   const fetchData = async () => {
@@ -142,6 +153,23 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       showToast((err as Error).message, 'error');
     } finally {
       setStatusLoading(false);
+    }
+  };
+
+  const handleNotesSave = async () => {
+    if (!token || !inquiry) return;
+    setNotesLoading(true);
+    try {
+      const res = await updateInquiryInternalNotesApi(token, inquiry.id, editNotes);
+      setInquiry({ ...inquiry, internalNotes: res.inquiry.internalNotes });
+      setIsEditingNotes(false);
+      showToast('Internal notes updated.', 'success');
+      const activitiesRes = await fetchInquiryActivityApi(token, String(id));
+      setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
+    } catch (err) {
+      showToast((err as Error).message, 'error');
+    } finally {
+      setNotesLoading(false);
     }
   };
 
@@ -281,6 +309,16 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 </span>
               </div>
             </div>
+            
+            <div className="flex shrink-0 items-center justify-end">
+              <button
+                onClick={() => generateInquiryReportPDF(inquiry)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs border border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors shadow-lg shadow-black/20"
+              >
+                <Printer className="w-4 h-4 text-brand-orange" />
+                Print Report
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -342,6 +380,70 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
             </div>
           </div>
+
+          {/* Internal Notes Section */}
+          <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800/80">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <StickyNote className="w-4 h-4 text-brand-orange" /> Internal Notes
+              </h3>
+              {!isEditingNotes && (
+                <button
+                  onClick={() => {
+                    setEditNotes(inquiry.internalNotes || '');
+                    setIsEditingNotes(true);
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-white transition-colors"
+                >
+                  Edit Notes
+                </button>
+              )}
+            </div>
+
+            {isEditingNotes ? (
+              <div className="space-y-4">
+                <textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Add internal notes about this inquiry..."
+                  className="w-full bg-black/40 border border-gray-700 rounded-sm p-4 text-sm text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none min-h-[120px] resize-y"
+                />
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setIsEditingNotes(false)}
+                    className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    <X className="w-3.5 h-3.5" /> Cancel
+                  </button>
+                  <button
+                    onClick={handleNotesSave}
+                    disabled={notesLoading}
+                    className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest bg-brand-orange text-white hover:bg-orange-600 transition-colors shadow-lg shadow-brand-orange/20 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" /> {notesLoading ? 'Saving...' : 'Save Notes'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-black/20 rounded p-5 border border-gray-800/50 min-h-[80px] flex flex-col justify-between">
+                {inquiry.internalNotes ? (
+                  <>
+                    <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap mb-4">{inquiry.internalNotes}</p>
+                    {lastNoteUpdate && (
+                      <p className="text-[10px] text-gray-500 font-mono text-right mt-2 border-t border-gray-800/50 pt-2">
+                        Last updated by <span className="text-gray-400 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-4 text-gray-600 gap-2">
+                    <FileText className="w-6 h-6 opacity-30" />
+                    <p className="text-[10px] uppercase tracking-widest font-bold">No internal notes</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Schedule & Timeline */}
@@ -367,22 +469,24 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     ? inquiry.appointmentTime
                     : 'No Time'}
                 </p>
-                <button
-                  onClick={() => {
-                    handleDateChange(inquiry.appointmentDate);
-                    setEditTime(inquiry.appointmentTime);
-                    setIsEditingSchedule(true);
-                    if (inquiry.appointmentDate) {
-                      const d = new Date(inquiry.appointmentDate + 'T00:00:00');
-                      setCalendarYear(d.getFullYear());
-                      setCalendarMonth(d.getMonth());
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs text-brand-orange border border-brand-orange/30 hover:bg-brand-orange hover:text-white transition-colors"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Reschedule
-                </button>
+                {inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && (
+                  <button
+                    onClick={() => {
+                      handleDateChange(inquiry.appointmentDate);
+                      setEditTime(inquiry.appointmentTime);
+                      setIsEditingSchedule(true);
+                      if (inquiry.appointmentDate) {
+                        const d = new Date(inquiry.appointmentDate + 'T00:00:00');
+                        setCalendarYear(d.getFullYear());
+                        setCalendarMonth(d.getMonth());
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs text-brand-orange border border-brand-orange/30 hover:bg-brand-orange hover:text-white transition-colors"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Reschedule
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-5">
