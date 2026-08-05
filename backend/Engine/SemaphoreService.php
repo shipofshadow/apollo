@@ -23,7 +23,7 @@ class SemaphoreService
         $this->apiKey = defined('SEMAPHORE_API_KEY') ? (string) SEMAPHORE_API_KEY : '';
         $this->senderName = defined('SEMAPHORE_SENDER_NAME') ? (string) SEMAPHORE_SENDER_NAME : '1625AutoLab';
         $this->accountCacheTtl = defined('SEMAPHORE_ACCOUNT_CACHE_TTL') ? max(0, (int) SEMAPHORE_ACCOUNT_CACHE_TTL) : 60;
-        $this->messagesCacheTtl = defined('SEMAPHORE_MESSAGES_CACHE_TTL') ? max(0, (int) SEMAPHORE_MESSAGES_CACHE_TTL) : 30;
+        $this->messagesCacheTtl = 14400;
 
         $this->http = new Client([
             'timeout' => 15,
@@ -70,85 +70,71 @@ class SemaphoreService
         return $result;
     }
 
-    /**
-     * @param array<string, mixed> $filters
-     * @return array<string, mixed>
-     */
     public function getMessages(array $filters = [], bool $refresh = false): array
     {
-        $page = max(1, (int) ($filters['page'] ?? 1));
-        $limit = max(1, min(1000, (int) ($filters['limit'] ?? 20)));
-        $status = strtolower(trim((string) ($filters['status'] ?? '')));
-        $network = strtolower(trim((string) ($filters['network'] ?? '')));
-        $startDate = trim((string) ($filters['startDate'] ?? ''));
-        $endDate = trim((string) ($filters['endDate'] ?? ''));
-
         if ($this->apiKey === '') {
             return [
                 'configured' => false,
                 'messages' => [],
-                'page' => $page,
-                'limit' => $limit,
             ];
         }
 
-        $query = [
-            'page' => $page,
-            'limit' => $limit,
-        ];
-        if ($status !== '') {
-            $query['status'] = $status;
-        }
-        if ($network !== '') {
-            $query['network'] = $network;
-        }
-        if ($this->isValidDate($startDate)) {
-            $query['startDate'] = $startDate;
-        }
-        if ($this->isValidDate($endDate)) {
-            $query['endDate'] = $endDate;
-        }
+        $cacheKey = 'semaphore_all_messages';
+        $messages = null;
 
-        $cacheKey = 'semaphore_messages_' . md5(json_encode($query) ?: '');
         if (!$refresh && $this->messagesCacheTtl > 0) {
             $cached = Cache::get($cacheKey);
-            if ($cached !== null) {
-                return $cached;
+            if (is_array($cached)) {
+                $messages = $cached;
             }
         }
 
-        $payload = $this->request('/messages', $query);
-        $messages = [];
-        foreach ($payload as $row) {
-            if (!is_array($row)) {
-                continue;
+        if ($messages === null) {
+            $messages = [];
+            $page = 1;
+            while (true) {
+                $payload = $this->request('/messages', ['page' => $page, 'limit' => 1000]);
+                
+                $pageMessages = [];
+                foreach ($payload as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $pageMessages[] = [
+                        'message_id' => (int) ($row['message_id'] ?? 0),
+                        'recipient' => (string) ($row['recipient'] ?? ''),
+                        'message' => (string) ($row['message'] ?? ''),
+                        'sender_name' => (string) ($row['sender_name'] ?? ''),
+                        'network' => (string) ($row['network'] ?? ''),
+                        'status' => (string) ($row['status'] ?? ''),
+                        'type' => (string) ($row['type'] ?? ''),
+                        'source' => (string) ($row['source'] ?? ''),
+                        'created_at' => (string) ($row['created_at'] ?? ''),
+                        'updated_at' => (string) ($row['updated_at'] ?? ''),
+                    ];
+                }
+                
+                $messages = array_merge($messages, $pageMessages);
+                
+                if (count($pageMessages) < 1000) {
+                    break;
+                }
+                $page++;
             }
-            $messages[] = [
-                'message_id' => (int) ($row['message_id'] ?? 0),
-                'recipient' => (string) ($row['recipient'] ?? ''),
-                'message' => (string) ($row['message'] ?? ''),
-                'sender_name' => (string) ($row['sender_name'] ?? ''),
-                'network' => (string) ($row['network'] ?? ''),
-                'status' => (string) ($row['status'] ?? ''),
-                'type' => (string) ($row['type'] ?? ''),
-                'source' => (string) ($row['source'] ?? ''),
-                'created_at' => (string) ($row['created_at'] ?? ''),
-                'updated_at' => (string) ($row['updated_at'] ?? ''),
-            ];
+
+            usort($messages, static function ($a, $b) {
+                return strtotime($b['created_at']) <=> strtotime($a['created_at']);
+            });
+
+            if ($this->messagesCacheTtl > 0) {
+                Cache::set($cacheKey, $messages, $this->messagesCacheTtl);
+            }
         }
 
-        $result = [
+        return [
             'configured' => true,
             'messages' => $messages,
-            'page' => $page,
-            'limit' => $limit,
         ];
-
-        if ($this->messagesCacheTtl > 0) {
-            Cache::set($cacheKey, $result, $this->messagesCacheTtl);
-        }
-
-        return $result;
     }
 
     /**

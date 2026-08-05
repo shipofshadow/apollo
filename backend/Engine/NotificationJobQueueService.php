@@ -146,10 +146,11 @@ class NotificationJobQueueService
                 $stats['processed']++;
                 
                 // Delay between emails/jobs to prevent hitting hostinger rate limits
+                // Only sleep if there are more jobs to process in this batch
                 $sleepSecs = defined('NOTIFICATION_QUEUE_SLEEP_SECONDS') 
                     ? (int) NOTIFICATION_QUEUE_SLEEP_SECONDS 
                     : 15;
-                if ($sleepSecs > 0) {
+                if ($sleepSecs > 0 && $stats['processed'] < count($jobs)) {
                     sleep($sleepSecs);
                 }
             } catch (\Throwable $e) {

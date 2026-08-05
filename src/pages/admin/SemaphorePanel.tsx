@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { WalletCards, RefreshCw, MessageSquare, AlertCircle, Loader2 } from 'lucide-react';
+import { WalletCards, RefreshCw, MessageSquare, AlertCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchSemaphoreAccountApi, fetchSemaphoreMessagesApi } from '../../services/api';
 import type { SemaphoreAccountDetails, SemaphoreMessage } from '../../types';
@@ -13,6 +13,8 @@ export default function SemaphorePanel() {
   const [semaphoreMessages,   setSemaphoreMessages]   = useState<SemaphoreMessage[]>([]);
   const [loading,             setLoading]             = useState(false);
   const [error,               setError]               = useState('');
+  const [currentPage,         setCurrentPage]         = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (!token || !hasPermission('settings:manage')) {
@@ -32,13 +34,14 @@ export default function SemaphorePanel() {
       try {
         const [accountRes, messagesRes] = await Promise.all([
           fetchSemaphoreAccountApi(token),
-          fetchSemaphoreMessagesApi(token, { limit: 20 }),
+          fetchSemaphoreMessagesApi(token, {}),
         ]);
         if (!active) return;
         setSemaphoreConfigured(accountRes.configured);
         setSemaphoreSenderName(accountRes.sender_name);
         setSemaphoreAccount(accountRes.account);
         setSemaphoreMessages(messagesRes.messages);
+        setCurrentPage(1);
       } catch (err) {
         if (!active) return;
         setError((err as Error).message ?? 'Failed to load Semaphore account data.');
@@ -59,12 +62,13 @@ export default function SemaphorePanel() {
     try {
       const [accountRes, messagesRes] = await Promise.all([
         fetchSemaphoreAccountApi(token, true),
-        fetchSemaphoreMessagesApi(token, { limit: 20, refresh: true }),
+        fetchSemaphoreMessagesApi(token, { refresh: true }),
       ]);
       setSemaphoreConfigured(accountRes.configured);
       setSemaphoreSenderName(accountRes.sender_name);
       setSemaphoreAccount(accountRes.account);
       setSemaphoreMessages(messagesRes.messages);
+      setCurrentPage(1);
     } catch (err) {
       setError((err as Error).message ?? 'Failed to refresh Semaphore account data.');
     } finally {
@@ -131,9 +135,35 @@ export default function SemaphorePanel() {
 
       {/* Messages table */}
       <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-800 flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-brand-orange" />
-          <h3 className="text-xs font-bold uppercase tracking-widest text-white">Recent Sent Messages</h3>
+        <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-brand-orange" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-white">Recent Sent Messages</h3>
+          </div>
+
+          {semaphoreMessages.length > 0 && !loading && (
+            <div className="flex items-center gap-4 text-xs font-medium text-gray-400">
+              <span>Page {currentPage} of {Math.max(1, Math.ceil(semaphoreMessages.length / itemsPerPage))}</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-sm border border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange disabled:opacity-50 disabled:hover:border-gray-700 disabled:hover:text-gray-400 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(Math.max(1, Math.ceil(semaphoreMessages.length / itemsPerPage)), p + 1))}
+                  disabled={currentPage === Math.max(1, Math.ceil(semaphoreMessages.length / itemsPerPage))}
+                  className="p-1.5 rounded-sm border border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange disabled:opacity-50 disabled:hover:border-gray-700 disabled:hover:text-gray-400 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -155,7 +185,7 @@ export default function SemaphorePanel() {
                 </tr>
               </thead>
               <tbody>
-                {semaphoreMessages.map((msg) => (
+                {semaphoreMessages.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((msg) => (
                   <tr key={msg.message_id} className="border-t border-gray-800 align-top hover:bg-gray-800/30 transition-colors">
                     <td className="px-5 py-3 text-gray-300 whitespace-nowrap">{msg.recipient || '—'}</td>
                     <td className="px-5 py-3 text-white min-w-[320px]">{msg.message || '—'}</td>
