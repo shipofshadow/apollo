@@ -58,7 +58,7 @@ class InquiryService
 
         $this->activity->add(
             $inquiry['id'],
-            'created',
+            ActivityEvents::INQUIRY_CREATED,
             'Inquiry submitted',
             null,
             null,
@@ -90,7 +90,7 @@ class InquiryService
         $stmt = $db->prepare(
                 'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
-                    appointment_time, status, created_at
+                    appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
                  WHERE user_id = :user_id
              ORDER BY appointment_date ASC, appointment_time ASC, created_at DESC'
@@ -173,10 +173,10 @@ class InquiryService
             $this->syncOccupancyForInquiry($inquiry);
 
             if ($status !== null) {
-                $this->activity->add($id, 'status_updated', "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+                $this->activity->add($id, ActivityEvents::INQUIRY_STATUS_CHANGED, "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
             }
             if ($isScheduleChange) {
-                $this->activity->add($id, 'rescheduled', "Rescheduled to {$appointmentDate} at {$appointmentTime}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+                $this->activity->add($id, ActivityEvents::INQUIRY_RESCHEDULED, "Rescheduled to {$appointmentDate} at {$appointmentTime}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
             }
 
             return $inquiry;
@@ -216,10 +216,82 @@ class InquiryService
         }
 
         if ($status !== null) {
-            $this->activity->add($id, 'status_updated', "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+            $this->activity->add($id, ActivityEvents::INQUIRY_STATUS_CHANGED, "Status changed to {$status}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
         }
         if ($isScheduleChange) {
-            $this->activity->add($id, 'rescheduled', "Rescheduled to {$appointmentDate} at {$appointmentTime}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+            $this->activity->add($id, ActivityEvents::INQUIRY_RESCHEDULED, "Rescheduled to {$appointmentDate} at {$appointmentTime}", null, $actorUserId, $actorUserId ? 'admin' : 'system');
+        }
+
+        return $updated;
+    }
+
+    /**
+     * @param string $id
+     * @param string $notes
+     * @param int|null $actorUserId
+     * @param string $actorRole
+     * @return array<string, mixed>
+     */
+    public function updateInternalNotes(string $id, string $notes, ?int $actorUserId = null, string $actorRole = 'admin'): array
+    {
+        if ($this->useDb) {
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                'UPDATE customer_inquiries SET internal_notes = :notes WHERE id = :id'
+            );
+            $stmt->execute([
+                ':notes' => $notes,
+                ':id'    => $id,
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+                // If it didn't change, we still return the full object
+                $existing = $this->dbGetById($id);
+                if ($existing === null) {
+                    throw new RuntimeException('Inquiry not found.', 404);
+                }
+            } else {
+                $this->activity->add(
+                    $id,
+                    ActivityEvents::INQUIRY_INTERNAL_NOTES_UPDATED,
+                    'Inquiry internal notes updated',
+                    null,
+                    $actorUserId,
+                    $actorRole
+                );
+            }
+            return $this->dbGetById($id) ?? [];
+        }
+
+        $items = $this->fileGetAll();
+        $found = false;
+        foreach ($items as &$item) {
+            if ((string) ($item['id'] ?? '') === $id) {
+                $item['internalNotes'] = $notes;
+                $found = true;
+                break;
+            }
+        }
+        unset($item);
+
+        if (!$found) {
+            throw new RuntimeException('Inquiry not found.', 404);
+        }
+
+        file_put_contents(self::$storageFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        $this->activity->add(
+            $id,
+            ActivityEvents::INQUIRY_INTERNAL_NOTES_UPDATED,
+            'Inquiry internal notes updated',
+            null,
+            $actorUserId,
+            $actorRole
+        );
+
+        $updated = array_values(array_filter($items, fn ($it) => (string) ($it['id'] ?? '') === $id))[0] ?? null;
+        if (!is_array($updated)) {
+            throw new RuntimeException('Inquiry not found.', 404);
         }
 
         return $updated;
@@ -526,7 +598,7 @@ class InquiryService
         $stmt = $db->query(
                 'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
-                    appointment_time, status, created_at
+                    appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
              ORDER BY appointment_date ASC, appointment_time ASC, created_at DESC'
         );
@@ -598,7 +670,7 @@ class InquiryService
         $stmt = $db->prepare(
             'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
-                appointment_time, status, created_at
+                appointment_time, status, internal_notes, created_at
              FROM customer_inquiries
              WHERE id = :id
              LIMIT 1'
@@ -630,6 +702,7 @@ class InquiryService
             'appointmentDate' => (string) ($row['appointment_date'] ?? ''),
             'appointmentTime' => (string) ($row['appointment_time'] ?? ''),
             'status' => (string) ($row['status'] ?? 'pending'),
+            'internalNotes' => $row['internal_notes'] ?? null,
             'createdAt' => (string) ($row['created_at'] ?? ''),
         ];
     }

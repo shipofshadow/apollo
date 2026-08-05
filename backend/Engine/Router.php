@@ -136,6 +136,7 @@ class Router
             $r->addRoute('GET',   '/api/inquiries/{id}',             'handleInquiryGet');
             $r->addRoute('GET',   '/api/inquiries/{id}/activity',    'handleInquiryActivity');
             $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
+            $r->addRoute('PATCH', '/api/inquiries/{id}/notes',       'handleInquiryInternalNotes');
             $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
@@ -1447,6 +1448,34 @@ class Router
 
         (new InquiryService())->delete($id);
         echo json_encode(['deleted' => true]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleInquiryInternalNotes(array $vars = []): void
+    {
+        $payload = $this->requirePermission('bookings:manage');
+        $id = $vars['id'] ?? '';
+
+        if ($id === '') {
+            throw new RuntimeException('Inquiry ID is required.', 400);
+        }
+
+        $input = $this->jsonBody();
+        $notes = mb_substr((string) ($input['internalNotes'] ?? ''), 0, 5000);
+
+        $userId = (int) ($payload['sub'] ?? 0) ?: null;
+        if ($userId === null) {
+            throw new RuntimeException('User not authenticated.', 401);
+        }
+        $userRole = $payload['role'] ?? 'unknown';
+
+        $inquiry = (new InquiryService())->updateInternalNotes(
+            $id,
+            $notes,
+            $userId,
+            $userRole
+        );
+        echo json_encode(['inquiry' => $inquiry]);
     }
 
     /** @param array<string, string> $vars */

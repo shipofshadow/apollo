@@ -25,6 +25,11 @@ final class ActivityEvents
     public const BOOKING_APPOINTMENT_RESCHEDULED = 'appointment_rescheduled';
     public const BOOKING_BUILD_UPDATE_POSTED = 'build_update_posted';
 
+    public const INQUIRY_CREATED = 'inquiry_created';
+    public const INQUIRY_INTERNAL_NOTES_UPDATED = 'inquiry_internal_notes_updated';
+    public const INQUIRY_STATUS_CHANGED = 'inquiry_status_changed';
+    public const INQUIRY_RESCHEDULED = 'inquiry_rescheduled';
+
     public const BUILD_UPDATE_CREATED = 'build_update_created';
 
     public const ORDER_CREATED = 'order_created';
@@ -95,6 +100,10 @@ final class ActivityEvents
             self::BOOKING_CALIBRATION_UPDATED => 'Booking calibration data updated',
             self::BOOKING_APPOINTMENT_RESCHEDULED => 'Booking appointment rescheduled',
             self::BOOKING_BUILD_UPDATE_POSTED => 'Booking build update posted',
+            self::INQUIRY_CREATED => 'Inquiry submitted by client',
+            self::INQUIRY_INTERNAL_NOTES_UPDATED => 'Inquiry internal notes updated',
+            self::INQUIRY_STATUS_CHANGED => 'Inquiry status transition',
+            self::INQUIRY_RESCHEDULED => 'Inquiry appointment rescheduled',
             self::BUILD_UPDATE_CREATED => 'Build update record created',
             self::ORDER_CREATED => 'Order created',
             self::ORDER_STATUS_CHANGED => 'Order status changed',
