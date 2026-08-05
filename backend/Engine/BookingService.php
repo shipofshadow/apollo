@@ -206,9 +206,9 @@ class BookingService
      *
      * @return array<string, mixed>
      */
-    public function getStats(?string $timeframe = null): array
+    public function getStats(?string $timeframe = null, ?string $from = null, ?string $to = null): array
     {
-        return $this->useDb ? $this->dbGetStats($timeframe) : $this->fileGetStats();
+        return $this->useDb ? $this->dbGetStats($timeframe, $from, $to) : $this->fileGetStats($timeframe, $from, $to);
     }
 
     /**
@@ -1456,7 +1456,7 @@ class BookingService
     // -------------------------------------------------------------------------
 
     /** @return array<string, mixed> */
-    private function dbGetStats(?string $timeframe = null): array
+    private function dbGetStats(?string $timeframe = null, ?string $from = null, ?string $to = null): array
     {
         $db = Database::getInstance();
 
@@ -1465,6 +1465,10 @@ class BookingService
             $whereClause = "WHERE YEARWEEK(appointment_date, 1) = YEARWEEK(CURDATE(), 1)";
         } elseif ($timeframe === 'this_month') {
             $whereClause = "WHERE YEAR(appointment_date) = YEAR(CURDATE()) AND MONTH(appointment_date) = MONTH(CURDATE())";
+        } elseif ($timeframe === 'custom' && $from && $to) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+                $whereClause = "WHERE appointment_date >= '$from' AND appointment_date <= '$to'";
+            }
         }
 
         $total = (int) $db->query("SELECT COUNT(*) FROM bookings $whereClause")->fetchColumn();
@@ -1831,9 +1835,28 @@ class BookingService
     }
 
     /** @return array<string, mixed> */
-    private function fileGetStats(): array
+    private function fileGetStats(?string $timeframe = null, ?string $from = null, ?string $to = null): array
     {
         $all = $this->fileGetAll();
+
+        if ($timeframe === 'custom' && $from && $to) {
+            $all = array_filter($all, function($b) use ($from, $to) {
+                $date = $b['appointmentDate'] ?? '';
+                return $date >= $from && $date <= $to;
+            });
+        } elseif ($timeframe === 'this_week') {
+            $all = array_filter($all, function($b) {
+                $date = new \DateTime($b['appointmentDate'] ?? '');
+                $start = (new \DateTime('monday this week'))->format('Y-m-d');
+                $end = (new \DateTime('sunday this week'))->format('Y-m-d');
+                return $date->format('Y-m-d') >= $start && $date->format('Y-m-d') <= $end;
+            });
+        } elseif ($timeframe === 'this_month') {
+            $all = array_filter($all, function($b) {
+                $date = new \DateTime($b['appointmentDate'] ?? '');
+                return $date->format('Y-m') === (new \DateTime())->format('Y-m');
+            });
+        }
 
         $weekAgo    = new \DateTime('-7 days');
         $monthStart = new \DateTime('first day of this month midnight');

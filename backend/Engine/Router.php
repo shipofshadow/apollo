@@ -304,6 +304,7 @@ class Router
             $r->addRoute('POST', '/api/admin/cron/appointment-reminders', 'handleAdminCronAppointmentReminders');
             $r->addRoute('POST', '/api/admin/inquiries/link-guests', 'handleAdminInquiryLinkGuests');
             $r->addRoute('GET',  '/api/admin/stats',   'handleAdminStats');
+            $r->addRoute('GET',  '/api/admin/activity','handleAdminActivity');
             $r->addRoute('POST', '/api/admin/upload',  'handleAdminMediaUpload');
             $r->addRoute('GET',    '/api/admin/users',            'handleAdminUserList');
             $r->addRoute('GET',    '/api/admin/users/assignable',  'handleAdminAssignableUsers');
@@ -3404,11 +3405,31 @@ class Router
         $this->requirePermission('analytics:view');
         
         $timeframe = $_GET['timeframe'] ?? null;
+        $from = $_GET['from'] ?? null;
+        $to = $_GET['to'] ?? null;
         
-        $stats = (new BookingService())->getStats($timeframe);
-        $inquiryStats = (new InquiryService())->getStats($timeframe);
+        $stats = (new BookingService())->getStats($timeframe, $from, $to);
+        $inquiryStats = (new InquiryService())->getStats($timeframe, $from, $to);
         
         $stats = array_merge($stats, $inquiryStats);
+        
+        $combinedPeakHours = [];
+        foreach ($stats['peakHours'] ?? [] as $ph) {
+            $combinedPeakHours[$ph['time']] = ['time' => $ph['time'], 'bookingsCount' => $ph['count'], 'inquiriesCount' => 0];
+        }
+        foreach ($stats['peakInquiryHours'] ?? [] as $ph) {
+            if (!isset($combinedPeakHours[$ph['time']])) {
+                $combinedPeakHours[$ph['time']] = ['time' => $ph['time'], 'bookingsCount' => 0, 'inquiriesCount' => 0];
+            }
+            $combinedPeakHours[$ph['time']]['inquiriesCount'] = $ph['count'];
+        }
+        
+        usort($combinedPeakHours, function($a, $b) {
+            return strtotime($a['time']) <=> strtotime($b['time']);
+        });
+
+        $stats['peakHours'] = array_values($combinedPeakHours);
+        unset($stats['peakInquiryHours']);
         
         $stats['totalAppointments'] = $stats['totalBookings'] + $stats['totalInquiries'];
         $stats['activeAppointments'] = $stats['activeBookings'] + $stats['activeInquiries'];
@@ -3416,6 +3437,56 @@ class Router
         $stats['todayActiveAppointments'] = $stats['todayPending'] + $stats['todayPendingInquiries'];
         
         echo json_encode($stats);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminActivity(array $vars = []): void
+    {
+        $this->requirePermission('analytics:view');
+        
+        $db = Database::getInstance();
+        $limit = 20;
+
+        $bookingLogs = [];
+        try {
+            $bookingLogs = $db->query("
+                SELECT 
+                    l.id, 'booking' as source, l.booking_id as reference_id,
+                    l.actor_role, l.event_type, l.action, l.detail, l.created_at,
+                    u.name as actor_name,
+                    b.first_name, b.last_name
+                FROM booking_activity_logs l
+                LEFT JOIN users u ON u.id = l.actor_user_id
+                LEFT JOIN bookings b ON b.id = l.booking_id
+                ORDER BY l.created_at DESC
+                LIMIT $limit
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {}
+
+        $inquiryLogs = [];
+        try {
+            $inquiryLogs = $db->query("
+                SELECT 
+                    l.id, 'inquiry' as source, l.inquiry_id as reference_id,
+                    l.actor_role, l.event_type, l.action, l.detail, l.created_at,
+                    u.name as actor_name,
+                    i.full_name as client_name
+                FROM inquiry_activity_logs l
+                LEFT JOIN users u ON u.id = l.actor_user_id
+                LEFT JOIN customer_inquiries i ON i.id = l.inquiry_id
+                ORDER BY l.created_at DESC
+                LIMIT $limit
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {}
+
+        $all = array_merge($bookingLogs, $inquiryLogs);
+        usort($all, function($a, $b) {
+            return strtotime($b['created_at']) <=> strtotime($a['created_at']);
+        });
+
+        $all = array_slice($all, 0, $limit);
+
+        echo json_encode(['logs' => $all]);
     }
 
     /** @param array<string, string> $vars */

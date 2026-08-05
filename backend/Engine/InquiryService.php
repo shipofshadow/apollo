@@ -312,9 +312,9 @@ class InquiryService
         ];
     }
 
-    public function getStats(?string $timeframe = null): array
+    public function getStats(?string $timeframe = null, ?string $from = null, ?string $to = null): array
     {
-        return $this->useDb ? $this->dbGetStats($timeframe) : $this->fileGetStats();
+        return $this->useDb ? $this->dbGetStats($timeframe, $from, $to) : $this->fileGetStats($timeframe, $from, $to);
     }
 
     /**
@@ -432,7 +432,7 @@ class InquiryService
         ]);
     }
 
-    private function dbGetStats(?string $timeframe = null): array
+    private function dbGetStats(?string $timeframe = null, ?string $from = null, ?string $to = null): array
     {
         $db = Database::getInstance();
 
@@ -441,6 +441,10 @@ class InquiryService
             $whereClause = "WHERE YEARWEEK(appointment_date, 1) = YEARWEEK(CURDATE(), 1)";
         } elseif ($timeframe === 'this_month') {
             $whereClause = "WHERE YEAR(appointment_date) = YEAR(CURDATE()) AND MONTH(appointment_date) = MONTH(CURDATE())";
+        } elseif ($timeframe === 'custom' && $from && $to) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+                $whereClause = "WHERE appointment_date >= '$from' AND appointment_date <= '$to'";
+            }
         }
 
         $total = (int) $db->query("SELECT COUNT(*) FROM customer_inquiries $whereClause")->fetchColumn();
@@ -471,6 +475,32 @@ class InquiryService
             "SELECT COUNT(*) FROM customer_inquiries WHERE appointment_date = CURDATE() AND status IN ('pending','confirmed','in_progress')"
         )->fetchColumn();
 
+        $peakWhere = $whereClause ? str_replace("WHERE", "AND", $whereClause) : "";
+        $peakHours = $db->query(
+            "SELECT appointment_time AS hour_label, COUNT(*) AS cnt
+               FROM customer_inquiries
+              WHERE status IN ('pending', 'confirmed', 'completed', 'in_progress')
+              $peakWhere
+              GROUP BY appointment_time
+              ORDER BY cnt DESC
+              LIMIT 8"
+        )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        usort($peakHours, static function (array $a, array $b): int {
+            $timeA = strtotime((string) ($a['hour_label'] ?? ''));
+            $timeB = strtotime((string) ($b['hour_label'] ?? ''));
+
+            if ($timeA === false && $timeB === false) return 0;
+            if ($timeA === false) return 1;
+            if ($timeB === false) return -1;
+            return $timeA <=> $timeB;
+        });
+        
+        $peakInquiryHours = array_map(fn($r) => [
+            'time' => (string) $r['hour_label'],
+            'count' => (int) $r['cnt']
+        ], $peakHours);
+
         return [
             'totalInquiries'        => $total,
             'pendingInquiries'      => $pending,
@@ -483,6 +513,7 @@ class InquiryService
             'inquiriesThisMonth'    => $thisMonth,
             'todayInquiries'        => $todayInquiries,
             'todayPendingInquiries' => $todayPending,
+            'peakInquiryHours'      => $peakInquiryHours,
         ];
     }
 
@@ -854,9 +885,28 @@ class InquiryService
         file_put_contents(self::$storageFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
-    private function fileGetStats(): array
+    private function fileGetStats(?string $timeframe = null, ?string $from = null, ?string $to = null): array
     {
         $all = $this->fileGetAll();
+
+        if ($timeframe === 'custom' && $from && $to) {
+            $all = array_filter($all, function($b) use ($from, $to) {
+                $date = $b['appointmentDate'] ?? '';
+                return $date >= $from && $date <= $to;
+            });
+        } elseif ($timeframe === 'this_week') {
+            $all = array_filter($all, function($b) {
+                $date = new \DateTime($b['appointmentDate'] ?? '');
+                $start = (new \DateTime('monday this week'))->format('Y-m-d');
+                $end = (new \DateTime('sunday this week'))->format('Y-m-d');
+                return $date->format('Y-m-d') >= $start && $date->format('Y-m-d') <= $end;
+            });
+        } elseif ($timeframe === 'this_month') {
+            $all = array_filter($all, function($b) {
+                $date = new \DateTime($b['appointmentDate'] ?? '');
+                return $date->format('Y-m') === (new \DateTime())->format('Y-m');
+            });
+        }
 
         $weekAgo    = new \DateTime('-7 days');
         $monthStart = new \DateTime('first day of this month midnight');
@@ -872,6 +922,7 @@ class InquiryService
         $todayPending  = 0;
         $todayIso = (new \DateTime('today'))->format('Y-m-d');
 
+        $peakHourCounts = [];
         foreach ($all as $b) {
             $status = (string) ($b['status'] ?? '');
 
@@ -894,7 +945,30 @@ class InquiryService
                     $todayPending++;
                 }
             }
+            
+            $timeLabel = trim((string) ($b['appointmentTime'] ?? ''));
+            if ($timeLabel !== '' && in_array($status, ['pending', 'confirmed', 'completed', 'in_progress'], true)) {
+                $peakHourCounts[$timeLabel] = ($peakHourCounts[$timeLabel] ?? 0) + 1;
+            }
         }
+
+        arsort($peakHourCounts);
+        $peakHourCounts = array_slice($peakHourCounts, 0, 8, true);
+
+        $peakInquiryHours = [];
+        foreach ($peakHourCounts as $time => $count) {
+            $peakInquiryHours[] = ['time' => (string) $time, 'count' => (int) $count];
+        }
+
+        usort($peakInquiryHours, static function (array $a, array $b): int {
+            $timeA = strtotime((string) ($a['time'] ?? ''));
+            $timeB = strtotime((string) ($b['time'] ?? ''));
+
+            if ($timeA === false && $timeB === false) return 0;
+            if ($timeA === false) return 1;
+            if ($timeB === false) return -1;
+            return $timeA <=> $timeB;
+        });
 
         return [
             'totalInquiries'        => count($all),
@@ -908,6 +982,7 @@ class InquiryService
             'inquiriesThisMonth'    => $thisMonth,
             'todayInquiries'        => $todayInquiries,
             'todayPendingInquiries' => $todayPending,
+            'peakInquiryHours'      => $peakInquiryHours,
         ];
     }
 

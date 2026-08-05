@@ -925,7 +925,7 @@ export interface AdminStats {
   todayActiveAppointments: number;
 
   topServices: { name: string; count: number }[];
-  peakHours: { time: string; count: number }[];
+  peakHours: { time: string; bookingsCount: number; inquiriesCount: number; count?: number }[];
   reviewCount: number;
   avgRating: number;
 }
@@ -1204,8 +1204,32 @@ export const deleteAdminRoleApi = (token: string, id: number) =>
     method: 'DELETE',
   }, token);
 
-export const fetchAdminStatsApi = (token: string, timeframe: string = 'all_time') =>
-  apiFetch<AdminStats>(`/api/admin/stats?timeframe=${encodeURIComponent(timeframe)}`, {}, token);
+export const fetchAdminStatsApi = (token: string, params: { timeframe?: string; from?: string; to?: string } = {}) => {
+  const query = new URLSearchParams();
+  if (params.timeframe) query.set('timeframe', params.timeframe);
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  const qs = query.toString();
+  return apiFetch<AdminStats>(`/api/admin/stats${qs ? `?${qs}` : ''}`, {}, token);
+};
+
+export interface AdminActivityLog {
+  id: number;
+  source: 'booking' | 'inquiry';
+  reference_id: string;
+  actor_role: string;
+  event_type: string;
+  action: string;
+  detail: string | null;
+  created_at: string;
+  actor_name: string | null;
+  first_name?: string;
+  last_name?: string;
+  client_name?: string;
+}
+
+export const fetchAdminActivityApi = (token: string) =>
+  apiFetch<{ logs: AdminActivityLog[] }>(`/api/admin/activity`, {}, token);
 
 export const fetchSemaphoreAccountApi = (token: string, refresh = false) => {
   const qs = refresh ? '?refresh=true' : '';

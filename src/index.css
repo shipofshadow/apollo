@@ -132,10 +132,29 @@
   .blog-prose em {
     @apply text-gray-200;
   }
+  .btn-secondary:hover {
+    @apply border-brand-orange text-brand-orange bg-brand-orange/10;
+  }
   .blog-prose a {
     @apply text-brand-orange underline hover:text-orange-400 transition-colors;
   }
   .blog-prose img {
     @apply rounded-sm max-w-full my-4;
   }
+}
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-brand-darker);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-brand-orange);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d65c19;
 }

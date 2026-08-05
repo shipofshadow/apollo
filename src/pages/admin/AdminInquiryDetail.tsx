@@ -464,72 +464,87 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
           </div>
 
           {/* Actions */}
+          {/* Actions */}
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange/80 mb-6 pb-4 border-b border-gray-800 flex items-center gap-2">
-              <ClipboardList className="w-3.5 h-3.5 text-brand-orange" /> Actions
+              <ClipboardList className="w-3.5 h-3.5 text-brand-orange" /> Change Status
             </p>
 
             <div className="space-y-3">
-              {inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => {
-                if (s === inquiry.status) return null;
+              {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => {
+                const isCurrent = s === inquiry.status;
+                const isLocked = inquiry.status === 'completed' || inquiry.status === 'cancelled';
 
-                let colorClass = 'border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white';
+                if (isLocked && !isCurrent) return null;
 
-                if (s === 'confirmed') {
-                  colorClass = 'border-green-500/30 text-green-400 hover:bg-green-500/10';
-                } else if (s === 'in_progress') {
-                  colorClass = 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10';
-                } else if (s === 'completed') {
-                  colorClass = 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10';
-                } else if (s === 'cancelled') {
-                  colorClass = 'border-red-500/30 text-red-400 hover:bg-red-500/10';
+                let colorClass = 'border-gray-800 text-gray-300';
+                let hoverClass = 'hover:border-gray-500 hover:text-white';
+                
+                if (isCurrent) {
+                  if (s === 'pending') colorClass = 'border-yellow-500 bg-yellow-500/10 text-yellow-500';
+                  else if (s === 'confirmed') colorClass = 'border-green-500 bg-green-500/10 text-green-500';
+                  else if (s === 'in_progress') colorClass = 'border-blue-500 bg-blue-500/10 text-blue-500';
+                  else if (s === 'completed') colorClass = 'border-purple-500 bg-purple-500/10 text-purple-500';
+                  else if (s === 'cancelled') colorClass = 'border-red-500 bg-red-500/10 text-red-500';
+                  hoverClass = '';
+                } else if (!isLocked) {
+                  if (s === 'confirmed') colorClass = 'border-green-500/30 text-green-400 hover:bg-green-500/10 hover:border-green-500/50';
+                  else if (s === 'in_progress') colorClass = 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50';
+                  else if (s === 'completed') colorClass = 'border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50';
+                  else if (s === 'cancelled') colorClass = 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50';
+                  else if (s === 'pending') colorClass = 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/50';
+                } else {
+                  colorClass = 'border-gray-800/50 text-gray-600 opacity-50 cursor-not-allowed';
+                  hoverClass = '';
                 }
 
                 return (
                   <button
                     key={s}
-                    onClick={() => requestConfirmation(
-                      {
-                        title: 'Update Status?',
-                        message: `Change inquiry status to ${formatStatus(s as any)}?`,
-                        confirmLabel: 'Confirm',
-                        tone: s === 'cancelled' ? 'danger' : 'default',
-                      },
-                      () => handleStatusChange(s)
-                    )}
-                    disabled={statusLoading}
-                    className={`w-full flex justify-between items-center px-4 py-3 bg-[#151515] border ${colorClass} text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group`}
+                    onClick={() => {
+                      if (isCurrent || isLocked) return;
+                      requestConfirmation(
+                        {
+                          title: 'Update Status?',
+                          message: `Change inquiry status to ${formatStatus(s as any)}?`,
+                          confirmLabel: 'Confirm',
+                          tone: s === 'cancelled' ? 'danger' : 'default',
+                        },
+                        () => handleStatusChange(s)
+                      )
+                    }}
+                    disabled={statusLoading || isCurrent || isLocked}
+                    className={`w-full flex justify-between items-center px-4 py-3 border ${isCurrent ? colorClass : `bg-[#151515] ${colorClass}`} ${hoverClass} text-[10px] font-bold uppercase tracking-widest rounded transition-all group`}
                   >
-                    <span>Mark as {formatStatus(s as any)}</span>
-                    <CheckCircle2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+                    <span className="flex items-center gap-2">
+                      {isCurrent ? <CheckCircle2 className="w-4 h-4" /> : <span className="w-4 h-4" />}
+                      {formatStatus(s as any)}
+                    </span>
+                    {!isCurrent && !isLocked && (
+                      <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
                   </button>
                 )
               })}
 
-              <button
-                onClick={() => requestConfirmation(
-                  {
-                    title: 'Delete Inquiry?',
-                    message: 'This permanently deletes the inquiry and cannot be undone.',
-                    confirmLabel: 'Delete Inquiry',
-                    tone: 'danger',
-                  },
-                  handleDelete
-                )}
-                disabled={isDeleting}
-                className="w-full flex justify-between items-center px-4 py-3 bg-[#151515] border border-red-500/40 text-red-300 hover:bg-red-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 group"
-              >
-                <span>{isDeleting ? 'Deleting...' : 'Delete Inquiry'}</span>
-                {isDeleting ? <Clock className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-50 group-hover:opacity-100" />}
-              </button>
-
-              {(inquiry.status === 'completed' || inquiry.status === 'cancelled') && (
-                <div className="bg-[#151515] border border-gray-800 rounded p-3 flex items-center justify-center mt-2">
-                  <p className="text-gray-600 text-[10px] font-mono uppercase tracking-widest">
-                    Status Locked ({formatStatus(inquiry.status as any)})
-                  </p>
-                </div>
-              )}
+              <div className="pt-6 mt-6 border-t border-gray-800/80">
+                <button
+                  onClick={() => requestConfirmation(
+                    {
+                      title: 'Delete Inquiry?',
+                      message: 'This permanently deletes the inquiry and cannot be undone.',
+                      confirmLabel: 'Delete Inquiry',
+                      tone: 'danger',
+                    },
+                    handleDelete
+                  )}
+                  disabled={isDeleting}
+                  className="w-full flex justify-between items-center px-4 py-3 bg-transparent border border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500 text-[10px] font-bold uppercase tracking-widest rounded transition-all disabled:opacity-30 group"
+                >
+                  <span>{isDeleting ? 'Deleting...' : 'Delete Inquiry'}</span>
+                  {isDeleting ? <Clock className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-70 group-hover:opacity-100" />}
+                </button>
+              </div>
             </div>
           </div>
 
