@@ -1020,3 +1020,26 @@ export interface ChecklistPhaseResponse {
   updatedAt: string;
   responses: InquiryChecklistResponse[];
 }
+
+export const INQUIRY_STAGES = ['pending', 'confirmed', 'in_progress', 'completed'] as const;
+export type InquiryStage = typeof INQUIRY_STAGES[number];
+
+
+export interface Inquiry {
+  id: string;
+  fullName: string;
+  contactNumber: string;
+  emailAddress: string;
+  facebookName: string;
+  plateNumber?: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  make: string;
+  model: string;
+  year?: string;
+  productToPurchase: string;
+  status: string;
+  internalNotes?: string | null;
+  serviceId?: number | null;
+}
+

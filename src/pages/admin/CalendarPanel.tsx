@@ -299,7 +299,7 @@ export default function CalendarPanel({ onView }: Props) {
   const isoForDay = (day: number) =>
     `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-  const todayIso = today.toISOString().split('T')[0];
+  const todayIso = today.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
   // Helper to find closure for a specific date (handles yearly closures)
   const getClosureForDate = (dateIso: string) => {
@@ -441,7 +441,7 @@ export default function CalendarPanel({ onView }: Props) {
               {selectedDate
                 ? (() => {
                   const [y, m, d] = selectedDate.split('-').map(Number);
-                  return new Date(y, m - 1, d).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' });
+                  return new Date(y, m - 1, d).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
                 })()
                 : 'Select a day'}
             </span>

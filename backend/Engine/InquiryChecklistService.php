@@ -322,10 +322,10 @@ class InquiryChecklistService
         $this->activity->add(
             $inquiryId,
             ActivityEvents::INQUIRY_INTERNAL_NOTES_UPDATED,
-            'Installation checklist PDF report queued for delivery to client & shop owners',
-            null,
+            'Installation checklist PDF report sent to client via SMS and Email',
+            "Phase: $phase",
             $sentByUserId,
-            'staff'
+            'admin'
         );
 
         // Notify client in-app immediately if they have an account.

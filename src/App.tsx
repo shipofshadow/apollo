@@ -13,7 +13,6 @@ import Footer from './components/Footer';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import WebsiteChatWidget from './components/chatbot/WebsiteChatWidget';
 import { useNotificationPoller } from './hooks/useNotificationPoller';
-import BookingPage from './pages/BookingPage';
 
 const Home = lazy(() => import('./pages/Home'));
 const ServicesPage = lazy(() => import('./pages/ServicesPage'));
@@ -95,7 +94,7 @@ function AppInner() {
             <Route path="/faq" element={<FaqPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/about" element={<About />} />
-            <Route path="/booking" element={<BookingPage />} />
+            <Route path="/booking" element={<Navigate to="/order" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />

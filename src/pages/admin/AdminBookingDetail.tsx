@@ -192,16 +192,16 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
                   type="button"
                   onClick={() => handleDateSelect(date)}
                   className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded relative ${active
-                      ? 'border-brand-orange bg-brand-orange/10'
-                      : 'border-gray-800 hover:border-gray-600 bg-[#181818]'
+                    ? 'border-brand-orange bg-brand-orange/10'
+                    : 'border-gray-800 hover:border-gray-600 bg-[#181818]'
                     }`}
                 >
                   <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">
-                    {date.toLocaleDateString('en-PH', { weekday: 'short' })}
+                    {date.toLocaleDateString('en-PH', { weekday: 'short', timeZone: 'Asia/Manila' })}
                   </div>
                   <div className="text-xl font-bold text-white">{date.getDate()}</div>
                   <div className="text-[10px] text-gray-500 uppercase font-mono mt-1">
-                    {date.toLocaleDateString('en-PH', { month: 'short' })}
+                    {date.toLocaleDateString('en-PH', { month: 'short', timeZone: 'Asia/Manila' })}
                   </div>
                   {isCurrentBookingDate && (
                     <div className="absolute bottom-1 left-0 right-0 flex justify-center">
@@ -222,7 +222,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
         </div>
         {selectedDate && (
           <p className="text-[10px] font-mono uppercase tracking-widest text-brand-orange mt-3">
-            Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+            Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}
           </p>
         )}
       </div>
@@ -258,15 +258,15 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
                     type="button"
                     onClick={() => setSelectedTime(slot)}
                     className={`flex flex-col items-center justify-center p-3 rounded border font-mono transition-all ${isSelected
-                        ? 'bg-brand-orange/20 border-brand-orange text-brand-orange shadow-[inset_0_0_10px_rgba(249,115,22,0.2)]'
-                        : 'bg-[#181818] border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white'
+                      ? 'bg-brand-orange/20 border-brand-orange text-brand-orange shadow-[inset_0_0_10px_rgba(249,115,22,0.2)]'
+                      : 'bg-[#181818] border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white'
                       }`}
                   >
                     <span className="text-sm font-bold">{slot}</span>
                     {spotsLeft > 0 && (
                       <span className={`text-[9px] uppercase tracking-wider mt-1.5 ${isSelected ? 'text-brand-orange' : almostFull ? 'text-yellow-500' : 'text-gray-600'
                         }`}>
-                        {almostFull ? 'Critical' : `CAP: ${spotsLeft}`}
+                        {almostFull ? 'Last' : `CAP: ${spotsLeft}`}
                       </span>
                     )}
                   </button>
@@ -1570,7 +1570,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                       <div className="absolute left-[13px] top-1.5 w-2 h-2 rounded-full bg-brand-orange ring-4 ring-[#121212]" />
                       <div className="bg-[#151515] border border-gray-800 rounded p-4">
                         <p className="text-[9px] text-gray-500 font-mono mb-2">
-                          SYS_TIME: {new Date(upd.createdAt).toISOString().replace('T', ' ').substring(0, 19)}Z
+                          SYS_TIME: {new Date(upd.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                         </p>
                         {upd.note && (
                           <p className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">{upd.note}</p>
@@ -1679,7 +1679,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                       </a>
                     </div>
                     <p className="text-[10px] font-mono uppercase tracking-widest text-gray-600 pt-1">
-                      Member Since: {customerProfile?.profile.createdAt ? new Date(customerProfile.profile.createdAt).toISOString().split('T')[0] : 'UNKNOWN'}
+                      Member Since: {customerProfile?.profile.createdAt ? new Date(customerProfile.profile.createdAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : 'UNKNOWN'}
                     </p>
                   </div>
                 </div>
@@ -1953,7 +1953,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
               </div>
               <div className="mt-4 text-center">
                 <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest">
-                  Customer Since: {customerStats.memberSince ? new Date(customerStats.memberSince).toISOString().split('T')[0] : 'UNKNOWN'}
+                  Customer Since: {customerStats.memberSince ? new Date(customerStats.memberSince).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : 'UNKNOWN'}
                 </p>
               </div>
               {customerStats.totalVisits >= 5 && (
@@ -1977,7 +1977,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 {activityLogs.slice().reverse().map((entry) => (
                   <div key={entry.id} className="border-b border-gray-800/50 pb-3 last:border-0 last:pb-0">
                     <p className="text-[9px] text-brand-orange mb-1">
-                      {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 19)}Z
+                      {new Date(entry.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     </p>
                     <p className="text-[11px] text-gray-300 uppercase font-bold"> {entry.action}</p>
                     {entry.detail && (

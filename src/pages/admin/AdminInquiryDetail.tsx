@@ -18,9 +18,11 @@ import {
   generateInquiryChecklistPdfApi,
   fetchShopHoursApi,
   fetchShopClosedDatesApi,
-  fetchInquiryChecklistsApi
+  fetchInquiryChecklistsApi,
+  sendInquiryChecklistPhaseApi
 } from '../../services/api';
-import type { ShopDayHours } from '../../types';
+import type { ShopDayHours, Inquiry, Service } from '../../types';
+import { INQUIRY_STAGES } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
@@ -158,11 +160,11 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
                     }`}
                 >
                   <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">
-                    {date.toLocaleDateString('en-PH', { weekday: 'short' })}
+                    {date.toLocaleDateString('en-PH', { weekday: 'short', timeZone: 'Asia/Manila' })}
                   </div>
                   <div className="text-xl font-bold text-white">{date.getDate()}</div>
                   <div className="text-[10px] text-gray-500 uppercase font-mono mt-1">
-                    {date.toLocaleDateString('en-PH', { month: 'short' })}
+                    {date.toLocaleDateString('en-PH', { month: 'short', timeZone: 'Asia/Manila' })}
                   </div>
                   {isCurrentInquiryDate && (
                     <div className="absolute bottom-1 left-0 right-0 flex justify-center">
@@ -183,7 +185,7 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
         </div>
         {selectedDate && (
           <p className="text-[10px] font-mono uppercase tracking-widest text-brand-orange mt-3">
-            Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+            Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}
           </p>
         )}
       </div>
@@ -278,23 +280,6 @@ type InquiryActivityLog = {
   actorName?: string | null;
 };
 
-type Inquiry = {
-  id: string;
-  fullName: string;
-  contactNumber: string;
-  emailAddress: string;
-  facebookName: string;
-  plateNumber?: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  make: string;
-  model: string;
-  year?: string;
-  productToPurchase: string;
-  status: string;
-  internalNotes?: string | null;
-  serviceId?: number | null;
-};
 
 interface Props {
   inquiryId: string;
@@ -320,15 +305,37 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const [statusLoading, setStatusLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
+  const [confirmAction, setConfirmAction] = useState<null | (() => Promise<any>)>(null);
 
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [isChangingService, setIsChangingService] = useState(false);
 
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    if (isStatusDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isStatusDropdownOpen]);
 
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editNotes, setEditNotes] = useState('');
@@ -348,12 +355,18 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const ACTIVITY_PAGE_SIZE = 3;
   const [activityPage, setActivityPage] = useState(0);
 
+  const blobUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    return () => blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+  }, []);
+
   const handlePreviewPdf = async (phase: string = 'after') => {
     if (!token || !inquiry) return;
     setPreviewLoading(phase);
     try {
       const blob = await generateInquiryChecklistPdfApi(token, inquiry.id.replace('inq-', ''), phase);
       const url = URL.createObjectURL(blob);
+      blobUrlsRef.current.push(url);
       window.open(url, '_blank');
     } catch (err: any) {
       console.error(err);
@@ -367,10 +380,11 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     if (!token || !inquiry) return;
     setSendPdfLoading(phase);
     try {
-      const { sendInquiryChecklistPhaseApi } = await import('../../services/api');
       await sendInquiryChecklistPhaseApi(token, inquiry.id.replace('inq-', ''), phase);
       showToast(`Inspection report PDF sent to client & shop owners.`, 'success');
       await loadChecklistsState(); // reload to get sentAt
+      const activitiesRes = await fetchInquiryActivityApi(token, String(id));
+      setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
     } catch (err: any) {
       showToast('Failed to send PDF: ' + err.message, 'error');
     } finally {
@@ -400,9 +414,9 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
         fetchInquiryByIdApi(token, String(id)),
         fetchInquiryActivityApi(token, String(id))
       ]);
-      setInquiry((res as { inquiry: Inquiry }).inquiry);
+      setInquiry((res as { inquiry: any }).inquiry);
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
-      loadChecklistsState();
+      await loadChecklistsState();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -428,8 +442,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!token || !inquiry) return;
+  const handleStatusChange = async (newStatus: string): Promise<boolean> => {
+    if (!token || !inquiry) return false;
     setStatusLoading(true);
     try {
       const res = await updateInquiryStatusApi(token, inquiry.id, newStatus);
@@ -438,8 +452,10 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       // Refresh activities
       const activitiesRes = await fetchInquiryActivityApi(token, String(id));
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
+      return true;
     } catch (err) {
       showToast((err as Error).message, 'error');
+      return false;
     } finally {
       setStatusLoading(false);
     }
@@ -465,29 +481,36 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const handleServiceChange = async (serviceId: string, serviceName: string) => {
     if (!token || !inquiry) return;
     const sId = serviceId ? parseInt(serviceId, 10) : null;
-    requestConfirmation(
-      {
-        title: 'Change Linked Service',
-        message: `Are you sure you want to link this inquiry to "${serviceName}"? This will change the active checklist template.`,
-        confirmLabel: 'Confirm',
-        tone: 'default',
-      },
-      async () => {
-        try {
-          setServicesLoading(true);
-          const res = await updateInquiryServiceIdApi(token, inquiry.id, sId);
-          setInquiry(res.inquiry);
-          showToast('Service linked successfully.', 'success');
-          const activitiesRes = await fetchInquiryActivityApi(token, String(id));
-          setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
-          setActivityPage(0);
-        } catch (err) {
-          showToast((err as Error).message, 'error');
-        } finally {
-          setServicesLoading(false);
-        }
+    
+    const updateService = async () => {
+      try {
+        setServicesLoading(true);
+        const res = await updateInquiryServiceIdApi(token, inquiry.id, sId);
+        setInquiry(res.inquiry);
+        showToast('Service linked successfully.', 'success');
+        const activitiesRes = await fetchInquiryActivityApi(token, String(id));
+        setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
+        setActivityPage(0);
+      } catch (err) {
+        showToast((err as Error).message, 'error');
+      } finally {
+        setServicesLoading(false);
       }
-    );
+    };
+
+    if (inquiry.serviceId) {
+      requestConfirmation(
+        {
+          title: 'Change Linked Service',
+          message: `Are you sure you want to link this inquiry to "${serviceName}"? This will change the active checklist template.`,
+          confirmLabel: 'Confirm',
+          tone: 'default',
+        },
+        updateService
+      );
+    } else {
+      updateService();
+    }
   };
 
 
@@ -505,7 +528,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     }
   };
 
-  const requestConfirmation = (dialog: ConfirmDialogState, action: () => Promise<void>) => {
+  const requestConfirmation = (dialog: ConfirmDialogState, action: () => Promise<any>) => {
     setConfirmDialog(dialog);
     setConfirmAction(() => action);
   };
@@ -667,7 +690,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               </h3>
               {inquiry.serviceId ? (
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3 h-3" /> Template Active
+                  <CheckCircle2 className="w-3 h-3" /> Inquiry Linked
                 </span>
               ) : (
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
@@ -678,37 +701,31 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
             {inquiry.serviceId && !isChangingService ? (
               /* Summary Card for Inquiry with Linked Service */
-              {
-                ...(() => {
-                  const linkedSvc = services.find(s => s.id === inquiry.serviceId);
-                  return (
-                    <div className="bg-[#151515] border border-brand-orange/40 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3.5 rounded-lg bg-brand-orange/20 border border-brand-orange/30 text-brand-orange shrink-0">
-                          <Wrench className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <span className="text-[9px] font-mono uppercase tracking-widest text-brand-orange">Assigned Template</span>
-                          <h4 className="text-base font-bold text-white uppercase tracking-wider mt-0.5">
-                            {linkedSvc ? linkedSvc.title : `Service #${inquiry.serviceId}`}
-                          </h4>
-                          {linkedSvc?.startingPrice && (
-                            <p className="text-xs text-gray-400 font-mono mt-0.5">Starting from {linkedSvc.startingPrice}</p>
-                          )}
-                        </div>
+              (() => {
+                const linkedSvc = services.find(s => s.id === inquiry.serviceId);
+                return (
+                  <div className="bg-[#151515] border border-brand-orange/40 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3.5 rounded-lg bg-brand-orange/20 border border-brand-orange/30 text-brand-orange shrink-0">
+                        <Wrench className="w-6 h-6" />
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsChangingService(true)}
-                        className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
-                      >
-                        Change Linked Service
-                      </button>
+                      <div>
+                        <h4 className="text-base font-bold text-white uppercase tracking-wider mt-0.5">
+                          {linkedSvc ? linkedSvc.title : `Service #${inquiry.serviceId}`}
+                        </h4>
+                      </div>
                     </div>
-                  );
-                })()
-              }
+
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingService(true)}
+                      className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                    >
+                      Change Checklist
+                    </button>
+                  </div>
+                );
+              })()
             ) : (
               /* Full Service Selector Grid for Old Inquiries or when Changing Service */
               <div>
@@ -792,7 +809,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
           </div>
 
           {/* Checklists Section */}
-          {(inquiry as any).serviceId && (
+          {inquiry.serviceId && (
             <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
               <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 pb-4 border-b border-gray-800/80">
                 <ClipboardList className="w-4 h-4 text-brand-orange" /> Installation Checklists
@@ -816,7 +833,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                       onClick={() => setActiveChecklistPhase('before')}
                       className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
                     >
-                      Open Before Checklist
+                      Before Installation Checklist
                     </button>
                   )}
                 </div>
@@ -838,16 +855,9 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                         onClick={() => setActiveChecklistPhase('after')}
                         className="flex-1 py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
                       >
-                        Open After Checklist
+                        After Installation Checklist
                       </button>
-                      <button
-                        onClick={() => handlePreviewPdf('after')}
-                        disabled={previewLoading === 'after'}
-                        title="Preview After PDF Report"
-                        className="flex items-center justify-center px-4 border border-gray-700 rounded hover:bg-gray-800 text-gray-400 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                        {previewLoading === 'after' ? <Clock className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                      </button>
+
                     </div>
                   )}
                 </div>
@@ -933,8 +943,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
                 {/* Progress Fill */}
                 {(() => {
-                  const stages = ['pending', 'confirmed', 'in_progress', 'completed'];
-                  const currentIndex = stages.indexOf(inquiry.status);
+                  const stages = INQUIRY_STAGES;
+                  const currentIndex = stages.indexOf(inquiry.status as any);
                   const widthPct = currentIndex > 0 ? (currentIndex / (stages.length - 1)) * 76 : 0;
                   return (
                     <div
@@ -952,8 +962,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     { key: 'in_progress', label: 'In Progress', activeColor: 'bg-brand-orange text-white ring-brand-orange/30' },
                     { key: 'completed', label: 'Completed', activeColor: 'bg-emerald-500 text-white ring-emerald-500/30' },
                   ].map((step, idx) => {
-                    const stages = ['pending', 'confirmed', 'in_progress', 'completed'];
-                    const currentIndex = stages.indexOf(inquiry.status);
+                    const stages = INQUIRY_STAGES;
+                    const currentIndex = stages.indexOf(inquiry.status as any);
                     const isDone = currentIndex >= idx;
                     const isCurrent = inquiry.status === step.key;
 
@@ -1061,8 +1071,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                           confirmLabel: 'Mark Completed',
                         },
                         async () => {
-                          await handleStatusChange('completed');
-                          setActiveChecklistPhase('after');
+                          const success = await handleStatusChange('completed');
+                          if (success) setActiveChecklistPhase('after');
                         }
                       )}
                       disabled={statusLoading}
@@ -1083,7 +1093,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                       <p className="text-[11px] text-gray-400 mt-1">
                         {!isAfterSubmitted
                           ? 'The service is finished. Please complete the final checklist before sending the report to the customer.'
-                          : !isAfterSent 
+                          : !isAfterSent
                             ? 'The service is finished and the final checklist is complete. You can now send the final report to the customer.'
                             : 'The final report has been sent to the customer and shop owners.'}
                       </p>
@@ -1094,12 +1104,19 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                       <BadgeCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                     )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     <button
                       onClick={() => setActiveChecklistPhase('after')}
                       className="py-3 px-4 bg-[#1a1a1a] border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <FileText className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View Checklist' : 'Final Checklist'}
+                      <ClipboardList className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View Installation Checklists' : 'Final Installation Checklist'}
+                    </button>
+                    <button
+                      onClick={() => handlePreviewPdf('after')}
+                      disabled={previewLoading === 'after'}
+                      className="py-3 px-4 bg-[#1a1a1a] border border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {previewLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />} Preview Report
                     </button>
                     {isAfterSent ? (
                       <button
@@ -1157,7 +1174,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               <p className="text-[9px] uppercase font-mono tracking-widest text-gray-500">More Actions</p>
 
               {/* Status Dropdown */}
-              <div className="relative">
+              <div ref={statusDropdownRef} className="relative">
                 {isStatusLocked ? (
                   <div className="w-full flex items-center justify-between bg-emerald-950/30 border border-emerald-800/40 rounded p-3 text-xs font-bold uppercase tracking-widest text-emerald-300">
                     <span className="flex items-center gap-2">
@@ -1186,7 +1203,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
                 {isStatusDropdownOpen && (
                   <div className="absolute bottom-full mb-2 inset-x-0 bg-[#1a1a1a] border border-gray-700 rounded-md shadow-2xl z-50 overflow-hidden">
-                    {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => {
+                    {[...INQUIRY_STAGES, 'cancelled'].map((s) => {
                       if (s === inquiry.status) return null;
 
                       let hoverClass = 'hover:bg-gray-800';
@@ -1345,7 +1362,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     {pageEntries.map((entry) => (
                       <div key={entry.id} className="border-b border-gray-800/40 pb-4 last:border-0 last:pb-0">
                         <p className="text-[10px] text-brand-orange mb-1.5">
-                          {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 19)}
+                          {new Date(entry.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                         </p>
                         <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
                           {entry.action}
@@ -1393,7 +1410,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
             <h3 className={`text-[10px] font-mono font-bold uppercase tracking-widest mb-4 border-b border-gray-800 pb-2 ${confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-brand-orange'}`}>
-              // Auth required
+              {confirmDialog.tone === 'danger' ? '// Action Required' : '// Please Confirm'}
             </h3>
             <p className="text-lg font-bold text-white mb-2">{confirmDialog.title}</p>
             <p className="text-sm text-gray-400 mb-6">{confirmDialog.message}</p>
@@ -1423,7 +1440,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       {activeChecklistPhase && token && (
         <InquiryChecklistModal
           inquiryId={inquiry.id}
-          phase={activeChecklistPhase}
+          initialPhase={activeChecklistPhase}
           token={token}
           onClose={() => setActiveChecklistPhase(null)}
           onSaved={() => {
