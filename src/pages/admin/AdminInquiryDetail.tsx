@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   ArrowLeft, CheckCircle2, Clock,
   Trash2, AlertTriangle, User, Car, Activity,
-  ChevronLeft, ChevronRight, Calendar, ClipboardList,
-  StickyNote, FileText, Printer, Save, X
+  ChevronLeft, ChevronRight, ChevronDown, Calendar, ClipboardList,
+  StickyNote, FileText, Save, X, Send, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Lock
 } from 'lucide-react';
 import {
   fetchInquiryByIdApi,
@@ -12,12 +12,253 @@ import {
   rescheduleInquiryApi,
   fetchInquiryActivityApi,
   fetchInquiryAvailabilityApi,
-  updateInquiryInternalNotesApi
+  updateInquiryInternalNotesApi,
+  fetchServicesApi,
+  updateInquiryServiceIdApi,
+  generateInquiryChecklistPdfApi,
+  fetchShopHoursApi,
+  fetchShopClosedDatesApi,
+  fetchInquiryChecklistsApi
 } from '../../services/api';
-import { generateInquiryReportPDF } from '../../utils/generateInquiryReportPDF';
+import type { ShopDayHours } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
+import InquiryChecklistModal from './InquiryChecklistModal';
+
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
+  const openDays = shopHours.length
+    ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
+    : new Set([1, 2, 3, 4, 5, 6]);
+  const dates: Date[] = [];
+  const cursor = new Date();
+  cursor.setDate(cursor.getDate() + 1);
+  while (dates.length < 30) {
+    const iso = cursor.toISOString().slice(0, 10);
+    if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
+function isoFromDate(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+interface ReschedulePanelProps {
+  inquiry: Inquiry;
+  token: string;
+  onSuccess: (updatedDate: string, updatedTime: string) => void;
+  onCancel: () => void;
+}
+
+function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: ReschedulePanelProps) {
+  const { showToast } = useToast();
+
+  const [shopHours, setShopHours] = useState<ShopDayHours[]>([]);
+  const [closedDatesSet, setClosedDatesSet] = useState<Set<string>>(new Set());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState('');
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
+  const [slotCapacity, setSlotCapacity] = useState(3);
+  const [shopDayIsOpen, setShopDayIsOpen] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
+      .then(([{ hours }, cdData]) => {
+        setShopHours(hours);
+        const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
+        setClosedDatesSet(new Set(cd.map(d => d.date)));
+      })
+      .catch(() => { });
+  }, []);
+
+  const availableDates = buildDateList(shopHours, closedDatesSet);
+
+  const handleDateSelect = async (date: Date) => {
+    setSelectedDate(date);
+    setSelectedTime('');
+    setAvailableSlots([]);
+    setBookedSlots([]);
+    setSlotCounts({});
+    setShopDayIsOpen(true);
+    setSlotsLoading(true);
+    try {
+      const res = await fetchInquiryAvailabilityApi(isoFromDate(date));
+      setShopDayIsOpen(res.isOpen ?? true);
+      setAvailableSlots(res.availableSlots ?? []);
+      const filtered = (res.bookedSlots ?? []).filter(
+        s => !(isoFromDate(date) === inquiry.appointmentDate && s === inquiry.appointmentTime)
+      );
+      setBookedSlots(filtered);
+      setSlotCounts(res.slotCounts ?? {});
+      setSlotCapacity(res.slotCapacity ?? 3);
+    } catch {
+      /* fallback */
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedDate || !selectedTime) return;
+    const dateStr = isoFromDate(selectedDate);
+    setSaveBusy(true);
+    try {
+      await rescheduleInquiryApi(token, inquiry.id, dateStr, selectedTime);
+      showToast('Inquiry rescheduled successfully.', 'success');
+      onSuccess(dateStr, selectedTime);
+    } catch (e: any) {
+      showToast(e.message || 'Failed to reschedule.', 'error');
+    } finally {
+      setSaveBusy(false);
+    }
+  };
+
+  const openSlots = availableSlots.filter(s => !bookedSlots.includes(s));
+  const unchanged = selectedDate
+    ? (isoFromDate(selectedDate) === inquiry.appointmentDate && selectedTime === inquiry.appointmentTime)
+    : false;
+
+  return (
+    <div className="space-y-5 bg-[#121212] border border-gray-800 p-5 rounded mt-4">
+      {/* Target Date Carousel */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3">Target Date</p>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-[#151515] border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange -translate-x-3 transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <div
+            ref={scrollRef}
+            className="flex overflow-x-auto gap-2 pb-2 snap-x px-1 scrollbar-hide"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {availableDates.map((date, i) => {
+              const active = selectedDate?.toDateString() === date.toDateString();
+              const isCurrentInquiryDate = isoFromDate(date) === inquiry.appointmentDate;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleDateSelect(date)}
+                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded relative ${active
+                    ? 'border-brand-orange bg-brand-orange/10'
+                    : 'border-gray-800 hover:border-gray-600 bg-[#181818]'
+                    }`}
+                >
+                  <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">
+                    {date.toLocaleDateString('en-PH', { weekday: 'short' })}
+                  </div>
+                  <div className="text-xl font-bold text-white">{date.getDate()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase font-mono mt-1">
+                    {date.toLocaleDateString('en-PH', { month: 'short' })}
+                  </div>
+                  {isCurrentInquiryDate && (
+                    <div className="absolute bottom-1 left-0 right-0 flex justify-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-[#151515] border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange translate-x-3 transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {selectedDate && (
+          <p className="text-[10px] font-mono uppercase tracking-widest text-brand-orange mt-3">
+            Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        )}
+      </div>
+
+      {/* Target Time Slots */}
+      {selectedDate && (
+        <div className="pt-4 border-t border-gray-800/50">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3 flex items-center gap-2">
+            Target Time
+            {slotsLoading && (
+              <span className="text-gray-500 font-mono flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Polling...
+              </span>
+            )}
+          </p>
+          {!slotsLoading && !shopDayIsOpen && (
+            <p className="text-xs text-red-400 font-mono bg-red-500/10 border border-red-500/20 px-4 py-3 rounded">
+              [SYSTEM] Shop closed on selected date.
+            </p>
+          )}
+          {!slotsLoading && shopDayIsOpen && openSlots.length === 0 && (
+            <p className="text-xs text-gray-500 font-mono py-2">[SYSTEM] Zero capacity for selected date.</p>
+          )}
+          {!slotsLoading && shopDayIsOpen && openSlots.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {openSlots.map(slot => {
+                const isSelected = selectedTime === slot;
+                const spotsLeft = slotCapacity - (slotCounts[slot] ?? 0);
+                const almostFull = spotsLeft === 1;
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setSelectedTime(slot)}
+                    className={`flex flex-col items-center justify-center p-3 rounded border font-mono transition-all ${isSelected
+                      ? 'bg-brand-orange/20 border-brand-orange text-brand-orange shadow-[inset_0_0_10px_rgba(249,115,22,0.2)]'
+                      : 'bg-[#181818] border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white'
+                      }`}
+                  >
+                    <span className="text-sm font-bold">{slot}</span>
+                    {spotsLeft > 0 && (
+                      <span className={`text-[9px] uppercase tracking-wider mt-1.5 ${isSelected ? 'text-brand-orange' : almostFull ? 'text-yellow-500' : 'text-gray-600'
+                        }`}>
+                        {almostFull ? 'Critical' : `CAP: ${spotsLeft}`}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-3 pt-4 border-t border-gray-800">
+        <button
+          onClick={handleSave}
+          disabled={saveBusy || !selectedDate || !selectedTime || unchanged}
+          className="flex-1 flex items-center justify-center gap-2 bg-brand-orange text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          {saveBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+          Execute Reschedule
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saveBusy}
+          className="px-5 py-2.5 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-xs font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30"
+        >
+          Abort
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_STYLES: Record<string, string> = {
   'pending': 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20',
@@ -52,6 +293,7 @@ type Inquiry = {
   productToPurchase: string;
   status: string;
   internalNotes?: string | null;
+  serviceId?: number | null;
 };
 
 interface Props {
@@ -80,42 +322,73 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
 
+  const [services, setServices] = useState<any[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [isChangingService, setIsChangingService] = useState(false);
+
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
-  const [editDate, setEditDate] = useState('');
-  const [editTime, setEditTime] = useState('');
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-
-  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
-
-  const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
-  const daysInMo = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMo }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const prevMonth = () => {
-    if (calendarMonth === 0) { setCalendarYear(y => y - 1); setCalendarMonth(11); }
-    else setCalendarMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (calendarMonth === 11) { setCalendarYear(y => y + 1); setCalendarMonth(0); }
-    else setCalendarMonth(m => m + 1);
-  };
-
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editNotes, setEditNotes] = useState('');
   const [notesLoading, setNotesLoading] = useState(false);
 
+  // Checklists
+  const [checklistsState, setChecklistsState] = useState<{ before?: any; after?: any }>({});
+  const [activeChecklistPhase, setActiveChecklistPhase] = useState<'before' | 'after' | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+  const [sendPdfLoading, setSendPdfLoading] = useState<string | null>(null);
+
+  const isAfterSubmitted = Boolean(checklistsState.after?.submittedAt);
+  const isStatusLocked = inquiry?.status === 'completed' && isAfterSubmitted;
+
+  // Activity log pagination
+  const ACTIVITY_PAGE_SIZE = 3;
+  const [activityPage, setActivityPage] = useState(0);
+
+  const handlePreviewPdf = async (phase: string = 'after') => {
+    if (!token || !inquiry) return;
+    setPreviewLoading(phase);
+    try {
+      const blob = await generateInquiryChecklistPdfApi(token, inquiry.id.replace('inq-', ''), phase);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Failed to generate PDF: ' + err.message, 'error');
+    } finally {
+      setPreviewLoading(null);
+    }
+  };
+
+  const handleSendPdf = async (phase: string = 'after') => {
+    if (!token || !inquiry) return;
+    setSendPdfLoading(phase);
+    try {
+      const { sendInquiryChecklistPhaseApi } = await import('../../services/api');
+      await sendInquiryChecklistPhaseApi(token, inquiry.id.replace('inq-', ''), phase);
+      showToast(`Inspection report PDF sent to client.`, 'success');
+    } catch (err: any) {
+      showToast('Failed to send PDF: ' + err.message, 'error');
+    } finally {
+      setSendPdfLoading(null);
+    }
+  };
+
   const lastNoteUpdate = activityLogs.slice().reverse().find(log => log.eventType === 'inquiry_internal_notes_updated');
 
   const id = inquiryId.replace('inq-', '');
+
+  const loadChecklistsState = async () => {
+    if (!token || !id) return;
+    try {
+      const res = await fetchInquiryChecklistsApi(token, String(id));
+      setChecklistsState(res || {});
+    } catch (err) {
+      console.error('Failed to load checklists state', err);
+    }
+  };
 
   const fetchData = async () => {
     if (!token) return;
@@ -127,6 +400,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       ]);
       setInquiry((res as { inquiry: Inquiry }).inquiry);
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
+      loadChecklistsState();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -136,8 +410,21 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
   useEffect(() => {
     fetchData();
+    fetchServices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, id]);
+
+  const fetchServices = async () => {
+    try {
+      setServicesLoading(true);
+      const res = await fetchServicesApi(token);
+      setServices(res.services || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setServicesLoading(false);
+    }
+  };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!token || !inquiry) return;
@@ -173,47 +460,35 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     }
   };
 
-  const handleDateChange = async (newDate: string) => {
-    setEditDate(newDate);
-    setEditTime('');
-    if (!newDate) {
-      setAvailableSlots([]);
-      return;
-    }
-    setSlotsLoading(true);
-    try {
-      const res = await fetchInquiryAvailabilityApi(newDate);
-      const slots = res.availableSlots.filter((slot: string) => !res.bookedSlots.includes(slot));
-      setAvailableSlots(slots);
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to load slots.', 'error');
-    } finally {
-      setSlotsLoading(false);
-    }
+  const handleServiceChange = async (serviceId: string, serviceName: string) => {
+    if (!token || !inquiry) return;
+    const sId = serviceId ? parseInt(serviceId, 10) : null;
+    requestConfirmation(
+      {
+        title: 'Change Linked Service',
+        message: `Are you sure you want to link this inquiry to "${serviceName}"? This will change the active checklist template.`,
+        confirmLabel: 'Confirm',
+        tone: 'default',
+      },
+      async () => {
+        try {
+          setServicesLoading(true);
+          const res = await updateInquiryServiceIdApi(token, inquiry.id, sId);
+          setInquiry(res.inquiry);
+          showToast('Service linked successfully.', 'success');
+          const activitiesRes = await fetchInquiryActivityApi(token, String(id));
+          setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
+          setActivityPage(0);
+        } catch (err) {
+          showToast((err as Error).message, 'error');
+        } finally {
+          setServicesLoading(false);
+        }
+      }
+    );
   };
 
-  const handleReschedule = async () => {
-    if (!token || !inquiry) return;
-    if (!editDate || !editTime) {
-      showToast('Date and time are required.', 'error');
-      return;
-    }
-    setScheduleLoading(true);
-    try {
-      await rescheduleInquiryApi(token, inquiry.id, editDate, editTime);
-      setInquiry({ ...inquiry, appointmentDate: editDate, appointmentTime: editTime });
-      setIsEditingSchedule(false);
-      showToast('Inquiry rescheduled.', 'success');
-      // Refresh activities
-      const activitiesRes = await fetchInquiryActivityApi(token, String(id));
-      setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
-    } catch (err) {
-      showToast((err as Error).message, 'error');
-    } finally {
-      setScheduleLoading(false);
-    }
-  };
+
 
   const handleDelete = async () => {
     if (!token || !inquiry) return;
@@ -309,14 +584,15 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex shrink-0 items-center justify-end">
               <button
-                onClick={() => generateInquiryReportPDF(inquiry)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs border border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800 transition-colors shadow-lg shadow-black/20"
+                onClick={() => handlePreviewPdf('after')}
+                disabled={previewLoading === 'after'}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white transition-all shadow-lg shadow-brand-orange/10 disabled:opacity-50 cursor-pointer"
               >
-                <Printer className="w-4 h-4 text-brand-orange" />
-                Print Report
+                {previewLoading === 'after' ? <Clock className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                Preview Installation Checklist
               </button>
             </div>
           </div>
@@ -378,6 +654,594 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          {/* Linked Service Section */}
+          <div className="bg-[#121212] border border-gray-800/80 p-6 lg:p-8 rounded-lg shadow-xl relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-gray-800/80 pb-4 mb-4">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-brand-orange" /> Linked Service & Checklist Template
+              </h3>
+              {inquiry.serviceId ? (
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3 h-3" /> Template Active
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3" /> Unlinked Inquiry
+                </span>
+              )}
+            </div>
+
+            {inquiry.serviceId && !isChangingService ? (
+              /* Summary Card for Inquiry with Linked Service */
+              {
+                ...(() => {
+                  const linkedSvc = services.find(s => s.id === inquiry.serviceId);
+                  return (
+                    <div className="bg-[#151515] border border-brand-orange/40 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3.5 rounded-lg bg-brand-orange/20 border border-brand-orange/30 text-brand-orange shrink-0">
+                          <Wrench className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-mono uppercase tracking-widest text-brand-orange">Assigned Template</span>
+                          <h4 className="text-base font-bold text-white uppercase tracking-wider mt-0.5">
+                            {linkedSvc ? linkedSvc.title : `Service #${inquiry.serviceId}`}
+                          </h4>
+                          {linkedSvc?.startingPrice && (
+                            <p className="text-xs text-gray-400 font-mono mt-0.5">Starting from {linkedSvc.startingPrice}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsChangingService(true)}
+                        className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                      >
+                        Change Linked Service
+                      </button>
+                    </div>
+                  );
+                })()
+              }
+            ) : (
+              /* Full Service Selector Grid for Old Inquiries or when Changing Service */
+              <div>
+                <p className="text-xs text-gray-400 mb-4">
+                  {!inquiry.serviceId
+                    ? 'This inquiry has no linked service template yet. Select a service below to enable installation checklists:'
+                    : 'Select a service below to update the active checklist template:'}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {services.map(s => {
+                    const isSelected = inquiry.serviceId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={servicesLoading}
+                        onClick={() => {
+                          if (!isSelected) {
+                            handleServiceChange(String(s.id), s.title);
+                            setIsChangingService(false);
+                          }
+                        }}
+                        className={`relative flex flex-col justify-between p-4 rounded-lg border text-left transition-all duration-300 group cursor-pointer ${isSelected
+                          ? 'border-brand-orange bg-brand-orange/10 shadow-[0_0_20px_rgba(249,115,22,0.15)] ring-1 ring-brand-orange/40'
+                          : 'border-gray-800 bg-[#151515] hover:border-gray-600 hover:bg-[#1a1a1a]'
+                          }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className={`p-2.5 rounded-md ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800/80 text-gray-400 group-hover:text-white group-hover:bg-gray-700'} transition-colors`}>
+                              <Wrench className="w-4 h-4" />
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="w-4 h-4 text-brand-orange animate-in zoom-in duration-200" />
+                            )}
+                          </div>
+                          <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
+                            {s.title}
+                          </h4>
+                          {s.startingPrice && (
+                            <p className="text-[10px] font-mono text-gray-400 mb-2">From {s.startingPrice}</p>
+                          )}
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
+                          <span className={`font-mono uppercase ${isSelected ? 'text-brand-orange font-bold' : 'text-gray-500'}`}>
+                            {isSelected ? 'Active Service' : 'Select'}
+                          </span>
+                          {s.variations?.length ? (
+                            <span className="text-gray-600 font-mono">{s.variations.length} Options</span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {isChangingService && inquiry.serviceId && (
+                  <div className="mt-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingService(false)}
+                      className="text-xs text-gray-500 hover:text-gray-300 font-mono uppercase underline cursor-pointer"
+                    >
+                      Cancel Service Change
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {servicesLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-xs rounded-lg">
+                <div className="flex items-center gap-3 bg-[#121212] px-6 py-3.5 rounded-full border border-gray-800 shadow-2xl">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Updating Linked Service...</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Checklists Section */}
+          {(inquiry as any).serviceId && (
+            <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
+              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 pb-4 border-b border-gray-800/80">
+                <ClipboardList className="w-4 h-4 text-brand-orange" /> Installation Checklists
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* Before Checklist Card */}
+                <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">Before Installation</h4>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-6 flex-1">Pre-installation inspection checklist to verify vehicle condition before work begins.</p>
+
+                  {['pending', 'confirmed'].includes(inquiry.status) ? (
+                    <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
+                      Locked. Unlocks when status is In Progress.
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setActiveChecklistPhase('before')}
+                      className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                    >
+                      Open Before Checklist
+                    </button>
+                  )}
+                </div>
+
+                {/* After Checklist Card */}
+                <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">After Installation</h4>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-6 flex-1">Post-installation quality check and customer orientation to verify functionality.</p>
+
+                  {inquiry.status !== 'completed' ? (
+                    <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
+                      Locked. Unlocks when status is Completed.
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setActiveChecklistPhase('after')}
+                        className="flex-1 py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                      >
+                        Open After Checklist
+                      </button>
+                      <button
+                        onClick={() => handlePreviewPdf('after')}
+                        disabled={previewLoading === 'after'}
+                        title="Preview After PDF Report"
+                        className="flex items-center justify-center px-4 border border-gray-700 rounded hover:bg-gray-800 text-gray-400 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        {previewLoading === 'after' ? <Clock className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Right Column: Schedule & Status Actions Workflow */}
+        <div className="lg:col-span-4 space-y-8">
+          <div className="bg-[#121212] border border-gray-800/80 p-6 rounded-lg shadow-xl relative overflow-hidden">
+            <h3 className="text-[10px] font-bold text-brand-orange uppercase tracking-widest mb-6 flex items-center justify-between border-b border-gray-800/80 pb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" /> Appointment Schedule
+              </div>
+              {!isEditingSchedule && inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && (
+                <button
+                  onClick={() => setIsEditingSchedule(true)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
+                >
+                  <Calendar className="w-3 h-3" /> Reschedule
+                </button>
+              )}
+            </h3>
+
+            {!isEditingSchedule ? (
+              <div className="space-y-3">
+                <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
+                  <span className="text-xs text-gray-500 font-mono">Target Date</span>
+                  <span className="text-sm font-bold text-gray-200">
+                    {inquiry.appointmentDate
+                      ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                      : 'Not Scheduled'}
+                  </span>
+                </div>
+                <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
+                  <span className="text-xs text-gray-500 font-mono">Target Time</span>
+                  <span className="text-sm font-bold text-brand-orange">
+                    {inquiry.appointmentTime || 'Not Scheduled'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              token && (
+                <AdminInquiryReschedulePanel
+                  inquiry={inquiry}
+                  token={token}
+                  onSuccess={async (updatedDate, updatedTime) => {
+                    setInquiry(prev => prev ? { ...prev, appointmentDate: updatedDate, appointmentTime: updatedTime } : null);
+                    setIsEditingSchedule(false);
+                    if (token && inquiryId) {
+                      try {
+                        const res = await fetchInquiryActivityApi(token, inquiryId);
+                        setActivityLogs((res as InquiryActivityLog[]) || []);
+                      } catch { }
+                    }
+                  }}
+                  onCancel={() => setIsEditingSchedule(false)}
+                />
+              )
+            )}
+          </div>
+
+          {/* Status Workflow & Actions */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6 shadow-xl relative overflow-hidden space-y-6">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-brand-orange" /> Actions & Lifecycle Workflow
+              </p>
+              <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full ${STATUS_STYLES[inquiry.status] || 'bg-gray-800 text-gray-300'}`}>
+                {formatStatus(inquiry.status)}
+              </span>
+            </div>
+
+            {/* Visual Workflow Stepper Bar */}
+            <div className="bg-[#161616] border border-gray-800 p-4 rounded-lg">
+
+              <div className="relative">
+                {/* Connecting Line */}
+                <div className="absolute top-3 left-[12%] right-[12%] h-0.5 bg-gray-800 z-0" />
+
+                {/* Progress Fill */}
+                {(() => {
+                  const stages = ['pending', 'confirmed', 'in_progress', 'completed'];
+                  const currentIndex = stages.indexOf(inquiry.status);
+                  const widthPct = currentIndex > 0 ? (currentIndex / (stages.length - 1)) * 76 : 0;
+                  return (
+                    <div
+                      className="absolute top-3 left-[12%] h-0.5 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 z-0 transition-all duration-500"
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  );
+                })()}
+
+                {/* Grid Steps */}
+                <div className="grid grid-cols-4 relative z-10">
+                  {[
+                    { key: 'pending', label: 'Pending', activeColor: 'bg-yellow-500 text-black ring-yellow-500/30' },
+                    { key: 'confirmed', label: 'Confirmed', activeColor: 'bg-green-500 text-black ring-green-500/30' },
+                    { key: 'in_progress', label: 'In Progress', activeColor: 'bg-blue-500 text-white ring-blue-500/30' },
+                    { key: 'completed', label: 'Completed', activeColor: 'bg-purple-500 text-white ring-purple-500/30' },
+                  ].map((step, idx) => {
+                    const stages = ['pending', 'confirmed', 'in_progress', 'completed'];
+                    const currentIndex = stages.indexOf(inquiry.status);
+                    const isDone = currentIndex >= idx;
+                    const isCurrent = inquiry.status === step.key;
+
+                    return (
+                      <div key={step.key} className="flex flex-col items-center text-center">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300 ${isCurrent
+                          ? `${step.activeColor} ring-4 scale-110 shadow-lg font-black`
+                          : isDone
+                            ? 'bg-gray-700 text-green-400 border border-green-500/50'
+                            : 'bg-[#222] text-gray-600 border border-gray-800'
+                          }`}>
+                          {isDone ? '✓' : idx + 1}
+                        </div>
+                        <span className={`text-[9px] font-mono uppercase tracking-wider mt-2.5 whitespace-nowrap ${isCurrent ? 'text-white font-bold' : isDone ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                          {step.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Recommended Next Action / Primary Execution Card */}
+            <div className="space-y-3">
+              <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Recommended Next Step</p>
+
+              {inquiry.status === 'pending' && (
+                <div className="bg-green-500/5 border border-green-500/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-green-400">Confirm Inquiry Appointment</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">Lock in customer appointment and move inquiry to confirmed status.</p>
+                    </div>
+                    <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                  </div>
+                  <button
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Confirm Inquiry?',
+                        message: 'Confirm this inquiry appointment date & time.',
+                        confirmLabel: 'Confirm Inquiry',
+                      },
+                      () => handleStatusChange('confirmed')
+                    )}
+                    disabled={statusLoading}
+                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Confirm Inquiry Now
+                  </button>
+                </div>
+              )}
+
+              {inquiry.status === 'confirmed' && (
+                <div className="bg-blue-500/5 border border-blue-500/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400">Start Installation Service</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">Vehicle arrived at shop. Move status to In Progress to begin work.</p>
+                    </div>
+                    <Wrench className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                  </div>
+                  <button
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Start Service?',
+                        message: 'Set inquiry status to In Progress to begin work.',
+                        confirmLabel: 'Start Service',
+                      },
+                      () => handleStatusChange('in_progress')
+                    )}
+                    disabled={statusLoading}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
+                    Start Service (In Progress)
+                  </button>
+                </div>
+              )}
+
+              {inquiry.status === 'in_progress' && (
+                <div className="bg-purple-500/5 border border-purple-500/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300">Active Service Execution</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">Perform pre-install inspection or complete installation sequence.</p>
+                    </div>
+                    <BadgeCheck className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setActiveChecklistPhase('before')}
+                      className="py-3 px-4 bg-[#1a1a1a] border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> Before Inspection
+                    </button>
+                    <button
+                      onClick={() => requestConfirmation(
+                        {
+                          title: 'Complete Inquiry?',
+                          message: 'Mark inquiry as completed. You will be prompted for the After Installation Checklist.',
+                          confirmLabel: 'Mark Completed',
+                        },
+                        async () => {
+                          await handleStatusChange('completed');
+                          setActiveChecklistPhase('after');
+                        }
+                      )}
+                      disabled={statusLoading}
+                      className="py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {statusLoading ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
+                      Mark Completed
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inquiry.status === 'completed' && (
+                <div className="bg-purple-500/5 border border-purple-500/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300">Service Completed</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {isAfterSubmitted
+                          ? 'Installation finished & after checklist finalized. Status is locked. Send final PDF report to client.'
+                          : 'All installation tasks finished. Access post-installation checklist & send final report.'}
+                      </p>
+                    </div>
+                    <BadgeCheck className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setActiveChecklistPhase('after')}
+                      className="py-3 px-4 bg-[#1a1a1a] border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View After Checklist' : 'After Checklist'}
+                    </button>
+                    <button
+                      onClick={() => handleSendPdf('after')}
+                      disabled={!!sendPdfLoading}
+                      className="py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {sendPdfLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      Send Report to Client
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inquiry.status === 'cancelled' && (
+                <div className="bg-red-500/5 border border-red-500/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-400">Inquiry Cancelled</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">This inquiry sequence was terminated.</p>
+                    </div>
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                  </div>
+                  <button
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Re-open Inquiry?',
+                        message: 'Re-open this inquiry back to pending status.',
+                        confirmLabel: 'Re-open',
+                      },
+                      () => handleStatusChange('pending')
+                    )}
+                    disabled={statusLoading}
+                    className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-yellow-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Re-open Inquiry
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Utility Actions */}
+            <div className="pt-4 border-t border-gray-800 space-y-3 relative">
+              <p className="text-[9px] uppercase font-mono tracking-widest text-gray-500">Secondary Controls</p>
+
+              {/* Status Dropdown */}
+              <div className="relative">
+                {isStatusLocked ? (
+                  <div className="w-full flex items-center justify-between bg-purple-950/20 border border-purple-800/40 rounded p-3 text-xs font-bold uppercase tracking-widest text-purple-300">
+                    <span className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-purple-400" />
+                      Status Locked (Completed & Finalized)
+                    </span>
+                    <BadgeCheck className="w-4 h-4 text-purple-400" />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                    disabled={statusLoading}
+                    className="w-full flex items-center justify-between bg-[#161616] border border-gray-700 hover:border-brand-orange/50 rounded p-3 text-xs font-bold uppercase tracking-widest text-white transition-all disabled:opacity-50 group cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-brand-orange" />
+                      Change Status Manually ({formatStatus(inquiry.status)})
+                    </span>
+                    {statusLoading ? (
+                      <Clock className="w-4 h-4 text-brand-orange animate-spin" />
+                    ) : (
+                      <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-300 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                    )}
+                  </button>
+                )}
+
+                {isStatusDropdownOpen && (
+                  <div className="absolute bottom-full mb-2 inset-x-0 bg-[#1a1a1a] border border-gray-700 rounded-md shadow-2xl z-50 overflow-hidden">
+                    {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => {
+                      if (s === inquiry.status) return null;
+
+                      let hoverClass = 'hover:bg-gray-800';
+                      let textClass = 'text-gray-300';
+
+                      if (s === 'confirmed') { hoverClass = 'hover:bg-green-500/10 hover:text-green-400'; }
+                      else if (s === 'in_progress') { hoverClass = 'hover:bg-blue-500/10 hover:text-blue-400'; }
+                      else if (s === 'completed') { hoverClass = 'hover:bg-purple-500/10 hover:text-purple-400'; }
+                      else if (s === 'cancelled') { hoverClass = 'hover:bg-red-500/10 hover:text-red-400'; }
+                      else if (s === 'pending') { hoverClass = 'hover:bg-yellow-500/10 hover:text-yellow-400'; }
+
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => {
+                            setIsStatusDropdownOpen(false);
+                            requestConfirmation(
+                              {
+                                title: 'Update Status?',
+                                message: `Change inquiry status to ${formatStatus(s as any)}?`,
+                                confirmLabel: 'Confirm',
+                                tone: s === 'cancelled' ? 'danger' : 'default',
+                              },
+                              () => handleStatusChange(s)
+                            );
+                          }}
+                          className={`w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest transition-colors border-b border-gray-800 last:border-0 flex items-center justify-between cursor-pointer ${textClass} ${hoverClass}`}
+                        >
+                          {formatStatus(s as any)}
+                          <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Cancel Button (if active) */}
+              {inquiry.status !== 'cancelled' && inquiry.status !== 'completed' && (
+                <button
+                  onClick={() => requestConfirmation(
+                    {
+                      title: 'Cancel Inquiry?',
+                      message: 'Irreversible status change to cancelled.',
+                      confirmLabel: 'Cancel Inquiry',
+                      tone: 'danger',
+                    },
+                    () => handleStatusChange('cancelled')
+                  )}
+                  disabled={statusLoading}
+                  className="w-full flex justify-between items-center px-4 py-3 bg-[#161616] border border-red-500/30 text-red-400 hover:bg-red-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-all disabled:opacity-30 group cursor-pointer"
+                >
+                  <span>Cancel Inquiry</span>
+                  <XCircle className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+                </button>
+              )}
+
+              {/* Delete Inquiry Button */}
+              <button
+                onClick={() => requestConfirmation(
+                  {
+                    title: 'Delete Inquiry?',
+                    message: 'This permanently deletes the inquiry record and cannot be undone.',
+                    confirmLabel: 'Delete Inquiry',
+                    tone: 'danger',
+                  },
+                  handleDelete
+                )}
+                disabled={isDeleting}
+                className="w-full flex justify-between items-center px-4 py-3 bg-transparent border border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500 text-[10px] font-bold uppercase tracking-widest rounded transition-all disabled:opacity-30 group cursor-pointer"
+              >
+                <span>{isDeleting ? 'Deleting...' : 'Delete Inquiry Record'}</span>
+                {isDeleting ? <Clock className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-70 group-hover:opacity-100" />}
+              </button>
             </div>
           </div>
 
@@ -444,213 +1308,6 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right Column: Schedule & Timeline */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="bg-black/40 border border-brand-orange/20 p-8 rounded-lg shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-
-            <h3 className="text-[10px] font-bold text-brand-orange uppercase tracking-widest mb-6 flex items-center justify-between border-b border-gray-800/80 pb-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" /> Schedule
-              </div>
-            </h3>
-
-            {!isEditingSchedule ? (
-              <div className="bg-[#121212] rounded-md border border-gray-800/80 p-6 text-center shadow-inner flex flex-col items-center">
-                <p className="text-3xl font-display font-black text-white tracking-tight mb-2">
-                  {inquiry.appointmentDate
-                    ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                    : 'No Date'}
-                </p>
-                <p className="text-brand-orange font-bold uppercase tracking-widest text-sm mb-6">
-                  {inquiry.appointmentTime
-                    ? inquiry.appointmentTime
-                    : 'No Time'}
-                </p>
-                {inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && (
-                  <button
-                    onClick={() => {
-                      handleDateChange(inquiry.appointmentDate);
-                      setEditTime(inquiry.appointmentTime);
-                      setIsEditingSchedule(true);
-                      if (inquiry.appointmentDate) {
-                        const d = new Date(inquiry.appointmentDate + 'T00:00:00');
-                        setCalendarYear(d.getFullYear());
-                        setCalendarMonth(d.getMonth());
-                      }
-                    }}
-                    className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs text-brand-orange border border-brand-orange/30 hover:bg-brand-orange hover:text-white transition-colors"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    Reschedule
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-2">Date</label>
-                  <div className="bg-[#121212] border border-gray-700 rounded-sm overflow-hidden">
-                    <div className="flex items-center justify-between p-3 border-b border-gray-700">
-                      <button onClick={prevMonth} className="p-1 hover:text-brand-orange text-gray-400 transition-colors"><ChevronLeft className="w-4 h-4" /></button>
-                      <span className="text-xs font-bold uppercase tracking-widest text-white">
-                        {new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long' })} {calendarYear}
-                      </span>
-                      <button onClick={nextMonth} className="p-1 hover:text-brand-orange text-gray-400 transition-colors"><ChevronRight className="w-4 h-4" /></button>
-                    </div>
-                    <div className="grid grid-cols-7 border-b border-gray-700 bg-black/20">
-                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                        <div key={d} className="py-2 text-center text-[10px] font-bold text-gray-500 uppercase">{d}</div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 p-2 gap-1">
-                      {cells.map((day, i) => {
-                        if (!day) return <div key={`empty-${i}`} />;
-                        const dateIso = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const isSelected = dateIso === editDate;
-                        const isPast = new Date(dateIso + 'T00:00:00') < new Date(new Date().setHours(0, 0, 0, 0));
-                        return (
-                          <button
-                            key={i}
-                            disabled={isPast}
-                            onClick={() => handleDateChange(dateIso)}
-                            className={`h-8 w-full rounded flex items-center justify-center text-xs font-bold transition-colors ${isSelected ? 'bg-brand-orange text-white shadow-md shadow-brand-orange/20' :
-                                isPast ? 'text-gray-700 cursor-not-allowed opacity-50' :
-                                  'text-gray-300 hover:bg-gray-800'
-                              }`}
-                          >
-                            {day}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-mono mb-2 flex justify-between">
-                    <span>Time</span>
-                    {slotsLoading && <span className="text-brand-orange animate-pulse">Loading slots...</span>}
-                  </label>
-                  <select
-                    value={editTime}
-                    onChange={e => setEditTime(e.target.value)}
-                    disabled={!editDate || slotsLoading}
-                    className="w-full bg-[#121212] border border-gray-700 rounded-sm px-4 py-3 text-sm text-white focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all disabled:opacity-50"
-                  >
-                    <option value="" disabled>Select a time</option>
-                    {availableSlots.length === 0 && !slotsLoading && editDate && (
-                      <option value="" disabled>No slots available</option>
-                    )}
-                    {availableSlots.map(slot => (
-                      <option key={slot} value={slot}>{slot}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setIsEditingSchedule(false)}
-                    className="flex-1 px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-widest border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleReschedule}
-                    disabled={scheduleLoading || !editDate || !editTime}
-                    className="flex-1 px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-widest bg-brand-orange text-white hover:bg-orange-600 transition-colors shadow-lg shadow-brand-orange/20 disabled:opacity-50"
-                  >
-                    {scheduleLoading ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          {/* Actions */}
-          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange/80 mb-6 pb-4 border-b border-gray-800 flex items-center gap-2">
-              <ClipboardList className="w-3.5 h-3.5 text-brand-orange" /> Change Status
-            </p>
-
-            <div className="space-y-3">
-              {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((s) => {
-                const isCurrent = s === inquiry.status;
-                const isLocked = inquiry.status === 'completed' || inquiry.status === 'cancelled';
-
-                if (isLocked && !isCurrent) return null;
-
-                let colorClass = 'border-gray-800 text-gray-300';
-                let hoverClass = 'hover:border-gray-500 hover:text-white';
-                
-                if (isCurrent) {
-                  if (s === 'pending') colorClass = 'border-yellow-500 bg-yellow-500/10 text-yellow-500';
-                  else if (s === 'confirmed') colorClass = 'border-green-500 bg-green-500/10 text-green-500';
-                  else if (s === 'in_progress') colorClass = 'border-blue-500 bg-blue-500/10 text-blue-500';
-                  else if (s === 'completed') colorClass = 'border-purple-500 bg-purple-500/10 text-purple-500';
-                  else if (s === 'cancelled') colorClass = 'border-red-500 bg-red-500/10 text-red-500';
-                  hoverClass = '';
-                } else if (!isLocked) {
-                  if (s === 'confirmed') colorClass = 'border-green-500/30 text-green-400 hover:bg-green-500/10 hover:border-green-500/50';
-                  else if (s === 'in_progress') colorClass = 'border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50';
-                  else if (s === 'completed') colorClass = 'border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50';
-                  else if (s === 'cancelled') colorClass = 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50';
-                  else if (s === 'pending') colorClass = 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/50';
-                } else {
-                  colorClass = 'border-gray-800/50 text-gray-600 opacity-50 cursor-not-allowed';
-                  hoverClass = '';
-                }
-
-                return (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      if (isCurrent || isLocked) return;
-                      requestConfirmation(
-                        {
-                          title: 'Update Status?',
-                          message: `Change inquiry status to ${formatStatus(s as any)}?`,
-                          confirmLabel: 'Confirm',
-                          tone: s === 'cancelled' ? 'danger' : 'default',
-                        },
-                        () => handleStatusChange(s)
-                      )
-                    }}
-                    disabled={statusLoading || isCurrent || isLocked}
-                    className={`w-full flex justify-between items-center px-4 py-3 border ${isCurrent ? colorClass : `bg-[#151515] ${colorClass}`} ${hoverClass} text-[10px] font-bold uppercase tracking-widest rounded transition-all group`}
-                  >
-                    <span className="flex items-center gap-2">
-                      {isCurrent ? <CheckCircle2 className="w-4 h-4" /> : <span className="w-4 h-4" />}
-                      {formatStatus(s as any)}
-                    </span>
-                    {!isCurrent && !isLocked && (
-                      <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
-                  </button>
-                )
-              })}
-
-              <div className="pt-6 mt-6 border-t border-gray-800/80">
-                <button
-                  onClick={() => requestConfirmation(
-                    {
-                      title: 'Delete Inquiry?',
-                      message: 'This permanently deletes the inquiry and cannot be undone.',
-                      confirmLabel: 'Delete Inquiry',
-                      tone: 'danger',
-                    },
-                    handleDelete
-                  )}
-                  disabled={isDeleting}
-                  className="w-full flex justify-between items-center px-4 py-3 bg-transparent border border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500 text-[10px] font-bold uppercase tracking-widest rounded transition-all disabled:opacity-30 group"
-                >
-                  <span>{isDeleting ? 'Deleting...' : 'Delete Inquiry'}</span>
-                  {isDeleting ? <Clock className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-70 group-hover:opacity-100" />}
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Activity Timeline */}
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-8 shadow-xl">
@@ -659,26 +1316,54 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
             </p>
             {activityLogs.length === 0 ? (
               <p className="text-gray-600 text-xs font-mono text-center py-4">No activity recorded.</p>
-            ) : (
-              <div className="space-y-5 font-mono">
-                {activityLogs.slice().reverse().map((entry) => (
-                  <div key={entry.id} className="border-b border-gray-800/40 pb-4 last:border-0 last:pb-0">
-                    <p className="text-[10px] text-brand-orange mb-1.5">
-                      {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 19)}
-                    </p>
-                    <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
-                      {entry.action}
-                      {entry.actorName && (
-                        <span className="text-gray-500 font-normal lowercase tracking-normal ml-1"> by {entry.actorName}</span>
-                      )}
-                    </p>
-                    {entry.detail && (
-                      <p className="text-[11px] text-gray-500 mt-2 pl-3 border-l-2 border-gray-700 leading-relaxed">{entry.detail}</p>
-                    )}
+            ) : (() => {
+              const reversed = activityLogs.slice().reverse();
+              const totalPages = Math.ceil(reversed.length / ACTIVITY_PAGE_SIZE);
+              const pageEntries = reversed.slice(activityPage * ACTIVITY_PAGE_SIZE, (activityPage + 1) * ACTIVITY_PAGE_SIZE);
+              return (
+                <>
+                  <div className="space-y-5 font-mono">
+                    {pageEntries.map((entry) => (
+                      <div key={entry.id} className="border-b border-gray-800/40 pb-4 last:border-0 last:pb-0">
+                        <p className="text-[10px] text-brand-orange mb-1.5">
+                          {new Date(entry.createdAt).toISOString().replace('T', ' ').substring(0, 19)}
+                        </p>
+                        <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
+                          {entry.action}
+                          {entry.actorName && (
+                            <span className="text-gray-500 font-normal lowercase tracking-normal ml-1"> by {entry.actorName}</span>
+                          )}
+                        </p>
+                        {entry.detail && (
+                          <p className="text-[11px] text-gray-500 mt-2 pl-3 border-l-2 border-gray-700 leading-relaxed">{entry.detail}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800">
+                      <button
+                        onClick={() => setActivityPage(p => Math.max(0, p - 1))}
+                        disabled={activityPage === 0}
+                        className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
+                      >
+                        <ChevronLeft className="w-3 h-3" /> Prev
+                      </button>
+                      <span className="text-[10px] font-mono text-gray-500">
+                        Page {activityPage + 1} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setActivityPage(p => Math.min(totalPages - 1, p + 1))}
+                        disabled={activityPage >= totalPages - 1}
+                        className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
+                      >
+                        Next <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
         </div>
@@ -714,6 +1399,18 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {activeChecklistPhase && token && (
+        <InquiryChecklistModal
+          inquiryId={inquiry.id}
+          phase={activeChecklistPhase}
+          token={token}
+          onClose={() => setActiveChecklistPhase(null)}
+          onSaved={() => {
+            fetchData();
+          }}
+        />
       )}
     </div>
   );

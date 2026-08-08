@@ -845,37 +845,37 @@ export interface BookingReview {
 // ── Notification Preferences ───────────────────────────────────────────────────
 
 export interface NotificationPreferences {
-  emailNewBooking:    boolean;
-  emailNewOrder:      boolean;
-  emailOrderCreated:  boolean;
-  emailOrderStatus:   boolean;
+  emailNewBooking: boolean;
+  emailNewOrder: boolean;
+  emailOrderCreated: boolean;
+  emailOrderStatus: boolean;
   emailOrderTracking: boolean;
   emailStatusChanged: boolean;
-  emailBuildUpdate:   boolean;
-  emailPartsUpdate:   boolean;
-  inappNewOrder:      boolean;
-  inappOrderCreated:  boolean;
-  inappOrderStatus:   boolean;
+  emailBuildUpdate: boolean;
+  emailPartsUpdate: boolean;
+  inappNewOrder: boolean;
+  inappOrderCreated: boolean;
+  inappOrderStatus: boolean;
   inappOrderTracking: boolean;
   inappStatusChanged: boolean;
-  inappBuildUpdate:   boolean;
-  inappPartsUpdate:   boolean;
-  inappNewBooking:    boolean;
-  inappAssignment:    boolean;
+  inappBuildUpdate: boolean;
+  inappPartsUpdate: boolean;
+  inappNewBooking: boolean;
+  inappAssignment: boolean;
   inappSecurityAlert: boolean;
   inappSlotAvailable: boolean;
-  smsNewBooking:      boolean;
-  smsNewInquiry:      boolean;
-  smsAssignment:      boolean;
-  smsStatusChanged:   boolean;
+  smsNewBooking: boolean;
+  smsNewInquiry: boolean;
+  smsAssignment: boolean;
+  smsStatusChanged: boolean;
 }
 
 // ── Customer Loyalty Stats ─────────────────────────────────────────────────────
 
 export interface CustomerStats {
-  totalVisits:     number;
+  totalVisits: number;
   completedVisits: number;
-  memberSince:     string | null;
+  memberSince: string | null;
 }
 
 export interface SemaphoreAccountDetails {
@@ -960,6 +960,47 @@ export interface NotificationQueueResponse {
 // ── Extended Admin Stats ───────────────────────────────────────────────────────
 
 export interface TopService {
-  name:  string;
+  name: string;
   count: number;
 }
+
+export type ChecklistPhase = 'before' | 'after' | 'acknowledgement';
+
+export interface ServiceChecklistItem {
+  id: number;
+  serviceId: number;
+  phase: ChecklistPhase;
+  section: string | null;
+  label: string;
+  description: string | null;
+  hasNotes: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InquiryChecklistResponse {
+  id: number;
+  checklistId: number;
+  itemId: number;
+  isChecked: boolean;
+  notes: string | null;
+  item: ServiceChecklistItem;
+}
+
+export interface InquiryChecklist {
+  id: number;
+  inquiryId: string;
+  serviceId: number;
+  phase: ChecklistPhase;
+  submittedBy: number | null;
+  generalNotes: string | null;
+  customerAcknowledged: boolean;
+  installerName: string | null;
+  serviceFieldValue: string | null;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  responses: InquiryChecklistResponse[];
+}
+

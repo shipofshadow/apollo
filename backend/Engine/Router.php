@@ -100,6 +100,14 @@ class Router
             $r->addRoute('POST',   '/api/services',                   'handleServiceCreate');
             $r->addRoute('PUT',    '/api/services/{id:\d+}',          'handleServiceUpdate');
             $r->addRoute('DELETE', '/api/services/{id:\d+}',          'handleServiceDelete');
+            
+            // ── Service Checklist Templates ───────────────────────────────
+            $r->addRoute('GET',    '/api/services/{id:\d+}/checklist-items',        'handleServiceChecklistItemsGet');
+            $r->addRoute('POST',   '/api/services/{id:\d+}/checklist-items',        'handleServiceChecklistItemsCreate');
+            $r->addRoute('POST',   '/api/services/{id:\d+}/checklist-items/reorder','handleServiceChecklistItemsReorder');
+            $r->addRoute('PUT',    '/api/services/{sid:\d+}/checklist-items/{id:\d+}', 'handleServiceChecklistItemsUpdate');
+            $r->addRoute('DELETE', '/api/services/{sid:\d+}/checklist-items/{id:\d+}', 'handleServiceChecklistItemsDelete');
+
             // Service variations (admin write, public read via parent service)
             $r->addRoute('GET',    '/api/services/{id:\d+}/variations',              'handleServiceVariationList');
             $r->addRoute('POST',   '/api/services/{id:\d+}/variations',              'handleServiceVariationCreate');
@@ -137,7 +145,18 @@ class Router
             $r->addRoute('GET',   '/api/inquiries/{id}/activity',    'handleInquiryActivity');
             $r->addRoute('PATCH', '/api/inquiries/{id}',             'handleInquiryUpdate');
             $r->addRoute('PATCH', '/api/inquiries/{id}/notes',       'handleInquiryInternalNotes');
+            $r->addRoute('PATCH', '/api/inquiries/{id}/service',     'handleInquiryUpdateService');
+            $r->addRoute('PUT',   '/api/admin/inquiries/{id}/service', 'handleInquiryUpdateService');
             $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
+            
+            // ── Inquiry Checklists ─────────────────────────────────────────
+            $r->addRoute('GET',    '/api/inquiries/{id}/checklists',                 'handleInquiryChecklistsGet');
+            $r->addRoute('GET',    '/api/inquiries/{id}/checklists/{phase}',         'handleInquiryChecklistsGetPhase');
+            $r->addRoute('PUT',    '/api/inquiries/{id}/checklists/{phase}',         'handleInquiryChecklistsUpdatePhase');
+            $r->addRoute('POST',   '/api/inquiries/{id}/checklists/{phase}/submit',  'handleInquiryChecklistsSubmitPhase');
+            $r->addRoute('POST',   '/api/inquiries/{id}/checklists/{phase}/send',    'handleInquiryChecklistsSendPhase');
+            $r->addRoute('GET',    '/api/inquiries/{id}/checklists/{phase}/pdf',     'handleInquiryChecklistsGetPdf');
+
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
             $r->addRoute('GET',   '/api/bookings/availability',     'handleBookingAvailability');
@@ -1475,6 +1494,36 @@ class Router
             $userId,
             $userRole
         );
+        echo json_encode(['inquiry' => $inquiry]);
+    }
+
+    private function handleInquiryUpdateService(array $vars = []): void
+    {
+        $this->requirePermission('bookings:manage');
+        $id = trim((string) ($vars['id'] ?? ''));
+        if ($id === '') {
+            throw new RuntimeException('Inquiry ID is required.', 400);
+        }
+        $data = $this->jsonBody();
+        $serviceId = isset($data['serviceId']) && $data['serviceId'] !== null ? (int) $data['serviceId'] : null;
+
+        $userId = null;
+        $token = Auth::tokenFromHeader();
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $userId = (int) ($payload['sub'] ?? 0);
+            } catch (RuntimeException) {
+                // Ignore
+            }
+        }
+
+        $inquiry = (new InquiryService())->updateServiceId(
+            $id,
+            $serviceId,
+            $userId
+        );
+
         echo json_encode(['inquiry' => $inquiry]);
     }
 
@@ -4739,5 +4788,159 @@ class Router
         $entry = (new WaitlistService())->getClaimByToken($token);
         echo json_encode(['entry' => $entry]);
     }
-}
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Service Checklist Templates
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function handleServiceChecklistItemsGet(array $vars): void
+    {
+        $this->requirePermission('services:manage');
+        $serviceId = (int) ($vars['id'] ?? 0);
+        $items = (new ServiceChecklistService())->getItemsByService($serviceId);
+        echo json_encode(['items' => $items]);
+    }
+
+    private function handleServiceChecklistItemsCreate(array $vars): void
+    {
+        $this->requirePermission('services:manage');
+        $serviceId = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $item = (new ServiceChecklistService())->createItem($serviceId, $data);
+        http_response_code(201);
+        echo json_encode(['item' => $item]);
+    }
+
+    private function handleServiceChecklistItemsUpdate(array $vars): void
+    {
+        $this->requirePermission('services:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $item = (new ServiceChecklistService())->updateItem($id, $data);
+        echo json_encode(['item' => $item]);
+    }
+
+    private function handleServiceChecklistItemsDelete(array $vars): void
+    {
+        $this->requirePermission('services:manage');
+        $id = (int) ($vars['id'] ?? 0);
+        (new ServiceChecklistService())->deleteItem($id);
+        echo json_encode(['message' => 'Item deleted.']);
+    }
+
+    private function handleServiceChecklistItemsReorder(array $vars): void
+    {
+        $this->requirePermission('services:manage');
+        $serviceId = (int) ($vars['id'] ?? 0);
+        $data = $this->jsonBody();
+        $orderedIds = $data['orderedIds'] ?? [];
+        if (is_array($orderedIds)) {
+            (new ServiceChecklistService())->reorderItems($serviceId, $orderedIds);
+        }
+        echo json_encode(['message' => 'Items reordered.']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Inquiry Checklists
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function handleInquiryChecklistsGet(array $vars): void
+    {
+        $this->requirePermission('bookings:manage');
+        $inquiryId = $vars['id'] ?? '';
+        $checklists = (new InquiryChecklistService())->getForInquiry($inquiryId);
+        echo json_encode(['checklists' => $checklists]);
+    }
+
+    private function handleInquiryChecklistsGetPhase(array $vars): void
+    {
+        $inquiryId = $vars['id'] ?? '';
+        $phase = $vars['phase'] ?? '';
+        
+        $payload = $this->requireAuth();
+        $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'bookings:manage');
+        
+        if (!$isAdmin) {
+             // Client accessing their own
+             $db = Database::getInstance();
+             $stmt = $db->prepare('SELECT user_id FROM customer_inquiries WHERE id = :id');
+             $stmt->execute([':id' => $inquiryId]);
+             $ownerId = $stmt->fetchColumn();
+             if ((int)$ownerId !== (int)($payload['sub'] ?? 0)) {
+                 throw new RuntimeException("Unauthorized", 403);
+             }
+        }
+        
+        $checklist = (new InquiryChecklistService())->getOrInit($inquiryId, $phase);
+        echo json_encode(['checklist' => $checklist]);
+    }
+
+    private function handleInquiryChecklistsGetPdf(array $vars): void
+    {
+        $inquiryId = $vars['id'] ?? '';
+        $phase = $vars['phase'] ?? '';
+        
+        $payload = $this->requireAuth();
+        $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'bookings:manage');
+        
+        if (!$isAdmin) {
+             // Client accessing their own
+             $db = Database::getInstance();
+             $stmt = $db->prepare('SELECT user_id FROM customer_inquiries WHERE id = :id');
+             $stmt->execute([':id' => $inquiryId]);
+             $ownerId = $stmt->fetchColumn();
+             if ((int)$ownerId !== (int)($payload['sub'] ?? 0)) {
+                 throw new RuntimeException("Unauthorized", 403);
+             }
+        }
+        
+        $pdfContent = (new InquiryChecklistService())->getChecklistPdfPublic($inquiryId, $phase);
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . ucfirst($phase) . ' Checklist.pdf"');
+        echo $pdfContent;
+    }
+
+    private function handleInquiryChecklistsUpdatePhase(array $vars): void
+    {
+        $this->requirePermission('bookings:manage');
+        $phase = $vars['phase'] ?? '';
+        $data = $this->jsonBody();
+        $inquiryId = $vars['id'] ?? '';
+        
+        $checklistId = (int) ($data['checklistId'] ?? 0);
+        $responses = $data['responses'] ?? [];
+        $generalNotes = $data['generalNotes'] ?? null;
+        $installerName = $data['installerName'] ?? null;
+        $customerAcknowledged = (bool)($data['customerAcknowledged'] ?? false);
+        $serviceFieldValue = isset($data['serviceFieldValue']) ? (string)$data['serviceFieldValue'] : null;
+        
+        $checklist = (new InquiryChecklistService())->saveResponses($checklistId, $responses, $generalNotes, $installerName, $customerAcknowledged, $serviceFieldValue);
+        echo json_encode(['checklist' => $checklist]);
+    }
+
+    private function handleInquiryChecklistsSubmitPhase(array $vars): void
+    {
+        $payload = $this->requirePermission('bookings:manage');
+        $data = $this->jsonBody();
+        $userId = (int) ($payload['sub'] ?? 0);
+        
+        $checklistId = (int) ($data['checklistId'] ?? 0);
+        $installerName = $data['installerName'] ?? null;
+        $customerAcknowledged = (bool)($data['customerAcknowledged'] ?? false);
+        $serviceFieldValue = isset($data['serviceFieldValue']) ? (string)$data['serviceFieldValue'] : null;
+        
+        $checklist = (new InquiryChecklistService())->submit($checklistId, $userId, $installerName, $customerAcknowledged, $serviceFieldValue);
+        echo json_encode(['checklist' => $checklist]);
+    }
+
+    private function handleInquiryChecklistsSendPhase(array $vars): void
+    {
+        $payload = $this->requirePermission('bookings:manage');
+        $inquiryId = $vars['id'] ?? '';
+        $phase = $vars['phase'] ?? '';
+        $userId = (int) ($payload['sub'] ?? 0);
+        
+        (new InquiryChecklistService())->sendToClient($inquiryId, $phase, $userId);
+        echo json_encode(['message' => 'Checklist sent to client.']);
+    }
+}

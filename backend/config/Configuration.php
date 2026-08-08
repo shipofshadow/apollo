@@ -46,6 +46,8 @@ define('CORS_ORIGINS',
 // Defaults to the first CORS origin when not explicitly set.
 define('APP_URL', rtrim($_ENV['APP_URL'] ?? (CORS_ORIGINS[0] ?? 'http://localhost:5173'), '/'));
 
+define('APP_ENV', strtolower(trim($_ENV['APP_ENV'] ?? 'production')));
+
 // ---------------------------------------------------------------------------
 // Database constants
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import type { AppDispatch, RootState } from '../../store';
 import type { Service, ServiceVariation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import VariationsManager from '../../components/VariationsManager';
+import ServiceChecklistItemsManager from './ServiceChecklistItemsManager';
 import { formatPrice } from '../../utils/formatPrice';
 
 const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
@@ -293,6 +294,19 @@ export default function ServicesPanel() {
               parentType="service"
               token={token}
               onSaved={v => setVariations(v as ServiceVariation[])}
+            />
+          </div>
+        )}
+
+        {editId !== null && token && (
+          <div className="mt-6 bg-brand-dark border border-gray-800 rounded-sm p-6">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block mb-3">
+              Service Checklist Template
+              <span className="ml-2 font-normal text-gray-600">(items for the before/after checklist PDF)</span>
+            </label>
+            <ServiceChecklistItemsManager
+              serviceId={editId}
+              token={token}
             />
           </div>
         )}

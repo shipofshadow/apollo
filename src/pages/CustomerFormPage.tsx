@@ -5,7 +5,7 @@ import PageSEO from '../components/PageSEO';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../config';
-import { fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, joinWaitlistApi } from '../services/api';
+import { fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, joinWaitlistApi, fetchServicesApi } from '../services/api';
 import type { ShopDayHours } from '../types';
 import CustomCalendar from '../components/CustomCalendar';
 import TurnstileWidget from '../components/TurnstileWidget';
@@ -130,6 +130,8 @@ export default function CustomerFormPage() {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileKey,   setTurnstileKey]   = useState(0);
   const [searchParams] = useSearchParams();
+  const [services, setServices] = useState<any[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
 
   const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
 
@@ -137,6 +139,23 @@ export default function CustomerFormPage() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  useEffect(() => {
+    fetchServicesApi()
+      .then(res => {
+        const svcs = res.services || [];
+        setServices(svcs);
+        const prefilledSvc = searchParams.get('serviceId') || searchParams.get('service');
+        if (prefilledSvc) {
+          const matched = svcs.find((s: any) => String(s.id) === prefilledSvc || s.slug === prefilledSvc || s.title.toLowerCase().includes(prefilledSvc.toLowerCase()));
+          if (matched) {
+            setSelectedServiceId(String(matched.id));
+            setFormData(prev => ({ ...prev, productToPurchase: prev.productToPurchase || matched.title }));
+          }
+        }
+      })
+      .catch(() => {});
+  }, [searchParams]);
 
   useEffect(() => {
     const prefilledDate = searchParams.get('date')?.trim() ?? '';
@@ -260,7 +279,11 @@ export default function CustomerFormPage() {
       const response = await fetch(`${BACKEND_URL}/api/inquiries`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ ...formData, 'cf-turnstile-response': turnstileToken }),
+        body: JSON.stringify({
+          ...formData,
+          serviceId: selectedServiceId ? Number(selectedServiceId) : undefined,
+          'cf-turnstile-response': turnstileToken
+        }),
       });
 
       const result = await response.json().catch(() => null);
@@ -450,6 +473,59 @@ export default function CustomerFormPage() {
                   <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaCalendarAlt /></span>
                   Scheduling & Request
                 </h3>
+
+                {services.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                        <FaWrench className="text-brand-orange"/> Service Category Template
+                      </label>
+                      <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">Tap to auto-select template</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {services.map((s: any) => {
+                        const isSelected = selectedServiceId === String(s.id);
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              const newId = isSelected ? '' : String(s.id);
+                              setSelectedServiceId(newId);
+                              if (!isSelected) {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  productToPurchase: s.title
+                                }));
+                              }
+                            }}
+                            className={`p-4 rounded-lg border text-left transition-all duration-300 flex flex-col justify-between group cursor-pointer ${
+                              isSelected
+                                ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/40 shadow-[0_0_20px_rgba(249,115,22,0.15)]'
+                                : 'border-gray-800 bg-[#121212] hover:border-gray-700 hover:bg-[#161616]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`p-2 rounded-md ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400 group-hover:text-white'} transition-colors`}>
+                                <FaWrench className="w-3.5 h-3.5" />
+                              </span>
+                              {isSelected && <CheckCircle className="w-4 h-4 text-brand-orange animate-in zoom-in duration-200" />}
+                            </div>
+                            <div>
+                              <h4 className={`text-xs font-bold uppercase tracking-wider ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
+                                {s.title}
+                              </h4>
+                              {s.startingPrice && (
+                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">From {s.startingPrice}</p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label htmlFor="productToPurchase" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">

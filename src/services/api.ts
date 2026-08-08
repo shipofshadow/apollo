@@ -1953,3 +1953,116 @@ export const updateInquiryInternalNotesApi = (token: string, id: string | number
     method: 'PATCH',
     body: JSON.stringify({ internalNotes: notes }),
   }, token);
+
+export interface InquiryChecklistItem {
+  id: number;
+  serviceId: number;
+  phase: 'before' | 'after';
+  section: string;
+  label: string;
+  description: string | null;
+  hasNotes: boolean;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface InquiryChecklistResponse {
+  id: number;
+  checklistId: number;
+  itemId: number;
+  isChecked: boolean;
+  notes: string | null;
+  item: InquiryChecklistItem;
+}
+
+export interface InquiryChecklist {
+  id: number;
+  inquiryId: string;
+  serviceId: number;
+  phase: 'before' | 'after';
+  submittedBy: number | null;
+  generalNotes: string | null;
+  installerName: string | null;
+  serviceFieldValue: string | null;
+  customerAcknowledged: boolean;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  responses: InquiryChecklistResponse[];
+}
+
+export async function fetchInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string): Promise<InquiryChecklist | null> {
+  const res = await apiFetch<{ checklist: InquiryChecklist | null }>(`/api/inquiries/${inquiryId}/checklists/${phase}`, { method: 'GET' }, token);
+  return res.checklist;
+}
+
+export async function saveInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string, checklistId: number, responses: any[], generalNotes: string | null, installerName: string | null, customerAcknowledged: boolean, serviceFieldValue?: string | null): Promise<InquiryChecklist> {
+  const res = await apiFetch<{ checklist: InquiryChecklist }>(`/api/inquiries/${inquiryId}/checklists/${phase}`, {
+    method: 'PUT',
+    body: JSON.stringify({ checklistId, responses, generalNotes, installerName, customerAcknowledged, serviceFieldValue: serviceFieldValue ?? null }),
+  }, token);
+  return res.checklist;
+}
+
+export async function submitInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string, checklistId: number, installerName: string | null, customerAcknowledged: boolean, serviceFieldValue?: string | null): Promise<InquiryChecklist> {
+  const res = await apiFetch<{ checklist: InquiryChecklist }>(`/api/inquiries/${inquiryId}/checklists/${phase}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ checklistId, installerName, customerAcknowledged, serviceFieldValue: serviceFieldValue ?? null }),
+  }, token);
+  return res.checklist;
+}
+
+export async function sendInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string): Promise<void> {
+  await apiFetch<{ message: string }>(`/api/inquiries/${inquiryId}/checklists/${phase}/send`, { method: 'POST' }, token);
+}
+
+export const generateInquiryChecklistPdfApi = async (token: string, inquiryId: string, phase: string): Promise<Blob> => {
+  const response = await fetch(`${BACKEND_URL}/api/inquiries/${inquiryId}/checklists/${phase}/pdf`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to generate PDF");
+  return response.blob();
+};
+
+// ── Inquiry service assignment ──────────────────────────────────────────────
+export const updateInquiryServiceIdApi = (token: string, inquiryId: string, serviceId: number | null) =>
+  apiFetch<{ inquiry: any }>(`/api/inquiries/${inquiryId}/service`, {
+    method: 'PATCH',
+    body: JSON.stringify({ serviceId }),
+  }, token);
+
+// ── Service checklist item management ──────────────────────────────────────
+export const fetchServiceChecklistItemsApi = (token: string, serviceId: number) =>
+  apiFetch<{ items: { before: any[]; after: any[]; acknowledgement: any[] } }>(`/api/services/${serviceId}/checklist-items`, {}, token);
+
+export const createServiceChecklistItemApi = (token: string, serviceId: number, data: any) =>
+  apiFetch<{ item: any }>(`/api/services/${serviceId}/checklist-items`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateServiceChecklistItemApi = (token: string, serviceId: number, itemId: number, data: any) =>
+  apiFetch<{ item: any }>(`/api/services/${serviceId}/checklist-items/${itemId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteServiceChecklistItemApi = (token: string, serviceId: number, itemId: number) =>
+  apiFetch<{ message: string }>(`/api/services/${serviceId}/checklist-items/${itemId}`, {
+    method: 'DELETE',
+  }, token);
+
+export const reorderServiceChecklistItemsApi = (token: string, serviceId: number, orderedIds: number[]) =>
+  apiFetch<{ message: string }>(`/api/services/${serviceId}/checklist-items/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ orderedIds }),
+  }, token);
+
+// ── Client-facing checklist listing (fetches both before & after) ───────────
+export async function fetchInquiryChecklistsApi(token: string, inquiryId: string): Promise<Record<string, InquiryChecklist | null>> {
+  const [before, after] = await Promise.all([
+    fetchInquiryChecklistPhaseApi(token, inquiryId, 'before').catch(() => null),
+    fetchInquiryChecklistPhaseApi(token, inquiryId, 'after').catch(() => null),
+  ]);
+  return { before, after };
+}

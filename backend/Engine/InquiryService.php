@@ -29,9 +29,28 @@ class InquiryService
         $this->validatePayload($normalized);
         $this->assertSlotCapacity($normalized['appointmentDate'], $normalized['appointmentTime']);
 
+        // Resolve service_id: accept int, numeric string, or null
+        $rawServiceId = $data['serviceId'] ?? $data['service_id'] ?? null;
+        $serviceId = ($rawServiceId !== null && $rawServiceId !== '') ? (int) $rawServiceId : null;
+
+        // Auto-match service_id from productToPurchase title if serviceId is not explicitly provided
+        if ($serviceId === null && !empty($normalized['productToPurchase']) && $this->useDb) {
+            try {
+                $db = Database::getInstance();
+                $stmtService = $db->prepare('SELECT id FROM services WHERE LOWER(:prod) LIKE CONCAT("%", LOWER(title), "%") OR LOWER(title) LIKE CONCAT("%", LOWER(:prod), "%") LIMIT 1');
+                $stmtService->execute([':prod' => trim($normalized['productToPurchase'])]);
+                if ($rowSvc = $stmtService->fetch(PDO::FETCH_ASSOC)) {
+                    $serviceId = (int)$rowSvc['id'];
+                }
+            } catch (Exception $e) {
+                // Ignore matching errors if services table is unavailable
+            }
+        }
+
         $inquiry = [
             'id' => $this->uuid(),
             'user_id' => $data['userId'] ?? null,
+            'service_id' => $serviceId,
             'fullName' => $normalized['fullName'],
             'address' => $normalized['address'],
             'contactNumber' => $normalized['contactNumber'],
@@ -88,7 +107,7 @@ class InquiryService
         }
         $db = Database::getInstance();
         $stmt = $db->prepare(
-                'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
@@ -223,6 +242,66 @@ class InquiryService
         }
 
         return $updated;
+    }
+
+    /**
+     * @param string $id
+     * @param string $notes
+     * @param int|null $actorUserId
+     * @param string $actorRole
+     * @return array<string, mixed>
+     */
+    public function updateServiceId(string $id, ?int $serviceId, ?int $actorUserId = null, string $actorRole = 'admin'): array
+    {
+        if ($this->useDb) {
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                'UPDATE customer_inquiries SET service_id = :service_id WHERE id = :id'
+            );
+            $stmt->execute([
+                ':service_id' => $serviceId,
+                ':id'         => $id,
+            ]);
+
+            // Clear unsubmitted draft checklists so they re-sync with the new service template
+            $stmtDelChecklists = $db->prepare(
+                'DELETE FROM inquiry_checklists WHERE inquiry_id = :id AND submitted_at IS NULL'
+            );
+            $stmtDelChecklists->execute([':id' => $id]);
+
+            if ($stmt->rowCount() === 0) {
+                // If it didn't change, we still return the full object
+                $existing = $this->dbGetById($id);
+                if ($existing === null) {
+                    throw new RuntimeException('Inquiry not found.', 404);
+                }
+            } else {
+                // Look up service name for a readable log entry
+                $serviceName = 'none';
+                if ($serviceId !== null) {
+                    $stmtName = $db->prepare('SELECT title FROM services WHERE id = :id LIMIT 1');
+                    $stmtName->execute([':id' => $serviceId]);
+                    $row = $stmtName->fetch(PDO::FETCH_ASSOC);
+                    $serviceName = $row ? $row['title'] : "ID: $serviceId";
+                }
+                $this->activity->add(
+                    $id,
+                    'service_id_updated',
+                    'Linked service updated',
+                    'New service: ' . $serviceName,
+                    $actorUserId,
+                    $actorRole
+                );
+            }
+
+            $updated = $this->dbGetById($id);
+            if ($updated === null) {
+                throw new RuntimeException('Failed to retrieve updated inquiry.', 500);
+            }
+            return $updated;
+        }
+
+        throw new RuntimeException('Database not configured.', 500);
     }
 
     /**
@@ -473,11 +552,11 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO customer_inquiries (
-                id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, created_at, updated_at
             ) VALUES (
-                :id, :user_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
+                :id, :user_id, :service_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
                 :make, :model, :year_model, :product_to_purchase, :appointment_date,
                 :appointment_time, :status, :created_at, :updated_at
             )'
@@ -486,6 +565,7 @@ class InquiryService
         $stmt->execute([
             ':id' => (string) $inquiry['id'],
             ':user_id' => $inquiry['user_id'] ? (string) $inquiry['user_id'] : null,
+            ':service_id' => $inquiry['service_id'] ?? null,
             ':full_name' => (string) $inquiry['fullName'],
             ':address' => (string) $inquiry['address'],
             ':contact_number' => (string) $inquiry['contactNumber'],
@@ -596,7 +676,7 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->query(
-                'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
@@ -668,7 +748,7 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            'SELECT id, user_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+            'SELECT id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, internal_notes, created_at
              FROM customer_inquiries
@@ -689,6 +769,7 @@ class InquiryService
         return [
             'id' => (string) ($row['id'] ?? ''),
             'userId' => $row['user_id'] ? (string) $row['user_id'] : null,
+            'serviceId' => isset($row['service_id']) && $row['service_id'] !== null ? (int) $row['service_id'] : null,
             'fullName' => (string) ($row['full_name'] ?? ''),
             'address' => (string) ($row['address'] ?? ''),
             'contactNumber' => (string) ($row['contact_number'] ?? ''),

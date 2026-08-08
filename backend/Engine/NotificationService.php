@@ -18,6 +18,29 @@ class NotificationService
     // Public API
     // -------------------------------------------------------------------------
 
+    public function sendChecklistEmail(array $inquiry, string $phaseName, string $pdfPath, string $pdfName): void
+    {
+        $clientEmail = $inquiry['emailAddress'] ?? $inquiry['email'] ?? '';
+        $clientName  = $inquiry['fullName'] ?? $inquiry['name'] ?? 'Client';
+        
+        if (!$clientEmail) {
+            return;
+        }
+
+        $subject = "Your $phaseName Checklist - 1625 AutoLab";
+        
+        $body = '<div style="font-family: sans-serif; color: #333;">';
+        $body .= '<p>Hi ' . htmlspecialchars($clientName) . ',</p>';
+        $body .= '<p>Attached is your <strong>' . htmlspecialchars($phaseName) . ' Checklist</strong> for your recent service with us.</p>';
+        $body .= '<p>If you have any questions, feel free to contact us.</p>';
+        $body .= '<p>Best regards,<br>1625 AutoLab Team</p>';
+        $body .= '</div>';
+
+        $this->send($clientEmail, $clientName, $subject, $body, [
+            ['path' => $pdfPath, 'name' => $pdfName]
+        ]);
+    }
+
     /**
      * Send a contact-form message to the admin inbox (1625autolab@gmail.com).
      *
@@ -1475,10 +1498,15 @@ class NotificationService
     // Mailer
     // -------------------------------------------------------------------------
 
-    private function send(string $to, string $toName, string $subject, string $htmlBody): void
+    private function send(string $to, string $toName, string $subject, string $htmlBody, array $attachments = []): void
     {
+        if (defined('APP_ENV') && APP_ENV === 'development') {
+            @error_log("[NotificationService] DEV MODE: Skipped sending email to {$to} - Subject: {$subject}");
+            return;
+        }
+
         if ($this->smtpConfigured()) {
-            $this->sendViaSmtp($to, $toName, $subject, $htmlBody);
+            $this->sendViaSmtp($to, $toName, $subject, $htmlBody, $attachments);
             return;
         }
 
@@ -1552,7 +1580,7 @@ class NotificationService
         return SMTP_HOST !== '';
     }
 
-    private function sendViaSmtp(string $to, string $toName, string $subject, string $htmlBody): void
+    private function sendViaSmtp(string $to, string $toName, string $subject, string $htmlBody, array $attachments = []): void
     {
         try {
             $mail = new PHPMailer(true);
@@ -1584,6 +1612,14 @@ class NotificationService
             $mail->Subject = $subject;
             $mail->isHTML(true);
             $mail->Body    = $htmlBody;
+            
+            foreach ($attachments as $attachment) {
+                if (isset($attachment['path']) && file_exists($attachment['path'])) {
+                    $name = $attachment['name'] ?? basename($attachment['path']);
+                    $mail->addAttachment($attachment['path'], $name);
+                }
+            }
+            
             $mail->send();
         } catch (PHPMailerException $e) {
             error_log('[NotificationService] SMTP send failed for ' . $to . ': ' . $e->getMessage());

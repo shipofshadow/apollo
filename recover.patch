@@ -1,0 +1,134 @@
+--- a/src/services/api.ts
++++ b/src/services/api.ts
+@@ -1,4 +1,4 @@
+-import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse, NotificationQueueResponse, NotificationQueueHealth, Customer360Data, MarketingCampaign, MarketingCampaignRunResult, CampaignAudienceRecipient, CampaignAnalyticsData, InventoryItem, InventoryMovement, InventoryAlert, InventorySupplier, PurchaseOrder, BookingPartRequirement } from '../types';
++import type { BookingPayload, Booking, FacebookPost, User, Service, Product, PortfolioItem, PortfolioCategory, Offer, BeforeAfterItem, ServiceVariation, ProductVariation, BuildUpdate, AppNotification, BookingActivityLog, ClientVehicle, ClientAdminSummary, UserRole, WaitlistEntry, CartItem, ProductOrder, ProductOrderStatus, SemaphoreAccountResponse, SemaphoreMessagesResponse, NotificationQueueResponse, NotificationQueueHealth, Customer360Data, MarketingCampaign, MarketingCampaignRunResult, CampaignAudienceRecipient, CampaignAnalyticsData, InventoryItem, InventoryMovement, InventoryAlert, InventorySupplier, PurchaseOrder, BookingPartRequirement, ServiceChecklistItem, InquiryChecklist } from '../types';
+ import { BACKEND_URL } from '../config';
+ 
+ // ── Helpers ─────────────────────────────────────────────────────────────────
+@@ -1896,20 +1896,80 @@ export const createOrderApi = (data: CreateOrderPayload, token?: string | null)
+ export const fetchMyOrdersApi = (token: string) =>
+   apiFetch<{ orders: ProductOrder[] }>('/api/orders/mine', {}, token);
+ 
+-export const fetchOrderByIdApi = (token: string, id: number) =>
+-  apiFetch<{ order: ProductOrder }>(`/api/orders/${id}`, {}, token);
++export const getReviewByIdApi = (token: string, id: number) =>
++  apiFetch<{ review: BookingReview }>(`/api/reviews/${id}`, {}, token);
+ 
+-export interface AdminOrderFilters {
+-  status?: ProductOrderStatus;
+-  paymentStatus?: 'unpaid' | 'paid' | 'cod';
+-  fulfillmentType?: 'courier' | 'walk_in';
+-  query?: string;
++// ─────────────────────────────────────────────────────────────────────────────
++// Service Checklist Templates
++// ─────────────────────────────────────────────────────────────────────────────
++
++export async function fetchServiceChecklistItemsApi(token: string, serviceId: number): Promise<{ before: ServiceChecklistItem[], after: ServiceChecklistItem[], acknowledgement: ServiceChecklistItem[] }> {
++  const res = await apiFetch<{ items: { before: ServiceChecklistItem[], after: ServiceChecklistItem[], acknowledgement: ServiceChecklistItem[] } }>(`/api/services/${serviceId}/checklist-items`, { method: 'GET' }, token);
++  return res.items || { before: [], after: [], acknowledgement: [] };
++}
++
++export async function createServiceChecklistItemApi(token: string, serviceId: number, data: Partial<ServiceChecklistItem>): Promise<ServiceChecklistItem> {
++  const res = await apiFetch<{ item: ServiceChecklistItem }>(`/api/services/${serviceId}/checklist-items`, {
++    method: 'POST',
++    body: JSON.stringify(data),
++  }, token);
++  return res.item;
++}
++
++export async function updateServiceChecklistItemApi(token: string, serviceId: number, itemId: number, data: Partial<ServiceChecklistItem>): Promise<ServiceChecklistItem> {
++  const res = await apiFetch<{ item: ServiceChecklistItem }>(`/api/services/${serviceId}/checklist-items/${itemId}`, {
++    method: 'PUT',
++    body: JSON.stringify(data),
++  }, token);
++  return res.item;
++}
++
++export async function deleteServiceChecklistItemApi(token: string, serviceId: number, itemId: number): Promise<void> {
++  await apiFetch<{ message: string }>(`/api/services/${serviceId}/checklist-items/${itemId}`, { method: 'DELETE' }, token);
++}
++
++export async function reorderServiceChecklistItemsApi(token: string, serviceId: number, orderedIds: number[]): Promise<void> {
++  await apiFetch<{ message: string }>(`/api/services/${serviceId}/checklist-items/reorder`, {
++    method: 'POST',
++    body: JSON.stringify({ orderedIds }),
++  }, token);
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// Inquiry Checklists
++// ─────────────────────────────────────────────────────────────────────────────
++
++export async function fetchInquiryChecklistsApi(token: string, inquiryId: string): Promise<Record<string, InquiryChecklist | null>> {
++  const res = await apiFetch<{ checklists: Record<string, InquiryChecklist | null> }>(`/api/inquiries/${inquiryId}/checklists`, { method: 'GET' }, token);
++  return res.checklists;
++}
++
++export async function fetchInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string): Promise<InquiryChecklist | null> {
++  const res = await apiFetch<{ checklist: InquiryChecklist | null }>(`/api/inquiries/${inquiryId}/checklists/${phase}`, { method: 'GET' }, token);
++  return res.checklist;
++}
++
++export async function saveInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string, checklistId: number, responses: any[], generalNotes: string | null, installerName: string | null, customerAcknowledged: boolean): Promise<InquiryChecklist> {
++  const res = await apiFetch<{ checklist: InquiryChecklist }>(`/api/inquiries/${inquiryId}/checklists/${phase}`, {
++    method: 'PUT',
++    body: JSON.stringify({ checklistId, responses, generalNotes, installerName, customerAcknowledged }),
++  }, token);
++  return res.checklist;
++}
++
++export async function submitInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string, checklistId: number, installerName: string | null, customerAcknowledged: boolean): Promise<InquiryChecklist> {
++  const res = await apiFetch<{ checklist: InquiryChecklist }>(`/api/inquiries/${inquiryId}/checklists/${phase}/submit`, {
++    method: 'POST',
++    body: JSON.stringify({ checklistId, installerName, customerAcknowledged }),
++  }, token);
++  return res.checklist;
++}
++
++export async function sendInquiryChecklistPhaseApi(token: string, inquiryId: string, phase: string): Promise<void> {
++  await apiFetch<{ message: string }>(`/api/inquiries/${inquiryId}/checklists/${phase}/send`, { method: 'POST' }, token);
++}
++
++export interface AdminOrderFilters {
++  status?: ProductOrderStatus;
++  paymentStatus?: 'unpaid' | 'paid' | 'cod';
++  fulfillmentType?: 'courier' | 'walk_in';
++  query?: string;
+   createdFrom?: string;
+   createdTo?: string;
+   page?: number;
+   pageSize?: number;
+ }
+ 
++export const fetchOrderByIdApi = (token: string, id: number | string) =>
++  apiFetch<{ order: ProductOrder }>(`/api/admin/orders/${id}`, {}, token);
++
++
+ export const fetchAdminOrdersApi = (token: string, filters: AdminOrderFilters = {}) => {
+   const params = new URLSearchParams();
+   if (filters.status) params.set('status', filters.status);
+@@ -1949,7 +2009,23 @@ export const fetchInquiryActivityApi = (token: string, id: number | string) =>
+   apiFetch<any[]>(`/api/inquiries/${id}/activity`, {}, token);
+ 
+ export const updateInquiryInternalNotesApi = (token: string, id: string | number, notes: string) =>
+-  apiFetch<{ inquiry: any }>(`/api/inquiries/${id}/notes`, {
+-    method: 'PATCH',
++  apiFetch<{ inquiry: any }>(`/api/admin/inquiries/${id}/notes`, {
++    method: 'PUT',
+     body: JSON.stringify({ internalNotes: notes }),
+   }, token);
++
++export const updateInquiryServiceIdApi = (token: string, id: string | number, serviceId: number | null) =>
++  apiFetch<{ inquiry: any }>(`/api/admin/inquiries/${id}/service`, {
++    method: 'PUT',
++    body: JSON.stringify({ serviceId }),
++  }, token);
++
++export const generateInquiryChecklistPdfApi = async (token: string, inquiryId: string, phase: string): Promise<Blob> => {
++  const response = await fetch(`${BACKEND_URL}/api/inquiries/${inquiryId}/checklists/${phase}/pdf`, {
++    headers: { Authorization: `Bearer ${token}` }
++  });
++  if (!response.ok) throw new Error("Failed to generate PDF");
++  return response.blob();
++};

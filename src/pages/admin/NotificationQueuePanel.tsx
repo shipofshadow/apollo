@@ -43,6 +43,11 @@ export default function NotificationQueuePanel() {
 
   const failedJobs = useMemo(() => jobs.filter(j => j.status === 'failed'), [jobs]);
 
+  const QUEUE_PAGE_SIZE = 10;
+  const [queuePage, setQueuePage] = useState(0);
+  const totalQueuePages = Math.ceil(jobs.length / QUEUE_PAGE_SIZE);
+  const pagedJobs = jobs.slice(queuePage * QUEUE_PAGE_SIZE, (queuePage + 1) * QUEUE_PAGE_SIZE);
+
   const loadData = async () => {
     if (!token || !canManage) return;
     setLoading(true);
@@ -272,7 +277,7 @@ export default function NotificationQueuePanel() {
                 </tr>
               </thead>
               <tbody>
-                {jobs.map((job) => {
+                {pagedJobs.map((job) => {
                   const isFailed = job.status === 'failed';
                   const statusTone = isFailed
                     ? 'bg-red-500/15 text-red-300 border-red-500/30'
@@ -316,6 +321,27 @@ export default function NotificationQueuePanel() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && jobs.length > QUEUE_PAGE_SIZE && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-800">
+            <button
+              onClick={() => setQueuePage(p => Math.max(0, p - 1))}
+              disabled={queuePage === 0}
+              className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
+            >
+              ← Prev
+            </button>
+            <span className="text-[10px] font-mono text-gray-500">
+              Page {queuePage + 1} / {totalQueuePages} &bull; {jobs.length} total jobs
+            </span>
+            <button
+              onClick={() => setQueuePage(p => Math.min(totalQueuePages - 1, p + 1))}
+              disabled={queuePage >= totalQueuePages - 1}
+              className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
+            >
+              Next →
+            </button>
           </div>
         )}
       </div>

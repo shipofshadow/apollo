@@ -486,6 +486,11 @@ public function customerInquiryAdmin(array $inquiry): void
      */
     private function send(string $to, string $body): void
     {
+        if (defined('APP_ENV') && APP_ENV === 'development') {
+            @error_log("[SmsService] DEV MODE: Skipped sending SMS to {$to}");
+            return;
+        }
+
         if (!$this->enabled) {
             return;
         }
