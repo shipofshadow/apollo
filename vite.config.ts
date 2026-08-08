@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import sitemap from 'vite-plugin-sitemap'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const publicRoutes = [
   '/',
   '/services',
@@ -18,29 +20,26 @@ const publicRoutes = [
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    sitemap({
-      hostname: 'https://1625autolab.com',
-      dynamicRoutes: publicRoutes,
-      exclude: [
-        '/admin',
-        '/client',
-        '/login',
-        '/register',
-        '/forgot-password',
-        '/reset-password',
-        '/api',
-        '/private',
-        '/backend',
-        '/config',
-        '/vendor',
-      ],
-      changefreq: 'weekly',
-      priority: 0.8,
-      generateRobotsTxt: true,
-    }),
-  ],
+  plugins: [react(), sitemap({
+    hostname: 'https://1625autolab.com',
+    dynamicRoutes: publicRoutes,
+    exclude: [
+      '/admin',
+      '/client',
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/reset-password',
+      '/api',
+      '/private',
+      '/backend',
+      '/config',
+      '/vendor',
+    ],
+    changefreq: 'weekly',
+    priority: 0.8,
+    generateRobotsTxt: true,
+  }), cloudflare()],
   build: {
     rollupOptions: {
       output: {
