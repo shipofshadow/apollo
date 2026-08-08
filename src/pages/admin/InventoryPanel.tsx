@@ -424,7 +424,7 @@ export default function InventoryPanel() {
               <p className="text-[11px] uppercase tracking-widest text-gray-500">Recent Movements</p>
               <div className="mt-2 space-y-1 max-h-36 overflow-auto">
                 {movements.length === 0 ? <p className="text-sm text-gray-500">No movement records yet.</p> : movements.slice(0, 12).map(m => (
-                  <p key={m.id} className="text-xs text-gray-300">{m.itemSku} • {m.movementType} • {m.quantityDelta > 0 ? '+' : ''}{m.quantityDelta} • {new Date(m.createdAt).toLocaleString()}</p>
+                  <p key={m.id} className="text-xs text-gray-300">{m.itemSku} • {m.movementType} • {m.quantityDelta > 0 ? '+' : ''}{m.quantityDelta} • {new Date(m.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</p>
                 ))}
               </div>
             </div>

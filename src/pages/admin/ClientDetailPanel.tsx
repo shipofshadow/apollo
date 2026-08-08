@@ -171,12 +171,12 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
             )}
             <div className="flex items-center gap-2 text-sm text-gray-300">
               <User className="w-4 h-4 text-gray-500 shrink-0" />
-              <span>Member since {new Date(client.created_at).toLocaleDateString()}</span>
+              <span>Member since {new Date(client.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</span>
             </div>
             {client.lastBookingAt && (
               <div className="flex items-center gap-2 text-sm text-gray-300">
                 <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
-                <span>Last booking: {new Date(client.lastBookingAt).toLocaleDateString()}</span>
+                <span>Last booking: {new Date(client.lastBookingAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</span>
               </div>
             )}
           </div>
@@ -207,7 +207,7 @@ export default function ClientDetailPanel({ client, onBack, onViewBooking }: Pro
                     <p className="text-xs text-gray-500">No communication history.</p>
                   ) : customer360.communications.slice(0, 8).map((event, idx) => (
                     <p key={`${event.createdAt}-${idx}`} className="text-xs text-gray-300">
-                      {event.source.toUpperCase()} • {event.title || event.event} • {new Date(event.createdAt).toLocaleString()}
+                      {event.source.toUpperCase()} • {event.title || event.event} • {new Date(event.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}
                     </p>
                   ))}
                 </div>

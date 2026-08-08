@@ -1120,7 +1120,7 @@ export default function UserAccessPanel() {
                         <td className="py-1.5 md:py-2.5 px-3 md:px-4 hidden sm:table-cell">
                           <StatusBadge isActive={isActive} />
                         </td>
-                        <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden lg:table-cell text-xs md:text-sm">{new Date(item.created_at).toLocaleDateString()}</td>
+                        <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden lg:table-cell text-xs md:text-sm">{new Date(item.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</td>
                         <td className="py-1.5 md:py-2.5 px-3 md:px-4">
                           <button
                             type="button"
@@ -1254,7 +1254,7 @@ export default function UserAccessPanel() {
                       </td>
                       <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-300">{item.bookingCount}</td>
                       <td className="py-1.5 md:py-2.5 px-3 md:px-4 text-gray-400 hidden xl:table-cell text-xs md:text-sm">
-                        {item.lastBookingAt ? new Date(item.lastBookingAt).toLocaleDateString() : '—'}
+                        {item.lastBookingAt ? new Date(item.lastBookingAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}
                       </td>
                       {canManageUsers && (
                         <td className="py-1.5 md:py-2.5 px-3 md:px-4">

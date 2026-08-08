@@ -421,7 +421,7 @@ export default function ManageUsersPanel() {
                           <StatusBadge isActive={isActive} />
                         </td>
                         <td className="py-2.5 px-3 md:px-4 text-gray-400 hidden lg:table-cell text-xs">
-                          {new Date(item.created_at).toLocaleDateString()}
+                          {new Date(item.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}
                         </td>
                         <td className="py-2.5 px-3 md:px-4">
                           <div className="flex items-center gap-1.5 flex-wrap">

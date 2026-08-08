@@ -1600,7 +1600,7 @@ function SystemPanel() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-gray-500 text-xs hidden md:table-cell">
-                      {m.ran_at ? new Date(m.ran_at).toLocaleString() : '—'}
+                      {m.ran_at ? new Date(m.ran_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}
                     </td>
                   </tr>
                 ))}

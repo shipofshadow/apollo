@@ -589,7 +589,7 @@ export default function Profile() {
                   </div>
                   <p className="text-[11px] text-gray-600 mt-2 truncate">{s.userAgent || 'Unknown device agent'}</p>
                   <p className="text-[11px] text-gray-500 mt-1">
-                    Signed in: {new Date(s.issuedAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    Signed in: {new Date(s.issuedAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}
                   </p>
                 </div>
               ))}

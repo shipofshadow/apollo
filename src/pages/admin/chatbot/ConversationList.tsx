@@ -26,7 +26,7 @@ function formatRelativeTime(dateStr?: string) {
   if (diffMinutes < 60) return `${diffMinutes}m ago`
   const diffHours = Math.floor(diffMinutes / 60)
   if (diffHours < 24) return `${diffHours}h ago`
-  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return then.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })
 }
 
 const STATUS_COLORS = {

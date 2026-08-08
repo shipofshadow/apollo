@@ -170,7 +170,7 @@ export default function MyOrders() {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mb-3">
-                {new Date(order.createdAt).toLocaleString('en-PH')} • {order.fulfillmentType === 'courier' ? 'Courier' : 'Walk-in Pickup'}
+                {new Date(order.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })} • {order.fulfillmentType === 'courier' ? 'Courier' : 'Walk-in Pickup'}
               </p>
               <div className="flex flex-wrap gap-1.5 mb-3">
                 <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-sm border ${paymentClass(order.paymentStatus)}`}>

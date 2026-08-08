@@ -100,7 +100,7 @@ export default function ChatView({ sessionId, onDeleteConversation }: ChatViewPr
     if (!value) return ''
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' })
   }, [])
 
   const fetchConversation = useCallback(async (isInitial = false) => {

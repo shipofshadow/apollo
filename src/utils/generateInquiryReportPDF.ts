@@ -112,6 +112,7 @@ export async function generateInquiryReportPDF(
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Asia/Manila',
       })
     : '-';
 
@@ -216,7 +217,7 @@ export async function generateInquiryReportPDF(
     }
 
     doc.text(`Page ${i} of ${pageCount}`, 198, 285, { align: 'right' });
-    doc.text(`Generated: ${new Date().toLocaleString('en-PH')}`, 12, 285, { align: 'left' });
+    doc.text(`Generated: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`, 12, 285, { align: 'left' });
   }
 
   doc.save(`inquiry-${inquiry.id.substring(0, 8) || 'report'}.pdf`);

@@ -133,7 +133,7 @@ export default function Customer360Panel() {
                   <p className="text-white font-semibold mt-1">{data.profile.name}</p>
                   <p className="text-xs text-gray-400">{data.profile.email}</p>
                   <p className="text-xs text-gray-400">{data.profile.phone || 'No phone'}</p>
-                  <p className="text-xs text-gray-500 mt-1">Joined: {new Date(data.profile.createdAt).toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-500 mt-1">Joined: {new Date(data.profile.createdAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</p>
                 </div>
                 <div className="rounded-sm border border-gray-800 bg-brand-darker/60 p-3 grid grid-cols-2 gap-2">
                   <Metric label="Lifetime Spend" value={`PHP ${data.spend.lifetimeSpend.toFixed(2)}`} />
@@ -170,7 +170,7 @@ export default function Customer360Panel() {
               <SectionCard title="Communication History" icon={<MessageSquare className="w-4 h-4" />}>
                 {data.communications.length === 0 ? <EmptyLine text="No communication history yet." /> : data.communications.slice(0, 8).map((c, idx) => (
                   <div key={`${c.createdAt}-${idx}`} className="text-sm text-gray-300">
-                    {c.source.toUpperCase()} • {c.title || c.event} • {new Date(c.createdAt).toLocaleString()}
+                    {c.source.toUpperCase()} • {c.title || c.event} • {new Date(c.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}
                   </div>
                 ))}
               </SectionCard>

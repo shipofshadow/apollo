@@ -922,7 +922,7 @@ export default function BookingDetail() {
                 <p className="text-[10px] font-mono text-gray-500">
                   {new Date(upd.createdAt).toLocaleString('en-US', {
                     year: 'numeric', month: 'short', day: 'numeric',
-                    hour: 'numeric', minute: '2-digit',
+                    hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila',
                   })}
                 </p>
                 {upd.note && (
@@ -1010,7 +1010,7 @@ export default function BookingDetail() {
                         <p className="text-[10px] font-mono text-gray-500 mt-1">
                           {new Date(log.createdAt).toLocaleString('en-US', {
                             year: 'numeric', month: 'short', day: 'numeric',
-                            hour: 'numeric', minute: '2-digit',
+                            hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila',
                           })}
                         </p>
                       </div>

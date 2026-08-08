@@ -139,6 +139,7 @@ export async function generateJobCompletionPDF(
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Asia/Manila',
       })
     : '-';
 
@@ -229,6 +230,7 @@ export async function generateJobCompletionPDF(
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
+            timeZone: 'Asia/Manila',
           }),
           valueOrDash(update.note),
           valueOrDash(update.assignedTech?.name),

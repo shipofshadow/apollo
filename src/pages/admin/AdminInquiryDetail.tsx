@@ -431,7 +431,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap mb-4">{inquiry.internalNotes}</p>
                     {lastNoteUpdate && (
                       <p className="text-[10px] text-gray-500 font-mono text-right mt-2 border-t border-gray-800/50 pt-2">
-                        Last updated by <span className="text-gray-400 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        Last updated by <span className="text-gray-400 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}
                       </p>
                     )}
                   </>

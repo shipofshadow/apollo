@@ -232,7 +232,7 @@ export default function ContentPanel() {
                     </button>
                   </td>
                   <td className="p-4 text-gray-400 text-sm">
-                    {new Date(post.createdAt).toLocaleDateString()}
+                    {new Date(post.createdAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">

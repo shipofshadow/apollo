@@ -434,7 +434,7 @@ export default function MarketingCampaignsPanel() {
                       <p className="text-xs text-gray-400">{c.category || c.type} • {c.status} • channels: {c.channels.join(', ')}</p>
                       <p className="text-[11px] text-gray-500">
                         {c.scheduleEnabled ? `Scheduled ${c.scheduleType} @ ${c.scheduleTime} (${c.scheduleTimezone})` : 'Manual'}
-                        {c.nextRunAt ? ` • next: ${new Date(c.nextRunAt).toLocaleString()}` : ''}
+                        {c.nextRunAt ? ` • next: ${new Date(c.nextRunAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}` : ''}
                       </p>
                     </button>
                     <div className="flex gap-1.5">

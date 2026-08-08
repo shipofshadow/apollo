@@ -231,7 +231,7 @@ export default function CustomerFormPage() {
       try {
         const scriptURL = 'https://script.google.com/macros/s/AKfycbxm860_AqLacRru8vXJ0NDfjl7gZgYcEB9rjqYXrvPEMph31vQ8kZQIHgbfeYWLHiTONw/exec';
         const googleData = new URLSearchParams({
-          'Timestamp': new Date().toLocaleString(),
+          'Timestamp': new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
           'Full Name': formData.fullName,
           'Address': formData.address,
           'Contact Number': formData.contactNumber,

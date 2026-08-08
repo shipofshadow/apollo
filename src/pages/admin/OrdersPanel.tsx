@@ -122,7 +122,7 @@ function allowedStatusOptions(order: ProductOrder): ProductOrderStatus[] {
 function formatDateTime(value: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString('en-PH');
+  return d.toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
 }
 
 export default function OrdersPanel() {

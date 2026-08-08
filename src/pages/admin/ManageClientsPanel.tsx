@@ -307,7 +307,7 @@ export default function ManageClientsPanel({ onView }: Props) {
                       </td>
                       <td className="py-2.5 px-3 md:px-4 text-gray-300">{item.bookingCount}</td>
                       <td className="py-2.5 px-3 md:px-4 text-gray-400 hidden xl:table-cell text-xs">
-                        {item.lastBookingAt ? new Date(item.lastBookingAt).toLocaleDateString() : '—'}
+                        {item.lastBookingAt ? new Date(item.lastBookingAt).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}
                       </td>
                       {canManageUsers ? (
                         <td className="py-2.5 px-3 md:px-4">
