@@ -1,3 +1,8 @@
+# ── Protect sensitive files ──────────────────────────────────────────────────
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
 # Apache – route all requests through index.php
 <IfModule mod_rewrite.c>
     RewriteEngine On
