@@ -160,7 +160,8 @@ class InquiryChecklistService
         }
 
         // ---- Backfill installer_name / general_notes / service_field_value from 'before' when opening 'after' ----
-        if (($phase === 'after' || $phase === 'acknowledgement')
+        if ($checklistRow
+            && ($phase === 'after' || $phase === 'acknowledgement')
             && (empty($checklistRow['installer_name']) || empty($checklistRow['general_notes']) || empty($checklistRow['service_field_value']))
         ) {
             $stmtPrev = $this->db->prepare(
