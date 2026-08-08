@@ -24,7 +24,7 @@ const STATUS_STYLES: Record<string, string> = {
   in_progress:    'bg-sky-500/10    text-sky-400     border-sky-500/30',
   completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
   cancelled:      'bg-[#1a1a1a]     text-gray-500    border-gray-800',
-  awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
+  awaiting_parts: 'bg-amber-500/10  text-amber-400   border-amber-500/30',
 };
 
 interface InquiryEvent {

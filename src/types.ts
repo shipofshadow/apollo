@@ -792,7 +792,6 @@ export interface BookingActivityLog {
 }
 
 
-// ── In-app Notification ────────────────────────────────────────────────────────
 
 export type NotificationType =
   | 'new_booking'
@@ -999,8 +998,25 @@ export interface InquiryChecklist {
   installerName: string | null;
   serviceFieldValue: string | null;
   submittedAt: string | null;
+  sentAt?: string | null;
   createdAt: string;
   updatedAt: string;
   responses: InquiryChecklistResponse[];
 }
 
+export interface ChecklistPhaseResponse {
+  id: number;
+  inquiryId: string;
+  serviceId: number | null;
+  phase: 'before' | 'after';
+  submittedBy: number | null;
+  generalNotes: string | null;
+  customerAcknowledged: boolean;
+  installerName: string | null;
+  serviceFieldValue: string | null;
+  submittedAt: string | null;
+  sentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  responses: InquiryChecklistResponse[];
+}

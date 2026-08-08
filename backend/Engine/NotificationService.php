@@ -18,28 +18,123 @@ class NotificationService
     // Public API
     // -------------------------------------------------------------------------
 
-    public function sendChecklistEmail(array $inquiry, string $phaseName, string $pdfPath, string $pdfName): void
+    /**
+     * Send checklist PDF to the client only.
+     *
+     * @param array<string,mixed> $inquiry  DB row or API-shaped inquiry array
+     */
+    public function sendChecklistEmailToClient(array $inquiry, string $pdfPath, string $pdfName): void
     {
-        $clientEmail = $inquiry['emailAddress'] ?? $inquiry['email'] ?? '';
-        $clientName  = $inquiry['fullName'] ?? $inquiry['name'] ?? 'Client';
-        
-        if (!$clientEmail) {
+        $clientEmail = $inquiry['emailAddress'] ?? $inquiry['email_address'] ?? $inquiry['email'] ?? '';
+        $clientName  = $inquiry['fullName']     ?? $inquiry['full_name']     ?? $inquiry['name']  ?? 'Client';
+
+        if ($clientEmail === '') {
+            error_log('[sendChecklistEmailToClient] No email on inquiry. Keys: ' . implode(', ', array_keys($inquiry)));
             return;
         }
 
-        $subject = "Your $phaseName Checklist - 1625 AutoLab";
-        
-        $body = '<div style="font-family: sans-serif; color: #333;">';
+        $subject = 'Your Installation Checklist Report | 1625 Autolab';
+        $body  = '<div style="font-family:sans-serif;color:#333;">';
         $body .= '<p>Hi ' . htmlspecialchars($clientName) . ',</p>';
-        $body .= '<p>Attached is your <strong>' . htmlspecialchars($phaseName) . ' Checklist</strong> for your recent service with us.</p>';
+        $body .= '<p>Attached is your <strong>Installation Checklist Report</strong> for your recent service with us.</p>';
         $body .= '<p>If you have any questions, feel free to contact us.</p>';
-        $body .= '<p>Best regards,<br>1625 AutoLab Team</p>';
+        $body .= '<p>Best regards,<br>1625 Autolab Team</p>';
         $body .= '</div>';
 
-        $this->send($clientEmail, $clientName, $subject, $body, [
-            ['path' => $pdfPath, 'name' => $pdfName]
-        ]);
+        $attachments = [['path' => $pdfPath, 'name' => $pdfName]];
+
+        try {
+            $this->send($clientEmail, $clientName, $subject, $body, $attachments);
+            error_log('[sendChecklistEmailToClient] Sent to ' . $clientEmail);
+        } catch (\Throwable $e) {
+            error_log('[sendChecklistEmailToClient] FAILED for ' . $clientEmail . ': ' . $e->getMessage());
+            throw $e;
+        }
     }
+
+    /**
+     * Send checklist PDF copy to all admins/owners (MAIL_ADMIN + DB users with admin|owner|manager role).
+     * Excludes the client's email to prevent duplicate delivery.
+     *
+     * @param array<string,mixed> $inquiry  DB row or API-shaped inquiry array
+     */
+    public function sendChecklistEmailToAdmins(array $inquiry, string $pdfPath, string $pdfName): void
+    {
+        $clientEmail = strtolower(trim(
+            $inquiry['emailAddress'] ?? $inquiry['email_address'] ?? $inquiry['email'] ?? ''
+        ));
+        $clientName  = $inquiry['fullName'] ?? $inquiry['full_name'] ?? $inquiry['name'] ?? 'Client';
+        $inqId       = $inquiry['id'] ?? '';
+
+        // Build de-duplicated recipient set
+        $recipients = [];
+
+        // 1. MAIL_ADMIN from .env
+        $envAdmins = defined('MAIL_ADMIN') ? preg_split('/\s*,\s*/', (string) MAIL_ADMIN) : [];
+        foreach ($envAdmins as $e) {
+            $e = strtolower(trim($e));
+            if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                $recipients[$e] = true;
+            }
+        }
+
+        // 2. All admin / owner / manager accounts in the DB
+        try {
+            $db   = Database::getInstance();
+            $stmt = $db->query(
+                "SELECT email FROM users
+                  WHERE role IN ('admin','owner','manager')
+                    AND is_active = 1
+                    AND email IS NOT NULL AND email != ''"
+            );
+            foreach ($stmt->fetchAll(\PDO::FETCH_COLUMN) as $dbEmail) {
+                $dbEmail = strtolower(trim((string) $dbEmail));
+                if ($dbEmail !== '' && filter_var($dbEmail, FILTER_VALIDATE_EMAIL)) {
+                    $recipients[$dbEmail] = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[sendChecklistEmailToAdmins] DB query failed: ' . $e->getMessage());
+        }
+
+        // 3. Never send the admin copy to the client (they already got the client copy)
+        if ($clientEmail !== '') {
+            unset($recipients[$clientEmail]);
+        }
+
+        if (empty($recipients)) {
+            error_log('[sendChecklistEmailToAdmins] No admin/owner recipients found — skipping.');
+            return;
+        }
+
+        $subject     = "[Installation Checklist] Inquiry #{$inqId} - " . $clientName;
+        $attachments = [['path' => $pdfPath, 'name' => $pdfName]];
+        $body  = '<div style="font-family:sans-serif;color:#333;">';
+        $body .= '<p><strong>Inspection Report Copy</strong> for Inquiry #' . htmlspecialchars((string) $inqId) . ' (' . htmlspecialchars($clientName) . ').</p>';
+        $body .= '<p>The <strong>Installation Checklist PDF</strong> is attached for shop records.</p>';
+        $body .= '</div>';
+
+        foreach (array_keys($recipients) as $aEmail) {
+            try {
+                $this->send($aEmail, '1625 Autolab', $subject, $body, $attachments);
+                error_log('[sendChecklistEmailToAdmins] Sent to ' . $aEmail);
+            } catch (\Throwable $e) {
+                error_log('[sendChecklistEmailToAdmins] FAILED for ' . $aEmail . ': ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Convenience wrapper — sends to both client and all admins/owners.
+     *
+     * @param array<string,mixed> $inquiry
+     */
+    public function sendChecklistEmail(array $inquiry, string $phaseName, string $pdfPath, string $pdfName): void
+    {
+        $this->sendChecklistEmailToClient($inquiry, $pdfPath, $pdfName);
+        $this->sendChecklistEmailToAdmins($inquiry, $pdfPath, $pdfName);
+    }
+
 
     /**
      * Send a contact-form message to the admin inbox (1625autolab@gmail.com).

@@ -53,7 +53,7 @@ const STATUS_BADGE: Record<string, string> = {
   in_progress: 'bg-transparent text-sky-500 border border-sky-500/40',
   completed: 'bg-transparent text-blue-500 border border-blue-500/40',
   cancelled: 'bg-transparent text-gray-400 border border-gray-700',
-  awaiting_parts: 'bg-transparent text-purple-500 border border-purple-500/40',
+  awaiting_parts: 'bg-transparent text-amber-500 border border-amber-500/40',
 };
 
 // Statuses that apply to inquiries only — awaiting_parts is booking-only.
@@ -69,7 +69,7 @@ const STATUS_DOT: Record<string, string> = {
   in_progress: 'bg-sky-500',
   completed: 'bg-blue-500',
   cancelled: 'bg-gray-500',
-  awaiting_parts: 'bg-purple-500',
+  awaiting_parts: 'bg-amber-500',
 };
 
 const formatAppointmentTime = (value?: string | null) => {

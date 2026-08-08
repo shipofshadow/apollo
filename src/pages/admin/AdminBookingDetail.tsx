@@ -56,7 +56,7 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
   confirmed: 'bg-green-500/10  text-green-400   border-green-500/30',
   completed: 'bg-blue-500/10   text-blue-400    border-blue-500/30',
   cancelled: 'bg-[#1a1a1a]     text-gray-500    border-gray-800',
-  awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
+  awaiting_parts: 'bg-amber-500/10  text-amber-400   border-amber-500/30',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1147,13 +1147,13 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
             {/* Parts Notes */}
             <div className="bg-[#121212] p-6">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 flex items-center gap-2">
                   <Package className="w-3.5 h-3.5" /> Parts / Materials
                 </p>
                 {canModify && !partsOpen && (
                   <button
                     onClick={() => setPartsOpen(true)}
-                    className="text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                    className="text-[10px] font-bold uppercase tracking-widest text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
                   >
                     <Edit3 className="w-3 h-3" /> {booking.partsNotes ? 'Edit' : 'Add'}
                   </button>
@@ -1162,8 +1162,8 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
               {!partsOpen ? (
                 booking.partsNotes ? (
-                  <div className="bg-purple-500/5 border border-purple-500/20 rounded p-4">
-                    <p className="text-purple-200 text-sm whitespace-pre-wrap">{booking.partsNotes}</p>
+                  <div className="bg-amber-500/5 border border-amber-500/20 rounded p-4">
+                    <p className="text-amber-200 text-sm whitespace-pre-wrap">{booking.partsNotes}</p>
                   </div>
                 ) : (
                   <p className="text-gray-600 text-xs font-mono bg-[#181818] border border-gray-800 border-dashed rounded p-4 text-center">No parts or materials pending.</p>
@@ -1175,7 +1175,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                     value={partsNotes}
                     onChange={e => setPartsNotes(e.target.value)}
                     placeholder="Enter missing parts or delivery info..."
-                    className="w-full bg-[#181818] border border-gray-800 text-white px-3 py-3 rounded focus:outline-none focus:border-purple-400 transition-colors resize-none text-sm"
+                    className="w-full bg-[#181818] border border-gray-800 text-white px-3 py-3 rounded focus:outline-none focus:border-amber-400 transition-colors resize-none text-sm"
                   />
                   <div className="flex gap-2">
                     <button
@@ -1188,7 +1188,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                         handlePartsSave,
                       )}
                       disabled={partsBusy || !partsNotes.trim()}
-                      className="flex-1 bg-purple-600/20 border border-purple-500/50 hover:bg-purple-600/40 text-purple-300 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
+                      className="flex-1 bg-amber-600/20 border border-amber-500/50 hover:bg-amber-600/40 text-amber-300 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-30 flex items-center justify-center gap-2"
                     >
                       {partsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
                       Save
@@ -1208,7 +1208,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
 
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6">
             <div className="flex items-center justify-between gap-3 mb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-purple-300 flex items-center gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300 flex items-center gap-2">
                 <Package className="w-3.5 h-3.5" /> Structured Part Requirements
               </p>
               <button
@@ -1269,7 +1269,7 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
                 type="button"
                 onClick={() => void handleCreatePartRequirement()}
                 disabled={partReqSaving || !partReqForm.partName.trim()}
-                className="px-4 py-2 bg-purple-600/20 border border-purple-500/50 hover:bg-purple-600/35 text-purple-200 text-[10px] font-bold uppercase tracking-widest rounded disabled:opacity-40"
+                className="px-4 py-2 bg-amber-600/20 border border-amber-500/50 hover:bg-amber-600/35 text-amber-200 text-[10px] font-bold uppercase tracking-widest rounded disabled:opacity-40"
               >
                 {partReqSaving ? 'Saving...' : 'Add Part'}
               </button>

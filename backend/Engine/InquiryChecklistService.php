@@ -292,82 +292,57 @@ class InquiryChecklistService
     
     public function sendToClient(string $inquiryId, string $phase, int $sentByUserId): void
     {
-        $checklistRow = $this->getOrInit($inquiryId, $phase);
-        if (!$checklistRow || !$checklistRow['submittedAt']) {
-            throw new RuntimeException("Cannot send an unsubmitted checklist.");
-        }
-        
         $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT * FROM customer_inquiries WHERE id = :id');
-        $stmt->execute([':id' => $inquiryId]);
+        $stmt = $db->prepare('SELECT id, email_address, full_name, service_id, user_id FROM customer_inquiries WHERE id = :id OR id = :inq_id');
+        $stmt->execute([':id' => $inquiryId, ':inq_id' => 'inq-' . $inquiryId]);
         $inquiry = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        $stmtSrv = $db->prepare('SELECT title FROM services WHERE id = :id');
-        $stmtSrv->execute([':id' => $inquiry['service_id']]);
-        $service = $stmtSrv->fetch(PDO::FETCH_ASSOC);
-        
-        $serviceName = $service ? $service['title'] : 'Service';
-        $clientName = $inquiry['full_name'] ?? 'Client';
-        $clientEmail = $inquiry['email_address'] ?? null;
-        
+
+        if (!$inquiry) {
+            throw new RuntimeException("Inquiry not found.");
+        }
+
+        $clientEmail = $inquiry['email_address'] ?? '';
         if (!$clientEmail) {
-            throw new RuntimeException("Client has no email address.");
+            throw new RuntimeException("Client has no email address configured on inquiry.");
         }
 
-        $pdfBinary = $this->generateChecklistPdf($checklistRow, $inquiry, $serviceName);
-        $filename = ucfirst($phase) . " Installation Checklist - {$serviceName} - {$clientName}.pdf";
+        // Queue PDF generation + email send entirely in the background worker.
+        // This avoids generating the ~1.6MB overlay PDF and doing SMTP in the HTTP request thread.
+        $queue = new NotificationJobQueueService();
+        $queue->dispatch('checklist_sent', [
+            'inquiryId' => $inquiry['id'],
+            'phase'     => $phase,
+        ], null, false);
 
-        // Create PHPMailer directly for attachment
-        $mailer = new \PHPMailer\PHPMailer\PHPMailer(true);
-        try {
-            $smtpHost = defined('SMTP_HOST') ? SMTP_HOST : '';
-            if ($smtpHost !== '') {
-                $mailer->isSMTP();
-                $mailer->Host       = SMTP_HOST;
-                $mailer->SMTPAuth   = true;
-                $mailer->Username   = defined('SMTP_USER') ? SMTP_USER : '';
-                $mailer->Password   = defined('SMTP_PASS') ? SMTP_PASS : '';
-                $mailer->SMTPSecure = defined('SMTP_SECURE') ? SMTP_SECURE : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-                $mailer->Port       = defined('SMTP_PORT') ? (int)SMTP_PORT : 587;
-            }
-            
-            $from = defined('MAIL_FROM') ? MAIL_FROM : 'noreply@1625autolab.com';
-            $mailer->setFrom($from, '1625 Autolab');
-            $mailer->addAddress($clientEmail, $clientName);
-            
-            $mailer->isHTML(true);
-            $mailer->Subject = "Your {$serviceName} " . ucfirst($phase) . " Checklist from 1625 Autolab";
-            $mailer->Body    = "Hi {$clientName},<br><br>Attached is your " . ucfirst($phase) . " Installation Checklist for your {$serviceName}.<br><br>Thank you for choosing 1625 Autolab!";
-            $mailer->AltBody = "Hi {$clientName},\n\nAttached is your " . ucfirst($phase) . " Installation Checklist for your {$serviceName}.\n\nThank you for choosing 1625 Autolab!";
-            
-            $mailer->addStringAttachment($pdfBinary, $filename, \PHPMailer\PHPMailer\PHPMailer::ENCODING_BASE64, 'application/pdf');
-            $mailer->send();
-            
-        } catch (Exception $e) {
-            error_log("Failed to send checklist email: " . $e->getMessage());
-            throw new RuntimeException("Failed to send checklist email.");
-        }
+        $stmtUpdate = $db->prepare('UPDATE inquiry_checklists SET sent_at = CURRENT_TIMESTAMP WHERE inquiry_id = :id AND phase = :phase');
+        $stmtUpdate->execute([':id' => $inquiryId, ':phase' => $phase]);
 
+        // Log activity immediately so the UI reflects the action without waiting for the worker.
         $this->activity->add(
             $inquiryId,
             ActivityEvents::INQUIRY_INTERNAL_NOTES_UPDATED,
-            ucfirst($phase) . ' checklist sent to client email',
+            'Installation checklist PDF report queued for delivery to client & shop owners',
             null,
             $sentByUserId,
             'staff'
         );
-        
-        // Also send in-app notification if they have an account
-        if ($inquiry['user_id']) {
+
+        // Notify client in-app immediately if they have an account.
+        if (!empty($inquiry['user_id'])) {
+            $serviceName = 'Service';
+            if (!empty($inquiry['service_id'])) {
+                $stmtSrv = $db->prepare('SELECT title FROM services WHERE id = :id');
+                $stmtSrv->execute([':id' => $inquiry['service_id']]);
+                if ($rowSrv = $stmtSrv->fetch(PDO::FETCH_ASSOC)) {
+                    $serviceName = $rowSrv['title'];
+                }
+            }
             $inapp = new InAppNotificationService();
             $inapp->notifyUser(
                 $inquiry['user_id'],
                 'checklist_sent',
-                ucfirst($phase) . " Installation Checklist for your {$serviceName} has been sent to your email.",
-                [
-                    'inquiryId' => $inquiryId,
-                    'phase' => $phase
-                ]
+                "Installation Checklist for your {$serviceName} is being sent to your email.",
+                ['inquiryId' => $inquiryId, 'phase' => $phase]
             );
         }
     }
@@ -572,6 +547,7 @@ class InquiryChecklistService
             'installerName' => $row['installer_name'],
             'serviceFieldValue' => $row['service_field_value'] ?? null,
             'submittedAt' => $row['submitted_at'],
+            'sentAt' => $row['sent_at'] ?? null,
             'createdAt' => $row['created_at'],
             'updatedAt' => $row['updated_at'],
             'responses' => $responses

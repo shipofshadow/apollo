@@ -12,7 +12,7 @@ const STATUS_STYLES: Record<string, string> = {
   'pending': 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20',
   'confirmed': 'bg-green-500/10 text-green-500 border border-green-500/20',
   'in_progress': 'bg-blue-500/10 text-blue-500 border border-blue-500/20',
-  'completed': 'bg-purple-500/10 text-purple-500 border border-purple-500/20',
+  'completed': 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
   'cancelled': 'bg-red-500/10 text-red-500 border border-red-500/20',
 };
 

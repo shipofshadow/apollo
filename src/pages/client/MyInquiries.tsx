@@ -10,27 +10,27 @@ import { fetchMyInquiriesApi } from '../../services/api';
 import { formatStatus } from '../../utils/formatStatus';
 
 const STATUS_STYLES: Record<string, string> = {
-  pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
-  confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
-  in_progress:    'bg-purple-500/10 text-purple-400  border-purple-500/30',
-  completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
-  cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
+  pending:        'bg-amber-500/10 text-amber-400  border-amber-500/30',
+  confirmed:      'bg-blue-500/10  text-blue-400   border-blue-500/30',
+  in_progress:    'bg-brand-orange/10 text-brand-orange border-brand-orange/30',
+  completed:      'bg-emerald-500/10 text-emerald-400  border-emerald-500/30',
+  cancelled:      'bg-red-500/10   text-red-400    border-red-500/30',
 };
 
 const STATUS_STRIP: Record<string, string> = {
-  pending:        'bg-yellow-400',
-  confirmed:      'bg-green-400',
-  in_progress:    'bg-purple-400',
-  completed:      'bg-blue-400',
-  cancelled:      'bg-gray-600',
+  pending:        'bg-amber-400',
+  confirmed:      'bg-blue-400',
+  in_progress:    'bg-brand-orange',
+  completed:      'bg-emerald-400',
+  cancelled:      'bg-red-500',
 };
 
 const STATUS_DOT: Record<string, string> = {
-  pending:        'bg-yellow-400',
-  confirmed:      'bg-green-400',
-  in_progress:    'bg-purple-400',
-  completed:      'bg-blue-400',
-  cancelled:      'bg-gray-500',
+  pending:        'bg-amber-400',
+  confirmed:      'bg-blue-400',
+  in_progress:    'bg-brand-orange',
+  completed:      'bg-emerald-400',
+  cancelled:      'bg-red-500',
 };
 
 function DetailRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {

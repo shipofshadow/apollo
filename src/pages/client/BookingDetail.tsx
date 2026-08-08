@@ -30,7 +30,7 @@ const STATUS_STYLES: Record<Booking['status'], string> = {
   confirmed:      'bg-green-500/10  text-green-400   border-green-500/30',
   completed:      'bg-blue-500/10   text-blue-400    border-blue-500/30',
   cancelled:      'bg-gray-700      text-gray-400    border-gray-600',
-  awaiting_parts: 'bg-purple-500/10 text-purple-400  border-purple-500/30',
+  awaiting_parts: 'bg-amber-500/10  text-amber-400   border-amber-500/30',
 };
 
 // Timeline steps in order
@@ -132,9 +132,9 @@ function getActivityPresentation(log: BookingActivityLog) {
   if (signature.includes('part')) {
     return {
       icon: Package,
-      iconClass: 'text-purple-400',
-      dotClass: 'bg-purple-500/10 border-purple-500/40',
-      cardClass: 'border-purple-500/20',
+      iconClass: 'text-amber-400',
+      dotClass: 'bg-amber-500/10 border-amber-500/40',
+      cardClass: 'border-amber-500/20',
       title: 'Parts Update',
     };
   }
@@ -658,11 +658,11 @@ export default function BookingDetail() {
 
       {/* Awaiting parts note */}
       {booking.status === 'awaiting_parts' && booking.partsNotes && (
-        <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
-          <Package className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl px-5 py-4 flex items-start gap-3">
+          <Package className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-purple-400 mb-1">Awaiting Parts</p>
-            <p className="text-purple-300 text-sm">{booking.partsNotes}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400 mb-1">Awaiting Parts</p>
+            <p className="text-amber-300 text-sm">{booking.partsNotes}</p>
           </div>
         </div>
       )}

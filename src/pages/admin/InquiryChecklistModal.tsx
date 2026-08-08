@@ -65,8 +65,8 @@ function ServiceFieldValueSelector({
                   onChange(v.name);
                 }}
                 className={`relative flex items-center justify-between p-3 rounded-md border text-left transition-all duration-200 ${isSelected
-                    ? 'bg-brand-orange/15 border-brand-orange text-white shadow-md shadow-brand-orange/10 font-bold'
-                    : 'bg-[#151515] border-gray-800 text-gray-300 hover:border-gray-600 hover:bg-[#1c1c1c]'
+                  ? 'bg-brand-orange/15 border-brand-orange text-white shadow-md shadow-brand-orange/10 font-bold'
+                  : 'bg-[#151515] border-gray-800 text-gray-300 hover:border-gray-600 hover:bg-[#1c1c1c]'
                   } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <span className="text-xs font-semibold truncate pr-1">{v.name}</span>
@@ -86,8 +86,8 @@ function ServiceFieldValueSelector({
               if (matchedPreset) onChange('');
             }}
             className={`flex items-center justify-center gap-1.5 p-3 rounded-md border text-xs font-bold transition-all duration-200 ${showCustomInput || isCustomActive
-                ? 'bg-brand-orange/15 border-brand-orange text-brand-orange'
-                : 'bg-[#151515] border-dashed border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
+              ? 'bg-brand-orange/15 border-brand-orange text-brand-orange'
+              : 'bg-[#151515] border-dashed border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -222,7 +222,7 @@ export default function InquiryChecklistModal({ inquiryId, phase, token, onClose
         try {
           setSending(true);
           await sendInquiryChecklistPhaseApi(token, inquiryId, phase);
-          setAlertModal('Checklist sent successfully!');
+          setAlertModal('Report queued — will be delivered to client & shop owners shortly.');
         } catch (err: any) {
           setError(err.message || 'Failed to send');
         } finally {
@@ -274,12 +274,16 @@ export default function InquiryChecklistModal({ inquiryId, phase, token, onClose
         </div>
         <div className="flex items-center gap-3">
           {checklist.submittedAt && (
-            <button onClick={handleSendToClient} disabled={sending}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-sm font-bold uppercase tracking-wider text-sm transition-colors">
+            <button
+              onClick={handleSendToClient}
+              disabled={sending}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white rounded-sm font-bold uppercase tracking-wider text-xs transition-colors cursor-pointer disabled:opacity-50"
+            >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send PDF to Client
+              Send PDF Report
             </button>
           )}
+
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-sm">
             <X className="w-5 h-5" />
           </button>

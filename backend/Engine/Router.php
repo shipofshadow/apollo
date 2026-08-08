@@ -4893,10 +4893,13 @@ class Router
                  throw new RuntimeException("Unauthorized", 403);
              }
         }
+
+        // Increase time limit for PDF generation — overlay rendering can take several seconds.
+        @set_time_limit(120);
         
         $pdfContent = (new InquiryChecklistService())->getChecklistPdfPublic($inquiryId, $phase);
         header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="' . ucfirst($phase) . ' Checklist.pdf"');
+        header('Content-Disposition: inline; filename="Installation Checklist.pdf"');
         echo $pdfContent;
     }
 

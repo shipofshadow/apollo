@@ -261,11 +261,11 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  'pending': 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20',
-  'confirmed': 'bg-green-500/10 text-green-500 border border-green-500/20',
-  'in_progress': 'bg-blue-500/10 text-blue-500 border border-blue-500/20',
-  'completed': 'bg-purple-500/10 text-purple-500 border border-purple-500/20',
-  'cancelled': 'bg-red-500/10 text-red-500 border border-red-500/20',
+  'pending': 'bg-amber-500/10 text-amber-400 border border-amber-500/30',
+  'confirmed': 'bg-blue-500/10 text-blue-400 border border-blue-500/30',
+  'in_progress': 'bg-brand-orange/10 text-brand-orange border border-brand-orange/30',
+  'completed': 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30',
+  'cancelled': 'bg-red-500/10 text-red-400 border border-red-500/30',
 };
 
 
@@ -341,6 +341,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const [sendPdfLoading, setSendPdfLoading] = useState<string | null>(null);
 
   const isAfterSubmitted = Boolean(checklistsState.after?.submittedAt);
+  const isAfterSent = Boolean(checklistsState.after?.sentAt);
   const isStatusLocked = inquiry?.status === 'completed' && isAfterSubmitted;
 
   // Activity log pagination
@@ -368,7 +369,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     try {
       const { sendInquiryChecklistPhaseApi } = await import('../../services/api');
       await sendInquiryChecklistPhaseApi(token, inquiry.id.replace('inq-', ''), phase);
-      showToast(`Inspection report PDF sent to client.`, 'success');
+      showToast(`Inspection report PDF sent to client & shop owners.`, 'success');
+      await loadChecklistsState(); // reload to get sentAt
     } catch (err: any) {
       showToast('Failed to send PDF: ' + err.message, 'error');
     } finally {
@@ -915,7 +917,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6 shadow-xl relative overflow-hidden space-y-6">
             <div className="flex items-center justify-between border-b border-gray-800 pb-4">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-brand-orange" /> Actions & Lifecycle Workflow
+                <ClipboardList className="w-4 h-4 text-brand-orange" /> Actions
               </p>
               <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full ${STATUS_STYLES[inquiry.status] || 'bg-gray-800 text-gray-300'}`}>
                 {formatStatus(inquiry.status)}
@@ -936,7 +938,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                   const widthPct = currentIndex > 0 ? (currentIndex / (stages.length - 1)) * 76 : 0;
                   return (
                     <div
-                      className="absolute top-3 left-[12%] h-0.5 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 z-0 transition-all duration-500"
+                      className="absolute top-3 left-[12%] h-0.5 bg-gradient-to-r from-amber-500 via-brand-orange to-emerald-500 z-0 transition-all duration-500"
                       style={{ width: `${widthPct}%` }}
                     />
                   );
@@ -945,10 +947,10 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 {/* Grid Steps */}
                 <div className="grid grid-cols-4 relative z-10">
                   {[
-                    { key: 'pending', label: 'Pending', activeColor: 'bg-yellow-500 text-black ring-yellow-500/30' },
-                    { key: 'confirmed', label: 'Confirmed', activeColor: 'bg-green-500 text-black ring-green-500/30' },
-                    { key: 'in_progress', label: 'In Progress', activeColor: 'bg-blue-500 text-white ring-blue-500/30' },
-                    { key: 'completed', label: 'Completed', activeColor: 'bg-purple-500 text-white ring-purple-500/30' },
+                    { key: 'pending', label: 'Pending', activeColor: 'bg-amber-500 text-black ring-amber-500/30' },
+                    { key: 'confirmed', label: 'Confirmed', activeColor: 'bg-blue-500 text-white ring-blue-500/30' },
+                    { key: 'in_progress', label: 'In Progress', activeColor: 'bg-brand-orange text-white ring-brand-orange/30' },
+                    { key: 'completed', label: 'Completed', activeColor: 'bg-emerald-500 text-white ring-emerald-500/30' },
                   ].map((step, idx) => {
                     const stages = ['pending', 'confirmed', 'in_progress', 'completed'];
                     const currentIndex = stages.indexOf(inquiry.status);
@@ -978,14 +980,14 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
             {/* Recommended Next Action / Primary Execution Card */}
             <div className="space-y-3">
-              <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Recommended Next Step</p>
+              <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Next Step</p>
 
               {inquiry.status === 'pending' && (
                 <div className="bg-green-500/5 border border-green-500/30 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-green-400">Confirm Inquiry Appointment</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">Lock in customer appointment and move inquiry to confirmed status.</p>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-green-400">Confirm Appointment</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">Confirm the customer's appointment date and time.</p>
                     </div>
                     <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
                   </div>
@@ -1011,8 +1013,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 <div className="bg-blue-500/5 border border-blue-500/30 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400">Start Installation Service</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">Vehicle arrived at shop. Move status to In Progress to begin work.</p>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400">Start Service</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">The vehicle has arrived. Start the service to begin work.</p>
                     </div>
                     <Wrench className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                   </div>
@@ -1035,13 +1037,13 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               )}
 
               {inquiry.status === 'in_progress' && (
-                <div className="bg-purple-500/5 border border-purple-500/30 rounded-lg p-4 space-y-3">
+                <div className="bg-brand-orange/5 border border-brand-orange/30 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300">Active Service Execution</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">Perform pre-install inspection or complete installation sequence.</p>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-brand-orange">Service In Progress</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">Fill out the inspection checklist or mark the service as completed.</p>
                     </div>
-                    <BadgeCheck className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                    <BadgeCheck className="w-5 h-5 text-brand-orange shrink-0 mt-0.5" />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1049,13 +1051,13 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                       onClick={() => setActiveChecklistPhase('before')}
                       className="py-3 px-4 bg-[#1a1a1a] border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <FileText className="w-3.5 h-3.5" /> Before Inspection
+                      <FileText className="w-3.5 h-3.5" /> Pre-Service Checklist
                     </button>
                     <button
                       onClick={() => requestConfirmation(
                         {
-                          title: 'Complete Inquiry?',
-                          message: 'Mark inquiry as completed. You will be prompted for the After Installation Checklist.',
+                          title: 'Complete Service?',
+                          message: 'Mark this service as completed. You will then be able to fill out the final checklist.',
                           confirmLabel: 'Mark Completed',
                         },
                         async () => {
@@ -1064,7 +1066,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                         }
                       )}
                       disabled={statusLoading}
-                      className="py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                      className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                     >
                       {statusLoading ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
                       Mark Completed
@@ -1074,33 +1076,50 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               )}
 
               {inquiry.status === 'completed' && (
-                <div className="bg-purple-500/5 border border-purple-500/30 rounded-lg p-4 space-y-3">
+                <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300">Service Completed</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service Completed</h4>
                       <p className="text-[11px] text-gray-400 mt-1">
-                        {isAfterSubmitted
-                          ? 'Installation finished & after checklist finalized. Status is locked. Send final PDF report to client.'
-                          : 'All installation tasks finished. Access post-installation checklist & send final report.'}
+                        {!isAfterSubmitted
+                          ? 'The service is finished. Please complete the final checklist before sending the report to the customer.'
+                          : !isAfterSent 
+                            ? 'The service is finished and the final checklist is complete. You can now send the final report to the customer.'
+                            : 'The final report has been sent to the customer and shop owners.'}
                       </p>
                     </div>
-                    <BadgeCheck className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                    {isAfterSent ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <BadgeCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
                       onClick={() => setActiveChecklistPhase('after')}
-                      className="py-3 px-4 bg-[#1a1a1a] border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="py-3 px-4 bg-[#1a1a1a] border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <FileText className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View After Checklist' : 'After Checklist'}
+                      <FileText className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View Checklist' : 'Final Checklist'}
                     </button>
-                    <button
-                      onClick={() => handleSendPdf('after')}
-                      disabled={!!sendPdfLoading}
-                      className="py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      {sendPdfLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                      Send Report to Client
-                    </button>
+                    {isAfterSent ? (
+                      <button
+                        onClick={() => handleSendPdf('after')}
+                        disabled={!!sendPdfLoading}
+                        className="py-3 px-4 bg-[#1a1a1a] border border-brand-orange/40 text-brand-orange hover:bg-orange-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                      >
+                        {sendPdfLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        Re-send Report
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSendPdf('after')}
+                        disabled={!!sendPdfLoading}
+                        className="py-3 px-4 bg-brand-orange hover:bg-orange-600 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-brand-orange/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                      >
+                        {sendPdfLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        Send Report
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1109,25 +1128,25 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 <div className="bg-red-500/5 border border-red-500/30 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-400">Inquiry Cancelled</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">This inquiry sequence was terminated.</p>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-400">Service Cancelled</h4>
+                      <p className="text-[11px] text-gray-400 mt-1">This service has been cancelled.</p>
                     </div>
                     <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                   </div>
                   <button
                     onClick={() => requestConfirmation(
                       {
-                        title: 'Re-open Inquiry?',
-                        message: 'Re-open this inquiry back to pending status.',
+                        title: 'Re-open Service?',
+                        message: 'Re-open this service back to pending status.',
                         confirmLabel: 'Re-open',
                       },
                       () => handleStatusChange('pending')
                     )}
                     disabled={statusLoading}
-                    className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-yellow-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
                     {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                    Re-open Inquiry
+                    Re-open Service
                   </button>
                 </div>
               )}
@@ -1135,17 +1154,17 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
             {/* Quick Utility Actions */}
             <div className="pt-4 border-t border-gray-800 space-y-3 relative">
-              <p className="text-[9px] uppercase font-mono tracking-widest text-gray-500">Secondary Controls</p>
+              <p className="text-[9px] uppercase font-mono tracking-widest text-gray-500">More Actions</p>
 
               {/* Status Dropdown */}
               <div className="relative">
                 {isStatusLocked ? (
-                  <div className="w-full flex items-center justify-between bg-purple-950/20 border border-purple-800/40 rounded p-3 text-xs font-bold uppercase tracking-widest text-purple-300">
+                  <div className="w-full flex items-center justify-between bg-emerald-950/30 border border-emerald-800/40 rounded p-3 text-xs font-bold uppercase tracking-widest text-emerald-300">
                     <span className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-purple-400" />
+                      <Lock className="w-4 h-4 text-emerald-400" />
                       Status Locked (Completed & Finalized)
                     </span>
-                    <BadgeCheck className="w-4 h-4 text-purple-400" />
+                    <BadgeCheck className="w-4 h-4 text-emerald-400" />
                   </div>
                 ) : (
                   <button
@@ -1173,11 +1192,11 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                       let hoverClass = 'hover:bg-gray-800';
                       let textClass = 'text-gray-300';
 
-                      if (s === 'confirmed') { hoverClass = 'hover:bg-green-500/10 hover:text-green-400'; }
-                      else if (s === 'in_progress') { hoverClass = 'hover:bg-blue-500/10 hover:text-blue-400'; }
-                      else if (s === 'completed') { hoverClass = 'hover:bg-purple-500/10 hover:text-purple-400'; }
+                      if (s === 'confirmed') { hoverClass = 'hover:bg-blue-500/10 hover:text-blue-400'; }
+                      else if (s === 'in_progress') { hoverClass = 'hover:bg-brand-orange/10 hover:text-brand-orange'; }
+                      else if (s === 'completed') { hoverClass = 'hover:bg-emerald-500/10 hover:text-emerald-400'; }
                       else if (s === 'cancelled') { hoverClass = 'hover:bg-red-500/10 hover:text-red-400'; }
-                      else if (s === 'pending') { hoverClass = 'hover:bg-yellow-500/10 hover:text-yellow-400'; }
+                      else if (s === 'pending') { hoverClass = 'hover:bg-amber-500/10 hover:text-amber-400'; }
 
                       return (
                         <button

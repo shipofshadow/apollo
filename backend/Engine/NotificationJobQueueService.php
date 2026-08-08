@@ -500,6 +500,65 @@ class NotificationJobQueueService
                 (new SmsService())->inquiryStatusChanged($inquiry);
                 return;
 
+            case 'checklist_sent':
+                $inquiryId = (string) ($payload['inquiryId'] ?? '');
+                $phase     = (string) ($payload['phase'] ?? 'after');
+
+                if ($inquiryId === '') {
+                    return;
+                }
+
+                // Generate PDF once, then send to client + admins separately
+                try {
+                    $checklistSvc = new InquiryChecklistService();
+                    $pdfBinary    = $checklistSvc->getChecklistPdfPublic($inquiryId, $phase);
+
+                    $storageDir = __DIR__ . '/../storage/runtime/checklists';
+                    if (!is_dir($storageDir)) {
+                        @mkdir($storageDir, 0775, true);
+                    }
+
+                    // Load full inquiry row for email addressing
+                    $db   = Database::getInstance();
+                    $stmt = $db->prepare(
+                        'SELECT id, email_address, full_name FROM customer_inquiries WHERE id = :id'
+                    );
+                    $stmt->execute([':id' => $inquiryId]);
+                    $inquiry = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                    $clientName = $inquiry['full_name'] ?? 'Client';
+                    $filename   = 'Installation Checklist - '
+                        . preg_replace('/[^A-Za-z0-9_\-]/', '_', $clientName)
+                        . '.pdf';
+                    $pdfPath = $storageDir . '/Checklist_' . md5($inquiryId . $phase . microtime()) . '.pdf';
+                    file_put_contents($pdfPath, $pdfBinary);
+
+                    $ns = new NotificationService();
+
+                    // Send client copy
+                    try {
+                        $ns->sendChecklistEmailToClient($inquiry, $pdfPath, $filename);
+                    } catch (\Throwable $clientErr) {
+                        error_log('[checklist_sent] Client email failed for inquiry ' . $inquiryId . ': ' . $clientErr->getMessage());
+                    }
+
+                    // Send admin/owner copy
+                    try {
+                        $ns->sendChecklistEmailToAdmins($inquiry, $pdfPath, $filename);
+                    } catch (\Throwable $adminErr) {
+                        error_log('[checklist_sent] Admin email failed for inquiry ' . $inquiryId . ': ' . $adminErr->getMessage());
+                    }
+
+                    // Clean up temp PDF
+                    if (file_exists($pdfPath)) {
+                        @unlink($pdfPath);
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[checklist_sent] PDF generation failed for inquiry ' . $inquiryId . ': ' . $e->getMessage());
+                    throw $e; // re-throw so queue marks as retry/failed
+                }
+                return;
+
             case 'inquiry_rescheduled':
                 $inquiry = is_array($payload['inquiry'] ?? null) ? $payload['inquiry'] : [];
                 if (empty($inquiry)) {

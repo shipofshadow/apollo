@@ -14,6 +14,11 @@ function runAutoCronWorkersOnRequest(): void
 		return;
 	}
 
+	// Remove max execution time limit for background workers (PDFs and SMTP can be slow)
+	// and ensure the script continues running even after the client disconnects
+	@set_time_limit(300);
+	@ignore_user_abort(true);
+
 	$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 	if (!is_string($requestPath) || !str_starts_with($requestPath, '/api/')) {
 		return;
