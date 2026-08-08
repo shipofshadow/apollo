@@ -2,4 +2,4 @@
 -- Adds service_field_value to inquiry_checklists
 
 ALTER TABLE inquiry_checklists
-ADD COLUMN service_field_value TEXT NULL AFTER general_notes;
+ADD COLUMN IF NOT EXISTS service_field_value TEXT NULL AFTER general_notes;
