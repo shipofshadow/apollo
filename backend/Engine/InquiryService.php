@@ -653,6 +653,29 @@ class InquiryService
             'count' => (int) $r['cnt']
         ], $peakHours);
 
+        $topInquiriesWhere = $whereClause ? str_replace("appointment_date", "ci.appointment_date", $whereClause) : "";
+        $topInquiriesWhereWithAnd = $topInquiriesWhere ? $topInquiriesWhere . " AND ci.service_id IS NOT NULL" : "WHERE ci.service_id IS NOT NULL";
+        $topInquiries = $db->query(
+            "SELECT s.title AS service_name, COUNT(*) AS cnt
+               FROM customer_inquiries ci
+               JOIN services s ON s.id = ci.service_id
+               $topInquiriesWhereWithAnd
+              GROUP BY ci.service_id, s.title
+              ORDER BY cnt DESC
+              LIMIT 10"
+        )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        $topInquiryServices = [];
+        foreach ($topInquiries as $r) {
+            $name = trim((string) ($r['service_name'] ?? ''));
+            if ($name !== '') {
+                $topInquiryServices[] = [
+                    'name' => $name,
+                    'count' => (int) $r['cnt']
+                ];
+            }
+        }
+
         return [
             'totalInquiries'        => $total,
             'pendingInquiries'      => $pending,
@@ -666,6 +689,7 @@ class InquiryService
             'todayInquiries'        => $todayInquiries,
             'todayPendingInquiries' => $todayPending,
             'peakInquiryHours'      => $peakInquiryHours,
+            'topInquiryServices'    => $topInquiryServices,
         ];
     }
 
@@ -1100,10 +1124,24 @@ class InquiryService
                 }
             }
             
+            $serviceId = $b['serviceId'] ?? $b['service_id'] ?? null;
+            $serviceName = trim((string) ($b['serviceName'] ?? $b['service_name'] ?? ''));
+            if ($serviceId || $serviceName !== '') {
+                $serviceLabel = $serviceName !== '' ? $serviceName : "Service #$serviceId";
+                $topServiceCounts[$serviceLabel] = ($topServiceCounts[$serviceLabel] ?? 0) + 1;
+            }
+
             $timeLabel = trim((string) ($b['appointmentTime'] ?? ''));
             if ($timeLabel !== '' && in_array($status, ['pending', 'confirmed', 'completed', 'in_progress'], true)) {
                 $peakHourCounts[$timeLabel] = ($peakHourCounts[$timeLabel] ?? 0) + 1;
             }
+        }
+
+        arsort($topServiceCounts);
+        $topServiceCounts = array_slice($topServiceCounts, 0, 10, true);
+        $topInquiryServices = [];
+        foreach ($topServiceCounts as $name => $count) {
+            $topInquiryServices[] = ['name' => (string) $name, 'count' => (int) $count];
         }
 
         arsort($peakHourCounts);
@@ -1137,6 +1175,7 @@ class InquiryService
             'todayInquiries'        => $todayInquiries,
             'todayPendingInquiries' => $todayPending,
             'peakInquiryHours'      => $peakInquiryHours,
+            'topInquiryServices'    => $topInquiryServices,
         ];
     }
 

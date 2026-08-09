@@ -297,6 +297,7 @@ type InquiryActivityLog = {
 interface Props {
   inquiryId: string;
   onBack: () => void;
+  backLabel?: string;
 }
 
 type ConfirmDialogState = {
@@ -323,7 +324,7 @@ function DetailSkeleton() {
   );
 }
 
-export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
+export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Return to Appointments' }: Props) {
   const { token } = useAuth();
   const { showToast } = useToast();
 
@@ -595,7 +596,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
             onClick={onBack}
             className="mt-2 text-xs font-bold uppercase tracking-widest text-brand-orange hover:underline cursor-pointer"
           >
-            Return to Appointments
+            {backLabel}
           </button>
         </div>
       </div>
@@ -611,7 +612,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
           onClick={onBack}
           className="inline-flex items-center gap-2 text-gray-400 hover:text-brand-orange text-xs font-mono uppercase tracking-widest transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" /> Return to Appointments
+          <ArrowLeft className="w-4 h-4" /> {backLabel}
         </button>
       </div>
 

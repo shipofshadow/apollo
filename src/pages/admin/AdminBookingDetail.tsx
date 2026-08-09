@@ -336,6 +336,7 @@ function AdminReschedulePanel({ booking, token, onSuccess, onCancel }: Reschedul
 interface Props {
   bookingId: string;
   onBack: () => void;
+  backLabel?: string;
 }
 
 type ConfirmDialogState = {
@@ -345,7 +346,7 @@ type ConfirmDialogState = {
   tone?: 'default' | 'danger';
 };
 
-export default function AdminBookingDetail({ bookingId, onBack }: Props) {
+export default function AdminBookingDetail({ bookingId, onBack, backLabel = 'Return to Operations' }: Props) {
   const dispatch = useDispatch<AppDispatch>();
   const { token, hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -910,9 +911,9 @@ export default function AdminBookingDetail({ bookingId, onBack }: Props) {
       <div className="flex flex-col gap-4">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-orange text-[10px] font-mono uppercase tracking-widest transition-colors w-fit"
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-orange text-[10px] font-mono uppercase tracking-widest transition-colors w-fit cursor-pointer"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Return to Operations
+          <ArrowLeft className="w-3.5 h-3.5" /> {backLabel}
         </button>
 
         <div className="relative border border-gray-800/80 rounded-lg bg-[#121212] overflow-hidden shadow-2xl">

@@ -1,7 +1,7 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { HelmetProvider } from 'react-helmet-async';
-import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { store } from './store';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -72,6 +72,17 @@ function PublicLayout() {
 /** Inner component so hooks can access the Redux store. */
 function AppInner() {
   useNotificationPoller();
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname + location.search;
+    const isAuthPath = ['/login', '/register', '/forgot-password', '/reset-password'].some(
+      p => location.pathname === p || location.pathname.startsWith(`${p}/`)
+    );
+    if (!isAuthPath) {
+      sessionStorage.setItem('last_visited_page', path);
+    }
+  }, [location]);
 
   return (
     <AppErrorBoundary>

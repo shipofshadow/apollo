@@ -150,21 +150,53 @@ export default function AnalyticsPanel() {
     markers: { size: 4, strokeWidth: 0 },
   };
 
+  const baseServiceSeries = [
+    {
+      name: 'Bookings',
+      data: topServices.map(service => service.bookingsCount ?? service.count),
+    },
+    {
+      name: 'Inquiries',
+      data: topServices.map(service => service.inquiriesCount ?? 0),
+    }
+  ];
+
+  const serviceSeries = baseServiceSeries.filter(s => s.data.some(val => val > 0));
+
   const serviceOptions: ApexOptions = {
     chart: {
       type: 'bar',
       toolbar: { show: false },
       foreColor: '#9ca3af',
     },
-    colors: ['#f97316'],
+    colors: serviceSeries.map(s => s.name === 'Bookings' ? '#f97316' : '#3b82f6'),
     plotOptions: {
       bar: {
         horizontal: true,
         borderRadius: 4,
         barHeight: '60%',
+        dataLabels: {
+          position: 'top',
+        },
       },
     },
-    dataLabels: { enabled: false },
+    dataLabels: {
+      enabled: true,
+      textAnchor: 'start',
+      style: {
+        fontSize: '10px',
+        fontWeight: 'bold',
+        colors: ['#ffffff'],
+      },
+      formatter: (val: number) => (val > 0 ? String(val) : ''),
+      offsetX: 5,
+    },
+    legend: {
+      show: true,
+      position: 'top',
+      horizontalAlign: 'right',
+      labels: { colors: '#9ca3af' },
+    },
     xaxis: {
       categories: topServices.map(service => service.name),
       labels: { style: commonAxisLabelStyle },
@@ -172,7 +204,7 @@ export default function AnalyticsPanel() {
     yaxis: {
       labels: {
         style: commonAxisLabelStyle,
-        maxWidth: 260,
+        maxWidth: 240,
       },
     },
     grid: {
@@ -181,13 +213,6 @@ export default function AnalyticsPanel() {
     },
     tooltip: { theme: 'dark' },
   };
-
-  const serviceSeries = [
-    {
-      name: 'Bookings',
-      data: topServices.map(service => service.count),
-    },
-  ];
 
   const statusDonutOptions: ApexOptions = {
     chart: {
@@ -389,19 +414,44 @@ export default function AnalyticsPanel() {
             <h3 className="text-xs font-bold uppercase tracking-widest text-white flex items-center gap-2">
               <Wrench className="w-4 h-4 text-brand-orange" /> Popular Services
             </h3>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">By booking count</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Bookings &amp; Inquiries volume</span>
           </div>
-          <div className="px-3 pt-4 pb-2 min-h-[300px]">
+          <div className="px-3 pt-4 pb-2 min-h-[300px] space-y-4">
             {topServices.length > 0 ? (
-              <ReactApexChart
-                type="bar"
-                height={280}
-                series={serviceSeries}
-                options={serviceOptions}
-              />
+              <>
+                <ReactApexChart
+                  type="bar"
+                  height={280}
+                  series={serviceSeries}
+                  options={serviceOptions}
+                />
+
+                <div className="space-y-1.5 border-t border-gray-800/80 pt-3 px-1">
+                  {topServices.map(s => (
+                    <div key={s.name} className="flex items-center justify-between text-xs font-mono bg-brand-darker border border-gray-800/80 rounded-lg px-3 py-1.5">
+                      <span className="text-gray-200 font-semibold truncate pr-2">{s.name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-bold">
+                        {(s.bookingsCount ?? 0) > 0 && (
+                          <span className="bg-brand-orange/10 text-brand-orange border border-brand-orange/30 px-2 py-0.5 rounded-full">
+                            {s.bookingsCount} {s.bookingsCount === 1 ? 'Booking' : 'Bookings'}
+                          </span>
+                        )}
+                        {(s.inquiriesCount ?? 0) > 0 && (
+                          <span className="bg-sky-500/10 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded-full">
+                            {s.inquiriesCount} {s.inquiriesCount === 1 ? 'Inquiry' : 'Inquiries'}
+                          </span>
+                        )}
+                        <span className="bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full">
+                          Total: {s.count}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="h-[280px] grid place-items-center text-xs text-gray-500 font-mono">
-                Popular services will appear after bookings are recorded.
+                Popular services will appear after bookings or inquiries are recorded.
               </div>
             )}
           </div>

@@ -42,7 +42,23 @@ export default function LoginPage() {
         hasShownToast.current = true;
         showToast(`Welcome back, ${user.name.split(' ')[0]}!`, 'success');
       }
-      navigate(redirect || (user.role === 'client' ? '/client/dashboard' : '/admin'), { replace: true });
+
+      const storedLastPage = sessionStorage.getItem('last_visited_page');
+      let destination = redirect || storedLastPage || '';
+
+      // Validate destination role appropriateness
+      if (user.role === 'client' && destination.startsWith('/admin')) {
+        destination = '/client/dashboard';
+      } else if (user.role !== 'client' && (!destination || destination === '/' || destination === '/client/dashboard')) {
+        destination = '/admin';
+      }
+
+      if (!destination) {
+        destination = user.role === 'client' ? '/client/dashboard' : '/admin';
+      }
+
+      sessionStorage.removeItem('last_visited_page');
+      navigate(destination, { replace: true });
     }
   }, [user, navigate, redirect, showToast]);
 

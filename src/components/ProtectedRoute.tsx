@@ -16,7 +16,7 @@ export default function ProtectedRoute({ children, requiredRole, denyClientRole 
   if (!user) {
     return (
       <Navigate
-        to={`/login?redirect=${encodeURIComponent(location.pathname)}`}
+        to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}
         replace
       />
     );

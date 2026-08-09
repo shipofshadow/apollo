@@ -3518,6 +3518,47 @@ class Router
 
         $stats['peakHours'] = array_values($combinedPeakHours);
         unset($stats['peakInquiryHours']);
+
+        // Merge top services from bookings and inquiries
+        $combinedTopServices = [];
+        foreach ($stats['topServices'] ?? [] as $s) {
+            $name = (string) ($s['name'] ?? '');
+            if ($name === '') continue;
+            if (!isset($combinedTopServices[$name])) {
+                $combinedTopServices[$name] = [
+                    'name' => $name,
+                    'count' => 0,
+                    'bookingsCount' => 0,
+                    'inquiriesCount' => 0,
+                ];
+            }
+            $cnt = (int) ($s['count'] ?? 0);
+            $combinedTopServices[$name]['bookingsCount'] += $cnt;
+            $combinedTopServices[$name]['count'] += $cnt;
+        }
+
+        foreach ($inquiryStats['topInquiryServices'] ?? [] as $s) {
+            $name = (string) ($s['name'] ?? '');
+            if ($name === '') continue;
+            if (!isset($combinedTopServices[$name])) {
+                $combinedTopServices[$name] = [
+                    'name' => $name,
+                    'count' => 0,
+                    'bookingsCount' => 0,
+                    'inquiriesCount' => 0,
+                ];
+            }
+            $cnt = (int) ($s['count'] ?? 0);
+            $combinedTopServices[$name]['inquiriesCount'] += $cnt;
+            $combinedTopServices[$name]['count'] += $cnt;
+        }
+
+        usort($combinedTopServices, function($a, $b) {
+            return $b['count'] <=> $a['count'];
+        });
+
+        $stats['topServices'] = array_slice(array_values($combinedTopServices), 0, 6);
+        unset($stats['topInquiryServices']);
         
         $stats['totalAppointments'] = $stats['totalBookings'] + $stats['totalInquiries'];
         $stats['activeAppointments'] = $stats['activeBookings'] + $stats['activeInquiries'];

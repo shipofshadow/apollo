@@ -924,7 +924,7 @@ export interface AdminStats {
   todayPendingInquiries: number;
   todayActiveAppointments: number;
 
-  topServices: { name: string; count: number }[];
+  topServices: { name: string; count: number; bookingsCount?: number; inquiriesCount?: number }[];
   peakHours: { time: string; bookingsCount: number; inquiriesCount: number; count?: number }[];
   reviewCount: number;
   avgRating: number;

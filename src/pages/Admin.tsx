@@ -4,7 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, GitBranch, Users, Workflow, Megaphone, Boxes, Activity,
+  Camera, MessageSquare, Users, Workflow, Megaphone, Boxes, Activity,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -95,12 +95,12 @@ export default function AdminPage() {
   const routeBookingId = routeState?.openBookingId ?? null;
   const selectedBookingId = activeBookingId ?? routeBookingId;
   
-  // Track which dropdown groups are open
+  // Track which dropdown groups are open (collapsed by default)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    chatbot: true,
-    shop: true,
-    content: true,
-    people: true,
+    chatbot: false,
+    shop: false,
+    content: false,
+    people: false,
     settings: false,
   });
 
@@ -204,13 +204,6 @@ export default function AdminPage() {
     { key: 'calendar',     label: 'Calendar',   icon: CalendarDays },
     { key: 'reviews',      label: 'Reviews',    icon: Star },
     {
-      isGroup: true, key: 'chatbot', label: 'Chatbot', icon: MessageSquare,
-      children: [
-        { key: 'chatbot-conversations', label: 'Conversations', icon: MessageSquare },
-        { key: 'chatbot-flow',          label: 'Flow Editor',  icon: GitBranch },
-      ]
-    },
-    {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
         { key: 'services',   label: 'Services',   icon: Wrench },
@@ -261,10 +254,10 @@ export default function AdminPage() {
   const handleLogout = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     await logout();
-    navigate('/login', { replace: true });
+    navigate(`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`, { replace: true });
   };
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   if (user.role === 'client') return <Navigate to="/" replace />;
 
   const renderContent = () => {
@@ -274,7 +267,26 @@ export default function AdminPage() {
       case 'offers':        return <OffersPanel />;
       case 'before-after':  return <BeforeAfterPanel />;
       case 'content':       return <ContentPanel />;
-      case 'calendar':      return <CalendarPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.appointments); }} />;
+      case 'calendar':
+        if (selectedBookingId) {
+          if (selectedBookingId.startsWith('inq-')) {
+            return (
+              <AdminInquiryDetail
+                inquiryId={selectedBookingId}
+                backLabel="Return to Calendar"
+                onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.calendar); }}
+              />
+            );
+          }
+          return (
+            <AdminBookingDetail
+              bookingId={selectedBookingId}
+              backLabel="Return to Calendar"
+              onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.calendar); }}
+            />
+          );
+        }
+        return <CalendarPanel onView={id => { setActiveBookingId(id); navigate(TAB_PATHS.calendar); }} />;
       case 'reviews':       return <ReviewsPanel />;
       case 'chatbot-conversations': return <ConversationsPage />;
       case 'chatbot-flow':  return <FlowEditorPage />;
@@ -284,6 +296,7 @@ export default function AdminPage() {
             return (
               <AdminInquiryDetail
                 inquiryId={selectedBookingId}
+                backLabel="Return to Appointments"
                 onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
               />
             );
@@ -291,6 +304,7 @@ export default function AdminPage() {
           return (
             <AdminBookingDetail
               bookingId={selectedBookingId}
+              backLabel="Return to Appointments"
               onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
             />
           );

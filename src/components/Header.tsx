@@ -199,7 +199,7 @@ export default function Header() {
           </Link>
           {!user ? (
             <>
-              <Link to="/login"
+              <Link to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}
                 className="text-sm font-bold uppercase tracking-widest text-gray-300 hover:text-brand-orange transition-colors">
                 Login
               </Link>
@@ -294,7 +294,7 @@ export default function Header() {
     
           {!user ? (
             <div className="flex flex-col gap-3 mt-6">
-              <Link to="/login"
+              <Link to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-center border border-gray-700 text-white font-bold uppercase tracking-widest px-6 py-3 rounded-sm hover:border-brand-orange transition-colors">
                 Login
