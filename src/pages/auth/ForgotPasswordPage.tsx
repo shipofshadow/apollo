@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { forgotPasswordApi } from '../../services/api';
 import TurnstileWidget from '../../components/TurnstileWidget';
+import PageSEO from '../../components/PageSEO';
 
 export default function ForgotPasswordPage() {
   const [email,   setEmail]   = useState('');
@@ -29,6 +30,11 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-brand-darker flex items-center justify-center px-4 pt-24 pb-16">
+      <PageSEO
+        title="Forgot Password"
+        description="Reset your 1625 Autolab account password."
+        robots="noindex, nofollow"
+      />
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-10">

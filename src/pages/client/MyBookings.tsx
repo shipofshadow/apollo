@@ -10,6 +10,7 @@ import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 import { fetchBookingByIdApi } from '../../services/api';
 import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
+import PageSEO from '../../components/PageSEO';
 
 type Filter = 'all' | Booking['status'];
 
@@ -92,6 +93,11 @@ export default function MyBookings() {
 
   return (
     <div className="space-y-6 w-full">
+      <PageSEO
+        title="My Bookings"
+        description="View and manage your service appointments at 1625 Autolab."
+        robots="noindex, nofollow"
+      />
       {/* Header */}
       <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#161515] p-5 md:p-7">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />

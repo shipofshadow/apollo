@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { KeyRound, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { resetPasswordApi } from '../../services/api';
 import TurnstileWidget from '../../components/TurnstileWidget';
+import PageSEO from '../../components/PageSEO';
 
 const REDIRECT_DELAY_MS = 3000;
 
@@ -52,6 +53,11 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen bg-brand-darker flex items-center justify-center px-4 pt-24 pb-16">
+      <PageSEO
+        title="Reset Password"
+        description="Set a new password for your 1625 Autolab account."
+        robots="noindex, nofollow"
+      />
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-10">

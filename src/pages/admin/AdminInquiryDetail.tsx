@@ -302,6 +302,9 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  type TabType = 'overview' | 'checklists' | 'notes' | 'activity';
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+
   const [statusLoading, setStatusLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -360,6 +363,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     return () => blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
   }, []);
 
+  const id = inquiryId.replace('inq-', '');
+
   const handlePreviewPdf = async (phase: string = 'after') => {
     if (!token || !inquiry) return;
     setPreviewLoading(phase);
@@ -393,8 +398,6 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   };
 
   const lastNoteUpdate = activityLogs.slice().reverse().find(log => log.eventType === 'inquiry_internal_notes_updated');
-
-  const id = inquiryId.replace('inq-', '');
 
   const loadChecklistsState = async () => {
     if (!token || !id) return;
@@ -481,7 +484,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const handleServiceChange = async (serviceId: string, serviceName: string) => {
     if (!token || !inquiry) return;
     const sId = serviceId ? parseInt(serviceId, 10) : null;
-    
+
     const updateService = async () => {
       try {
         setServicesLoading(true);
@@ -625,304 +628,472 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Details */}
-        <div className="lg:col-span-8 space-y-8">
-          {/* Inquiry Details (Client + Vehicle) */}
-          <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg relative overflow-hidden shadow-xl">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+        {/* Left Column: Tabbed Content */}
+        <div className="lg:col-span-8 space-y-6">
 
-              {/* Client Column */}
-              <div>
-                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                  <User className="w-4 h-4 text-brand-orange" /> Client Details
-                </h3>
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Full Name</p>
-                    <p className="text-white font-medium text-sm">{inquiry.fullName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Email Address</p>
-                    <p className="text-white font-medium text-sm">{inquiry.emailAddress || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Contact Number</p>
-                    <p className="text-white font-medium text-sm">{inquiry.contactNumber || 'N/A'}</p>
-                  </div>
-                  {inquiry.facebookName && (
-                    <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Facebook Name</p>
-                      <p className="text-white font-medium text-sm">{inquiry.facebookName}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Vehicle Column */}
-              <div>
-                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                  <Car className="w-4 h-4 text-brand-orange" /> Vehicle Info
-                </h3>
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Make & Model</p>
-                    <p className="text-white font-medium text-sm">{inquiry.make} {inquiry.model} {inquiry.year || ''}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Plate Number</p>
-                    <p className="text-white font-medium text-sm uppercase">{inquiry.plateNumber || 'N/A'}</p>
-                  </div>
-                  <div className="bg-brand-orange/5 border border-brand-orange/20 rounded p-4 mt-2">
-                    <p className="text-[10px] text-brand-orange/80 uppercase tracking-widest font-mono mb-1">Product / Service</p>
-                    <p className="text-brand-orange font-bold text-sm leading-relaxed">{inquiry.productToPurchase || 'Service inquiry'}</p>
-                  </div>
-                </div>
-              </div>
-
-            </div>
+          {/* Tab Navigation */}
+          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-2 flex overflow-x-auto hide-scrollbar shadow-xl">
+            {[
+              { id: 'overview', label: 'Overview', icon: <FileText className="w-4 h-4" /> },
+              { id: 'checklists', label: 'Checklists', icon: <ClipboardList className="w-4 h-4" /> },
+              { id: 'notes', label: 'Internal Notes', icon: <StickyNote className="w-4 h-4" /> },
+              { id: 'activity', label: 'Activity Log', icon: <Activity className="w-4 h-4" />, badge: activityLogs.length },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className={`flex items-center gap-2 px-5 py-3 rounded-md text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id
+                  ? 'bg-brand-orange text-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+                  }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-black leading-none ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
 
-          {/* Linked Service Section */}
-          <div className="bg-[#121212] border border-gray-800/80 p-6 lg:p-8 rounded-lg shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between border-b border-gray-800/80 pb-4 mb-4">
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-brand-orange" /> Linked Service & Checklist Template
-              </h3>
-              {inquiry.serviceId ? (
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3 h-3" /> Inquiry Linked
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                  <AlertTriangle className="w-3 h-3" /> Unlinked Inquiry
-                </span>
-              )}
-            </div>
+          {activeTab === 'overview' && (
+            <div className="space-y-8">
+              {/* Inquiry Details (Client + Vehicle) */}
+              <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg relative overflow-hidden shadow-xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
 
-            {inquiry.serviceId && !isChangingService ? (
-              /* Summary Card for Inquiry with Linked Service */
-              (() => {
-                const linkedSvc = services.find(s => s.id === inquiry.serviceId);
-                return (
-                  <div className="bg-[#151515] border border-brand-orange/40 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3.5 rounded-lg bg-brand-orange/20 border border-brand-orange/30 text-brand-orange shrink-0">
-                        <Wrench className="w-6 h-6" />
+                  {/* Client Column */}
+                  <div>
+                    <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
+                      <User className="w-4 h-4 text-brand-orange" /> Client Details
+                    </h3>
+                    <div className="space-y-5">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Full Name</p>
+                        <p className="text-white font-medium text-sm">{inquiry.fullName}</p>
                       </div>
                       <div>
-                        <h4 className="text-base font-bold text-white uppercase tracking-wider mt-0.5">
-                          {linkedSvc ? linkedSvc.title : `Service #${inquiry.serviceId}`}
-                        </h4>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Email Address</p>
+                        <p className="text-white font-medium text-sm">{inquiry.emailAddress || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Contact Number</p>
+                        <p className="text-white font-medium text-sm">{inquiry.contactNumber || 'N/A'}</p>
+                      </div>
+                      {inquiry.facebookName && (
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Facebook Name</p>
+                          <p className="text-white font-medium text-sm">{inquiry.facebookName}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vehicle Column */}
+                  <div>
+                    <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
+                      <Car className="w-4 h-4 text-brand-orange" /> Vehicle Info
+                    </h3>
+                    <div className="space-y-5">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Make & Model</p>
+                        <p className="text-white font-medium text-sm">{inquiry.make} {inquiry.model} {inquiry.year || ''}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Plate Number</p>
+                        <p className="text-white font-medium text-sm uppercase">{inquiry.plateNumber || 'N/A'}</p>
+                      </div>
+                      <div className="bg-brand-orange/5 border border-brand-orange/20 rounded p-4 mt-2">
+                        <p className="text-[10px] text-brand-orange/80 uppercase tracking-widest font-mono mb-1">Product / Service</p>
+                        <p className="text-brand-orange font-bold text-sm leading-relaxed">{inquiry.productToPurchase || 'Service inquiry'}</p>
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsChangingService(true)}
-                      className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
-                    >
-                      Change Checklist
-                    </button>
                   </div>
-                );
-              })()
-            ) : (
-              /* Full Service Selector Grid for Old Inquiries or when Changing Service */
-              <div>
-                <p className="text-xs text-gray-400 mb-4">
-                  {!inquiry.serviceId
-                    ? 'This inquiry has no linked service template yet. Select a service below to enable installation checklists:'
-                    : 'Select a service below to update the active checklist template:'}
-                </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {services.map(s => {
-                    const isSelected = inquiry.serviceId === s.id;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        disabled={servicesLoading}
-                        onClick={() => {
-                          if (!isSelected) {
-                            handleServiceChange(String(s.id), s.title);
-                            setIsChangingService(false);
-                          }
-                        }}
-                        className={`relative flex flex-col justify-between p-4 rounded-lg border text-left transition-all duration-300 group cursor-pointer ${isSelected
-                          ? 'border-brand-orange bg-brand-orange/10 shadow-[0_0_20px_rgba(249,115,22,0.15)] ring-1 ring-brand-orange/40'
-                          : 'border-gray-800 bg-[#151515] hover:border-gray-600 hover:bg-[#1a1a1a]'
-                          }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <div className={`p-2.5 rounded-md ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800/80 text-gray-400 group-hover:text-white group-hover:bg-gray-700'} transition-colors`}>
-                              <Wrench className="w-4 h-4" />
-                            </div>
-                            {isSelected && (
-                              <CheckCircle2 className="w-4 h-4 text-brand-orange animate-in zoom-in duration-200" />
-                            )}
-                          </div>
-                          <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
-                            {s.title}
-                          </h4>
-                          {s.startingPrice && (
-                            <p className="text-[10px] font-mono text-gray-400 mb-2">From {s.startingPrice}</p>
-                          )}
-                        </div>
-
-                        <div className="mt-3 pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
-                          <span className={`font-mono uppercase ${isSelected ? 'text-brand-orange font-bold' : 'text-gray-500'}`}>
-                            {isSelected ? 'Active Service' : 'Select'}
-                          </span>
-                          {s.variations?.length ? (
-                            <span className="text-gray-600 font-mono">{s.variations.length} Options</span>
-                          ) : null}
-                        </div>
-                      </button>
-                    );
-                  })}
                 </div>
+              </div>
 
-                {isChangingService && inquiry.serviceId && (
-                  <div className="mt-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setIsChangingService(false)}
-                      className="text-xs text-gray-500 hover:text-gray-300 font-mono uppercase underline cursor-pointer"
-                    >
-                      Cancel Service Change
-                    </button>
+
+              <div className="bg-[#121212] border border-gray-800/80 p-6 rounded-lg shadow-xl relative overflow-hidden">
+                <h3 className="text-[10px] font-bold text-brand-orange uppercase tracking-widest mb-6 flex items-center justify-between border-b border-gray-800/80 pb-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Appointment Schedule
                   </div>
+                  {!isEditingSchedule && inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && (
+                    <button
+                      onClick={() => setIsEditingSchedule(true)}
+                      className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
+                    >
+                      <Calendar className="w-3 h-3" /> Reschedule
+                    </button>
+                  )}
+                </h3>
+
+                {!isEditingSchedule ? (
+                  <div className="space-y-3">
+                    <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-mono">Target Date</span>
+                      <span className="text-sm font-bold text-gray-200">
+                        {inquiry.appointmentDate
+                          ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                          : 'Not Scheduled'}
+                      </span>
+                    </div>
+                    <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-mono">Target Time</span>
+                      <span className="text-sm font-bold text-brand-orange">
+                        {inquiry.appointmentTime || 'Not Scheduled'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  token && (
+                    <AdminInquiryReschedulePanel
+                      inquiry={inquiry}
+                      token={token}
+                      onSuccess={async (updatedDate, updatedTime) => {
+                        setInquiry(prev => prev ? { ...prev, appointmentDate: updatedDate, appointmentTime: updatedTime } : null);
+                        setIsEditingSchedule(false);
+                        if (token && inquiryId) {
+                          try {
+                            const res = await fetchInquiryActivityApi(token, inquiryId);
+                            setActivityLogs((res as InquiryActivityLog[]) || []);
+                          } catch { }
+                        }
+                      }}
+                      onCancel={() => setIsEditingSchedule(false)}
+                    />
+                  )
                 )}
-              </div>
-            )}
-
-            {servicesLoading && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-xs rounded-lg">
-                <div className="flex items-center gap-3 bg-[#121212] px-6 py-3.5 rounded-full border border-gray-800 shadow-2xl">
-                  <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Updating Linked Service...</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Checklists Section */}
-          {inquiry.serviceId && (
-            <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 pb-4 border-b border-gray-800/80">
-                <ClipboardList className="w-4 h-4 text-brand-orange" /> Installation Checklists
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                {/* Before Checklist Card */}
-                <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">Before Installation</h4>
-                  </div>
-                  <p className="text-xs text-gray-500 mb-6 flex-1">Pre-installation inspection checklist to verify vehicle condition before work begins.</p>
-
-                  {['pending', 'confirmed'].includes(inquiry.status) ? (
-                    <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
-                      Locked. Unlocks when status is In Progress.
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setActiveChecklistPhase('before')}
-                      className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
-                    >
-                      Before Installation Checklist
-                    </button>
-                  )}
-                </div>
-
-                {/* After Checklist Card */}
-                <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">After Installation</h4>
-                  </div>
-                  <p className="text-xs text-gray-500 mb-6 flex-1">Post-installation quality check and customer orientation to verify functionality.</p>
-
-                  {inquiry.status !== 'completed' ? (
-                    <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
-                      Locked. Unlocks when status is Completed.
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setActiveChecklistPhase('after')}
-                        className="flex-1 py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
-                      >
-                        After Installation Checklist
-                      </button>
-
-                    </div>
-                  )}
-                </div>
-
               </div>
             </div>
           )}
 
+          {activeTab === 'checklists' && (
+            <div className="space-y-8">
+
+
+              {/* Linked Service Section */}
+              <div className="bg-[#121212] border border-gray-800/80 p-6 lg:p-8 rounded-lg shadow-xl relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-gray-800/80 pb-4 mb-4">
+                  <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-brand-orange" /> Linked Service & Checklist Template
+                  </h3>
+                  {inquiry.serviceId ? (
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3 h-3" /> Inquiry Linked
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3" /> Unlinked Inquiry
+                    </span>
+                  )}
+                </div>
+
+                {inquiry.serviceId && !isChangingService ? (
+                  /* Summary Card for Inquiry with Linked Service */
+                  (() => {
+                    const linkedSvc = services.find(s => s.id === inquiry.serviceId);
+                    return (
+                      <div className="bg-[#151515] border border-brand-orange/40 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3.5 rounded-lg bg-brand-orange/20 border border-brand-orange/30 text-brand-orange shrink-0">
+                            <Wrench className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="text-base font-bold text-white uppercase tracking-wider mt-0.5">
+                              {linkedSvc ? linkedSvc.title : `Service #${inquiry.serviceId}`}
+                            </h4>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsChangingService(true)}
+                          className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                        >
+                          Change Checklist
+                        </button>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* Full Service Selector Grid for Old Inquiries or when Changing Service */
+                  <div>
+                    <p className="text-xs text-gray-400 mb-4">
+                      {!inquiry.serviceId
+                        ? 'This inquiry has no linked service template yet. Select a service below to enable installation checklists:'
+                        : 'Select a service below to update the active checklist template:'}
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {services.map(s => {
+                        const isSelected = inquiry.serviceId === s.id;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            disabled={servicesLoading}
+                            onClick={() => {
+                              if (!isSelected) {
+                                handleServiceChange(String(s.id), s.title);
+                                setIsChangingService(false);
+                              }
+                            }}
+                            className={`relative flex flex-col justify-between p-4 rounded-lg border text-left transition-all duration-300 group cursor-pointer ${isSelected
+                              ? 'border-brand-orange bg-brand-orange/10 shadow-[0_0_20px_rgba(249,115,22,0.15)] ring-1 ring-brand-orange/40'
+                              : 'border-gray-800 bg-[#151515] hover:border-gray-600 hover:bg-[#1a1a1a]'
+                              }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-3">
+                                <div className={`p-2.5 rounded-md ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800/80 text-gray-400 group-hover:text-white group-hover:bg-gray-700'} transition-colors`}>
+                                  <Wrench className="w-4 h-4" />
+                                </div>
+                                {isSelected && (
+                                  <CheckCircle2 className="w-4 h-4 text-brand-orange animate-in zoom-in duration-200" />
+                                )}
+                              </div>
+                              <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
+                                {s.title}
+                              </h4>
+                              {s.startingPrice && (
+                                <p className="text-[10px] font-mono text-gray-400 mb-2">From {s.startingPrice}</p>
+                              )}
+                            </div>
+
+                            <div className="mt-3 pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
+                              <span className={`font-mono uppercase ${isSelected ? 'text-brand-orange font-bold' : 'text-gray-500'}`}>
+                                {isSelected ? 'Active Service' : 'Select'}
+                              </span>
+                              {s.variations?.length ? (
+                                <span className="text-gray-600 font-mono">{s.variations.length} Options</span>
+                              ) : null}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {isChangingService && inquiry.serviceId && (
+                      <div className="mt-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setIsChangingService(false)}
+                          className="text-xs text-gray-500 hover:text-gray-300 font-mono uppercase underline cursor-pointer"
+                        >
+                          Cancel Service Change
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {servicesLoading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-xs rounded-lg">
+                    <div className="flex items-center gap-3 bg-[#121212] px-6 py-3.5 rounded-full border border-gray-800 shadow-2xl">
+                      <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Updating Linked Service...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Checklists Section */}
+              {inquiry.serviceId && (
+                <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
+                  <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 pb-4 border-b border-gray-800/80">
+                    <ClipboardList className="w-4 h-4 text-brand-orange" /> Installation Checklists
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* Before Checklist Card */}
+                    <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-white uppercase tracking-widest">Before Installation</h4>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-6 flex-1">Pre-installation inspection checklist to verify vehicle condition before work begins.</p>
+
+                      {['pending', 'confirmed'].includes(inquiry.status) ? (
+                        <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
+                          Locked. Unlocks when status is In Progress.
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setActiveChecklistPhase('before')}
+                          className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                        >
+                          Before Installation Checklist
+                        </button>
+                      )}
+                    </div>
+
+                    {/* After Checklist Card */}
+                    <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-white uppercase tracking-widest">After Installation</h4>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-6 flex-1">Post-installation quality check and customer orientation to verify functionality.</p>
+
+                      {inquiry.status !== 'completed' ? (
+                        <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
+                          Locked. Unlocks when status is Completed.
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setActiveChecklistPhase('after')}
+                            className="flex-1 py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                          >
+                            After Installation Checklist
+                          </button>
+
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="space-y-8">
+              {/* Internal Notes Section */}
+              <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800/80">
+                  <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                    <StickyNote className="w-4 h-4 text-brand-orange" /> Internal Notes
+                  </h3>
+                  {!isEditingNotes && (
+                    <button
+                      onClick={() => {
+                        setEditNotes(inquiry.internalNotes || '');
+                        setIsEditingNotes(true);
+                      }}
+                      className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-white transition-colors"
+                    >
+                      Edit Notes
+                    </button>
+                  )}
+                </div>
+
+                {isEditingNotes ? (
+                  <div className="space-y-4">
+                    <textarea
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Add internal notes about this inquiry..."
+                      className="w-full bg-black/40 border border-gray-700 rounded-sm p-4 text-sm text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none min-h-[120px] resize-y"
+                    />
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        onClick={() => setIsEditingNotes(false)}
+                        className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2"
+                      >
+                        <X className="w-3.5 h-3.5" /> Cancel
+                      </button>
+                      <button
+                        onClick={handleNotesSave}
+                        disabled={notesLoading}
+                        className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest bg-brand-orange text-white hover:bg-orange-600 transition-colors shadow-lg shadow-brand-orange/20 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" /> {notesLoading ? 'Saving...' : 'Save Notes'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-black/20 rounded p-5 border border-gray-800/50 min-h-[80px] flex flex-col justify-between">
+                    {inquiry.internalNotes ? (
+                      <>
+                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap mb-4">{inquiry.internalNotes}</p>
+                        {lastNoteUpdate && (
+                          <p className="text-[10px] text-gray-500 font-mono text-right mt-2 border-t border-gray-800/50 pt-2">
+                            Last updated by <span className="text-gray-400 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-4 text-gray-600 gap-2">
+                        <FileText className="w-6 h-6 opacity-30" />
+                        <p className="text-[10px] uppercase tracking-widest font-bold">No internal notes</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'activity' && (
+            <div className="space-y-8">
+              {/* Activity Timeline */}
+              <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-8 shadow-xl">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
+                  <Activity className="w-4 h-4 text-brand-orange" /> Activity Log
+                </p>
+                {activityLogs.length === 0 ? (
+                  <p className="text-gray-600 text-xs font-mono text-center py-4">No activity recorded.</p>
+                ) : (() => {
+                  const reversed = activityLogs.slice().reverse();
+                  const totalPages = Math.ceil(reversed.length / ACTIVITY_PAGE_SIZE);
+                  const pageEntries = reversed.slice(activityPage * ACTIVITY_PAGE_SIZE, (activityPage + 1) * ACTIVITY_PAGE_SIZE);
+                  return (
+                    <>
+                      <div className="space-y-5 font-mono">
+                        {pageEntries.map((entry) => (
+                          <div key={entry.id} className="border-b border-gray-800/40 pb-4 last:border-0 last:pb-0">
+                            <p className="text-[10px] text-brand-orange mb-1.5">
+                              {new Date(entry.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </p>
+                            <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
+                              {entry.action}
+                              {entry.actorName && (
+                                <span className="text-gray-500 font-normal lowercase tracking-normal ml-1"> by {entry.actorName}</span>
+                              )}
+                            </p>
+                            {entry.detail && (
+                              <p className="text-[11px] text-gray-500 mt-2 pl-3 border-l-2 border-gray-700 leading-relaxed">{entry.detail}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800">
+                          <button
+                            onClick={() => setActivityPage(p => Math.max(0, p - 1))}
+                            disabled={activityPage === 0}
+                            className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
+                          >
+                            <ChevronLeft className="w-3 h-3" /> Prev
+                          </button>
+                          <span className="text-[10px] font-mono text-gray-500">
+                            Page {activityPage + 1} / {totalPages}
+                          </span>
+                          <button
+                            onClick={() => setActivityPage(p => Math.min(totalPages - 1, p + 1))}
+                            disabled={activityPage >= totalPages - 1}
+                            className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
+                          >
+                            Next <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
+            </div>
+          )}
         </div>
 
         {/* Right Column: Schedule & Status Actions Workflow */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="bg-[#121212] border border-gray-800/80 p-6 rounded-lg shadow-xl relative overflow-hidden">
-            <h3 className="text-[10px] font-bold text-brand-orange uppercase tracking-widest mb-6 flex items-center justify-between border-b border-gray-800/80 pb-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" /> Appointment Schedule
-              </div>
-              {!isEditingSchedule && inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && (
-                <button
-                  onClick={() => setIsEditingSchedule(true)}
-                  className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
-                >
-                  <Calendar className="w-3 h-3" /> Reschedule
-                </button>
-              )}
-            </h3>
-
-            {!isEditingSchedule ? (
-              <div className="space-y-3">
-                <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
-                  <span className="text-xs text-gray-500 font-mono">Target Date</span>
-                  <span className="text-sm font-bold text-gray-200">
-                    {inquiry.appointmentDate
-                      ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-                      : 'Not Scheduled'}
-                  </span>
-                </div>
-                <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
-                  <span className="text-xs text-gray-500 font-mono">Target Time</span>
-                  <span className="text-sm font-bold text-brand-orange">
-                    {inquiry.appointmentTime || 'Not Scheduled'}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              token && (
-                <AdminInquiryReschedulePanel
-                  inquiry={inquiry}
-                  token={token}
-                  onSuccess={async (updatedDate, updatedTime) => {
-                    setInquiry(prev => prev ? { ...prev, appointmentDate: updatedDate, appointmentTime: updatedTime } : null);
-                    setIsEditingSchedule(false);
-                    if (token && inquiryId) {
-                      try {
-                        const res = await fetchInquiryActivityApi(token, inquiryId);
-                        setActivityLogs((res as InquiryActivityLog[]) || []);
-                      } catch { }
-                    }
-                  }}
-                  onCancel={() => setIsEditingSchedule(false)}
-                />
-              )
-            )}
-          </div>
-
+        <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-6 self-start">
           {/* Status Workflow & Actions */}
           <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6 shadow-xl relative overflow-hidden space-y-6">
             <div className="flex items-center justify-between border-b border-gray-800 pb-4">
@@ -1280,128 +1451,6 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               </button>
             </div>
           </div>
-
-          {/* Internal Notes Section */}
-          <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800/80">
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                <StickyNote className="w-4 h-4 text-brand-orange" /> Internal Notes
-              </h3>
-              {!isEditingNotes && (
-                <button
-                  onClick={() => {
-                    setEditNotes(inquiry.internalNotes || '');
-                    setIsEditingNotes(true);
-                  }}
-                  className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-white transition-colors"
-                >
-                  Edit Notes
-                </button>
-              )}
-            </div>
-
-            {isEditingNotes ? (
-              <div className="space-y-4">
-                <textarea
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Add internal notes about this inquiry..."
-                  className="w-full bg-black/40 border border-gray-700 rounded-sm p-4 text-sm text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none min-h-[120px] resize-y"
-                />
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => setIsEditingNotes(false)}
-                    className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2"
-                  >
-                    <X className="w-3.5 h-3.5" /> Cancel
-                  </button>
-                  <button
-                    onClick={handleNotesSave}
-                    disabled={notesLoading}
-                    className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest bg-brand-orange text-white hover:bg-orange-600 transition-colors shadow-lg shadow-brand-orange/20 flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Save className="w-3.5 h-3.5" /> {notesLoading ? 'Saving...' : 'Save Notes'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-black/20 rounded p-5 border border-gray-800/50 min-h-[80px] flex flex-col justify-between">
-                {inquiry.internalNotes ? (
-                  <>
-                    <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap mb-4">{inquiry.internalNotes}</p>
-                    {lastNoteUpdate && (
-                      <p className="text-[10px] text-gray-500 font-mono text-right mt-2 border-t border-gray-800/50 pt-2">
-                        Last updated by <span className="text-gray-400 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-4 text-gray-600 gap-2">
-                    <FileText className="w-6 h-6 opacity-30" />
-                    <p className="text-[10px] uppercase tracking-widest font-bold">No internal notes</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Activity Timeline */}
-          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-8 shadow-xl">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-              <Activity className="w-4 h-4 text-brand-orange" /> Activity Log
-            </p>
-            {activityLogs.length === 0 ? (
-              <p className="text-gray-600 text-xs font-mono text-center py-4">No activity recorded.</p>
-            ) : (() => {
-              const reversed = activityLogs.slice().reverse();
-              const totalPages = Math.ceil(reversed.length / ACTIVITY_PAGE_SIZE);
-              const pageEntries = reversed.slice(activityPage * ACTIVITY_PAGE_SIZE, (activityPage + 1) * ACTIVITY_PAGE_SIZE);
-              return (
-                <>
-                  <div className="space-y-5 font-mono">
-                    {pageEntries.map((entry) => (
-                      <div key={entry.id} className="border-b border-gray-800/40 pb-4 last:border-0 last:pb-0">
-                        <p className="text-[10px] text-brand-orange mb-1.5">
-                          {new Date(entry.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                        </p>
-                        <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
-                          {entry.action}
-                          {entry.actorName && (
-                            <span className="text-gray-500 font-normal lowercase tracking-normal ml-1"> by {entry.actorName}</span>
-                          )}
-                        </p>
-                        {entry.detail && (
-                          <p className="text-[11px] text-gray-500 mt-2 pl-3 border-l-2 border-gray-700 leading-relaxed">{entry.detail}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800">
-                      <button
-                        onClick={() => setActivityPage(p => Math.max(0, p - 1))}
-                        disabled={activityPage === 0}
-                        className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
-                      >
-                        <ChevronLeft className="w-3 h-3" /> Prev
-                      </button>
-                      <span className="text-[10px] font-mono text-gray-500">
-                        Page {activityPage + 1} / {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setActivityPage(p => Math.min(totalPages - 1, p + 1))}
-                        disabled={activityPage >= totalPages - 1}
-                        className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
-                      >
-                        Next <ChevronRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-
         </div>
       </div>
 

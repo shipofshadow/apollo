@@ -22,6 +22,7 @@ import { formatStatus } from '../../utils/formatStatus';
 import BookingReviewWidget from '../../components/BookingReviewWidget';
 import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
 import ClientChecklistPanel from './ClientChecklistPanel';
+import PageSEO from '../../components/PageSEO';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -515,6 +516,11 @@ export default function BookingDetail() {
 
   return (
     <div className="space-y-6 w-full">
+      <PageSEO
+        title={booking ? `Booking #${booking.referenceNumber || booking.id}` : 'Booking Detail'}
+        description="View status, build progress, and details for your appointment."
+        robots="noindex, nofollow"
+      />
       {/* Lightbox */}
       {lightboxUrl && (
         <div

@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { fetchMyInquiriesApi } from '../../services/api';
 import { formatStatus } from '../../utils/formatStatus';
+import PageSEO from '../../components/PageSEO';
 
 const STATUS_STYLES: Record<string, string> = {
   pending:        'bg-amber-500/10 text-amber-400  border-amber-500/30',
@@ -102,6 +103,11 @@ export default function MyInquiries() {
 
   return (
     <div className="space-y-6 w-full">
+      <PageSEO
+        title="My Inquiries"
+        description="Review and track your service inquiries submitted to 1625 Autolab."
+        robots="noindex, nofollow"
+      />
       {/* Header */}
       <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#161515] p-5 md:p-7">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />

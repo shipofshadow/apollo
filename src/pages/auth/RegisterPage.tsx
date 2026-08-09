@@ -4,6 +4,7 @@ import { UserPlus, Eye, EyeOff, AlertCircle, ClipboardList } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import TurnstileWidget from '../../components/TurnstileWidget';
+import PageSEO from '../../components/PageSEO';
 
 /** Returns a score 0–4 for password strength. */
 function passwordStrength(pw: string): number {
@@ -100,6 +101,11 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-brand-darker flex items-center justify-center px-4 pt-24 pb-16">
+      <PageSEO
+        title="Create Account"
+        description="Sign up for a 1625 Autolab account to track your bookings, inquiries, and orders."
+        robots="noindex, nofollow"
+      />
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-display font-black text-white uppercase tracking-tighter mb-2">

@@ -2,6 +2,7 @@ export interface RouteSEO {
   title: string;
   description: string;
   image?: string;
+  noindex?: boolean;
 }
 
 export const ROUTE_SEO: Record<string, RouteSEO> = {
@@ -50,6 +51,38 @@ export const ROUTE_SEO: Record<string, RouteSEO> = {
     title: 'Calendar | 1625 Autolab',
     description: 'View upcoming appointments and booking availability for 1625 Autolab.',
   },
+  // Private & Auth routes - not crawlable
+  '/admin': {
+    title: 'Admin Portal | 1625 Autolab',
+    description: 'Admin portal for managing shop bookings, inquiries, and settings.',
+    noindex: true,
+  },
+  '/client': {
+    title: 'Client Portal | 1625 Autolab',
+    description: 'Client dashboard for managing account bookings and vehicle records.',
+    noindex: true,
+  },
+  '/login': {
+    title: 'Sign In | 1625 Autolab',
+    description: 'Log in to your 1625 Autolab account.',
+    noindex: true,
+  },
+  '/register': {
+    title: 'Create Account | 1625 Autolab',
+    description: 'Sign up for a 1625 Autolab account.',
+    noindex: true,
+  },
+  '/forgot-password': {
+    title: 'Forgot Password | 1625 Autolab',
+    description: 'Reset your 1625 Autolab account password.',
+    noindex: true,
+  },
+  '/reset-password': {
+    title: 'Reset Password | 1625 Autolab',
+    description: 'Set a new password for your 1625 Autolab account.',
+    noindex: true,
+  },
 };
 
 export const DEFAULT_SEO = ROUTE_SEO['/'];
+

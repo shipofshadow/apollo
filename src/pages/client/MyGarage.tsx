@@ -10,6 +10,7 @@ import {
   deleteMyVehicleApi,
   uploadMyVehicleImageApi,
 } from '../../services/api';
+import PageSEO from '../../components/PageSEO';
 
 type VehicleForm = {
   make: string;
@@ -154,6 +155,11 @@ export default function MyGarage() {
 
   return (
     <div className="space-y-6 w-full">
+      <PageSEO
+        title="My Garage"
+        description="Manage saved vehicles for faster inquiry and appointment booking at 1625 Autolab."
+        robots="noindex, nofollow"
+      />
       <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#151515] px-6 py-6 md:px-7 md:py-7">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-14 left-20 h-32 w-32 rounded-full bg-amber-400/10 blur-2xl" />

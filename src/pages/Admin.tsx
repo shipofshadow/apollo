@@ -9,6 +9,7 @@ import {
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
+import PageSEO from '../components/PageSEO';
 import AnalyticsPanel       from './admin/AnalyticsPanel';
 import BookingsPanel        from './admin/BookingsPanel';
 import AdminBookingDetail   from './admin/AdminBookingDetail';
@@ -339,6 +340,11 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-brand-darker flex flex-col">
+      <PageSEO
+        title="Admin Portal"
+        description="Admin dashboard for managing bookings, inquiries, services, and shop settings."
+        robots="noindex, nofollow"
+      />
       {/* Top bar */}
       <header className="h-14 md:h-16 bg-brand-dark border-b border-gray-800 flex items-center justify-between px-3 md:px-6 shrink-0 z-30">
         <div className="flex items-center gap-2 md:gap-4">

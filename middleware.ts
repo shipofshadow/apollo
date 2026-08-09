@@ -15,7 +15,20 @@ export default async function middleware(req: Request) {
   }
 
   const url = new URL(req.url);
-  const seo = ROUTE_SEO[url.pathname] ?? DEFAULT_SEO;
+  const isNoindexRoute =
+    url.pathname.startsWith('/admin') ||
+    url.pathname.startsWith('/client') ||
+    ['/login', '/register', '/forgot-password', '/reset-password'].includes(url.pathname);
+
+  const matchedSeo = ROUTE_SEO[url.pathname] ?? (
+    url.pathname.startsWith('/admin')
+      ? ROUTE_SEO['/admin']
+      : url.pathname.startsWith('/client')
+      ? ROUTE_SEO['/client']
+      : DEFAULT_SEO
+  );
+  const seo = matchedSeo;
+  const isNoindex = isNoindexRoute || !!seo.noindex;
   const image = seo.image ?? DEFAULT_OG_IMAGE;
   const canonical = `${SITE_URL}${url.pathname === '/' ? '' : url.pathname}`;
 
@@ -25,6 +38,7 @@ export default async function middleware(req: Request) {
   const metaTags = `
     <title>${escapeHtml(seo.title)}</title>
     <meta name="description" content="${escapeHtml(seo.description)}" />
+    ${isNoindex ? '<meta name="robots" content="noindex, nofollow" />' : '<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />'}
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${canonical}" />
     <meta property="og:site_name" content="1625 Autolab" />

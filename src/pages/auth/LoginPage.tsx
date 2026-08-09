@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import TurnstileWidget from '../../components/TurnstileWidget';
 import { verifyEmailApi, resendVerificationApi } from '../../services/api';
+import PageSEO from '../../components/PageSEO';
 
 export default function LoginPage() {
   const navigate   = useNavigate();
@@ -77,6 +78,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-brand-darker flex items-center justify-center px-4 pt-24 pb-16">
+      <PageSEO
+        title="Sign In"
+        description="Log in to your 1625 Autolab account to manage your bookings, inquiries, and orders."
+        robots="noindex, nofollow"
+      />
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-10">

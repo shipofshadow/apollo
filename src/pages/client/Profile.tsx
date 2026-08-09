@@ -17,6 +17,7 @@ import {
 } from '../../services/api';
 import type { NotificationPreferences } from '../../types';
 import { getDicebearAvatarDataUri } from '../../utils/avatar';
+import PageSEO from '../../components/PageSEO';
 
 const UPLOAD_MAX_MB = 10;
 
@@ -165,6 +166,11 @@ export default function Profile() {
 
   return (
     <div className="space-y-6 w-full">
+      <PageSEO
+        title="My Profile"
+        description="Manage your 1625 Autolab account profile, security settings, and notifications."
+        robots="noindex, nofollow"
+      />
       {/* Page header */}
       <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#151515] px-6 py-6 md:px-7 md:py-7">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />

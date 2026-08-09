@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { fetchMyOrdersApi } from '../../services/api';
 import type { ProductOrder } from '../../types';
 import { formatPrice } from '../../utils/formatPrice';
+import PageSEO from '../../components/PageSEO';
 
 function statusLabel(status: ProductOrder['status']): string {
   return status.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -97,6 +98,11 @@ export default function MyOrders() {
 
   return (
     <div className="space-y-6">
+      <PageSEO
+        title="My Orders"
+        description="Track product orders and purchase status at 1625 Autolab."
+        robots="noindex, nofollow"
+      />
       <div className="rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#161515] p-6">
         <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-orange/90 mb-2">Client Portal</p>
         <h1 className="text-3xl md:text-4xl font-display font-black text-white uppercase tracking-tight">My Orders</h1>

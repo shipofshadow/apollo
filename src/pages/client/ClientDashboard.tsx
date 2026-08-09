@@ -7,6 +7,7 @@ import type { AppDispatch, RootState } from '../../store';
 import type { Booking } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { formatStatus } from '../../utils/formatStatus';
+import PageSEO from '../../components/PageSEO';
 
 const STATUS_STYLES: Record<Booking['status'], string> = {
   pending:        'bg-yellow-500/10 text-yellow-400  border-yellow-500/30',
@@ -58,6 +59,11 @@ export default function ClientDashboard() {
 
   return (
     <div className="space-y-8 w-full">
+      <PageSEO
+        title="My Dashboard"
+        description="Overview of your bookings, inquiries, and account activity at 1625 Autolab."
+        robots="noindex, nofollow"
+      />
       {/* Welcome hero */}
       <div className="relative overflow-hidden rounded-xl border border-gray-800 bg-gradient-to-br from-brand-darker via-brand-dark to-[#151515] px-6 py-6 md:px-7 md:py-7">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-orange/10 blur-2xl" />

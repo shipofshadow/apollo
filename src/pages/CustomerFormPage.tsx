@@ -150,7 +150,6 @@ export default function CustomerFormPage() {
           const matched = svcs.find((s: any) => String(s.id) === prefilledSvc || s.slug === prefilledSvc || s.title.toLowerCase().includes(prefilledSvc.toLowerCase()));
           if (matched) {
             setSelectedServiceId(String(matched.id));
-            setFormData(prev => ({ ...prev, productToPurchase: prev.productToPurchase || matched.title }));
           }
         }
       })
@@ -493,14 +492,7 @@ export default function CustomerFormPage() {
                               key={s.id}
                               type="button"
                               onClick={() => {
-                                const newId = isSelected ? '' : String(s.id);
-                                setSelectedServiceId(newId);
-                                if (!isSelected) {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    productToPurchase: s.title
-                                  }));
-                                }
+                                setSelectedServiceId(isSelected ? '' : String(s.id));
                               }}
                               className={`p-4 rounded-lg border text-left transition-all duration-300 flex flex-col justify-between group cursor-pointer ${isSelected
                                 ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/40 shadow-[0_0_20px_rgba(249,115,22,0.15)]'
@@ -544,12 +536,20 @@ export default function CustomerFormPage() {
                       id="productToPurchase" name="productToPurchase" required rows={3}
                       value={formData.productToPurchase} onChange={handleChange}
                       className={`${inputClass} resize-none`}
-                      placeholder="Tell us what needs doing..."
+                      placeholder="Tell us what needs doing — e.g. full tint, brand preferences, concerns..."
                     />
                   </div>
 
+                  {/*
+                    Date/time split: this used to be xl:col-span-7 / xl:col-span-5, and
+                    the time-slot grid dropped from lg:grid-cols-4 down to xl:grid-cols-2
+                    right at the same breakpoint the two columns appear — so on desktop
+                    the slot list got squeezed into 2 narrow columns with a scrollbar the
+                    moment there was actually room for more. Balancing the split to 6/6
+                    and keeping the slot grid at 3 columns from lg upward fixes that.
+                  */}
                   <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-stretch pt-2">
-                    <div className="xl:col-span-7 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm">
+                    <div className="xl:col-span-6 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm min-w-0">
                       <p className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest text-brand-orange mb-6">
                         <FaCalendarAlt className="w-4 h-4" /> Available Dates
                       </p>
@@ -565,7 +565,7 @@ export default function CustomerFormPage() {
                       </div>
                     </div>
 
-                    <div className="xl:col-span-5 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm">
+                    <div className="xl:col-span-6 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm min-w-0">
                       <div className="flex items-center justify-between mb-6">
                         <label className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
                           <FaClock className="w-4 h-4" /> Appointment Time *
@@ -588,7 +588,7 @@ export default function CustomerFormPage() {
                             <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-3 rounded-sm text-center">
                               <p className="text-sm text-amber-300">
                                 {closureReason
-                                  ? `Currently not accepting appointments – ${closureReason}.`
+                                  ? `Currently not accepting appointments - ${closureReason}.`
                                   : 'Currently not accepting appointments for this date.'}
                               </p>
                             </div>
@@ -678,11 +678,13 @@ export default function CustomerFormPage() {
                                   )}
                                   {visibleSlots.length > 0 && (
                                     <>
-                                      <div className="mb-2 flex items-center gap-2 rounded-sm border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-400 xl:hidden">
-                                        <span className="font-semibold text-brand-orange">Scroll</span> to see more available times.
-                                      </div>
-                                      <div className="max-h-72 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-2 gap-3">
+                                      {visibleSlots.length > 6 && (
+                                        <div className="mb-2 flex items-center gap-2 rounded-sm border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-400">
+                                          <span className="font-semibold text-brand-orange">Scroll</span> to see more available times.
+                                        </div>
+                                      )}
+                                      <div className="max-h-80 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2 sm:gap-3">
                                           {visibleSlots.map((time) => {
                                             const isSelected = selectedTime === time;
                                             const takenCount = slotCounts[time] ?? 0;
@@ -694,14 +696,14 @@ export default function CustomerFormPage() {
                                                 key={time}
                                                 type="button"
                                                 onClick={() => handleTimeSelect(time)}
-                                                className={`flex min-h-[84px] w-full flex-col items-center justify-center rounded-sm border p-3 text-center transition-all duration-200 focus:outline-none ${isSelected
+                                                className={`flex min-h-[72px] sm:min-h-[80px] w-full flex-col items-center justify-center rounded-sm border p-2.5 sm:p-3 text-center transition-all duration-200 focus:outline-none ${isSelected
                                                   ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
                                                   : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
                                                   }`}
                                               >
-                                                <span className="text-sm font-bold tracking-wide">{time}</span>
+                                                <span className="text-xs sm:text-sm font-bold tracking-wide whitespace-nowrap">{time}</span>
                                                 {spotsLeft > 0 && (
-                                                  <span className={`mt-1 text-[10px] font-semibold ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
+                                                  <span className={`mt-1 text-[9px] sm:text-[10px] font-semibold whitespace-nowrap ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
                                                     {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
                                                   </span>
                                                 )}
@@ -743,6 +745,9 @@ export default function CustomerFormPage() {
                     <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Client Details</span>
                     <span className="text-white font-sans text-sm font-semibold block">{formData.fullName || <span className="text-gray-600 italic font-normal">Not provided</span>}</span>
                     {formData.contactNumber && <span className="text-gray-400 block">{formData.contactNumber}</span>}
+                    {formData.address && <span className="text-gray-400 block">{formData.address}</span>}
+                    {formData.emailAddress && <span className="text-gray-400 block">{formData.emailAddress}</span>}
+                    {formData.facebookName && <span className="text-gray-400 block">fb: {formData.facebookName}</span>}
                   </div>
 
                   <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
@@ -756,9 +761,18 @@ export default function CustomerFormPage() {
                   </div>
 
                   <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Service / Request</span>
+                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Service</span>
                     <span className="text-brand-orange font-sans text-sm font-semibold block leading-snug">
-                      {formData.productToPurchase || <span className="text-gray-600 italic font-normal">Select service category above</span>}
+                      {selectedServiceId
+                        ? services.find((s: any) => String(s.id) === selectedServiceId)?.title || <span className="text-gray-600 italic font-normal">Unknown service</span>
+                        : <span className="text-gray-600 italic font-normal">No service selected</span>}
+                    </span>
+                  </div>
+
+                  <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
+                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Additional Information</span>
+                    <span className="text-gray-300 font-sans text-sm block leading-snug">
+                      {formData.productToPurchase || <span className="text-gray-600 italic font-normal">None provided</span>}
                     </span>
                   </div>
 
@@ -789,7 +803,7 @@ export default function CustomerFormPage() {
                   type="submit"
                   disabled={isSubmitting || !turnstileToken}
                   title={!turnstileToken ? 'Please complete the CAPTCHA' : undefined}
-                  className="w-full relative z-10 bg-gradient-to-r from-brand-orange to-orange-600 hover:from-orange-600 hover:to-brand-orange text-white px-8 py-4 font-bold uppercase tracking-widest disabled:opacity-50 transition-all flex items-center justify-center gap-3 rounded-lg shadow-xl shadow-brand-orange/20 hover:shadow-brand-orange/40 active:scale-[0.99] cursor-pointer"
+                  className="w-full relative z-10 bg-brand-orange hover:bg-orange-600 text-white px-8 py-4 font-bold uppercase tracking-widest disabled:opacity-50 transition-all flex items-center justify-center gap-3 rounded-lg shadow-xl  active:scale-[0.99] cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
