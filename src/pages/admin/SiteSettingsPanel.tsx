@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   Settings, Users, MessageSquare, Loader2, AlertCircle,
   Plus, Pencil, Trash2, Save, X, Upload, Star, Layout,
-  ServerCog, CheckCircle2, Clock, RefreshCw, Database, Info,
+  ServerCog, CheckCircle2, RefreshCw, Database, Info,
+  Sparkles, ShieldCheck, ArrowLeft, Play,
 } from 'lucide-react';
 import {
   fetchSiteSettingsAsync, updateSiteSettingsAsync,
@@ -115,139 +116,201 @@ function CompanyInfoPanel() {
   };
 
   return (
-    <div>
-      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide mb-6">
-        Company / About Page Info
-      </h3>
+    <div className="space-y-6 font-sans">
+      <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+        <div>
+          <h3 className="text-lg font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Settings className="w-5 h-5 text-brand-orange" /> Company &amp; About Overview
+          </h3>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Configure public shop information, about section copy, contact channels, and map embeds.
+          </p>
+        </div>
+      </div>
 
       {status === 'loading' && (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-brand-orange animate-spin" /></div>
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
+        </div>
       )}
 
       {status !== 'loading' && (
-        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
-          {saveError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
-            </div>
-          )}
-          {saveSuccess && (
-            <div className="bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
-              Settings saved successfully.
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">About Section Heading</label>
-            <input value={form.about_heading}
-              onChange={e => setForm(f => ({ ...f, about_heading: e.target.value }))}
-              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+        <form onSubmit={handleSave} className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl">
+          <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> About Section &amp; Public Metadata
+            </h4>
+            <span className="text-[10px] font-mono text-gray-500">Updates live site copy immediately</span>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Company Description (Paragraph 1)</label>
-            <textarea rows={4} value={form.company_description_1}
-              onChange={e => setForm(f => ({ ...f, company_description_1: e.target.value }))}
-              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Company Description (Paragraph 2)</label>
-            <textarea rows={4} value={form.company_description_2}
-              onChange={e => setForm(f => ({ ...f, company_description_2: e.target.value }))}
-              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Company Phone Numbers</label>
-              <textarea rows={3} value={form.company_phones}
-                onChange={e => setForm(f => ({ ...f, company_phones: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
-                placeholder={'One per line\n09123456789\n+639123456789'} />
-              <p className="text-xs text-gray-600">Single source used by Contact and Footer sections.</p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Company Emails</label>
-              <textarea rows={3} value={form.company_emails}
-                onChange={e => setForm(f => ({ ...f, company_emails: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
-                placeholder={'One per line\ninfo@example.com\nservice@example.com'} />
-              <p className="text-xs text-gray-600">Single source used by Contact and Footer sections.</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">About Section Image</label>
-            <div className="flex gap-2">
-              <input value={form.about_image_url}
-                onChange={e => setForm(f => ({ ...f, about_image_url: e.target.value }))}
-                className="flex-1 bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="https://… or upload below" />
-              <label className={`flex items-center gap-2 px-4 py-3 border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange transition-colors rounded-sm cursor-pointer text-sm font-bold uppercase tracking-widest ${imgUploading ? 'opacity-60 pointer-events-none' : ''}`}>
-                {imgUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                <span className="hidden sm:inline">Upload</span>
-                <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
-                  const file = e.target.files?.[0];
-                  if (!file || !token) return;
-                  const sizeErr = validateImageFile(file);
-                  if (sizeErr) { setSaveError(sizeErr); e.target.value = ''; return; }
-                  setImgUploading(true);
-                  try {
-                    const url = await uploadAdminImageApi(token, file, 'services');
-                    setForm(f => ({ ...f, about_image_url: url }));
-                  } catch (err: unknown) {
-                    setSaveError((err as Error)?.message ?? 'Image upload failed.');
-                  } finally {
-                    setImgUploading(false);
-                    e.target.value = '';
-                  }
-                }} />
-              </label>
-            </div>
-            {form.about_image_url && (
-              <div className="relative mt-2 h-32 w-full rounded-sm border border-gray-700 overflow-hidden bg-gray-800">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-gray-600 animate-spin" />
-                </div>
-                <img src={form.about_image_url} alt="About section"
-                  className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
-                  onLoad={e => { (e.target as HTMLImageElement).style.opacity = '1'; }}
-                  onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
-                  referrerPolicy="no-referrer"
-                />
-                <button type="button" onClick={() => setForm(f => ({ ...f, about_image_url: '' }))}
-                  className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500/70 text-white rounded-sm transition-colors"
-                  title="Remove image">
-                  <X className="w-3 h-3" />
-                </button>
+          <div className="p-6 md:p-8 space-y-6">
+            {saveError && (
+              <div className="flex items-center gap-3 bg-red-950/50 border border-red-500/40 text-red-400 px-5 py-4 rounded-xl text-sm shadow-xl">
+                <AlertCircle className="w-5 h-5 shrink-0" /> {saveError}
               </div>
             )}
+            {saveSuccess && (
+              <div className="flex items-center gap-3 bg-emerald-950/50 border border-emerald-500/40 text-emerald-400 px-5 py-4 rounded-xl text-sm shadow-xl font-mono">
+                <CheckCircle2 className="w-5 h-5 shrink-0" /> Company settings saved successfully.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">About Section Heading</label>
+              <input
+                value={form.about_heading}
+                onChange={e => setForm(f => ({ ...f, about_heading: e.target.value }))}
+                placeholder="e.g. Precision Engineering & Automotive Refinement"
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-sans text-sm transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Company Description (Paragraph 1)</label>
+                <textarea
+                  rows={4}
+                  value={form.company_description_1}
+                  onChange={e => setForm(f => ({ ...f, company_description_1: e.target.value }))}
+                  placeholder="Primary shop overview statement..."
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Company Description (Paragraph 2)</label>
+                <textarea
+                  rows={4}
+                  value={form.company_description_2}
+                  onChange={e => setForm(f => ({ ...f, company_description_2: e.target.value }))}
+                  placeholder="Secondary background and philosophy..."
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400 flex items-center justify-between">
+                  <span>Company Phone Numbers</span>
+                  <span className="text-[10px] text-gray-500 font-normal">One per line</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.company_phones}
+                  onChange={e => setForm(f => ({ ...f, company_phones: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm resize-none transition-colors"
+                  placeholder={'09123456789\n+639123456789'}
+                />
+                <p className="text-[11px] text-gray-500">Single source of truth used across Contact and Footer sections.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400 flex items-center justify-between">
+                  <span>Company Emails</span>
+                  <span className="text-[10px] text-gray-500 font-normal">One per line</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.company_emails}
+                  onChange={e => setForm(f => ({ ...f, company_emails: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm resize-none transition-colors"
+                  placeholder={'info@1625autolab.com\nsupport@1625autolab.com'}
+                />
+                <p className="text-[11px] text-gray-500">Single source of truth used across Contact and Footer sections.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">About Section Featured Image</label>
+              <div className="flex gap-2">
+                <input
+                  value={form.about_image_url}
+                  onChange={e => setForm(f => ({ ...f, about_image_url: e.target.value }))}
+                  className="flex-1 bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm font-mono placeholder:text-gray-600 transition-colors"
+                  placeholder="https://... or upload local file"
+                />
+                <label className={`flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 hover:border-brand-orange text-gray-200 hover:text-white rounded-lg transition-colors cursor-pointer text-xs font-mono font-bold uppercase tracking-wider ${imgUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin text-brand-orange" /> : <Upload className="w-4 h-4 text-brand-orange" />}
+                  <span>Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={imgUploading}
+                    onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file || !token) return;
+                      const sizeErr = validateImageFile(file);
+                      if (sizeErr) { setSaveError(sizeErr); e.target.value = ''; return; }
+                      setImgUploading(true);
+                      try {
+                        const url = await uploadAdminImageApi(token, file, 'services');
+                        setForm(f => ({ ...f, about_image_url: url }));
+                      } catch (err: unknown) {
+                        setSaveError((err as Error)?.message ?? 'Image upload failed.');
+                      } finally {
+                        setImgUploading(false);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {form.about_image_url && (
+                <div className="relative mt-3 h-36 w-full rounded-lg border border-gray-800 overflow-hidden bg-brand-darker">
+                  <img
+                    src={form.about_image_url}
+                    alt="About section"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, about_image_url: '' }))}
+                    className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-red-600 text-white rounded-md transition-colors cursor-pointer"
+                    title="Remove image"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Map Embed URL (About Page)</label>
+                <input
+                  value={form.map_embed_url}
+                  onChange={e => setForm(f => ({ ...f, map_embed_url: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm placeholder:text-gray-600 transition-colors"
+                  placeholder="https://www.openstreetmap.org/export/embed.html?..."
+                />
+                <p className="text-[11px] text-gray-500">Paste the iframe <code className="bg-brand-darker px-1 rounded text-gray-300 font-mono">src</code> URL from OpenStreetMap or Google Maps.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Open in Maps External Link</label>
+                <input
+                  value={form.map_link_url}
+                  onChange={e => setForm(f => ({ ...f, map_link_url: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm placeholder:text-gray-600 transition-colors"
+                  placeholder="https://maps.google.com/?q=..."
+                />
+                <p className="text-[11px] text-gray-500">Direct share URL opened when users click "Open in Maps".</p>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Map Embed URL (About Page)</label>
-            <input value={form.map_embed_url}
-              onChange={e => setForm(f => ({ ...f, map_embed_url: e.target.value }))}
-              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-              placeholder="https://www.openstreetmap.org/export/embed.html?… or Google Maps embed src" />
-            <p className="text-xs text-gray-500">Paste the <code className="bg-brand-darker px-1 rounded">src</code> URL from an OpenStreetMap or Google Maps embed iframe. Leave blank to use the default map.</p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Open in Maps Link (About Page)</label>
-            <input value={form.map_link_url}
-              onChange={e => setForm(f => ({ ...f, map_link_url: e.target.value }))}
-              className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-              placeholder="https://www.openstreetmap.org/?mlat=… or Google Maps share link" />
-            <p className="text-xs text-gray-500">The URL that opens when users click "Open in Maps". Leave blank to use the default link.</p>
-          </div>
-
-          <div className="pt-4 border-t border-gray-800">
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
+          <div className="px-6 py-4 bg-brand-dark/80 border-t border-gray-800/80 flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
+            >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Changes
+              <span>Save Company Info</span>
             </button>
           </div>
         </form>
@@ -304,18 +367,6 @@ function TeamMembersPanel() {
         if (!cancelled) setRoleCatalog([]);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) {
-      setUserCatalog([]);
-      return;
-    }
-
-    let cancelled = false;
     fetchAdminUsersApi(token)
       .then(({ users }) => {
         if (!cancelled) setUserCatalog(users);
@@ -355,7 +406,7 @@ function TeamMembersPanel() {
       });
   }, [userCatalog, linkedUserSearch]);
 
-  const openNew  = () => {
+  const openNew = () => {
     setCurrent(EMPTY_MEMBER);
     setLinkedUserSearch('');
     setSaveError(null);
@@ -378,53 +429,43 @@ function TeamMembersPanel() {
     setLinkedUserSearch('');
   };
 
-  const handleUserPick = (userIdRaw: string) => {
-    const userId = Number(userIdRaw);
-    if (!Number.isFinite(userId) || userId <= 0) {
-      setCurrent(prev => ({ ...prev, userId: null }));
-      return;
-    }
-
-    const picked = userCatalog.find(item => item.id === userId);
-    if (!picked) {
-      setCurrent(prev => ({ ...prev, userId: null }));
-      return;
-    }
-
-    setCurrent(prev => ({
-      ...prev,
-      userId: picked.id,
-      name: picked.name,
-      email: picked.email,
-      phone: picked.phone ?? '',
-      role: picked.role,
+  const handleSelectUser = (u: AdminManagedUser) => {
+    setCurrent(p => ({
+      ...p,
+      userId: u.id,
+      name: p.name || u.name,
+      email: p.email || u.email,
+      phone: p.phone || (u.phone ?? ''),
+      role: p.role || roleLabelByKey[u.role] || u.role,
     }));
-    setLinkedUserSearch(`${picked.name} ${picked.email}`);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    if (!current.userId) {
-      setSaveError('Please select an existing user account for this team member.');
-      return;
-    }
     setSaving(true);
     setSaveError(null);
-    const data = {
-      userId: current.userId,
-      name: current.name, role: current.role,
-      imageUrl: current.imageUrl || null, bio: current.bio || null,
-      fullBio: current.fullBio || null, email: current.email || null,
-      phone: current.phone || null, facebook: current.facebook || null,
-      instagram: current.instagram || null, sortOrder: current.sortOrder,
+
+    const payload = {
+      userId: current.userId ?? undefined,
+      name: current.name,
+      role: current.role,
+      imageUrl: current.imageUrl,
+      bio: current.bio,
+      fullBio: current.fullBio,
+      email: current.email,
+      phone: current.phone,
+      facebook: current.facebook,
+      instagram: current.instagram,
+      sortOrder: current.sortOrder,
       isActive: current.isActive,
     };
+
     try {
       if (current.id !== null) {
-        await dispatch(updateTeamMemberAsync({ token, id: current.id, data })).unwrap();
+        await dispatch(updateTeamMemberAsync({ token, id: current.id, data: payload })).unwrap();
       } else {
-        await dispatch(createTeamMemberAsync({ token, data })).unwrap();
+        await dispatch(createTeamMemberAsync({ token, data: payload })).unwrap();
       }
       setEditing(false);
     } catch (err: unknown) {
@@ -442,173 +483,264 @@ function TeamMembersPanel() {
 
   if (editing) {
     return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">
-            {current.id ? 'Edit Team Member' : 'New Team Member'}
-          </h3>
-          <button onClick={cancel} className="text-gray-400 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+      <div className="space-y-6 font-sans">
+        <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+          <div>
+            <button
+              onClick={cancel}
+              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors mb-2 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" /> Return to Team Showcase
+            </button>
+            <h3 className="text-2xl font-display font-black text-white uppercase tracking-tight flex items-center gap-3">
+              <Users className="w-6 h-6 text-brand-orange" />
+              {current.id ? `Edit Member: ${current.name}` : 'Add New Team Member'}
+            </h3>
+          </div>
         </div>
 
-        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
-          {saveError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
-            </div>
-          )}
+        {saveError && (
+          <div className="flex items-center gap-3 bg-red-950/50 border border-red-500/40 text-red-400 px-5 py-4 rounded-xl text-sm shadow-xl">
+            <AlertCircle className="w-5 h-5 shrink-0" /> {saveError}
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Linked User *</label>
+        <form onSubmit={handleSave} className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl space-y-6">
+          <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> Staff Profile &amp; Linked System Account
+            </h4>
+            <span className="text-[10px] font-mono text-gray-500">Public Team Showcase Profile</span>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="space-y-3 p-4 bg-brand-darker border border-gray-800 rounded-xl">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-300 flex items-center justify-between">
+                <span>Link System User Account (Optional)</span>
+                {current.userId && (
+                  <span className="text-emerald-400 text-[10px] bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
+                    Linked to ID #{current.userId}
+                  </span>
+                )}
+              </label>
               <input
+                type="text"
                 value={linkedUserSearch}
                 onChange={e => setLinkedUserSearch(e.target.value)}
-                placeholder="Search user by name, email, or phone"
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
+                placeholder="Search staff by name or email to auto-fill..."
+                className="w-full bg-[#121212] border border-gray-800 text-white px-4 py-2.5 rounded-lg text-xs font-mono focus:outline-none focus:border-brand-orange"
               />
-              <select
-                required
-                value={current.userId ?? ''}
-                onChange={e => handleUserPick(e.target.value)}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-              >
-                <option value="">Select user account</option>
-                {selectableUsers.map(entry => (
-                  <option key={entry.id} value={entry.id}>{entry.name} ({entry.email})</option>
-                ))}
-              </select>
-              <p className="text-[11px] text-gray-500">Client accounts are excluded from team members.</p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Name *</label>
-              <input required value={current.name}
-                className="w-full bg-brand-darker border border-gray-700 text-gray-300 px-4 py-3 rounded-sm"
-                readOnly />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Role / Position</label>
-              <select value={current.role} onChange={e => setCurrent(p => ({ ...p, role: e.target.value }))}
-                required
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-              >
-                <option value="">Select role</option>
-                {current.role && !roleCatalog.some(role => role.key === current.role) ? (
-                  <option value={current.role}>{current.role}</option>
-                ) : null}
-                {roleCatalog.map(role => (
-                  <option key={role.id} value={role.key}>{role.name}</option>
-                ))}
-              </select>
-              {roleCatalog.length > 0 && (
-                <p className="text-[11px] text-gray-500">
-                  Role is restricted to configured access roles.
-                </p>
+              {selectableUsers.length > 0 && (
+                <div className="max-h-36 overflow-y-auto space-y-1 border border-gray-800 rounded-lg p-2 bg-[#121212]">
+                  {selectableUsers.map(u => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => handleSelectUser(u)}
+                      className={`w-full text-left px-3 py-1.5 rounded text-xs font-mono flex items-center justify-between transition-colors ${
+                        current.userId === u.id ? 'bg-brand-orange/20 text-brand-orange font-bold' : 'hover:bg-gray-800 text-gray-300'
+                      }`}
+                    >
+                      <span>{u.name} ({u.email})</span>
+                      <span className="text-[10px] uppercase text-gray-500">{roleLabelByKey[u.role] || u.role}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Profile Image</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Full Name *</label>
+                <input
+                  required
+                  value={current.name}
+                  onChange={e => setCurrent(p => ({ ...p, name: e.target.value }))}
+                  placeholder="e.g. Master Technician Alex Vance"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Role Title *</label>
+                <input
+                  required
+                  value={current.role}
+                  onChange={e => setCurrent(p => ({ ...p, role: e.target.value }))}
+                  placeholder="e.g. Head Retrofit Specialist"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Email Address</label>
+                <input
+                  value={current.email}
+                  onChange={e => setCurrent(p => ({ ...p, email: e.target.value }))}
+                  placeholder="alex@1625autolab.com"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Phone Contact</label>
+                <input
+                  value={current.phone}
+                  onChange={e => setCurrent(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="+63 912 345 6789"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Profile Photo Asset</label>
               <div className="flex gap-2">
-                <input value={current.imageUrl} onChange={e => setCurrent(p => ({ ...p, imageUrl: e.target.value }))}
-                  className="flex-1 bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                  placeholder="https://… or upload" />
-                <label className={`flex items-center gap-2 px-4 py-3 border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange transition-colors rounded-sm cursor-pointer text-sm font-bold uppercase tracking-widest ${imgUploading ? 'opacity-60 pointer-events-none' : ''}`}>
-                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  <span className="hidden sm:inline">Upload</span>
-                  <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
-                    const file = e.target.files?.[0];
-                    if (!file || !token) return;
-                    const sizeErr = validateImageFile(file);
-                    if (sizeErr) { setSaveError(sizeErr); e.target.value = ''; return; }
-                    setImgUploading(true);
-                    try {
-                      const url = await uploadAdminImageApi(token, file, 'team');
-                      setCurrent(p => ({ ...p, imageUrl: url }));
-                    } catch (err: unknown) {
-                      setSaveError((err as Error)?.message ?? 'Image upload failed.');
-                    } finally {
-                      setImgUploading(false);
-                      e.target.value = '';
-                    }
-                  }} />
+                <input
+                  value={current.imageUrl}
+                  onChange={e => setCurrent(p => ({ ...p, imageUrl: e.target.value }))}
+                  className="flex-1 bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm font-mono"
+                  placeholder="https://... or upload below"
+                />
+                <label className={`flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 hover:border-brand-orange text-gray-200 hover:text-white rounded-lg transition-colors cursor-pointer text-xs font-mono font-bold uppercase tracking-wider ${imgUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin text-brand-orange" /> : <Upload className="w-4 h-4 text-brand-orange" />}
+                  <span>Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={imgUploading}
+                    onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file || !token) return;
+                      const sizeErr = validateImageFile(file);
+                      if (sizeErr) { setSaveError(sizeErr); e.target.value = ''; return; }
+                      setImgUploading(true);
+                      try {
+                        const url = await uploadAdminImageApi(token, file, 'team');
+                        setCurrent(p => ({ ...p, imageUrl: url }));
+                      } catch (err: unknown) {
+                        setSaveError((err as Error)?.message ?? 'Image upload failed.');
+                      } finally {
+                        setImgUploading(false);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
                 </label>
               </div>
+
               {current.imageUrl && (
-                <div className="relative mt-2 h-24 w-24 rounded-sm border border-gray-700 overflow-hidden bg-gray-800">
-                  <img src={current.imageUrl} alt="Preview"
+                <div className="relative mt-3 h-28 w-28 rounded-xl border border-gray-800 overflow-hidden bg-brand-darker">
+                  <img
+                    src={current.imageUrl}
+                    alt="Preview"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                     onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
                   />
-                  <button type="button" onClick={() => setCurrent(p => ({ ...p, imageUrl: '' }))}
-                    className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500/70 text-white rounded-sm transition-colors">
-                    <X className="w-3 h-3" />
+                  <button
+                    type="button"
+                    onClick={() => setCurrent(p => ({ ...p, imageUrl: '' }))}
+                    className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-red-600 text-white rounded-md transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Email</label>
-              <input type="email" value={current.email}
-                className="w-full bg-brand-darker border border-gray-700 text-gray-300 px-4 py-3 rounded-sm"
-                readOnly />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Phone</label>
-              <input value={current.phone}
-                className="w-full bg-brand-darker border border-gray-700 text-gray-300 px-4 py-3 rounded-sm"
-                readOnly />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Facebook URL</label>
-              <input value={current.facebook} onChange={e => setCurrent(p => ({ ...p, facebook: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="https://facebook.com/…" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Instagram URL</label>
-              <input value={current.instagram} onChange={e => setCurrent(p => ({ ...p, instagram: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="https://instagram.com/…" />
-            </div>
-
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Short Bio (shown on card)</label>
-              <textarea rows={3} value={current.bio} onChange={e => setCurrent(p => ({ ...p, bio: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white p-4 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Full Bio (shown in modal)</label>
-              <textarea rows={5} value={current.fullBio} onChange={e => setCurrent(p => ({ ...p, fullBio: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white p-4 focus:outline-none focus:border-brand-orange rounded-sm resize-none" />
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Short Bio (Team Card)</label>
+              <textarea
+                rows={2}
+                value={current.bio}
+                onChange={e => setCurrent(p => ({ ...p, bio: e.target.value }))}
+                placeholder="10+ years specializing in Custom Projector Optics & Retrofitting..."
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none"
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Sort Order</label>
-              <input type="number" value={current.sortOrder} onChange={e => setCurrent(p => ({ ...p, sortOrder: Number(e.target.value) }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Full Profile Biography</label>
+              <textarea
+                rows={4}
+                value={current.fullBio}
+                onChange={e => setCurrent(p => ({ ...p, fullBio: e.target.value }))}
+                placeholder="Detailed career overview, certifications, and technical specialties..."
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-y"
+              />
             </div>
-            <div className="flex items-center gap-3 mt-6">
-              <input type="checkbox" id="memberActive" checked={current.isActive}
-                onChange={e => setCurrent(p => ({ ...p, isActive: e.target.checked }))}
-                className="w-4 h-4 accent-brand-orange" />
-              <label htmlFor="memberActive" className="text-xs font-bold uppercase tracking-widest text-gray-400">Active (visible on site)</label>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Instagram Handle</label>
+                <input
+                  value={current.instagram}
+                  onChange={e => setCurrent(p => ({ ...p, instagram: e.target.value }))}
+                  placeholder="@handle or full link"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Facebook URL</label>
+                <input
+                  value={current.facebook}
+                  onChange={e => setCurrent(p => ({ ...p, facebook: e.target.value }))}
+                  placeholder="https://facebook.com/..."
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Sort Priority</label>
+                <input
+                  type="number"
+                  value={current.sortOrder}
+                  onChange={e => setCurrent(p => ({ ...p, sortOrder: Number(e.target.value) }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-800/80 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-mono font-bold uppercase tracking-wider text-white">Public Visibility</p>
+                <p className="text-[11px] text-gray-500">Showcase this team member profile on the public website.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={current.isActive}
+                  onChange={e => setCurrent(p => ({ ...p, isActive: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                <span className="ml-3 text-xs font-mono font-bold uppercase tracking-wider text-gray-300">
+                  {current.isActive ? 'Active (Visible)' : 'Hidden (Draft)'}
+                </span>
+              </label>
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4 border-t border-gray-800">
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {current.id ? 'Save Changes' : 'Add Member'}
-            </button>
-            <button type="button" onClick={cancel}
-              className="px-6 py-3 border border-gray-700 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-colors rounded-sm">
+          <div className="px-6 py-4 bg-brand-dark/80 border-t border-gray-800/80 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={cancel}
+              className="px-5 py-2.5 border border-gray-800 text-gray-400 hover:text-white text-xs font-mono uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+            >
               Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{current.id ? 'Save Member Profile' : 'Add Team Member'}</span>
             </button>
           </div>
         </form>
@@ -617,92 +749,114 @@ function TeamMembersPanel() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">Team Members</h3>
-        <button onClick={openNew}
-          className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-sm font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
-          <Plus className="w-4 h-4" /> Add Member
+    <div className="space-y-6 font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800/80 pb-4">
+        <div>
+          <h3 className="text-lg font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Users className="w-5 h-5 text-brand-orange" /> Team Member Showcase
+          </h3>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Manage staff profiles, technical roles, and system user linkages.
+          </p>
+        </div>
+        <button
+          onClick={openNew}
+          className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-all rounded-lg shadow-lg cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" /> Add Team Member
         </button>
       </div>
 
       {status === 'loading' && (
-        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-brand-orange animate-spin" /></div>
-      )}
-
-      {members.length > 0 && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-x-auto">
-          <table className="w-full text-left min-w-[500px]">
-            <thead>
-              <tr className="border-b border-gray-800 bg-brand-darker/50">
-                {['Member', 'Role', 'Status', 'Order', 'Actions'].map(h => (
-                  <th key={h} className="p-4 text-xs font-bold uppercase tracking-widest text-gray-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {members.map(m => (
-                <tr key={m.id} className="border-b border-gray-800 hover:bg-brand-darker/50 transition-colors">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      {m.imageUrl && (
-                        <img src={m.imageUrl} alt={m.name}
-                          className="w-10 h-10 rounded-full object-cover border border-gray-700"
-                          referrerPolicy="no-referrer"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      )}
-                      <span className="text-white font-bold">{m.name}</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-gray-400 text-sm">
-                    <div>{roleLabelByKey[m.role] ?? m.role}</div>
-                    {m.userId ? (
-                      <div className="text-[11px] text-gray-600">{userLabelById[m.userId] ?? `User #${m.userId}`}</div>
-                    ) : null}
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 text-xs font-bold uppercase tracking-widest rounded-sm ${m.isActive ? 'bg-green-500/10 text-green-500' : 'bg-gray-800 text-gray-400'}`}>
-                      {m.isActive ? 'Active' : 'Hidden'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-400 text-sm">{m.sortOrder}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => openEdit(m)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange text-xs font-bold uppercase rounded-sm transition-colors">
-                        <Pencil className="w-3 h-3" /> Edit
-                      </button>
-                      {deleteConf === m.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => handleDelete(m.id)}
-                            className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
-                            Confirm
-                          </button>
-                          <button onClick={() => setDeleteConf(null)}
-                            className="px-3 py-1.5 border border-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase rounded-sm transition-colors">
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setDeleteConf(m.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-500 hover:border-red-500/50 hover:text-red-400 text-xs font-bold uppercase rounded-sm transition-colors">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
         </div>
       )}
 
       {members.length === 0 && status !== 'loading' && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
-          <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No team members yet. Click <strong>Add Member</strong> to create one.</p>
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-12 text-center shadow-xl space-y-4">
+          <Users className="w-12 h-12 text-gray-600 mx-auto opacity-50" />
+          <p className="text-xs text-gray-400 font-mono">No team members added yet. Click Add Team Member to create one.</p>
+        </div>
+      )}
+
+      {members.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {members.map(m => (
+            <div
+              key={m.id}
+              className="bg-[#121212] border border-gray-800/80 hover:border-brand-orange/40 rounded-xl p-5 shadow-xl transition-all flex items-start gap-4 group"
+            >
+              <div className="w-16 h-16 rounded-xl bg-brand-darker border border-gray-800 overflow-hidden shrink-0">
+                {m.imageUrl ? (
+                  <img
+                    src={m.imageUrl}
+                    alt={m.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-600 font-mono font-bold text-lg">
+                    {m.name.charAt(0)}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-white font-bold text-base truncate group-hover:text-brand-orange transition-colors">{m.name}</h4>
+                  {m.isActive ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full font-bold">Active</span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full font-bold">Hidden</span>
+                  )}
+                </div>
+                <p className="text-brand-orange text-xs font-mono font-bold uppercase">{m.role}</p>
+                <p className="text-gray-400 text-xs line-clamp-2">{m.bio || 'No bio specified'}</p>
+
+                {m.userId && (
+                  <p className="text-[10px] font-mono text-gray-500 pt-1">
+                    Linked User: <span className="text-gray-300 font-bold">{userLabelById[m.userId] || `#${m.userId}`}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => openEdit(m)}
+                  className="p-2 border border-gray-800 hover:border-brand-orange text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Edit Profile"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+
+                {deleteConf === m.id ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      className="px-2.5 py-1.5 bg-red-600 text-white text-[10px] font-mono font-bold uppercase rounded-lg cursor-pointer"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setDeleteConf(null)}
+                      className="px-2 py-1.5 border border-gray-700 text-gray-400 hover:text-white text-[10px] font-mono uppercase rounded-lg cursor-pointer"
+                    >
+                      X
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConf(m.id)}
+                    className="p-2 border border-gray-800 hover:border-red-500/40 text-gray-500 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
+                    title="Delete Member"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -713,12 +867,13 @@ function TeamMembersPanel() {
 
 type TestimonialForm = {
   id: number | null;
-  name: string; role: string; content: string; rating: number;
-  imageUrl: string; isActive: boolean; sortOrder: number;
+  name: string; role: string; imageUrl: string;
+  rating: number; content: string; sortOrder: number;
+  isActive: boolean;
 };
 const EMPTY_TESTIMONIAL: TestimonialForm = {
-  id: null, name: '', role: '', content: '', rating: 5,
-  imageUrl: '', isActive: true, sortOrder: 0,
+  id: null, name: '', role: '', imageUrl: '',
+  rating: 5, content: '', sortOrder: 0, isActive: true,
 };
 
 function TestimonialsPanel() {
@@ -737,11 +892,12 @@ function TestimonialsPanel() {
     if (token) dispatch(fetchTestimonialsAsync(token));
   }, [token, dispatch]);
 
-  const openNew  = () => { setCurrent(EMPTY_TESTIMONIAL); setSaveError(null); setEditing(true); };
+  const openNew = () => { setCurrent(EMPTY_TESTIMONIAL); setSaveError(null); setEditing(true); };
   const openEdit = (t: Testimonial) => {
     setCurrent({
-      id: t.id, name: t.name, role: t.role, content: t.content,
-      rating: t.rating, imageUrl: t.imageUrl ?? '', isActive: t.isActive, sortOrder: t.sortOrder,
+      id: t.id, name: t.name, role: t.role ?? '',
+      imageUrl: t.imageUrl ?? '', rating: t.rating, content: t.content,
+      sortOrder: t.sortOrder, isActive: t.isActive,
     });
     setSaveError(null);
     setEditing(true);
@@ -753,16 +909,22 @@ function TestimonialsPanel() {
     if (!token) return;
     setSaving(true);
     setSaveError(null);
-    const data = {
-      name: current.name, role: current.role, content: current.content,
-      rating: current.rating, imageUrl: current.imageUrl || null,
-      isActive: current.isActive, sortOrder: current.sortOrder,
+
+    const payload = {
+      name: current.name,
+      role: current.role,
+      imageUrl: current.imageUrl,
+      rating: current.rating,
+      content: current.content,
+      sortOrder: current.sortOrder,
+      isActive: current.isActive,
     };
+
     try {
       if (current.id !== null) {
-        await dispatch(updateTestimonialAsync({ token, id: current.id, data })).unwrap();
+        await dispatch(updateTestimonialAsync({ token, id: current.id, data: payload })).unwrap();
       } else {
-        await dispatch(createTestimonialAsync({ token, data })).unwrap();
+        await dispatch(createTestimonialAsync({ token, data: payload })).unwrap();
       }
       setEditing(false);
     } catch (err: unknown) {
@@ -780,120 +942,169 @@ function TestimonialsPanel() {
 
   if (editing) {
     return (
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">
-            {current.id ? 'Edit Testimonial' : 'New Testimonial'}
-          </h3>
-          <button onClick={cancel} className="text-gray-400 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+      <div className="space-y-6 font-sans">
+        <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+          <div>
+            <button
+              onClick={cancel}
+              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors mb-2 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" /> Return to Testimonials List
+            </button>
+            <h3 className="text-2xl font-display font-black text-white uppercase tracking-tight flex items-center gap-3">
+              <Star className="w-6 h-6 text-brand-orange fill-brand-orange" />
+              {current.id ? `Edit Review: ${current.name}` : 'Add New Client Testimonial'}
+            </h3>
+          </div>
         </div>
 
-        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
-          {saveError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
-            </div>
-          )}
+        {saveError && (
+          <div className="flex items-center gap-3 bg-red-950/50 border border-red-500/40 text-red-400 px-5 py-4 rounded-xl text-sm shadow-xl">
+            <AlertCircle className="w-5 h-5 shrink-0" /> {saveError}
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Client Name *</label>
-              <input required value={current.name} onChange={e => setCurrent(p => ({ ...p, name: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Role / Vehicle</label>
-              <input value={current.role} onChange={e => setCurrent(p => ({ ...p, role: e.target.value }))}
-                placeholder="e.g. Honda Civic Owner"
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
-            </div>
+        <form onSubmit={handleSave} className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl space-y-6">
+          <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> Client Review &amp; Social Proof
+            </h4>
+            <span className="text-[10px] font-mono text-gray-500">Public Website Review Card</span>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Rating (1–5)</label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map(n => (
-                  <button key={n} type="button" onClick={() => setCurrent(p => ({ ...p, rating: n }))}>
-                    <Star className={`w-6 h-6 ${n <= current.rating ? 'fill-brand-orange text-brand-orange' : 'text-gray-600'}`} />
-                  </button>
-                ))}
-                <span className="text-gray-400 text-sm ml-1">{current.rating}/5</span>
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Client Name *</label>
+                <input
+                  required
+                  value={current.name}
+                  onChange={e => setCurrent(p => ({ ...p, name: e.target.value }))}
+                  placeholder="e.g. Marco Rossi"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Vehicle / Subtitle Tag</label>
+                <input
+                  value={current.role}
+                  onChange={e => setCurrent(p => ({ ...p, role: e.target.value }))}
+                  placeholder="e.g. Subaru WRX STI Owner"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm"
+                />
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mt-6">
-              <input type="checkbox" id="testimonialActive" checked={current.isActive}
-                onChange={e => setCurrent(p => ({ ...p, isActive: e.target.checked }))}
-                className="w-4 h-4 accent-brand-orange" />
-              <label htmlFor="testimonialActive" className="text-xs font-bold uppercase tracking-widest text-gray-400">Active (visible on site)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Rating (1–5 Stars)</label>
+                <div className="flex items-center gap-2 pt-1">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setCurrent(p => ({ ...p, rating: star }))}
+                      className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
+                    >
+                      <Star className={`w-6 h-6 ${star <= current.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-700'}`} />
+                    </button>
+                  ))}
+                  <span className="text-xs font-mono font-bold text-gray-300 ml-2">{current.rating} / 5 Stars</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Avatar Image Asset</label>
+                <div className="flex gap-2">
+                  <input
+                    value={current.imageUrl}
+                    onChange={e => setCurrent(p => ({ ...p, imageUrl: e.target.value }))}
+                    className="flex-1 bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm font-mono"
+                    placeholder="https://... or upload below"
+                  />
+                  <label className={`flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 hover:border-brand-orange text-gray-200 hover:text-white rounded-lg transition-colors cursor-pointer text-xs font-mono font-bold uppercase tracking-wider ${imgUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {imgUploading ? <Loader2 className="w-4 h-4 animate-spin text-brand-orange" /> : <Upload className="w-4 h-4 text-brand-orange" />}
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={imgUploading}
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (!file || !token) return;
+                        const sizeErr = validateImageFile(file);
+                        if (sizeErr) { setSaveError(sizeErr); e.target.value = ''; return; }
+                        setImgUploading(true);
+                        try {
+                          const url = await uploadAdminImageApi(token, file, 'testimonials');
+                          setCurrent(p => ({ ...p, imageUrl: url }));
+                        } catch (err: unknown) {
+                          setSaveError((err as Error)?.message ?? 'Image upload failed.');
+                        } finally {
+                          setImgUploading(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Client Photo</label>
-              <div className="flex gap-2">
-                <input value={current.imageUrl} onChange={e => setCurrent(p => ({ ...p, imageUrl: e.target.value }))}
-                  className="flex-1 bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm"
-                  placeholder="https://… or upload" />
-                <label className={`flex items-center gap-2 px-4 py-3 border border-gray-700 text-gray-300 hover:text-white hover:border-brand-orange transition-colors rounded-sm cursor-pointer text-sm font-bold uppercase tracking-widest ${imgUploading ? 'opacity-60 pointer-events-none' : ''}`}>
-                  {imgUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  <span className="hidden sm:inline">Upload</span>
-                  <input type="file" accept="image/*" className="hidden" disabled={imgUploading} onChange={async e => {
-                    const file = e.target.files?.[0];
-                    if (!file || !token) return;
-                    const sizeErr = validateImageFile(file);
-                    if (sizeErr) { setSaveError(sizeErr); e.target.value = ''; return; }
-                    setImgUploading(true);
-                    try {
-                      const url = await uploadAdminImageApi(token, file, 'testimonials');
-                      setCurrent(p => ({ ...p, imageUrl: url }));
-                    } catch (err: unknown) {
-                      setSaveError((err as Error)?.message ?? 'Image upload failed.');
-                    } finally {
-                      setImgUploading(false);
-                      e.target.value = '';
-                    }
-                  }} />
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Testimonial Review Content *</label>
+              <textarea
+                required
+                rows={4}
+                value={current.content}
+                onChange={e => setCurrent(p => ({ ...p, content: e.target.value }))}
+                placeholder="The beam pattern precision and custom demon eye setup exceeded all expectations..."
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Sort Priority</label>
+                <input
+                  type="number"
+                  value={current.sortOrder}
+                  onChange={e => setCurrent(p => ({ ...p, sortOrder: Number(e.target.value) }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                />
+              </div>
+
+              <div className="pt-6 flex items-center">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-xs font-mono uppercase font-bold tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={current.isActive}
+                    onChange={e => setCurrent(p => ({ ...p, isActive: e.target.checked }))}
+                    className="accent-emerald-500 w-4 h-4 rounded"
+                  />
+                  Active &amp; Visible on Site
                 </label>
               </div>
-              {current.imageUrl && (
-                <div className="relative mt-2 h-16 w-16 rounded-full border border-gray-700 overflow-hidden bg-gray-800">
-                  <img src={current.imageUrl} alt="Preview"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
-                  />
-                  <button type="button" onClick={() => setCurrent(p => ({ ...p, imageUrl: '' }))}
-                    className="absolute top-0 right-0 p-0.5 bg-black/60 hover:bg-red-500/70 text-white rounded-full transition-colors">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Testimonial Content *</label>
-              <textarea required rows={5} value={current.content} onChange={e => setCurrent(p => ({ ...p, content: e.target.value }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white p-4 focus:outline-none focus:border-brand-orange rounded-sm resize-none"
-                placeholder="What the client said…" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Sort Order</label>
-              <input type="number" value={current.sortOrder} onChange={e => setCurrent(p => ({ ...p, sortOrder: Number(e.target.value) }))}
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm" />
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4 border-t border-gray-800">
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {current.id ? 'Save Changes' : 'Add Testimonial'}
-            </button>
-            <button type="button" onClick={cancel}
-              className="px-6 py-3 border border-gray-700 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-colors rounded-sm">
+          <div className="px-6 py-4 bg-brand-dark/80 border-t border-gray-800/80 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={cancel}
+              className="px-5 py-2.5 border border-gray-800 text-gray-400 hover:text-white text-xs font-mono uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+            >
               Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{current.id ? 'Save Changes' : 'Add Testimonial'}</span>
             </button>
           </div>
         </form>
@@ -902,223 +1113,117 @@ function TestimonialsPanel() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">Client Testimonials</h3>
-        <button onClick={openNew}
-          className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-sm font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm">
+    <div className="space-y-6 font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800/80 pb-4">
+        <div>
+          <h3 className="text-lg font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Star className="w-5 h-5 text-amber-400 fill-amber-400" /> Client Testimonials &amp; Reviews
+          </h3>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Manage public client reviews, star ratings, and social proof cards.
+          </p>
+        </div>
+        <button
+          onClick={openNew}
+          className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-all rounded-lg shadow-lg cursor-pointer shrink-0"
+        >
           <Plus className="w-4 h-4" /> Add Testimonial
         </button>
       </div>
 
       {status === 'loading' && (
-        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-brand-orange animate-spin" /></div>
-      )}
-
-      {testimonials.length > 0 && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-x-auto">
-          <table className="w-full text-left min-w-[500px]">
-            <thead>
-              <tr className="border-b border-gray-800 bg-brand-darker/50">
-                {['Client', 'Rating', 'Status', 'Order', 'Actions'].map(h => (
-                  <th key={h} className="p-4 text-xs font-bold uppercase tracking-widest text-gray-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {testimonials.map(t => (
-                <tr key={t.id} className="border-b border-gray-800 hover:bg-brand-darker/50 transition-colors">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      {t.imageUrl && (
-                        <img src={t.imageUrl} alt={t.name}
-                          className="w-10 h-10 rounded-full object-cover border border-gray-700"
-                          referrerPolicy="no-referrer"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      )}
-                      <div>
-                        <p className="text-white font-bold">{t.name}</p>
-                        <p className="text-gray-500 text-xs">{t.role}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`w-3.5 h-3.5 ${i < t.rating ? 'fill-brand-orange text-brand-orange' : 'text-gray-700'}`} />
-                      ))}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 text-xs font-bold uppercase tracking-widest rounded-sm ${t.isActive ? 'bg-green-500/10 text-green-500' : 'bg-gray-800 text-gray-400'}`}>
-                      {t.isActive ? 'Active' : 'Hidden'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-gray-400 text-sm">{t.sortOrder}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => openEdit(t)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-brand-orange text-xs font-bold uppercase rounded-sm transition-colors">
-                        <Pencil className="w-3 h-3" /> Edit
-                      </button>
-                      {deleteConf === t.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <button onClick={() => handleDelete(t.id)}
-                            className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold uppercase rounded-sm transition-colors">
-                            Confirm
-                          </button>
-                          <button onClick={() => setDeleteConf(null)}
-                            className="px-3 py-1.5 border border-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase rounded-sm transition-colors">
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setDeleteConf(t.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-500 hover:border-red-500/50 hover:text-red-400 text-xs font-bold uppercase rounded-sm transition-colors">
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
         </div>
       )}
 
       {testimonials.length === 0 && status !== 'loading' && (
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
-          <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No testimonials yet. Click <strong>Add Testimonial</strong> to create one.</p>
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-12 text-center shadow-xl space-y-4">
+          <Star className="w-12 h-12 text-gray-600 mx-auto opacity-50" />
+          <p className="text-xs text-gray-400 font-mono">No testimonials found. Click Add Testimonial to create one.</p>
         </div>
       )}
-    </div>
-  );
-}
 
-// ── Sub-panel: Footer Settings ───────────────────────────────────────────────
+      {testimonials.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {testimonials.map(t => (
+            <div
+              key={t.id}
+              className="bg-[#121212] border border-gray-800/80 hover:border-brand-orange/40 rounded-xl p-5 shadow-xl transition-all space-y-3 group"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-darker border border-gray-800 overflow-hidden shrink-0">
+                    {t.imageUrl ? (
+                      <img src={t.imageUrl} alt={t.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 font-mono font-bold text-xs">
+                        {t.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-sm group-hover:text-brand-orange transition-colors">{t.name}</h4>
+                    <p className="text-xs text-gray-400 font-mono">{t.role || 'Client'}</p>
+                  </div>
+                </div>
 
-function FooterSettingsPanel() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { token } = useAuth();
-  const { settings, status } = useSelector((s: RootState) => s.siteSettings);
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {t.isActive ? (
+                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full font-bold">Active</span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[9px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full font-bold">Draft</span>
+                  )}
+                </div>
+              </div>
 
-  const [form, setForm] = useState({
-    footer_tagline:   '',
-    footer_address:   '',
-    footer_instagram: '',
-    footer_facebook:  '',
-    footer_youtube:   '',
-  });
-  const [saving,      setSaving]      = useState(false);
-  const [saveError,   setSaveError]   = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map(s => (
+                  <Star key={s} className={`w-3.5 h-3.5 ${s <= t.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-700'}`} />
+                ))}
+              </div>
 
-  useEffect(() => {
-    dispatch(fetchSiteSettingsAsync());
-  }, [dispatch]);
+              <p className="text-gray-300 text-xs italic line-clamp-3 leading-relaxed">
+                "{t.content}"
+              </p>
 
-  useEffect(() => {
-    setForm({
-      footer_tagline:   settings.footer_tagline   ?? '',
-      footer_address:   settings.footer_address   ?? '',
-      footer_instagram: settings.footer_instagram ?? '',
-      footer_facebook:  settings.footer_facebook  ?? '',
-      footer_youtube:   settings.footer_youtube   ?? '',
-    });
-  }, [settings]);
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800/80">
+                <button
+                  onClick={() => openEdit(t)}
+                  className="p-1.5 border border-gray-800 hover:border-brand-orange text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Edit Review"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-    setSaving(true);
-    setSaveError(null);
-    setSaveSuccess(false);
-    try {
-      await dispatch(updateSiteSettingsAsync({ token, data: form })).unwrap();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err: unknown) {
-      setSaveError((err as Error)?.message ?? 'Failed to save settings.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const inputCls = 'w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm';
-
-  return (
-    <div>
-      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide mb-6">
-        Footer Settings
-      </h3>
-
-      {status === 'loading' && (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-brand-orange animate-spin" /></div>
-      )}
-
-      {status !== 'loading' && (
-        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
-          {saveError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
+                {deleteConf === t.id ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDelete(t.id)}
+                      className="px-2.5 py-1 bg-red-600 text-white text-[10px] font-mono font-bold uppercase rounded-lg cursor-pointer"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setDeleteConf(null)}
+                      className="px-2 py-1 border border-gray-700 text-gray-400 hover:text-white text-[10px] font-mono uppercase rounded-lg cursor-pointer"
+                    >
+                      X
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConf(t.id)}
+                    className="p-1.5 border border-gray-800 hover:border-red-500/40 text-gray-500 hover:text-red-400 rounded-lg transition-colors cursor-pointer"
+                    title="Delete Review"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
-          {saveSuccess && (
-            <div className="bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
-              Footer settings saved successfully.
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Tagline</label>
-            <textarea rows={2} value={form.footer_tagline}
-              onChange={e => setForm(f => ({ ...f, footer_tagline: e.target.value }))}
-              className={`${inputCls} resize-none`}
-              placeholder="Short description shown below the logo" />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Address</label>
-            <textarea rows={2} value={form.footer_address}
-              onChange={e => setForm(f => ({ ...f, footer_address: e.target.value }))}
-              className={`${inputCls} resize-none`}
-              placeholder="Shop address" />
-          </div>
-
-          <div className="rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-3 text-xs text-gray-400">
-            Phone numbers and email addresses are managed in the Company Info tab.
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Instagram URL</label>
-            <input value={form.footer_instagram}
-              onChange={e => setForm(f => ({ ...f, footer_instagram: e.target.value }))}
-              className={inputCls} placeholder="https://www.instagram.com/yourhandle" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Facebook URL</label>
-            <input value={form.footer_facebook}
-              onChange={e => setForm(f => ({ ...f, footer_facebook: e.target.value }))}
-              className={inputCls} placeholder="https://www.facebook.com/yourpage" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">YouTube URL</label>
-            <input value={form.footer_youtube}
-              onChange={e => setForm(f => ({ ...f, footer_youtube: e.target.value }))}
-              className={inputCls} placeholder="https://www.youtube.com/@yourchannel (leave blank to hide)" />
-          </div>
-
-          <div className="pt-4 border-t border-gray-800">
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Changes
-            </button>
-          </div>
-        </form>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1165,71 +1270,263 @@ function ContactPanel() {
     } finally { setSaving(false); }
   };
 
-  const inputCls = 'w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange rounded-sm text-sm transition-colors';
-
   return (
-    <div>
-      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide mb-2">Contact Page</h3>
-      <p className="text-gray-500 text-sm mb-6">Edit the content shown on the public /contact page.</p>
+    <div className="space-y-6 font-sans">
+      <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+        <div>
+          <h3 className="text-lg font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-brand-orange" /> Contact Page Settings
+          </h3>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Configure copy and operational hours displayed on the public /contact page.
+          </p>
+        </div>
+      </div>
 
       {status === 'loading' && (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-brand-orange animate-spin" /></div>
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
+        </div>
       )}
 
       {status !== 'loading' && (
-        <form onSubmit={handleSave} className="bg-brand-dark border border-gray-800 rounded-sm p-6 space-y-5">
-          {saveError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {saveError}
+        <form onSubmit={handleSave} className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl">
+          <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> Contact Copy &amp; Business Hours
+            </h4>
+            <span className="text-[10px] font-mono text-gray-500">Public Contact Section</span>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6">
+            {saveError && (
+              <div className="flex items-center gap-3 bg-red-950/50 border border-red-500/40 text-red-400 px-5 py-4 rounded-xl text-sm shadow-xl">
+                <AlertCircle className="w-5 h-5 shrink-0" /> {saveError}
+              </div>
+            )}
+            {saveSuccess && (
+              <div className="flex items-center gap-3 bg-emerald-950/50 border border-emerald-500/40 text-emerald-400 px-5 py-4 rounded-xl text-sm shadow-xl font-mono">
+                <CheckCircle2 className="w-5 h-5 shrink-0" /> Contact page settings saved.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Page Heading</label>
+              <input
+                value={form.contact_heading}
+                onChange={e => setForm(f => ({ ...f, contact_heading: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm"
+                placeholder="Contact The Lab"
+              />
             </div>
-          )}
-          {saveSuccess && (
-            <div className="bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" /> Contact page settings saved.
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Tagline / Subheading Intro</label>
+              <textarea
+                rows={3}
+                value={form.contact_tagline}
+                onChange={e => setForm(f => ({ ...f, contact_tagline: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none"
+                placeholder="Schedule your retrofit consultation or reach out to our engineering team..."
+              />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Page Heading</label>
-            <input value={form.contact_heading}
-              onChange={e => setForm(f => ({ ...f, contact_heading: e.target.value }))}
-              className={inputCls} placeholder="Contact The Lab" />
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Shop Physical Address</label>
+              <textarea
+                rows={2}
+                value={form.contact_address}
+                onChange={e => setForm(f => ({ ...f, contact_address: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none"
+                placeholder="Full workshop location..."
+              />
+            </div>
+
+            <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl text-xs font-mono text-gray-400">
+              Phone numbers and email addresses are managed in the <span className="text-brand-orange font-bold">Company Info</span> tab.
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400 flex items-center justify-between">
+                <span>Business Hours Schedule</span>
+                <span className="text-[10px] text-gray-500 font-normal">One schedule entry per line</span>
+              </label>
+              <textarea
+                rows={3}
+                value={form.contact_hours}
+                onChange={e => setForm(f => ({ ...f, contact_hours: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm resize-none"
+                placeholder={'Mon–Fri: 9:00 AM – 6:00 PM\nSat: By Appointment\nSun: Closed'}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Tagline / Description</label>
-            <textarea rows={3} value={form.contact_tagline}
-              onChange={e => setForm(f => ({ ...f, contact_tagline: e.target.value }))}
-              className={`${inputCls} resize-none`}
-              placeholder="Short intro shown below the heading" />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Address</label>
-            <textarea rows={2} value={form.contact_address}
-              onChange={e => setForm(f => ({ ...f, contact_address: e.target.value }))}
-              className={`${inputCls} resize-none`}
-              placeholder="Full shop address" />
-          </div>
-
-          <div className="rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-3 text-xs text-gray-400">
-            Phone numbers and email addresses are managed in the Company Info tab.
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Business Hours</label>
-            <textarea rows={3} value={form.contact_hours}
-              onChange={e => setForm(f => ({ ...f, contact_hours: e.target.value }))}
-              className={`${inputCls} resize-none`}
-              placeholder="Mon–Fri: 9AM–6PM&#10;Sat: By Appointment&#10;Sun: Closed" />
-            <p className="text-xs text-gray-600">Each line is shown as a separate entry.</p>
-          </div>
-
-          <div className="pt-4 border-t border-gray-800">
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-8 py-3 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm">
+          <div className="px-6 py-4 bg-brand-dark/80 border-t border-gray-800/80 flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
+            >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Changes
+              <span>Save Contact Settings</span>
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-panel: Footer Settings ────────────────────────────────────────────────
+
+function FooterSettingsPanel() {
+  const dispatch = useDispatch<AppDispatch>();
+  const { token } = useAuth();
+  const { settings, status } = useSelector((s: RootState) => s.siteSettings);
+
+  const [form, setForm] = useState({
+    footer_tagline:   '',
+    footer_address:   '',
+    footer_instagram: '',
+    footer_facebook:  '',
+    footer_youtube:   '',
+  });
+  const [saving,      setSaving]      = useState(false);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => { dispatch(fetchSiteSettingsAsync()); }, [dispatch]);
+
+  useEffect(() => {
+    setForm({
+      footer_tagline:   settings.footer_tagline   ?? '',
+      footer_address:   settings.footer_address   ?? '',
+      footer_instagram: settings.footer_instagram ?? '',
+      footer_facebook:  settings.footer_facebook  ?? '',
+      footer_youtube:   settings.footer_youtube   ?? '',
+    });
+  }, [settings]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true); setSaveError(null); setSaveSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({ token, data: form })).unwrap();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: unknown) {
+      setSaveError((err as Error)?.message ?? 'Failed to save settings.');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-6 font-sans">
+      <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+        <div>
+          <h3 className="text-lg font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Layout className="w-5 h-5 text-brand-orange" /> Global Footer Settings
+          </h3>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Configure site-wide footer branding copy, address, and social media channels.
+          </p>
+        </div>
+      </div>
+
+      {status === 'loading' && (
+        <div className="flex justify-center py-12">
+          <Loader2 className="w-8 h-8 text-brand-orange animate-spin" />
+        </div>
+      )}
+
+      {status !== 'loading' && (
+        <form onSubmit={handleSave} className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl">
+          <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> Global Footer Configuration
+            </h4>
+            <span className="text-[10px] font-mono text-gray-500">Site-wide Footer Bar</span>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-6">
+            {saveError && (
+              <div className="flex items-center gap-3 bg-red-950/50 border border-red-500/40 text-red-400 px-5 py-4 rounded-xl text-sm shadow-xl">
+                <AlertCircle className="w-5 h-5 shrink-0" /> {saveError}
+              </div>
+            )}
+            {saveSuccess && (
+              <div className="flex items-center gap-3 bg-emerald-950/50 border border-emerald-500/40 text-emerald-400 px-5 py-4 rounded-xl text-sm shadow-xl font-mono">
+                <CheckCircle2 className="w-5 h-5 shrink-0" /> Footer settings saved successfully.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Footer Tagline</label>
+              <textarea
+                rows={2}
+                value={form.footer_tagline}
+                onChange={e => setForm(f => ({ ...f, footer_tagline: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none"
+                placeholder="Short tagline shown under the footer logo..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Footer Physical Address</label>
+              <textarea
+                rows={2}
+                value={form.footer_address}
+                onChange={e => setForm(f => ({ ...f, footer_address: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange text-sm resize-none"
+                placeholder="Shop address snippet..."
+              />
+            </div>
+
+            <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl text-xs font-mono text-gray-400">
+              Phone numbers and email addresses are managed in the <span className="text-brand-orange font-bold">Company Info</span> tab.
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Instagram URL</label>
+                <input
+                  value={form.footer_instagram}
+                  onChange={e => setForm(f => ({ ...f, footer_instagram: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                  placeholder="https://instagram.com/1625autolab"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Facebook URL</label>
+                <input
+                  value={form.footer_facebook}
+                  onChange={e => setForm(f => ({ ...f, footer_facebook: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                  placeholder="https://facebook.com/1625autolab"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">YouTube URL</label>
+                <input
+                  value={form.footer_youtube}
+                  onChange={e => setForm(f => ({ ...f, footer_youtube: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-sm"
+                  placeholder="https://youtube.com/@1625autolab"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-4 bg-brand-dark/80 border-t border-gray-800/80 flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>Save Footer Settings</span>
             </button>
           </div>
         </form>
@@ -1265,10 +1562,9 @@ function SystemPanel() {
   const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
   const [migrTotal,     setMigrTotal]     = useState(0);
   const [migrPage,      setMigrPage]      = useState(1);
-  const [migrPageSize,  setMigrPageSize]  = useState(5);
+  const migrPageSize = 5;
   const [migrCounts,    setMigrCounts]    = useState<{ ran: number; pending: number; total: number }>({ ran: 0, pending: 0, total: 0 });
   const [migrLoading,   setMigrLoading]   = useState(true);
-  const [migrError,     setMigrError]     = useState<string | null>(null);
   const [running,       setRunning]       = useState(false);
   const [runResult,     setRunResult]     = useState<{ ran: string[]; skipped: string[]; total: number } | null>(null);
   const [runError,      setRunError]      = useState<string | null>(null);
@@ -1279,14 +1575,13 @@ function SystemPanel() {
   const loadStatus = useCallback(() => {
     if (!token) return;
     setMigrLoading(true);
-    setMigrError(null);
     fetchMigrationStatusApi(token, { page: migrPage, pageSize: migrPageSize })
       .then(res => {
         setMigrations(res.migrations);
         setMigrTotal(res.total);
         setMigrCounts(res.counts);
       })
-      .catch(e  => setMigrError((e as Error).message))
+      .catch(e  => setRunError((e as Error).message))
       .finally(() => setMigrLoading(false));
   }, [token, migrPage, migrPageSize]);
 
@@ -1334,7 +1629,6 @@ function SystemPanel() {
     try {
       const result = await runMigrationsApi(token);
       setRunResult(result);
-      // Refresh the migration list after running
       loadStatus();
     } catch (e: unknown) {
       setRunError((e as Error).message ?? 'Failed to run migrations.');
@@ -1418,386 +1712,322 @@ function SystemPanel() {
   };
 
   return (
-    <div className="space-y-8">
-      <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide">
-        System Information
-      </h3>
+    <div className="space-y-8 font-sans">
+      <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+        <div>
+          <h3 className="text-lg font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <ServerCog className="w-5 h-5 text-brand-orange" /> System Operations &amp; Maintenance
+          </h3>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Monitor environment stats, run database migrations, and execute background cron workers.
+          </p>
+        </div>
+      </div>
 
-      {/* Info cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
-          <div className="w-10 h-10 bg-brand-orange/10 rounded-sm flex items-center justify-center shrink-0">
+      {/* Info Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl flex items-start gap-4">
+          <div className="w-10 h-10 bg-brand-orange/10 border border-brand-orange/20 rounded-lg flex items-center justify-center shrink-0">
             <Info className="w-5 h-5 text-brand-orange" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Application</p>
-            <p className="text-white font-bold text-sm">{APP_NAME}</p>
-            <p className="text-gray-400 text-xs mt-0.5">v{APP_VERSION}</p>
+            <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400">Application</p>
+            <p className="text-white font-mono font-bold text-sm truncate">{APP_NAME}</p>
+            <p className="text-gray-500 font-mono text-xs mt-0.5">v{APP_VERSION}</p>
           </div>
         </div>
 
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
-          <div className="w-10 h-10 bg-blue-500/10 rounded-sm flex items-center justify-center shrink-0">
-            <ServerCog className="w-5 h-5 text-blue-400" />
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl flex items-start gap-4">
+          <div className="w-10 h-10 bg-sky-500/10 border border-sky-500/20 rounded-lg flex items-center justify-center shrink-0">
+            <ServerCog className="w-5 h-5 text-sky-400" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Backend URL</p>
-            <p className="text-white font-bold text-sm break-all">{BACKEND_URL}</p>
-            <p className="text-gray-400 text-xs mt-0.5">PHP API Server</p>
+            <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400">Backend API URL</p>
+            <p className="text-white font-mono font-bold text-xs truncate">{BACKEND_URL}</p>
+            <p className="text-gray-500 font-mono text-xs mt-0.5">PHP Engine</p>
           </div>
         </div>
 
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4">
-          <div className="w-10 h-10 bg-purple-500/10 rounded-sm flex items-center justify-center shrink-0">
-            <Database className="w-5 h-5 text-purple-400" />
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl flex items-start gap-4">
+          <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
+            <Database className="w-5 h-5 text-emerald-400" />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Migrations</p>
-            <p className="text-white font-bold text-sm">{ranCount} / {migrations.length} applied</p>
-            <p className={`text-xs mt-0.5 font-bold ${pendingCount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
-              {pendingCount > 0 ? `${pendingCount} pending` : 'All up to date'}
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 flex items-start gap-4 sm:col-span-2 lg:col-span-3">
-          <div className="w-10 h-10 bg-gray-700/50 rounded-sm flex items-center justify-center shrink-0">
-            <Settings className="w-5 h-5 text-gray-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Tech Stack</p>
-            <p className="text-gray-300 text-sm">{TECH_STACK}</p>
+            <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400">Technology Stack</p>
+            <p className="text-white font-mono font-bold text-xs truncate">{TECH_STACK}</p>
+            <p className="text-emerald-400 font-mono text-xs mt-0.5 font-bold">Operational</p>
           </div>
         </div>
       </div>
 
-      {/* User Registration Settings */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
-            <Users className="w-5 h-5 text-brand-orange" />
-            User Registration Access
-          </h3>
-        </div>
-
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
-          <p className="text-sm text-gray-300">
-            Control whether new public visitors are allowed to create accounts on the platform.
-          </p>
-
-          {registrationSettingsError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {registrationSettingsError}
+      {/* Access Control & Permissions Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Staff Booking Access Permissions */}
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div>
+            <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+              <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" /> Staff Access Policy
+              </h4>
+              <span className="text-[10px] font-mono text-gray-500">Role Permissions</span>
             </div>
-          )}
 
-          {registrationSettingsSuccess && (
-            <div className="flex items-center gap-2 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
-              <CheckCircle2 className="w-4 h-4 shrink-0" /> Registration access settings saved.
+            <div className="p-6 space-y-4">
+              {staffSettingsError && (
+                <div className="text-xs font-mono text-red-400 bg-red-950/50 p-3 rounded-lg border border-red-500/30">
+                  {staffSettingsError}
+                </div>
+              )}
+              {staffSettingsSuccess && (
+                <div className="text-xs font-mono text-emerald-400 bg-emerald-950/50 p-3 rounded-lg border border-emerald-500/30">
+                  Staff booking permissions updated successfully.
+                </div>
+              )}
+
+              <div className="flex items-center justify-between p-3 bg-brand-darker border border-gray-800 rounded-lg">
+                <div>
+                  <p className="text-xs font-mono font-bold uppercase text-white">Staff View All Bookings</p>
+                  <p className="text-[11px] text-gray-500">Allows staff to view bookings outside their assigned roster.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={staffBookingSettings.staff_can_view_all_bookings}
+                    onChange={e => setStaffBookingSettings(p => ({ ...p, staff_can_view_all_bookings: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-brand-darker border border-gray-800 rounded-lg">
+                <div>
+                  <p className="text-xs font-mono font-bold uppercase text-white">Staff Manage All Bookings</p>
+                  <p className="text-[11px] text-gray-500">Allows staff to reschedule or modify all appointments.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={staffBookingSettings.staff_can_manage_all_bookings}
+                    onChange={e => setStaffBookingSettings(p => ({ ...p, staff_can_manage_all_bookings: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
             </div>
-          )}
-
-          <label className="flex items-start gap-3 rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-4 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={disableRegistration}
-              onChange={e => setDisableRegistration(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
-            />
-            <span>
-              <span className="block text-sm font-semibold text-white">Disable new user registration</span>
-              <span className="block text-xs text-gray-400">
-                When enabled, public registration forms and registration API endpoints will block new user creation. Existing accounts can still sign in.
-              </span>
-            </span>
-          </label>
-
-          <div className="pt-2 border-t border-gray-800 flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-500">System-wide setting for user onboarding.</p>
-            <button
-              type="button"
-              onClick={handleSaveRegistrationSettings}
-              disabled={registrationSettingsSaving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm cursor-pointer"
-            >
-              {registrationSettingsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Access Setting
-            </button>
           </div>
-        </div>
-      </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
-            <Settings className="w-5 h-5 text-brand-orange" />
-            Staff Booking Access
-          </h3>
-        </div>
-
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
-          <p className="text-sm text-gray-300">
-            Control whether staff accounts can see or modify bookings beyond the jobs directly assigned to them.
-          </p>
-
-          {staffSettingsError && (
-            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {staffSettingsError}
-            </div>
-          )}
-
-          {staffSettingsSuccess && (
-            <div className="flex items-center gap-2 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
-              <CheckCircle2 className="w-4 h-4 shrink-0" /> Staff booking access settings saved.
-            </div>
-          )}
-
-          <label className="flex items-start gap-3 rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-4">
-            <input
-              type="checkbox"
-              checked={staffBookingSettings.staff_can_view_all_bookings}
-              onChange={e => setStaffBookingSettings(prev => ({ ...prev, staff_can_view_all_bookings: e.target.checked }))}
-              className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
-            />
-            <span>
-              <span className="block text-sm font-semibold text-white">Staff can view all bookings</span>
-              <span className="block text-xs text-gray-400">When off, staff can only open bookings assigned to them.</span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-4">
-            <input
-              type="checkbox"
-              checked={staffBookingSettings.staff_can_manage_all_bookings}
-              onChange={e => setStaffBookingSettings(prev => ({ ...prev, staff_can_manage_all_bookings: e.target.checked }))}
-              className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
-            />
-            <span>
-              <span className="block text-sm font-semibold text-white">Staff can manage all bookings</span>
-              <span className="block text-xs text-gray-400">When off, staff can only update bookings assigned to them.</span>
-            </span>
-          </label>
-
-          <div className="pt-2 border-t border-gray-800 flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-500">Admins, owners, and managers keep full booking access.</p>
+          <div className="px-6 py-3 bg-brand-dark/80 border-t border-gray-800/80 flex justify-end">
             <button
               type="button"
               onClick={handleSaveStaffBookingSettings}
               disabled={staffSettingsSaving}
-              className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
+              className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50"
             >
-              {staffSettingsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Access Rules
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Database Migrations */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
-            <Database className="w-5 h-5 text-brand-orange" />
-            Database Migrations
-          </h3>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={loadStatus}
-              disabled={migrLoading}
-              title="Refresh status"
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-xs font-bold uppercase tracking-widest rounded-sm transition-colors disabled:opacity-50">
-              <RefreshCw className={`w-3.5 h-3.5 ${migrLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={handleRunMigrations}
-              disabled={running || migrLoading || pendingCount === 0}
-              className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-sm font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-sm">
-              {running
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
-                : <><RefreshCw className="w-4 h-4" /> Run Migrations</>
-              }
+              {staffSettingsSaving ? 'Saving...' : 'Save Staff Policy'}
             </button>
           </div>
         </div>
 
-        {/* Run result banner */}
-        {runResult && (
-          <div className="mb-4 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
-            <p className="font-bold mb-1">
-              Migrations complete — {runResult.ran.length} applied, {runResult.skipped.length} skipped.
-            </p>
-            {runResult.ran.length > 0 && (
-              <ul className="list-disc list-inside text-xs space-y-0.5 text-green-300">
-                {runResult.ran.map(name => <li key={name}>{name}</li>)}
-              </ul>
-            )}
-          </div>
-        )}
+        {/* User Registration Disable Switch */}
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div>
+            <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+              <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                <Users className="w-4 h-4" /> Account Registration Access
+              </h4>
+              <span className="text-[10px] font-mono text-gray-500">Public Portal</span>
+            </div>
 
-        {runError && (
-          <div className="mb-4 flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {runError}
-          </div>
-        )}
+            <div className="p-6 space-y-4">
+              {registrationSettingsError && (
+                <div className="text-xs font-mono text-red-400 bg-red-950/50 p-3 rounded-lg border border-red-500/30">
+                  {registrationSettingsError}
+                </div>
+              )}
+              {registrationSettingsSuccess && (
+                <div className="text-xs font-mono text-emerald-400 bg-emerald-950/50 p-3 rounded-lg border border-emerald-500/30">
+                  Registration settings updated.
+                </div>
+              )}
 
-        {migrLoading && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 text-brand-orange animate-spin" />
-          </div>
-        )}
-
-        {migrError && (
-          <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm mb-4">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{migrError}</span>
-            <span className="text-gray-500 text-xs ml-2">(Database may not be configured)</span>
-          </div>
-        )}
-
-        {!migrLoading && !migrError && migrations.length > 0 && (
-          <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-800 text-left">
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500">Migration File</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500 w-28">Status</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-widest text-gray-500 hidden md:table-cell">Applied At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {migrations.map((m, i) => (
-                  <tr key={m.name} className={`border-b border-gray-800/60 last:border-0 ${i % 2 === 1 ? 'bg-brand-darker/40' : ''}`}>
-                    <td className="px-5 py-3 font-mono text-xs text-gray-300">{m.name}</td>
-                    <td className="px-5 py-3">
-                      {m.status === 'ran' ? (
-                        <span className="inline-flex items-center gap-1.5 text-green-400 text-xs font-bold uppercase tracking-wider">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Applied
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-yellow-400 text-xs font-bold uppercase tracking-wider">
-                          <Clock className="w-3.5 h-3.5" /> Pending
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-gray-500 text-xs hidden md:table-cell">
-                      {m.ran_at ? new Date(m.ran_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-800 text-xs text-gray-400">
-              <span>
-                Page {migrPage} of {totalPages} · {migrTotal} total migration(s)
-              </span>
-              <div className="flex items-center gap-2">
-                <label className="text-gray-500">Per page</label>
-                <select
-                  value={String(migrPageSize)}
-                  onChange={(e) => {
-                    const size = Number(e.target.value) || 25;
-                    setMigrPage(1);
-                    setMigrPageSize(size);
-                  }}
-                  className="bg-brand-darker border border-gray-700 text-xs text-white px-2 py-1 rounded-sm"
-                >
-                  {[10, 25, 50, 100].map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setMigrPage(p => Math.max(1, p - 1))}
-                  disabled={migrPage <= 1}
-                  className="px-2 py-1 border border-gray-700 rounded-sm text-gray-300 hover:text-white disabled:opacity-40"
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMigrPage(p => Math.min(totalPages, p + 1))}
-                  disabled={migrPage >= totalPages}
-                  className="px-2 py-1 border border-gray-700 rounded-sm text-gray-300 hover:text-white disabled:opacity-40"
-                >
-                  Next
-                </button>
+              <div className="flex items-center justify-between p-4 bg-brand-darker border border-gray-800 rounded-lg">
+                <div>
+                  <p className="text-xs font-mono font-bold uppercase text-white">Disable New Registration</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Disables public sign-up form on the website.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={disableRegistration}
+                    onChange={e => setDisableRegistration(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
               </div>
             </div>
           </div>
-        )}
 
-        {!migrLoading && !migrError && migrations.length === 0 && (
-          <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 text-center text-gray-500">
-            <Database className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p>No migration files found.</p>
+          <div className="px-6 py-3 bg-brand-dark/80 border-t border-gray-800/80 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSaveRegistrationSettings}
+              disabled={registrationSettingsSaving}
+              className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50"
+            >
+              {registrationSettingsSaving ? 'Saving...' : 'Save Registration Policy'}
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Cron Jobs */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
-            <ServerCog className="w-5 h-5 text-brand-orange" />
-            Cron Jobs (Run Now)
-          </h3>
+      {/* Manual Worker Operations Control */}
+      <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-800/80 pb-4">
+          <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+            <Play className="w-4 h-4" /> Execute Background Cron Workers
+          </h4>
+          <span className="text-[10px] font-mono text-gray-500">Manual Operations Triggers</span>
         </div>
 
         {cronResult && (
-          <div className="mb-4 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
+          <div className="p-3 bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-mono">
             {cronResult}
           </div>
         )}
-
         {cronError && (
-          <div className="mb-4 flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" /> {cronError}
+          <div className="p-3 bg-red-950/50 border border-red-500/30 text-red-400 rounded-lg text-xs font-mono">
+            {cronError}
           </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Notification Queue Worker</p>
-            <p className="text-sm text-gray-300 mb-4">Process queued/retry notification jobs immediately.</p>
-            <button
-              type="button"
-              onClick={handleRunQueueWorker}
-              disabled={cronBusy !== null}
-              className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
-            >
-              {cronBusy === 'queue' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Run Queue Worker
-            </button>
+          <button
+            onClick={handleRunQueueWorker}
+            disabled={cronBusy !== null}
+            className="flex items-center justify-center gap-2 p-4 bg-brand-darker hover:bg-gray-800 border border-gray-800 hover:border-brand-orange/40 text-gray-200 hover:text-white rounded-xl transition-all cursor-pointer disabled:opacity-50"
+          >
+            {cronBusy === 'queue' ? <Loader2 className="w-4 h-4 animate-spin text-brand-orange" /> : <RefreshCw className="w-4 h-4 text-brand-orange" />}
+            <span className="text-xs font-mono font-bold uppercase">Run Notification Queue</span>
+          </button>
+
+          <button
+            onClick={handleRunWaitlistWorker}
+            disabled={cronBusy !== null}
+            className="flex items-center justify-center gap-2 p-4 bg-brand-darker hover:bg-gray-800 border border-gray-800 hover:border-brand-orange/40 text-gray-200 hover:text-white rounded-xl transition-all cursor-pointer disabled:opacity-50"
+          >
+            {cronBusy === 'waitlist' ? <Loader2 className="w-4 h-4 animate-spin text-sky-400" /> : <RefreshCw className="w-4 h-4 text-sky-400" />}
+            <span className="text-xs font-mono font-bold uppercase">Run Waitlist Auto-Fill</span>
+          </button>
+
+          <button
+            onClick={handleRunReminderWorker}
+            disabled={cronBusy !== null}
+            className="flex items-center justify-center gap-2 p-4 bg-brand-darker hover:bg-gray-800 border border-gray-800 hover:border-brand-orange/40 text-gray-200 hover:text-white rounded-xl transition-all cursor-pointer disabled:opacity-50"
+          >
+            {cronBusy === 'reminders' ? <Loader2 className="w-4 h-4 animate-spin text-emerald-400" /> : <RefreshCw className="w-4 h-4 text-emerald-400" />}
+            <span className="text-xs font-mono font-bold uppercase">Send Daily Reminders</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Database Migrations Control */}
+      <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl space-y-6">
+        <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+              <Database className="w-4 h-4" /> Database Schema Migrations
+            </h4>
+            <p className="text-[11px] font-mono text-gray-500 mt-0.5">
+              Ran: <span className="text-emerald-400 font-bold">{ranCount}</span> · Pending: <span className="text-amber-400 font-bold">{pendingCount}</span> · Total: <span className="text-white font-bold">{migrCounts.total}</span>
+            </p>
           </div>
 
-          <div className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Waitlist Auto-Fill Worker</p>
-            <p className="text-sm text-gray-300 mb-4">Expire stale claims and notify the next eligible waiting user.</p>
-            <button
-              type="button"
-              onClick={handleRunWaitlistWorker}
-              disabled={cronBusy !== null}
-              className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
-            >
-              {cronBusy === 'waitlist' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Run Waitlist Worker
-            </button>
-          </div>
+          <button
+            onClick={handleRunMigrations}
+            disabled={running || pendingCount === 0}
+            className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2 text-xs font-mono font-bold uppercase tracking-widest rounded-lg transition-all disabled:opacity-50 cursor-pointer shrink-0 shadow-lg"
+          >
+            {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            <span>Run Migrations ({pendingCount})</span>
+          </button>
+        </div>
 
-          <div className="bg-brand-dark border border-gray-800 rounded-sm p-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Appointment Reminders Worker</p>
-            <p className="text-sm text-gray-300 mb-4">Send reminder SMS for tomorrow's confirmed/pending bookings.</p>
-            <button
-              type="button"
-              onClick={handleRunReminderWorker}
-              disabled={cronBusy !== null}
-              className="flex items-center gap-2 bg-brand-orange text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm"
-            >
-              {cronBusy === 'reminders' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Run Reminders Worker
-            </button>
-          </div>
+        <div className="p-6 space-y-4">
+          {runResult && (
+            <div className="p-4 bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-mono space-y-1">
+              <p className="font-bold">Migrations executed successfully! Ran {runResult.ran.length} file(s).</p>
+              {runResult.ran.map(f => <p key={f}>✓ {f}</p>)}
+            </div>
+          )}
+
+          {runError && (
+            <div className="p-4 bg-red-950/50 border border-red-500/30 text-red-400 rounded-xl text-xs font-mono">
+              {runError}
+            </div>
+          )}
+
+          {migrLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 text-brand-orange animate-spin" />
+            </div>
+          ) : (
+            <div className="border border-gray-800 rounded-xl overflow-hidden bg-brand-darker">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-gray-800 bg-black/40 text-gray-400 uppercase text-[10px] tracking-wider">
+                    <th className="py-3 px-4">Migration File</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Execution Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/60 text-gray-300">
+                  {migrations.map(m => (
+                    <tr key={m.name} className="hover:bg-gray-800/30 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-white">{m.name}</td>
+                      <td className="py-3 px-4">
+                        {m.status === 'ran' ? (
+                          <span className="px-2 py-0.5 text-[9px] uppercase font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full">
+                            RAN
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-[9px] uppercase font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full">
+                            PENDING
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-gray-400">{m.ran_at ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination Footer */}
+              <div className="px-4 py-3 border-t border-gray-800 flex items-center justify-between bg-black/40">
+                <span className="text-[11px] text-gray-500">
+                  Page {migrPage} of {totalPages} ({migrTotal} entries)
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={migrPage <= 1}
+                    onClick={() => setMigrPage(p => p - 1)}
+                    className="px-3 py-1 border border-gray-800 text-gray-400 hover:text-white disabled:opacity-40 rounded text-xs cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={migrPage >= totalPages}
+                    onClick={() => setMigrPage(p => p + 1)}
+                    className="px-3 py-1 border border-gray-800 text-gray-400 hover:text-white disabled:opacity-40 rounded text-xs cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1826,7 +2056,7 @@ export default function SiteSettingsPanel() {
     },
     {
       key: 'footer',
-      label: 'Footer',
+      label: 'Footer Settings',
       hint: 'Global footer links and legal text',
       icon: <Layout className="w-4 h-4" />,
     },
@@ -1840,12 +2070,12 @@ export default function SiteSettingsPanel() {
       key: 'testimonials',
       label: 'Testimonials',
       hint: 'Client reviews and social proof',
-      icon: <MessageSquare className="w-4 h-4" />,
+      icon: <Star className="w-4 h-4" />,
     },
     {
       key: 'system',
-      label: 'System',
-      hint: 'Environment checks and migrations',
+      label: 'System Operations',
+      hint: 'Migrations and cron workers',
       icon: <ServerCog className="w-4 h-4" />,
     },
   ], []);
@@ -1853,27 +2083,33 @@ export default function SiteSettingsPanel() {
   const activeTabMeta = useMemo(() => tabs.find(tab => tab.key === activeTab), [tabs, activeTab]);
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
+    <div className="space-y-6 pb-20 font-sans">
+      {/* Top Hero Card */}
+      <section className="relative overflow-hidden rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl">
         <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-brand-orange/15 blur-3xl" />
         <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">Admin Controls</p>
-            <h2 className="mt-1 text-2xl font-display font-bold uppercase tracking-wide text-white">Site Settings</h2>
-            <p className="mt-2 max-w-2xl text-sm text-gray-300">
-              Configure public-facing content, team profiles, testimonials, and operational system settings.
-            </p>
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-brand-orange/10 border border-brand-orange/20 rounded-xl">
+              <ServerCog className="w-6 h-6 text-brand-orange" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">Admin Controls</p>
+              </div>
+              <h2 className="text-2xl font-display font-black uppercase tracking-tight text-white">Site &amp; System Settings</h2>
+            </div>
           </div>
-          <div className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-3 py-2 text-right">
-            <p className="text-[10px] uppercase tracking-widest text-gray-300">Current Section</p>
-            <p className="text-sm font-semibold text-white">{activeTabMeta?.label ?? 'Company Info'}</p>
+          <div className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-4 py-2 text-right">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-gray-400">Current Section</p>
+            <p className="text-sm font-mono font-bold text-white">{activeTabMeta?.label ?? 'Company Info'}</p>
           </div>
         </div>
       </section>
 
-      <section className="rounded-xl border border-gray-800 bg-brand-dark p-3">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Tab Navigation Grid */}
+      <section className="rounded-xl border border-gray-800/80 bg-[#121212] p-3 shadow-xl">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           {tabs.map(t => {
             const isActive = activeTab === t.key;
             return (
@@ -1881,31 +2117,24 @@ export default function SiteSettingsPanel() {
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}
                 className={[
-                  'group rounded-lg border px-3 py-3 text-left transition-all',
+                  'group rounded-lg border px-3.5 py-3 text-left transition-all cursor-pointer',
                   isActive
-                    ? 'border-brand-orange bg-brand-orange/15 text-white shadow-[0_0_0_1px_rgba(249,115,22,0.25)]'
-                    : 'border-gray-700 text-gray-300 hover:border-brand-orange/70 hover:text-white',
+                    ? 'border-brand-orange bg-brand-orange/15 text-white shadow-[0_0_15px_rgba(249,115,22,0.15)] font-bold'
+                    : 'border-gray-800 bg-brand-darker/60 text-gray-400 hover:border-brand-orange/60 hover:text-white',
                 ].join(' ')}
               >
-                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
+                <span className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider">
                   {t.icon} {t.label}
                 </span>
-                <span className="mt-1 block text-xs text-gray-500 group-hover:text-gray-300">{t.hint}</span>
+                <span className="mt-1 block text-[10px] text-gray-500 group-hover:text-gray-300 font-mono truncate">{t.hint}</span>
               </button>
             );
           })}
         </div>
       </section>
 
-      <section className="rounded-xl border border-gray-800 bg-brand-dark p-4 sm:p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Editing</p>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-white">{activeTabMeta?.label}</h3>
-          </div>
-          <p className="text-xs text-gray-400">{activeTabMeta?.hint}</p>
-        </div>
-
+      {/* Active Sub-Panel Workspace */}
+      <section className="rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl">
         {activeTab === 'company'      && <CompanyInfoPanel />}
         {activeTab === 'contact'      && <ContactPanel />}
         {activeTab === 'footer'       && <FooterSettingsPanel />}

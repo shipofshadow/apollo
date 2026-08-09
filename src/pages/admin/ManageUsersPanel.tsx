@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, Filter, Loader2, LockIcon, Pencil, Save, Trash2, UserPlus, Users } from 'lucide-react';
+import { Ban, CheckCircle2, Filter, Loader2, LockIcon, Pencil, Save, Trash2, UserPlus, Users, Search, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -89,7 +89,7 @@ export default function ManageUsersPanel() {
       const { roles: list } = await fetchAdminRolesApi(token);
       setRoles(list);
     } catch {
-      // roles are non-critical for this panel
+      // non-critical
     }
   };
 
@@ -138,7 +138,7 @@ export default function ManageUsersPanel() {
       setUsers(prev => [created, ...prev]);
       setNewUser({ name: '', email: '', phone: '', password: '', role: roleOptions.includes('staff') ? 'staff' : (roleOptions[0] ?? newUser.role) });
       setShowCreateModal(false);
-      showToast('User account created.', 'success');
+      showToast('User account created successfully.', 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to create user.', 'error');
     } finally {
@@ -152,7 +152,7 @@ export default function ManageUsersPanel() {
     const payload = { name: newUser.name.trim(), email: newUser.email.trim(), phone: newUser.phone.trim() || undefined, password: newUser.password, role: newUser.role };
     requestConfirmation({
       title: 'Create user account?',
-      message: `This will create a login for ${payload.name || payload.email} with the ${payload.role} role.`,
+      message: `Create login credentials for ${payload.name || payload.email} with the ${payload.role} role.`,
       confirmLabel: 'Create User',
       onConfirm: async () => performCreateUser(payload),
     });
@@ -164,7 +164,7 @@ export default function ManageUsersPanel() {
     try {
       const { user: updated } = await updateAdminUserRoleApi(token, id, role);
       setUsers(prev => prev.map(item => (item.id === id ? updated : item)));
-      showToast('Role updated.', 'success');
+      showToast('User role updated successfully.', 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to update role.', 'error');
     } finally {
@@ -176,7 +176,7 @@ export default function ManageUsersPanel() {
     if (currentRole === nextRole) return;
     requestConfirmation({
       title: 'Change user role?',
-      message: `${label} will be moved from ${currentRole} to ${nextRole}.`,
+      message: `${label} will be changed from ${currentRole} to ${nextRole}.`,
       confirmLabel: 'Change Role',
       onConfirm: async () => performRoleChange(id, nextRole),
     });
@@ -194,7 +194,7 @@ export default function ManageUsersPanel() {
       setUsers(prev => prev.map(item => (item.id === id ? updated : item)));
       setEditingUserId(null);
       setUserEditDraft({ name: '', email: '', phone: '' });
-      showToast('User info updated.', 'success');
+      showToast('User details updated.', 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to update user info.', 'error');
     } finally {
@@ -214,8 +214,8 @@ export default function ManageUsersPanel() {
 
   const handleSaveUserEdit = (id: number, name: string) => {
     requestConfirmation({
-      title: 'Save user changes?',
-      message: `Updates to ${name}'s account will be applied.`,
+      title: 'Save user details?',
+      message: `Updates to ${name}'s account will be saved.`,
       confirmLabel: 'Save Changes',
       onConfirm: async () => performSaveUserEdit(id),
     });
@@ -238,10 +238,10 @@ export default function ManageUsersPanel() {
   const handleToggleStatus = (id: number, isActive: boolean, name: string) => {
     const makeActive = !isActive;
     requestConfirmation({
-      title: makeActive ? 'Enable account?' : 'Disable account?',
+      title: makeActive ? 'Enable user account?' : 'Disable user account?',
       message: makeActive
-        ? `${name}'s account will be re-enabled and they will be able to log in.`
-        : `${name}'s account will be disabled. They will not be able to log in until re-enabled.`,
+        ? `${name}'s account will be enabled for login.`
+        : `${name}'s account will be disabled. They cannot log in until re-enabled.`,
       confirmLabel: makeActive ? 'Enable Account' : 'Disable Account',
       tone: makeActive ? 'default' : 'danger',
       onConfirm: async () => performToggleStatus(id, makeActive),
@@ -254,7 +254,7 @@ export default function ManageUsersPanel() {
     try {
       await deleteAdminUserApi(token, id);
       setUsers(prev => prev.filter(item => item.id !== id));
-      showToast(`${name} deleted.`, 'success');
+      showToast(`${name}'s account deleted.`, 'success');
     } catch (e) {
       showToast((e as Error).message ?? 'Failed to delete user.', 'error');
     } finally {
@@ -265,234 +265,254 @@ export default function ManageUsersPanel() {
   const handleDeleteUser = (id: number, name: string) => {
     requestConfirmation({
       title: 'Delete user account?',
-      message: `${name}'s account and personal data will be permanently deleted. This cannot be undone.`,
+      message: `${name}'s account will be permanently deleted. This action cannot be undone.`,
       confirmLabel: 'Delete User',
       tone: 'danger',
       onConfirm: async () => performDeleteUser(id, name),
     });
   };
 
+  if (!canManageUsers) {
+    return (
+      <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-8 text-center space-y-3 font-sans shadow-2xl">
+        <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
+        <h3 className="text-lg font-display font-black uppercase tracking-tight text-red-200">Access Restricted</h3>
+        <p className="text-xs font-mono text-red-300/80 max-w-md mx-auto">
+          User account management is restricted to Root Owners and Administrators.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans pb-20">
       {/* Breadcrumbs */}
       <Breadcrumbs items={[{ label: 'Admin' }, { label: 'Manage Users' }]} />
 
-      {/* Header */}
-      <section className="relative overflow-hidden rounded-xl border border-gray-800 bg-brand-dark p-5 sm:p-6">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-brand-orange/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">Admin Controls</p>
-            <h2 className="mt-1 text-2xl font-display font-bold uppercase tracking-wide text-white">Manage Users</h2>
-            <p className="mt-1 max-w-2xl text-sm text-gray-300">
-              Create internal accounts, assign roles, and control access for staff, managers, and admins.
-            </p>
+      {/* Top Hero Header Card */}
+      <section className="relative overflow-hidden rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-brand-orange/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-brand-orange/10 border border-brand-orange/20 rounded-xl">
+              <Users className="w-6 h-6 text-brand-orange" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">Staff &amp; Admin Access</p>
+              </div>
+              <h2 className="text-2xl font-display font-black uppercase tracking-tight text-white">Internal User Directory</h2>
+            </div>
           </div>
           {canManageUsers && (
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors"
+              className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-all rounded-lg shadow-lg cursor-pointer shrink-0"
             >
               <UserPlus className="w-4 h-4" />
-              Add New User
+              <span>Add New User</span>
             </button>
           )}
         </div>
       </section>
 
-      {/* Users list */}
-      {canManageUsers && (
-        <section className="rounded-xl border border-gray-800 bg-brand-dark p-3 md:p-5 space-y-3 md:space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" /> Internal Users
-            </p>
-            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-1.5 flex-wrap">
-              <input value={userSearch} onChange={e => setUserSearch(e.target.value)}
-                placeholder="Search by name or email"
-                aria-label="Search users"
-                className="bg-brand-darker border border-gray-700 text-white px-2 md:px-3 py-2 rounded-sm text-xs md:text-sm focus:outline-none focus:border-brand-orange flex-1 xs:flex-none min-w-0 xs:min-w-40" />
-              <div className="flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" aria-hidden="true" />
-                <select value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)}
-                  aria-label="Filter by role"
-                  className="bg-brand-darker border border-gray-700 text-white px-2 py-2 rounded-sm text-xs focus:outline-none focus:border-brand-orange">
-                  <option value="">All Roles</option>
-                  {nonClientRoleOptions.map(role => <option key={role} value={role}>{role}</option>)}
-                </select>
-              </div>
-              <button type="button" onClick={() => { setUsersPage(1); void loadUsers(); }}
-                className="px-3 py-2 rounded-sm border border-gray-700 text-gray-300 text-xs font-bold uppercase tracking-widest hover:border-brand-orange hover:text-white whitespace-nowrap">
-                Search
-              </button>
+      {/* Users List Panel */}
+      <section className="rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-800/80 pb-4">
+          <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+            <Users className="w-4 h-4" /> Internal Accounts Catalog
+          </h3>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative w-full md:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+              <input
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                placeholder="Search name or email..."
+                className="w-full bg-brand-darker border border-gray-800 text-white pl-9 pr-3 py-2 rounded-lg text-xs font-mono focus:outline-none focus:border-brand-orange"
+              />
             </div>
+
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <select
+                value={userRoleFilter}
+                onChange={e => setUserRoleFilter(e.target.value)}
+                className="bg-brand-darker border border-gray-800 text-white px-3 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-brand-orange cursor-pointer"
+              >
+                <option value="">All Roles</option>
+                {nonClientRoleOptions.map(role => <option key={role} value={role}>{role}</option>)}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { setUsersPage(1); void loadUsers(); }}
+              className="px-4 py-2 bg-brand-darker border border-gray-800 hover:border-brand-orange text-gray-300 hover:text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Search
+            </button>
           </div>
+        </div>
 
-          {nonClientRoleOptions.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {nonClientRoleOptions.map(role => (
-                <button key={role} type="button"
-                  onClick={() => setUserRoleFilter(prev => prev === role ? '' : role)}
-                  className={`transition-opacity ${userRoleFilter && userRoleFilter !== role ? 'opacity-40' : 'opacity-100'}`}>
-                  <RoleBadge role={role} />
-                </button>
-              ))}
-            </div>
-          )}
+        {nonClientRoleOptions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {nonClientRoleOptions.map(role => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setUserRoleFilter(prev => prev === role ? '' : role)}
+                className={`transition-all cursor-pointer ${userRoleFilter && userRoleFilter !== role ? 'opacity-40 scale-95' : 'opacity-100 scale-100'}`}
+              >
+                <RoleBadge role={role} />
+              </button>
+            ))}
+          </div>
+        )}
 
-          {loadingUsers ? (
-            <div className="py-10 flex items-center justify-center gap-2 text-gray-400">
-              <Loader2 className="w-5 h-5 animate-spin text-brand-orange" />
-              <span className="text-xs">Loading users...</span>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-800 -mx-3 md:mx-0">
-              <table className="w-full text-left text-xs md:text-sm">
-                <thead>
-                  <tr className="text-gray-500 text-[10px] md:text-[11px] uppercase tracking-widest border-b border-gray-800">
-                    <th className="py-2 px-3 md:px-4">Name</th>
-                    <th className="py-2 px-3 md:px-4 hidden md:table-cell">Email</th>
-                    <th className="py-2 px-3 md:px-4">Role</th>
-                    <th className="py-2 px-3 md:px-4 hidden sm:table-cell">Status</th>
-                    <th className="py-2 px-3 md:px-4 hidden lg:table-cell">Created</th>
-                    <th className="py-2 px-3 md:px-4">Actions</th>
+        {loadingUsers ? (
+          <div className="py-16 flex items-center justify-center gap-3 text-xs font-mono text-gray-400">
+            <Loader2 className="w-6 h-6 animate-spin text-brand-orange" />
+            <span>Loading user directory…</span>
+          </div>
+        ) : (
+          <div className="border border-gray-800 rounded-xl overflow-hidden bg-brand-darker">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-gray-800 bg-black/40 text-gray-400 uppercase text-[10px] tracking-wider">
+                  <th className="py-3.5 px-4">User Name</th>
+                  <th className="py-3.5 px-4 hidden md:table-cell">Email Address</th>
+                  <th className="py-3.5 px-4">Assigned Role</th>
+                  <th className="py-3.5 px-4 hidden sm:table-cell">Status</th>
+                  <th className="py-3.5 px-4 hidden lg:table-cell">Created Date</th>
+                  <th className="py-3.5 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60 text-gray-300">
+                {pagedUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center text-gray-500">
+                      No internal user accounts found.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {pagedUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center">
-                        <div className="flex flex-col items-center gap-2">
-                          <Users className="w-8 h-8 text-gray-700" />
-                          <p className="text-sm text-gray-500">No users found.</p>
-                          <p className="text-xs text-gray-600">Try adjusting your search or filter.</p>
+                ) : pagedUsers.map(item => {
+                  const isActive = item.is_active !== false;
+                  const isProtected = !isOwner && (item.role === 'admin' || item.role === 'owner');
+                  const isSelf = user?.id === item.id;
+                  const userAvatarFallback = getDicebearAvatarDataUri({
+                    id: item.id,
+                    name: item.name,
+                    email: item.email,
+                  });
+                  const userAvatar = item.avatar_url ?? item.avatarUrl ?? userAvatarFallback;
+                  return (
+                    <tr key={item.id} className={`hover:bg-gray-800/30 transition-colors align-middle ${!isActive ? 'opacity-50' : ''}`}>
+                      <td className="py-3.5 px-4 text-white font-bold">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={userAvatar}
+                            alt={item.name}
+                            className="h-8 w-8 rounded-full border border-gray-700 object-cover shrink-0"
+                            onError={(e) => {
+                              if (e.currentTarget.src !== userAvatarFallback) {
+                                e.currentTarget.src = userAvatarFallback;
+                                return;
+                              }
+                              e.currentTarget.onerror = null;
+                            }}
+                          />
+                          <span className="truncate">{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-300 hidden md:table-cell">{item.email}</td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={item.role}
+                            disabled={isProtected || updatingRoleId === item.id || !roleOptions.length}
+                            onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
+                            className="bg-brand-darker border border-gray-800 text-white px-2 py-1 rounded text-xs font-mono focus:outline-none focus:border-brand-orange disabled:opacity-50 cursor-pointer"
+                          >
+                            {roleOptions.map(role => <option key={role} value={role}>{role}</option>)}
+                          </select>
+                          <RoleBadge role={item.role} />
+                          {isProtected && (
+                            <span title="Protected Account (Owner level required)" className="text-gray-500">
+                              <LockIcon className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 hidden sm:table-cell">
+                        <StatusBadge isActive={isActive} />
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-400 hidden lg:table-cell">
+                        {new Date(item.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            disabled={isProtected || savingUserId === item.id}
+                            onClick={() => handleEditUser(item)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-brand-orange text-gray-300 hover:text-white text-xs font-bold uppercase disabled:opacity-40 transition-colors cursor-pointer"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-brand-orange" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isProtected || togglingStatusId === item.id}
+                            onClick={() => handleToggleStatus(item.id, isActive, item.name)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold uppercase disabled:opacity-40 transition-colors cursor-pointer ${
+                              isActive
+                                ? 'border-gray-800 hover:border-red-500/40 text-gray-400 hover:text-red-400'
+                                : 'border-gray-800 hover:border-emerald-500/40 text-gray-400 hover:text-emerald-400'
+                            }`}
+                          >
+                            {togglingStatusId === item.id
+                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
+                              : isActive
+                                ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
+                                : <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /><span>Enable</span></>}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isProtected || isSelf || deletingUserId === item.id}
+                            onClick={() => handleDeleteUser(item.id, item.name)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-800 hover:border-red-500/40 text-gray-400 hover:text-red-400 text-xs font-bold uppercase disabled:opacity-30 transition-colors cursor-pointer"
+                          >
+                            {deletingUserId === item.id
+                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Deleting...</span></>
+                              : <><Trash2 className="w-3.5 h-3.5" /><span>Delete</span></>}
+                          </button>
                         </div>
                       </td>
                     </tr>
-                  ) : pagedUsers.map(item => {
-                    const isActive = item.is_active !== false;
-                    // Admins cannot edit other admin or owner accounts — only owners can.
-                    const isProtected = !isOwner && (item.role === 'admin' || item.role === 'owner');
-                    const isSelf = user?.id === item.id;
-                    const userAvatarFallback = getDicebearAvatarDataUri({
-                      id: item.id,
-                      name: item.name,
-                      email: item.email,
-                    });
-                    const userAvatar = item.avatar_url ?? item.avatarUrl ?? userAvatarFallback;
-                    return (
-                      <tr key={item.id} className={`border-b border-gray-800/70 ${!isActive ? 'opacity-60' : ''}`}>
-                        <td className="py-2.5 px-3 md:px-4 text-white font-medium">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <img
-                              src={userAvatar}
-                              alt={item.name}
-                              className="h-8 w-8 rounded-full border border-gray-700 object-cover shrink-0"
-                              onError={(e) => {
-                                if (e.currentTarget.src !== userAvatarFallback) {
-                                  e.currentTarget.src = userAvatarFallback;
-                                  return;
-                                }
-                                e.currentTarget.onerror = null;
-                              }}
-                            />
-                            <span className="truncate">{item.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 md:px-4 text-gray-300 hidden md:table-cell text-xs">{item.email}</td>
-                        <td className="py-2.5 px-3 md:px-4">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <label className="sr-only" htmlFor={`role-select-${item.id}`}>Change role for {item.name}</label>
-                            <select id={`role-select-${item.id}`} value={item.role}
-                              disabled={isProtected || updatingRoleId === item.id || !roleOptions.length}
-                              onChange={e => handleRoleChange(item.id, item.role, e.target.value as UserRole, item.name)}
-                              className="bg-brand-darker border border-gray-700 text-white px-1.5 py-1 rounded-sm text-xs focus:outline-none focus:border-brand-orange disabled:opacity-60">
-                              {roleOptions.map(role => <option key={role} value={role}>{role}</option>)}
-                            </select>
-                            <RoleBadge role={item.role} />
-                            {isProtected && (
-                              <span title="Only the owner can edit admin and owner accounts" className="text-[10px] text-gray-600 select-none"><LockIcon className="w-3.5 h-3.5" /></span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 md:px-4 hidden sm:table-cell">
-                          <StatusBadge isActive={isActive} />
-                        </td>
-                        <td className="py-2.5 px-3 md:px-4 text-gray-400 hidden lg:table-cell text-xs">
-                          {new Date(item.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}
-                        </td>
-                        <td className="py-2.5 px-3 md:px-4">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              type="button"
-                              disabled={isProtected || savingUserId === item.id}
-                              onClick={() => handleEditUser(item)}
-                              title={isProtected ? 'Only the owner can edit admin and owner accounts' : undefined}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              Edit Details
-                            </button>
-                            <button type="button"
-                              disabled={isProtected || togglingStatusId === item.id}
-                              onClick={() => handleToggleStatus(item.id, isActive, item.name)}
-                              title={isProtected ? 'Only the owner can change status of admin/owner accounts' : undefined}
-                              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors ${isActive
-                                  ? 'border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200'
-                                  : 'border-green-900/60 text-green-300 hover:border-green-500 hover:text-green-200'
-                                }`}>
-                              {togglingStatusId === item.id
-                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Updating...</span></>
-                                : isActive
-                                  ? <><Ban className="w-3.5 h-3.5" /><span>Disable</span></>
-                                  : <><CheckCircle2 className="w-3.5 h-3.5" /><span>Enable</span></>}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isProtected || isSelf || deletingUserId === item.id}
-                              onClick={() => handleDeleteUser(item.id, item.name)}
-                              title={
-                                isSelf
-                                  ? 'You cannot delete your own account here'
-                                  : isProtected
-                                    ? 'Only the owner can delete admin/owner accounts'
-                                    : undefined
-                              }
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm border border-red-900/60 text-red-300 hover:border-red-500 hover:text-red-200 text-xs font-semibold whitespace-nowrap disabled:opacity-40 transition-colors"
-                            >
-                              {deletingUserId === item.id
-                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Deleting...</span></>
-                                : <><Trash2 className="w-3.5 h-3.5" /><span>Delete</span></>}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <Pager page={usersPage} totalPages={usersTotalPages} totalItems={filteredUsers.length} onPageChange={setUsersPage} />
-            </div>
-          )}
-        </section>
-      )}
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <Pager page={usersPage} totalPages={usersTotalPages} totalItems={filteredUsers.length} onPageChange={setUsersPage} />
+          </div>
+        )}
+      </section>
 
       {/* Create User Modal */}
       {showCreateModal && (
         <ModalShell
-          title="Add New User"
-          description="Create an internal account for a staff member, manager, or admin."
+          title="Add New User Account"
+          description="Create credentials for a staff member, manager, or admin."
           onClose={() => { if (!creatingUser) setShowCreateModal(false); }}
         >
-          <form
-            className="space-y-4"
-            onSubmit={e => { handleCreateUser(e); }}
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+          <form className="space-y-4 font-sans" onSubmit={handleCreateUser}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
                   Full Name <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -500,11 +520,11 @@ export default function ManageUsersPanel() {
                   onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g. Jane Smith"
                   required
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
                   Email Address <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -513,22 +533,22 @@ export default function ManageUsersPanel() {
                   placeholder="e.g. jane@example.com"
                   type="email"
                   required
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange font-mono"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                  Phone Number <span className="text-gray-600">(optional)</span>
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
+                  Phone Number
                 </label>
                 <input
                   value={newUser.phone}
                   onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Please enter your phone number."
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  placeholder="+63 9XX XXX XXXX"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange font-mono"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
                   Password <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -538,102 +558,100 @@ export default function ManageUsersPanel() {
                   type="password"
                   minLength={8}
                   required
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange font-mono"
                 />
               </div>
-              <div className="space-y-1 sm:col-span-2">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                  Role <span className="text-red-400">*</span>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
+                  Assigned Role <span className="text-red-400">*</span>
                 </label>
                 <select
                   value={newUser.role}
                   onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value as UserRole }))}
                   disabled={!roleOptions.length}
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange font-mono cursor-pointer"
                 >
                   {roleOptions.length > 0
                     ? roleOptions.map(role => <option key={role} value={role}>{role}</option>)
-                    : <option value="" disabled>No roles available</option>}
+                    : <option value="" disabled>No roles loaded</option>}
                 </select>
-                {!roleOptions.length && (
-                  <p className="text-xs text-yellow-400">No roles loaded from API. User creation is disabled while API is offline.</p>
-                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800/80">
               <button
                 type="button"
                 onClick={() => { if (!creatingUser) setShowCreateModal(false); }}
                 disabled={creatingUser}
-                className="px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                className="px-5 py-2.5 border border-gray-800 text-gray-400 hover:text-white text-xs font-mono uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creatingUser || !roleOptions.length}
-                className="flex items-center gap-2 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+                className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
               >
                 {creatingUser
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Creating...</>
-                  : <><UserPlus className="w-3.5 h-3.5" />Create User</>}
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Creating...</span></>
+                  : <><UserPlus className="w-4 h-4" /><span>Create User</span></>}
               </button>
             </div>
           </form>
         </ModalShell>
       )}
 
+      {/* Edit User Modal */}
       {editingUserId !== null && (() => {
         const editingUser = users.find(item => item.id === editingUserId);
         const isSavingThis = savingUserId === editingUserId;
         return (
           <ModalShell
-            title="Edit User Details"
-            description="Update the user's name, email, and phone number. Changes will be saved to their account."
+            title="Edit User Information"
+            description="Update name, email address, and contact number."
             onClose={() => { if (!isSavingThis) handleCancelUserEdit(); }}
           >
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+            <div className="space-y-4 font-sans">
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
                   Full Name <span className="text-red-400">*</span>
                 </label>
                 <input
                   value={userEditDraft.name}
                   onChange={e => setUserEditDraft(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Jane Smith"
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  placeholder="Full name"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
                   Email Address <span className="text-red-400">*</span>
                 </label>
                 <input
                   value={userEditDraft.email}
                   onChange={e => setUserEditDraft(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="e.g. jane@example.com"
+                  placeholder="Email address"
                   type="email"
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange font-mono"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                  Phone Number <span className="text-gray-600">(optional)</span>
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase tracking-widest text-gray-400">
+                  Phone Number
                 </label>
                 <input
                   value={userEditDraft.phone}
                   onChange={e => setUserEditDraft(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="Phone number"
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-brand-orange"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg text-sm focus:outline-none focus:border-brand-orange font-mono"
                 />
               </div>
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800/80">
                 <button
                   type="button"
                   onClick={handleCancelUserEdit}
                   disabled={isSavingThis}
-                  className="px-4 py-2 rounded-sm border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-300 hover:border-gray-500 hover:text-white disabled:opacity-50"
+                  className="px-5 py-2.5 border border-gray-800 text-gray-400 hover:text-white text-xs font-mono uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -641,17 +659,18 @@ export default function ManageUsersPanel() {
                   type="button"
                   disabled={isSavingThis}
                   onClick={() => handleSaveUserEdit(editingUserId, editingUser?.name ?? '')}
-                  className="flex items-center gap-2 px-4 py-2 rounded-sm bg-brand-orange text-white text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60"
+                  className="flex items-center gap-2 bg-brand-orange text-white px-7 py-2.5 text-xs font-mono font-bold uppercase tracking-widest hover:bg-orange-600 transition-all rounded-lg shadow-lg disabled:opacity-60 cursor-pointer"
                 >
                   {isSavingThis
-                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving...</>
-                    : <><Save className="w-3.5 h-3.5" />Save Changes</>}
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Saving...</span></>
+                    : <><Save className="w-4 h-4" /><span>Save Changes</span></>}
                 </button>
               </div>
             </div>
           </ModalShell>
         );
       })()}
+
       {confirmDialog && (
         <ConfirmDialog
           dialog={confirmDialog}

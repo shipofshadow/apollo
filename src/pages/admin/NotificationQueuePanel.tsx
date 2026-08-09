@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw, ShieldAlert, Workflow } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw, ShieldAlert, Workflow, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   fetchNotificationQueueApi,
@@ -45,7 +45,7 @@ export default function NotificationQueuePanel() {
 
   const QUEUE_PAGE_SIZE = 10;
   const [queuePage, setQueuePage] = useState(0);
-  const totalQueuePages = Math.ceil(jobs.length / QUEUE_PAGE_SIZE);
+  const totalQueuePages = Math.max(1, Math.ceil(jobs.length / QUEUE_PAGE_SIZE));
   const pagedJobs = jobs.slice(queuePage * QUEUE_PAGE_SIZE, (queuePage + 1) * QUEUE_PAGE_SIZE);
 
   const loadData = async () => {
@@ -122,8 +122,12 @@ export default function NotificationQueuePanel() {
 
   if (!canManage) {
     return (
-      <div className="w-full max-w-4xl rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-        You do not have permission to access Notification Queue Monitor.
+      <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-8 text-center space-y-3 font-sans shadow-2xl">
+        <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
+        <h3 className="text-lg font-display font-black uppercase tracking-tight text-red-200">Access Restricted</h3>
+        <p className="text-xs font-mono text-red-300/80 max-w-md mx-auto">
+          You do not have permission to access the Notification Queue Monitor.
+        </p>
       </div>
     );
   }
@@ -131,189 +135,216 @@ export default function NotificationQueuePanel() {
   const counts = summary?.counts ?? { queued: 0, retry: 0, processing: 0, failed: 0, done: 0 };
 
   return (
-    <div className="space-y-6 w-full max-w-7xl">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-display font-bold text-white uppercase tracking-wide flex items-center gap-3">
-            <Workflow className="w-6 h-6 text-brand-orange" />
-            Notification Queue Monitor
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">Track queued/retry/failed jobs and replay dead-letter failures.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => { void runCronNow(); }}
-            disabled={cronBusy || loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm border border-brand-orange/60 bg-brand-orange/10 text-brand-orange hover:bg-brand-orange hover:text-white disabled:opacity-50 transition-colors"
-          >
-            {cronBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Workflow className="w-3.5 h-3.5" />}
-            Run Cron Now
-          </button>
-          <button
-            type="button"
-            onClick={() => { void replayFailed(); }}
-            disabled={replayBusy || cronBusy || loading || failedJobs.length === 0}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm border border-yellow-600/40 text-yellow-300 hover:border-yellow-400 hover:text-yellow-200 disabled:opacity-50 transition-colors"
-          >
-            {replayBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-            Replay Failed
-          </button>
-          <button
-            type="button"
-            onClick={() => { void loadData(); }}
-            disabled={loading || cronBusy}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm border border-gray-700 text-gray-300 hover:border-brand-orange hover:text-white disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6 w-full max-w-7xl font-sans pb-20">
+      {/* Top Hero Header Card */}
+      <section className="relative overflow-hidden rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-brand-orange/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-brand-orange/10 border border-brand-orange/20 rounded-xl">
+              <Workflow className="w-6 h-6 text-brand-orange" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">Background Services</p>
+              </div>
+              <h2 className="text-2xl font-display font-black uppercase tracking-tight text-white">Notification Queue Monitor</h2>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => { void runCronNow(); }}
+              disabled={cronBusy || loading}
+              className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-all rounded-lg shadow-lg disabled:opacity-50 cursor-pointer"
+            >
+              {cronBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Workflow className="w-4 h-4" />}
+              <span>Run Cron Now</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { void replayFailed(); }}
+              disabled={replayBusy || cronBusy || loading || failedJobs.length === 0}
+              className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors disabled:opacity-30 cursor-pointer"
+            >
+              {replayBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              <span>Replay Failed ({failedJobs.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { void loadData(); }}
+              disabled={loading || cronBusy}
+              className="flex items-center gap-2 bg-brand-darker border border-gray-800 hover:border-gray-700 text-gray-300 hover:text-white px-4 py-2.5 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-brand-orange' : 'text-brand-orange'}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Warning Banners */}
       {health?.warning && (
-        <div className="flex items-start gap-2 rounded-sm border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
-          <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-950/50 p-4 text-xs font-mono text-amber-200 shadow-xl">
+          <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold">Worker Health Warning</p>
-            <p>{health.message}</p>
+            <p className="font-bold text-amber-300">Worker Health Warning</p>
+            <p className="mt-0.5">{health.message}</p>
           </div>
         </div>
       )}
 
       {error && (
-        <div className="flex items-center gap-2 rounded-sm border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        <div className="flex items-center gap-3 rounded-xl border border-red-500/40 bg-red-950/50 p-4 text-xs font-mono text-red-300 shadow-xl">
+          <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
       {cronNotice && (
-        <div className="flex items-center gap-2 rounded-sm border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
-          <CheckCircle2 className="w-4 h-4 shrink-0" /> {cronNotice}
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-950/50 p-4 text-xs font-mono text-emerald-300 shadow-xl">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span>{cronNotice}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      {/* Queue Stat Metrics Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
         {[
-          ['Queued', counts.queued],
-          ['Retry', counts.retry],
-          ['Processing', counts.processing],
-          ['Failed', counts.failed],
-          ['Done', counts.done],
-          ['Pending', (counts.queued + counts.retry)],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">{label}</p>
-            <p className="mt-1 text-lg font-bold text-white">{value}</p>
+          { label: 'Queued', value: counts.queued, color: 'text-sky-400' },
+          { label: 'Retry', value: counts.retry, color: 'text-amber-400' },
+          { label: 'Processing', value: counts.processing, color: 'text-brand-orange' },
+          { label: 'Failed', value: counts.failed, color: 'text-red-400' },
+          { label: 'Done', value: counts.done, color: 'text-emerald-400' },
+          { label: 'Total Pending', value: (counts.queued + counts.retry), color: 'text-white' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-[#121212] border border-gray-800/80 rounded-xl p-4 shadow-xl">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</p>
+            <p className={`mt-1 text-2xl font-black ${color}`}>{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Last Processed</p>
-          <p className="mt-1 text-sm text-white">{fmtAge(summary?.lastProcessedAt ?? null)}</p>
+      {/* Worker Details Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Last Processed</p>
+          <p className="mt-1 text-base font-bold text-white">{fmtAge(summary?.lastProcessedAt ?? null)}</p>
         </div>
-        <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Oldest Pending</p>
-          <p className="mt-1 text-sm text-white">{fmtAge(summary?.oldestPendingAt ?? null)}</p>
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Oldest Pending</p>
+          <p className="mt-1 text-base font-bold text-white">{fmtAge(summary?.oldestPendingAt ?? null)}</p>
         </div>
-        <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Worker Message</p>
-          <p className={`mt-1 text-sm ${health?.warning ? 'text-yellow-200' : 'text-green-300'}`}>
-            {health?.message ?? 'No health data yet.'}
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Worker Status</p>
+          <p className={`mt-1 text-sm font-bold truncate ${health?.warning ? 'text-amber-300' : 'text-emerald-400'}`}>
+            {health?.message ?? 'No health data available.'}
           </p>
         </div>
       </div>
 
-      <div className="rounded-sm border border-gray-800 bg-brand-dark px-4 py-3 flex flex-wrap items-center gap-3">
-        <label className="text-xs uppercase tracking-widest text-gray-500 font-bold">Status</label>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as (typeof STATUS_OPTIONS)[number])}
-          className="bg-brand-darker border border-gray-700 text-sm text-white px-3 py-2 rounded-sm"
-        >
-          {STATUS_OPTIONS.map((value) => (
-            <option key={value || 'all'} value={value}>
-              {value === '' ? 'All' : value.charAt(0).toUpperCase() + value.slice(1)}
-            </option>
-          ))}
-        </select>
+      {/* Filter Toolbar */}
+      <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-4 shadow-xl flex flex-wrap items-center gap-4 font-mono text-xs">
+        <div className="flex items-center gap-2">
+          <label className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Filter Status:</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as (typeof STATUS_OPTIONS)[number]); setQueuePage(0); }}
+            className="bg-brand-darker border border-gray-800 text-white px-3 py-2 rounded-lg font-mono focus:outline-none focus:border-brand-orange cursor-pointer"
+          >
+            {STATUS_OPTIONS.map((value) => (
+              <option key={value || 'all'} value={value}>
+                {value === '' ? 'All Statuses' : value.charAt(0).toUpperCase() + value.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <label className="text-xs uppercase tracking-widest text-gray-500 font-bold ml-2">Limit</label>
-        <select
-          value={String(limit)}
-          onChange={(e) => setLimit(Number(e.target.value) || 100)}
-          className="bg-brand-darker border border-gray-700 text-sm text-white px-3 py-2 rounded-sm"
-        >
-          {[50, 100, 200, 500].map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <label className="text-gray-500 font-bold uppercase tracking-wider text-[10px]">Fetch Limit:</label>
+          <select
+            value={String(limit)}
+            onChange={(e) => { setLimit(Number(e.target.value) || 100); setQueuePage(0); }}
+            className="bg-brand-darker border border-gray-800 text-white px-3 py-2 rounded-lg font-mono focus:outline-none focus:border-brand-orange cursor-pointer"
+          >
+            {[50, 100, 200, 500].map(v => <option key={v} value={v}>{v} records</option>)}
+          </select>
+        </div>
       </div>
 
-      <div className="bg-brand-dark border border-gray-800 rounded-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-800 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-brand-orange" />
-          <h3 className="text-xs font-bold uppercase tracking-widest text-white">Queue Jobs</h3>
+      {/* Queue Jobs Table Container */}
+      <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl space-y-4">
+        <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-brand-orange" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-white">Queue Jobs Log</h3>
+          </div>
+          <span className="text-[10px] font-mono text-gray-500">{jobs.length} Jobs Fetched</span>
         </div>
 
         {loading ? (
-          <div className="px-4 py-16 text-sm text-gray-400 flex items-center justify-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading queue jobs...
+          <div className="px-6 py-20 text-xs font-mono text-gray-400 flex items-center justify-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-brand-orange" />
+            <span>Loading notification queue records…</span>
           </div>
         ) : jobs.length === 0 ? (
-          <div className="px-4 py-16 text-sm text-gray-500 text-center">No jobs found for this filter.</div>
+          <div className="px-6 py-20 text-xs font-mono text-gray-500 text-center">No queue jobs found for current filter.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-brand-darker text-gray-500 uppercase text-[11px] tracking-widest">
-                <tr>
-                  <th className="text-left px-4 py-3">ID</th>
-                  <th className="text-left px-4 py-3">Event</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-left px-4 py-3">Attempts</th>
-                  <th className="text-left px-4 py-3">Run After</th>
-                  <th className="text-left px-4 py-3">Last Error</th>
-                  <th className="text-left px-4 py-3">Action</th>
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-gray-800/80 bg-black/40 text-gray-400 uppercase text-[10px] tracking-wider">
+                  <th className="py-3.5 px-4">Job ID</th>
+                  <th className="py-3.5 px-4">Event Type</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Attempts</th>
+                  <th className="py-3.5 px-4">Run After</th>
+                  <th className="py-3.5 px-4">Last Error Payload</th>
+                  <th className="py-3.5 px-4">Action</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-800/60 text-gray-300">
                 {pagedJobs.map((job) => {
                   const isFailed = job.status === 'failed';
                   const statusTone = isFailed
-                    ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                    ? 'bg-red-500/10 text-red-400 border-red-500/30'
                     : job.status === 'retry'
-                    ? 'bg-yellow-500/15 text-yellow-200 border-yellow-500/30'
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                     : job.status === 'done'
-                    ? 'bg-green-500/15 text-green-300 border-green-500/30'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                     : 'bg-gray-800 text-gray-300 border-gray-700';
 
                   return (
-                    <tr key={job.id} className="border-t border-gray-800 align-top hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-3 text-gray-300">{job.id}</td>
-                      <td className="px-4 py-3 text-white whitespace-nowrap">{job.event}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-block px-2 py-0.5 text-[11px] font-bold uppercase tracking-widest rounded-sm border ${statusTone}`}>
+                    <tr key={job.id} className="hover:bg-gray-800/30 transition-colors align-top">
+                      <td className="px-4 py-3.5 text-white font-bold">#{job.id}</td>
+                      <td className="px-4 py-3.5 text-white font-bold whitespace-nowrap">{job.event}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className={`inline-block px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full border ${statusTone}`}>
                           {job.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-300">{job.attempts}/{job.maxAttempts}</td>
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtAge(job.runAfter)}</td>
-                      <td className="px-4 py-3 text-gray-400 max-w-[420px]">
+                      <td className="px-4 py-3.5 text-gray-300">{job.attempts} / {job.maxAttempts}</td>
+                      <td className="px-4 py-3.5 text-gray-400 whitespace-nowrap">{fmtAge(job.runAfter)}</td>
+                      <td className="px-4 py-3.5 text-gray-400 max-w-xs leading-relaxed">
                         <span className="line-clamp-2">{job.lastError || '—'}</span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         {isFailed ? (
                           <button
                             type="button"
                             onClick={() => { void replayOne(job.id); }}
                             disabled={jobReplayBusyId === job.id}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded-sm border border-yellow-600/40 text-yellow-300 hover:border-yellow-400 hover:text-yellow-200 disabled:opacity-50 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-mono font-bold uppercase tracking-wider disabled:opacity-40 transition-colors cursor-pointer"
                           >
-                            {jobReplayBusyId === job.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-                            Replay
+                            {jobReplayBusyId === job.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                            <span>Replay</span>
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-600">—</span>
+                          <span className="text-gray-600 text-[10px]">—</span>
                         )}
                       </td>
                     </tr>
@@ -323,25 +354,29 @@ export default function NotificationQueuePanel() {
             </table>
           </div>
         )}
+
+        {/* Pagination Controls */}
         {!loading && jobs.length > QUEUE_PAGE_SIZE && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-800">
-            <button
-              onClick={() => setQueuePage(p => Math.max(0, p - 1))}
-              disabled={queuePage === 0}
-              className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
-            >
-              ← Prev
-            </button>
-            <span className="text-[10px] font-mono text-gray-500">
-              Page {queuePage + 1} / {totalQueuePages} &bull; {jobs.length} total jobs
-            </span>
-            <button
-              onClick={() => setQueuePage(p => Math.min(totalQueuePages - 1, p + 1))}
-              disabled={queuePage >= totalQueuePages - 1}
-              className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
-            >
-              Next →
-            </button>
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-800/80 bg-brand-dark/50 font-mono text-xs">
+            <p className="text-gray-400">
+              Page <span className="text-white font-bold">{queuePage + 1}</span> of <span className="text-white font-bold">{totalQueuePages}</span> &bull; <span className="text-brand-orange font-bold">{jobs.length}</span> Total Jobs
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setQueuePage(p => Math.max(0, p - 1))}
+                disabled={queuePage === 0}
+                className="p-1.5 rounded-lg border border-gray-800 bg-brand-darker text-gray-400 hover:text-white hover:border-brand-orange disabled:opacity-40 transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setQueuePage(p => Math.min(totalQueuePages - 1, p + 1))}
+                disabled={queuePage >= totalQueuePages - 1}
+                className="p-1.5 rounded-lg border border-gray-800 bg-brand-darker text-gray-400 hover:text-white hover:border-brand-orange disabled:opacity-40 transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { Star, MessageSquare, Loader2 } from 'lucide-react';
 import { fetchPublishedReviewsApi } from '../services/api';
 import type { BookingReview } from '../types';
+import type { RootState } from '../store';
 
 interface Props {
   serviceId?: number;
@@ -56,16 +58,22 @@ function ReviewCard({ review }: { review: BookingReview }) {
 }
 
 export default function PublishedReviews({ serviceId }: Props) {
+  const siteSettings = useSelector((state: RootState) => state.siteSettings.settings);
+  const isRegistrationDisabled = siteSettings.disable_registration === '1';
+
   const [reviews, setReviews] = useState<BookingReview[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isRegistrationDisabled) return;
     setLoading(true);
     fetchPublishedReviewsApi(serviceId)
       .then(r => setReviews(r.reviews ?? []))
       .catch(() => setReviews([]))
       .finally(() => setLoading(false));
-  }, [serviceId]);
+  }, [serviceId, isRegistrationDisabled]);
+
+  if (isRegistrationDisabled) return null;
 
   if (loading) {
     return (

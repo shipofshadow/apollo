@@ -6,11 +6,16 @@ import type { AppDispatch, RootState } from '../store';
 
 export default function Testimonials() {
   const dispatch = useDispatch<AppDispatch>();
-  const { testimonials, status } = useSelector((s: RootState) => s.siteSettings);
+  const { testimonials, settings, status } = useSelector((s: RootState) => s.siteSettings);
+  const isRegistrationDisabled = settings.disable_registration === '1';
 
   useEffect(() => {
-    dispatch(fetchTestimonialsAsync(null));
-  }, [dispatch]);
+    if (!isRegistrationDisabled) {
+      dispatch(fetchTestimonialsAsync(null));
+    }
+  }, [dispatch, isRegistrationDisabled]);
+
+  if (isRegistrationDisabled) return null;
 
   if (status === 'loading' && testimonials.length === 0) {
     return (

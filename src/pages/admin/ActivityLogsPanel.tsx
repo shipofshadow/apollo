@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ChevronDown, Loader2, RefreshCw, Search, UserRound } from 'lucide-react';
+import { Activity, ChevronDown, Loader2, RefreshCw, Search, UserRound, ShieldAlert, FileText, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -99,16 +99,16 @@ const CATEGORY_LABEL: Record<ActivityCategory, string> = {
 };
 
 const CATEGORY_BADGE: Record<ActivityCategory, string> = {
-  auth: 'border-cyan-700/50 bg-cyan-900/30 text-cyan-200',
-  booking: 'border-orange-700/50 bg-orange-900/30 text-orange-200',
-  order: 'border-emerald-700/50 bg-emerald-900/30 text-emerald-200',
-  inventory: 'border-amber-700/50 bg-amber-900/30 text-amber-200',
-  content: 'border-violet-700/50 bg-violet-900/30 text-violet-200',
-  team: 'border-blue-700/50 bg-blue-900/30 text-blue-200',
-  waitlist: 'border-fuchsia-700/50 bg-fuchsia-900/30 text-fuchsia-200',
-  settings: 'border-slate-600/60 bg-slate-800/40 text-slate-200',
-  queue: 'border-lime-700/50 bg-lime-900/30 text-lime-200',
-  other: 'border-gray-700 bg-gray-800/60 text-gray-200',
+  auth: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400 font-mono font-bold',
+  booking: 'border-brand-orange/30 bg-brand-orange/10 text-brand-orange font-mono font-bold',
+  order: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-mono font-bold',
+  inventory: 'border-amber-500/30 bg-amber-500/10 text-amber-400 font-mono font-bold',
+  content: 'border-violet-500/30 bg-violet-500/10 text-violet-400 font-mono font-bold',
+  team: 'border-sky-500/30 bg-sky-500/10 text-sky-400 font-mono font-bold',
+  waitlist: 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-400 font-mono font-bold',
+  settings: 'border-gray-700 bg-gray-800/60 text-gray-300 font-mono font-bold',
+  queue: 'border-lime-500/30 bg-lime-500/10 text-lime-400 font-mono font-bold',
+  other: 'border-gray-800 bg-gray-800/40 text-gray-400 font-mono font-bold',
 };
 
 function fmtDate(v: string | null): string {
@@ -346,175 +346,229 @@ export default function ActivityLogsPanel() {
 
   if (user?.role !== 'owner') {
     return (
-      <div className="rounded-lg border border-red-700/30 bg-red-950/20 p-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-red-300">Owner Access Required</p>
-        <p className="mt-2 text-sm text-red-100/80">This activity log view is restricted to owner accounts only.</p>
+      <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-8 text-center space-y-3 font-sans shadow-2xl">
+        <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
+        <h3 className="text-lg font-display font-black uppercase tracking-tight text-red-200">Owner Access Required</h3>
+        <p className="text-xs font-mono text-red-300/80 max-w-md mx-auto">
+          The User Activity Logs audit trail is restricted to root owner accounts only.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-gray-800 bg-[#121212] p-6">
-        <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">Owner Console</p>
-        <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">User Activity Logs</h2>
-        <p className="mt-2 text-xs font-mono text-gray-400">Filter users, then inspect every recorded action for the selected account.</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <section className="lg:col-span-4 rounded-lg border border-gray-800 bg-[#121212]">
-          <header className="flex items-center justify-between border-b border-gray-800 bg-[#151515] px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Users With Activity</p>
-            <div className="relative">
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as UserSort)}
-                className="appearance-none rounded border border-gray-700 bg-[#111111] py-1 pl-2 pr-7 text-[10px] font-bold uppercase tracking-widest text-gray-300 focus:border-brand-orange focus:outline-none"
-              >
-                {Object.entries(SORT_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+    <div className="space-y-6 font-sans pb-20">
+      {/* Top Hero Card */}
+      <section className="relative overflow-hidden rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-brand-orange/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-orange-300/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-brand-orange/10 border border-brand-orange/20 rounded-xl">
+              <Activity className="w-6 h-6 text-brand-orange" />
             </div>
-          </header>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange">Owner Console</p>
+              </div>
+              <h2 className="text-2xl font-display font-black uppercase tracking-tight text-white">User Activity Logs &amp; Audit Trail</h2>
+            </div>
+          </div>
+          <div className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-4 py-2 text-right">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-gray-400">Total Tracked Accounts</p>
+            <p className="text-sm font-mono font-bold text-white">{users.length} Users</p>
+          </div>
+        </div>
+      </section>
 
-          <div className="max-h-[32rem] overflow-y-auto p-2">
-            {loadingUsers ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-5 w-5 animate-spin text-brand-orange" />
+      {/* Main Grid Workspace */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left Column: User Selector Panel */}
+        <section className="lg:col-span-4 rounded-xl border border-gray-800/80 bg-[#121212] overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div>
+            <header className="flex items-center justify-between border-b border-gray-800/80 bg-brand-dark/50 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <UserRound className="w-4 h-4 text-brand-orange" />
+                <p className="text-xs font-mono font-bold uppercase tracking-widest text-white">Active Accounts</p>
               </div>
-            ) : users.length === 0 ? (
-              <div className="px-3 py-10 text-center">
-                <UserRound className="mx-auto h-8 w-8 text-gray-600" />
-                <p className="mt-2 text-xs uppercase tracking-widest text-gray-500">No users found</p>
+              <div className="relative">
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as UserSort)}
+                  className="appearance-none rounded-lg border border-gray-800 bg-brand-darker py-1.5 pl-3 pr-8 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-300 focus:border-brand-orange focus:outline-none cursor-pointer"
+                >
+                  {Object.entries(SORT_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              users.map((u) => {
-                const active = selectedUserId === u.userId;
-                return (
-                  <button
-                    key={u.userId}
-                    type="button"
-                    onClick={() => setSelectedUserId(u.userId)}
-                    className={`mb-2 w-full rounded border px-3 py-3 text-left transition-colors ${
-                      active
-                        ? 'border-brand-orange/60 bg-brand-orange/10'
-                        : 'border-gray-800 bg-[#141414] hover:border-gray-700 hover:bg-[#181818]'
-                    }`}
-                  >
-                    <p className="truncate text-sm font-bold text-white">{u.userName || 'Unknown User'}</p>
-                    <p className="truncate text-[11px] text-gray-500">{u.userEmail || 'No email'}</p>
-                    <div className="mt-2 flex items-center justify-between text-[10px] uppercase tracking-widest text-gray-400">
-                      <span>{u.totalActivities} events</span>
-                      <span>{fmtDate(u.lastActivityAt)}</span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
+            </header>
+
+            <div className="max-h-[36rem] overflow-y-auto p-3 space-y-2">
+              {loadingUsers ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand-orange" />
+                </div>
+              ) : users.length === 0 ? (
+                <div className="px-3 py-16 text-center space-y-2">
+                  <UserRound className="mx-auto h-8 w-8 text-gray-600 opacity-50" />
+                  <p className="text-xs font-mono uppercase tracking-widest text-gray-500">No active users recorded</p>
+                </div>
+              ) : (
+                users.map((u) => {
+                  const active = selectedUserId === u.userId;
+                  return (
+                    <button
+                      key={u.userId}
+                      type="button"
+                      onClick={() => setSelectedUserId(u.userId)}
+                      className={`w-full rounded-xl border p-4 text-left transition-all cursor-pointer ${
+                        active
+                          ? 'border-brand-orange bg-brand-orange/15 shadow-[0_0_15px_rgba(249,115,22,0.15)]'
+                          : 'border-gray-800/80 bg-brand-darker/60 hover:border-gray-700 hover:bg-gray-800/40'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`truncate text-sm font-bold transition-colors ${active ? 'text-brand-orange' : 'text-white'}`}>
+                          {u.userName || 'Unknown User'}
+                        </p>
+                        <span className="px-2 py-0.5 text-[9px] font-mono uppercase bg-brand-orange/10 text-brand-orange border border-brand-orange/30 rounded-full font-bold shrink-0">
+                          {u.totalActivities} events
+                        </span>
+                      </div>
+                      <p className="truncate text-xs font-mono text-gray-400 mt-0.5">{u.userEmail || 'No email registered'}</p>
+                      <div className="mt-3 pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px] font-mono text-gray-500">
+                        <span>Last Active</span>
+                        <span className="text-gray-300 font-bold">{fmtDate(u.lastActivityAt)}</span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </section>
 
-        <section className="lg:col-span-8 rounded-lg border border-gray-800 bg-[#121212]">
-          <header className="flex flex-col gap-3 border-b border-gray-800 bg-[#151515] px-4 py-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Selected User</p>
-              <h3 className="text-sm font-bold text-white">
-                {selectedUser ? `${selectedUser.userName} (${selectedUser.totalActivities} logs)` : 'No user selected'}
-              </h3>
-            </div>
-            <div className="flex w-full items-center gap-2 md:w-auto">
-              <div className="relative w-full md:w-72">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search logs, subject, payload..."
-                  className="w-full rounded border border-gray-700 bg-[#121212] py-2 pl-8 pr-3 text-xs text-white placeholder:text-gray-500 focus:border-brand-orange focus:outline-none"
-                />
+        {/* Right Column: Activity Logs Timeline */}
+        <section className="lg:col-span-8 rounded-xl border border-gray-800/80 bg-[#121212] overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div>
+            <header className="flex flex-col gap-3 border-b border-gray-800/80 bg-brand-dark/50 px-6 py-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500">Inspecting Target Account</p>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2 mt-0.5">
+                  <FileText className="w-4 h-4 text-brand-orange" />
+                  {selectedUser ? `${selectedUser.userName} (${selectedUser.userEmail || 'No email'})` : 'No user selected'}
+                </h3>
               </div>
-              <button
-                type="button"
-                onClick={() => loadLogs(selectedUserId)}
-                disabled={loadingLogs || selectedUserId === null}
-                className="inline-flex items-center gap-1 rounded border border-gray-700 bg-[#121212] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-300 hover:border-brand-orange hover:text-brand-orange disabled:opacity-40"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${loadingLogs ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-            </div>
-          </header>
+              <div className="flex w-full items-center gap-3 md:w-auto">
+                <div className="relative w-full md:w-72">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search event, subject, or payload..."
+                    className="w-full rounded-lg border border-gray-800 bg-brand-darker py-2 pl-9 pr-3 text-xs text-white placeholder:text-gray-600 focus:border-brand-orange focus:outline-none font-mono"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadLogs(selectedUserId)}
+                  disabled={loadingLogs || selectedUserId === null}
+                  className="flex items-center gap-2 rounded-lg border border-gray-800 bg-brand-darker px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider text-gray-300 hover:border-brand-orange hover:text-white disabled:opacity-40 transition-colors cursor-pointer shrink-0"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingLogs ? 'animate-spin text-brand-orange' : 'text-brand-orange'}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </header>
 
-          <div className="max-h-[32rem] overflow-y-auto p-3">
-            {loadingLogs ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-5 w-5 animate-spin text-brand-orange" />
-              </div>
-            ) : filteredLogs.length === 0 ? (
-              <div className="py-16 text-center text-gray-500">
-                <Activity className="mx-auto h-8 w-8 text-gray-600" />
-                <p className="mt-2 text-xs uppercase tracking-widest">No activity entries for this filter.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredLogs.map((log) => (
-                  <article key={log.id} className="rounded border border-gray-800 bg-[#141414] p-3">
-                    {(() => {
-                      const category = categoryForLog(log);
-                      return (
-                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-white">{readableEvent(log)}</p>
-                        <p className="mt-1 text-xs text-gray-300">{summarizeLog(log)}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] tracking-widest text-gray-500">
-                          <span className={`rounded border px-1.5 py-0.5 font-bold ${CATEGORY_BADGE[category]}`}>{CATEGORY_LABEL[category]}</span>
-                          <span className="rounded border border-gray-700 px-1.5 py-0.5">Table: {readableTable(log)}</span>
-                          <span className="rounded border border-gray-700 px-1.5 py-0.5">{titleCaseSnake(log.logName || 'default')}</span>
-                          <span className="rounded border border-gray-700 px-1.5 py-0.5">{readableSubject(log)}</span>
-                          <span className="rounded border border-gray-700 px-1.5 py-0.5">Performed by: {readablePerformer(log)}</span>
+            <div className="max-h-[36rem] overflow-y-auto p-6 space-y-4">
+              {loadingLogs ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-brand-orange" />
+                </div>
+              ) : filteredLogs.length === 0 ? (
+                <div className="py-20 text-center space-y-3">
+                  <Activity className="mx-auto h-10 w-10 text-gray-600 opacity-50" />
+                  <p className="text-xs font-mono uppercase tracking-widest text-gray-500">No activity entries matching current search filter.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredLogs.map((log) => {
+                    const category = categoryForLog(log);
+                    const changes = extractAttributeChangeLines(log);
+                    return (
+                      <article key={log.id} className="rounded-xl border border-gray-800/80 bg-brand-darker/70 p-5 space-y-3 hover:border-brand-orange/40 transition-all shadow-xl">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2.5 py-0.5 text-[9px] uppercase rounded-full border ${CATEGORY_BADGE[category]}`}>
+                                {CATEGORY_LABEL[category]}
+                              </span>
+                              <h4 className="text-sm font-bold text-white">{readableEvent(log)}</h4>
+                            </div>
+                            <p className="text-xs text-gray-300 leading-relaxed pt-1">{summarizeLog(log)}</p>
+                          </div>
+                          <span className="text-[11px] font-mono text-gray-400 shrink-0">{fmtDate(log.createdAt)}</span>
                         </div>
-                      </div>
-                      <p className="text-[11px] font-mono text-gray-400">{fmtDate(log.createdAt)}</p>
-                    </div>
-                      );
-                    })()}
 
-                    {log.attribute_changes && (
-                      <div className="mt-3 rounded border border-brand-orange/30 bg-brand-orange/5 p-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">What Changed</p>
-                        {extractAttributeChangeLines(log).length > 0 ? (
-                          <ul className="mt-2 space-y-1.5 text-[11px] text-gray-200">
-                            {extractAttributeChangeLines(log).map((item) => (
-                              <li key={item.field} className="rounded border border-brand-orange/20 bg-[#181818] px-2 py-1.5">
-                                <span className="font-semibold text-white">{item.field}:</span>{' '}
-                                <span className="text-gray-400">{item.before}</span>
-                                <span className="mx-1 text-brand-orange">→</span>
-                                <span>{item.after}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-1 text-[11px] text-gray-300">No field-level changes detected.</p>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-gray-400 pt-1">
+                          <span className="rounded bg-black/40 border border-gray-800 px-2 py-0.5">Table: <strong className="text-gray-200">{readableTable(log)}</strong></span>
+                          <span className="rounded bg-black/40 border border-gray-800 px-2 py-0.5">Log: <strong className="text-gray-200">{titleCaseSnake(log.logName || 'default')}</strong></span>
+                          <span className="rounded bg-black/40 border border-gray-800 px-2 py-0.5">Subject: <strong className="text-brand-orange">{readableSubject(log)}</strong></span>
+                          <span className="rounded bg-black/40 border border-gray-800 px-2 py-0.5">Actor: <strong className="text-gray-200">{readablePerformer(log)}</strong></span>
+                        </div>
+
+                        {log.attribute_changes && (
+                          <div className="mt-3 rounded-lg border border-brand-orange/30 bg-brand-orange/5 p-4 space-y-2">
+                            <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-1.5">
+                              <ArrowRight className="w-3 h-3" /> Field Mutation Diff
+                            </p>
+                            {changes.length > 0 ? (
+                              <ul className="space-y-2 text-xs font-mono">
+                                {changes.map((item) => (
+                                  <li key={item.field} className="rounded-md border border-gray-800 bg-[#121212] p-2.5 flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-bold text-white">{item.field}:</span>
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-400 line-through bg-red-950/40 border border-red-500/20 px-2 py-0.5 rounded">{item.before}</span>
+                                      <span className="text-brand-orange font-bold">→</span>
+                                      <span className="text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-0.5 rounded">{item.after}</span>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-[11px] font-mono text-gray-400">No field-level mutations recorded.</p>
+                            )}
+
+                            <details className="pt-2">
+                              <summary className="cursor-pointer text-[10px] font-mono uppercase tracking-widest text-gray-400 hover:text-white transition-colors">
+                                Toggle Raw JSON Payload
+                              </summary>
+                              <pre className="mt-2 overflow-x-auto rounded-lg border border-gray-800 bg-black/60 p-3 text-[11px] font-mono text-gray-300">
+                                {JSON.stringify(log.attribute_changes, null, 2)}
+                              </pre>
+                            </details>
+                          </div>
                         )}
 
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-gray-400">Show technical JSON</summary>
-                          <pre className="mt-1 overflow-x-auto text-[11px] text-gray-300">{JSON.stringify(log.attribute_changes, null, 2)}</pre>
-                        </details>
-                      </div>
-                    )}
-
-                    {log.properties && Object.keys(log.properties).length > 0 && (
-                      <details className="mt-3 rounded border border-gray-700 bg-[#111111] p-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Custom Properties</p>
-                        <pre className="mt-1 overflow-x-auto text-[11px] text-gray-300">{JSON.stringify(log.properties, null, 2)}</pre>
-                      </details>
-                    )}
-                  </article>
-                ))}
-              </div>
-            )}
+                        {log.properties && Object.keys(log.properties).length > 0 && (
+                          <details className="rounded-lg border border-gray-800 bg-black/40 p-3">
+                            <summary className="cursor-pointer text-[10px] font-mono font-bold uppercase tracking-widest text-gray-400 hover:text-white transition-colors">
+                              View Custom Properties ({Object.keys(log.properties).length})
+                            </summary>
+                            <pre className="mt-2 overflow-x-auto rounded-lg border border-gray-800 bg-[#121212] p-3 text-[11px] font-mono text-gray-300">
+                              {JSON.stringify(log.properties, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>
