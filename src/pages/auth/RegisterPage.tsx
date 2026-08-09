@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { UserPlus, Eye, EyeOff, AlertCircle, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import TurnstileWidget from '../../components/TurnstileWidget';
 import PageSEO from '../../components/PageSEO';
+import { fetchSiteSettingsAsync } from '../../store/siteSettingsSlice';
+import type { AppDispatch, RootState } from '../../store';
 
 /** Returns a score 0–4 for password strength. */
 function passwordStrength(pw: string): number {
@@ -28,6 +31,10 @@ export default function RegisterPage() {
   const redirect  = params.get('redirect') ?? '';
   const isInquiryFlow = params.get('source') === 'inquiry';
 
+  const dispatch = useDispatch<AppDispatch>();
+  const siteSettings = useSelector((state: RootState) => state.siteSettings.settings);
+  const isRegistrationDisabled = siteSettings.disable_registration === '1';
+
   const { user, status, error, register, clearError } = useAuth();
   const { showToast } = useToast();
 
@@ -43,6 +50,10 @@ export default function RegisterPage() {
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileKey,   setTurnstileKey]   = useState(0);
   const hasShownToast = useRef(false);
+
+  useEffect(() => {
+    dispatch(fetchSiteSettingsAsync());
+  }, [dispatch]);
 
   useEffect(() => {
     if (user) {
@@ -118,150 +129,178 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 shadow-2xl">
-          {/* Inquiry linking context banner */}
-          {isInquiryFlow && (
-            <div className="flex items-start gap-3 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange rounded-sm px-4 py-3 mb-6 text-sm">
-              <ClipboardList className="w-5 h-5 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold mb-0.5">Inquiry Linking Active</p>
-                <p className="text-orange-200/80 text-xs leading-relaxed">
-                  Register using the <strong>same email</strong> from your inquiry and it will automatically appear in your <strong>My Inquiries</strong> tab.
-                </p>
-              </div>
+        {isRegistrationDisabled ? (
+          <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 shadow-2xl text-center space-y-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 text-amber-400 mx-auto">
+              <AlertCircle className="w-8 h-8" />
             </div>
-          )}
-          {displayError && (
-            <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm mb-6 text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {displayError}
+            <div>
+              <h2 className="text-xl font-display font-bold text-white uppercase tracking-wide mb-2">
+                Registration Closed
+              </h2>
+              <p className="text-gray-400 text-sm max-w-sm mx-auto leading-relaxed">
+                New user account registration is currently unavailable. Please sign in if you already have an account.
+              </p>
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Full Name *</label>
-              <input
-                type="text" required value={form.name} onChange={set('name')}
-                autoComplete="name"
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                placeholder="Juan dela Cruz"
-              />
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Email Address *</label>
-              <input
-                type="email" required value={form.email} onChange={set('email')}
-                autoComplete="email"
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                placeholder="juan@example.com"
-              />
-            </div>
-
-            {/* Phone */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Phone Number</label>
-              <input
-                type="tel" value={form.phone} onChange={set('phone')}
-                autoComplete="tel"
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                placeholder="Please enter your phone number."
-              />
-            </div>
-
-            {/* Password */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Password *</label>
-              <div className="relative">
-                <input
-                  type={showPw ? 'text' : 'password'} required value={form.password} onChange={set('password')}
-                  autoComplete="new-password"
-                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 pr-12 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                  placeholder="At least 8 characters"
-                />
-                <button
-                  type="button" onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {/* Password strength meter */}
-              {form.password && (() => {
-                const score = passwordStrength(form.password);
-                return (
-                  <div className="space-y-1">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4].map(n => (
-                        <div
-                          key={n}
-                          className={`h-1 flex-1 rounded-full transition-colors ${n <= score ? STRENGTH_COLORS[score] : 'bg-gray-700'}`}
-                        />
-                      ))}
-                    </div>
-                    <p className={`text-xs font-semibold ${STRENGTH_TEXT[score]}`}>{STRENGTH_LABELS[score]}</p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Confirm password */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Confirm Password *</label>
-              <input
-                type={showPw ? 'text' : 'password'} required value={form.confirm} onChange={set('confirm')}
-                autoComplete="new-password"
-                className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
-                placeholder="Repeat your password"
-              />
-            </div>
-
-            {/* Privacy Consent */}
-            <div className="flex items-start gap-3 p-3 bg-brand-darker border border-gray-700 rounded-sm">
-              <input
-                type="checkbox"
-                id="consent"
-                checked={consentGiven}
-                onChange={e => setConsentGiven(e.target.checked)}
-                className="mt-0.5 w-4 h-4 accent-brand-orange cursor-pointer shrink-0"
-              />
-              <label htmlFor="consent" className="text-xs text-gray-400 cursor-pointer leading-relaxed">
-                I agree to the collection and processing of my personal data (bookings, vehicle info, contact details) by 1625 Auto Lab for service delivery purposes. You may export or delete your data anytime from your profile.
-              </label>
-            </div>
-
-            <TurnstileWidget
-              onVerify={setTurnstileToken}
-              onExpire={() => setTurnstileToken('')}
-              resetKey={turnstileKey}
-            />
-
-            <button
-              type="submit"
-              disabled={status === 'loading' || !turnstileToken}
-              className="w-full bg-brand-orange text-white font-bold uppercase tracking-widest py-4 hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-sm mt-2"
-            >
-              {status === 'loading' ? (
-                <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-5 h-5" />
-              ) : (
-                <><UserPlus className="w-5 h-5" /> Create Account</>
-              )}
-            </button>
-          </form>
-
-          <p className="text-center text-gray-500 text-sm mt-6">
-            Already have an account?{' '}
             <Link
               to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'}
-              className="text-brand-orange hover:text-orange-400 font-bold transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-brand-orange text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded-sm shadow-md"
             >
-              Sign in
+              Go to Sign In
             </Link>
-          </p>
-        </div>
+          </div>
+        ) : (
+          <div className="bg-brand-dark border border-gray-800 rounded-sm p-8 shadow-2xl">
+            {/* Inquiry linking context banner */}
+            {isInquiryFlow && (
+              <div className="flex items-start gap-3 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange rounded-sm px-4 py-3 mb-6 text-sm">
+                <ClipboardList className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold mb-0.5">Inquiry Linking Active</p>
+                  <p className="text-orange-200/80 text-xs leading-relaxed">
+                    Register using the <strong>same email</strong> from your inquiry and it will automatically appear in your <strong>My Inquiries</strong> tab.
+                  </p>
+                </div>
+              </div>
+            )}
+            {displayError && (
+              <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-sm mb-6 text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {displayError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Full Name *</label>
+                <input
+                  type="text" required value={form.name} onChange={set('name')}
+                  autoComplete="name"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
+                  placeholder="Juan dela Cruz"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Email Address *</label>
+                <input
+                  type="email" required value={form.email} onChange={set('email')}
+                  autoComplete="email"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
+                  placeholder="juan@example.com"
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Phone Number *</label>
+                <input
+                  type="tel" required value={form.phone} onChange={set('phone')}
+                  autoComplete="tel"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
+                  placeholder="0912 345 6789"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Password *</label>
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'} required value={form.password} onChange={set('password')}
+                    autoComplete="new-password"
+                    className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 pr-12 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
+                    placeholder="At least 8 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {form.password && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-gray-800">
+                      {[1, 2, 3, 4].map(level => {
+                        const score = passwordStrength(form.password);
+                        return (
+                          <div
+                            key={level}
+                            className={`flex-1 transition-all duration-300 ${level <= score ? STRENGTH_COLORS[score] : 'bg-gray-800'}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <p className={`text-xs ${STRENGTH_TEXT[passwordStrength(form.password)]}`}>
+                      Strength: {STRENGTH_LABELS[passwordStrength(form.password)]}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">Confirm Password *</label>
+                <input
+                  type="password" required value={form.confirm} onChange={set('confirm')}
+                  autoComplete="new-password"
+                  className="w-full bg-brand-darker border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange transition-colors rounded-sm"
+                  placeholder="Re-enter password"
+                />
+              </div>
+
+              {/* Privacy Consent */}
+              <div className="pt-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={consentGiven}
+                    onChange={e => setConsentGiven(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
+                  />
+                  <span className="text-xs text-gray-400 leading-relaxed">
+                    I agree to the processing of my personal data in accordance with the{' '}
+                    <Link to="/privacy-policy" className="text-brand-orange underline hover:text-orange-400" target="_blank">
+                      Privacy Policy
+                    </Link>. *
+                  </span>
+                </label>
+              </div>
+
+              <TurnstileWidget
+                onVerify={setTurnstileToken}
+                onExpire={() => setTurnstileToken('')}
+                resetKey={turnstileKey}
+              />
+
+              <button
+                type="submit"
+                disabled={status === 'loading' || !turnstileToken}
+                className="w-full bg-brand-orange text-white font-bold uppercase tracking-widest py-4 hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 rounded-sm mt-2"
+              >
+                {status === 'loading' ? (
+                  <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-5 h-5" />
+                ) : (
+                  <><UserPlus className="w-5 h-5" /> Create Account</>
+                )}
+              </button>
+            </form>
+
+            <p className="text-center text-gray-500 text-sm mt-6">
+              Already have an account?{' '}
+              <Link
+                to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'}
+                className="text-brand-orange hover:text-orange-400 font-bold transition-colors"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import {
   fetchShopHoursApi, fetchMyVehiclesApi,
   createMyVehicleApi,
   fetchShopClosedDatesApi,
+  fetchSiteSettingsApi,
   joinWaitlistApi,
   fetchWaitlistClaimApi,
 } from '../services/api';
@@ -100,15 +101,16 @@ function slotToMinutes(slot: string): number {
   return h * 60 + (mRaw || 0);
 }
 
-function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>, weeks: number = 2): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]); 
 
+  const targetCount = Math.max(1, weeks) * 7;
   const dates: Date[] = [];
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
-  while (dates.length < 14) {
+  while (dates.length < targetCount) {
     const iso = formatDateYMD(cursor);
     if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
@@ -197,8 +199,9 @@ export default function BookingPage() {
   const [formErrors, setFormErrors] = useState<{ phone?: string; email?: string }>({});
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileKey,   setTurnstileKey]   = useState(0);
+  const [bookingHorizonWeeks, setBookingHorizonWeeks] = useState(2);
 
-  const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
+  const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet, bookingHorizonWeeks);
   const selectedServices = services.filter(s => s.id === selectedId);
   const totalMaxHours    = selectedServices.reduce(
     (acc, s) => acc + parseDurationMax(s.duration), 0
@@ -219,11 +222,12 @@ export default function BookingPage() {
   useEffect(() => {
     dispatch(fetchServicesAsync(token));
     if (BACKEND_URL) {
-      Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
-        .then(([{ hours }, cdData]) => {
+      Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi(), fetchSiteSettingsApi()])
+        .then(([{ hours }, cdData, { settings }]) => {
           setShopHours(hours);
           const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
           setClosedDatesSet(new Set(cd.map(d => d.date)));
+          setBookingHorizonWeeks(Math.max(1, parseInt(settings.booking_horizon_weeks ?? '2', 10) || 2));
         })
         .catch(() => {})
         .finally(() => setShopHoursLoaded(true));

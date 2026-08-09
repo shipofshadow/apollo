@@ -192,10 +192,12 @@ class SiteSettingsService
             // Map / location settings
             'map_embed_url'    => 'https://www.openstreetmap.org/export/embed.html?bbox=120.6699%2C15.0086%2C120.7099%2C15.0486&layer=mapnik&marker=15.0286%2C120.6899',
             'map_link_url'     => 'https://www.openstreetmap.org/?mlat=15.0286&mlon=120.6899#map=15/15.0286/120.6899',
-            // Booking settings
+            // Booking & Security settings
             'slot_capacity'    => '3',
+            'booking_horizon_weeks' => '2',
             'staff_can_view_all_bookings' => '0',
             'staff_can_manage_all_bookings' => '0',
+            'disable_registration' => '0',
             // Contact page settings
             'contact_heading'  => 'Contact The Lab',
             'contact_tagline'  => 'Ready to upgrade your ride? Reach out and we\'ll get back to you within 24 hours.',

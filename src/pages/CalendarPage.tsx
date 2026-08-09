@@ -7,7 +7,7 @@ import PageSEO from '../components/PageSEO';
 import CustomCalendar from '../components/CustomCalendar';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../config';
-import { deleteInquiryApi, fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, fetchInquiryCalendarApi } from '../services/api';
+import { deleteInquiryApi, fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, fetchSiteSettingsApi, fetchInquiryCalendarApi } from '../services/api';
 import type { ShopDayHours } from '../types';
 
 // FontAwesome Icons
@@ -159,16 +159,17 @@ function isSameLocalDay(a: Date, b: Date): boolean {
     && a.getDate() === b.getDate();
 }
 
-function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>, weeks: number = 2): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter((hour) => hour.isOpen).map((hour) => hour.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]);
 
+  const targetCount = Math.max(1, weeks) * 7;
   const dates: Date[] = [];
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
 
-  while (dates.length < 14) {
+  while (dates.length < targetCount) {
     const iso = formatDateYMD(cursor);
     if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) {
       dates.push(new Date(cursor));
@@ -259,13 +260,15 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
     return unique.map((date) => new Date(date));
   }, [events]);
 
+  const [bookingHorizonWeeks, setBookingHorizonWeeks] = useState(2);
+
   const availableDates = useMemo(() => {
     if (isAdminPage) {
       return eventAvailableDates;
     }
 
-    return buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
-  }, [isAdminPage, eventAvailableDates, shopHoursLoaded, shopHours, closedDatesSet]);
+    return buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet, bookingHorizonWeeks);
+  }, [isAdminPage, eventAvailableDates, shopHoursLoaded, shopHours, closedDatesSet, bookingHorizonWeeks]);
 
   const eventSlotCounts = useMemo(() => {
     return events.reduce<Record<string, number>>((acc, event) => {
@@ -298,11 +301,12 @@ export default function CalendarPage({ isAdminPage = false }: CalendarPageProps)
       return;
     }
 
-    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
-      .then(([{ hours }, closedDatesData]) => {
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi(), fetchSiteSettingsApi()])
+      .then(([{ hours }, closedDatesData, { settings }]) => {
         setShopHours(hours);
         const dates = (closedDatesData as { closedDates: { date: string }[] }).closedDates ?? [];
         setClosedDatesSet(new Set(dates.map((date) => date.date)));
+        setBookingHorizonWeeks(Math.max(1, parseInt(settings.booking_horizon_weeks ?? '2', 10) || 2));
       })
       .catch(() => {})
       .finally(() => setShopHoursLoaded(true));

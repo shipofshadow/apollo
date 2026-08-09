@@ -1257,6 +1257,11 @@ function SystemPanel() {
   const [staffSettingsError, setStaffSettingsError] = useState<string | null>(null);
   const [staffSettingsSuccess, setStaffSettingsSuccess] = useState(false);
 
+  const [disableRegistration, setDisableRegistration] = useState(false);
+  const [registrationSettingsSaving, setRegistrationSettingsSaving] = useState(false);
+  const [registrationSettingsError, setRegistrationSettingsError] = useState<string | null>(null);
+  const [registrationSettingsSuccess, setRegistrationSettingsSuccess] = useState(false);
+
   const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
   const [migrTotal,     setMigrTotal]     = useState(0);
   const [migrPage,      setMigrPage]      = useState(1);
@@ -1297,7 +1302,29 @@ function SystemPanel() {
       staff_can_view_all_bookings: toBool(settings.staff_can_view_all_bookings),
       staff_can_manage_all_bookings: toBool(settings.staff_can_manage_all_bookings),
     });
-  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings]);
+    setDisableRegistration(toBool(settings.disable_registration));
+  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings, settings.disable_registration]);
+
+  const handleSaveRegistrationSettings = async () => {
+    if (!token || registrationSettingsSaving) return;
+    setRegistrationSettingsSaving(true);
+    setRegistrationSettingsError(null);
+    setRegistrationSettingsSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({
+        token,
+        data: {
+          disable_registration: disableRegistration ? '1' : '0',
+        },
+      })).unwrap();
+      setRegistrationSettingsSuccess(true);
+      setTimeout(() => setRegistrationSettingsSuccess(false), 3000);
+    } catch (e: unknown) {
+      setRegistrationSettingsError((e as Error).message ?? 'Failed to save registration access settings.');
+    } finally {
+      setRegistrationSettingsSaving(false);
+    }
+  };
 
   const handleRunMigrations = async () => {
     if (!token || running) return;
@@ -1440,6 +1467,62 @@ function SystemPanel() {
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">Tech Stack</p>
             <p className="text-gray-300 text-sm">{TECH_STACK}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* User Registration Settings */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-display font-bold text-white uppercase tracking-wide flex items-center gap-2">
+            <Users className="w-5 h-5 text-brand-orange" />
+            User Registration Access
+          </h3>
+        </div>
+
+        <div className="bg-brand-dark border border-gray-800 rounded-sm p-5 space-y-4">
+          <p className="text-sm text-gray-300">
+            Control whether new public visitors are allowed to create accounts on the platform.
+          </p>
+
+          {registrationSettingsError && (
+            <div className="flex items-center gap-2 bg-red-900/30 border border-red-500/40 text-red-400 px-4 py-3 rounded-sm text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {registrationSettingsError}
+            </div>
+          )}
+
+          {registrationSettingsSuccess && (
+            <div className="flex items-center gap-2 bg-green-900/30 border border-green-500/40 text-green-400 px-4 py-3 rounded-sm text-sm">
+              <CheckCircle2 className="w-4 h-4 shrink-0" /> Registration access settings saved.
+            </div>
+          )}
+
+          <label className="flex items-start gap-3 rounded-sm border border-gray-800 bg-brand-darker/40 px-4 py-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={disableRegistration}
+              onChange={e => setDisableRegistration(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-600 bg-brand-darker text-brand-orange focus:ring-brand-orange"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-white">Disable new user registration</span>
+              <span className="block text-xs text-gray-400">
+                When enabled, public registration forms and registration API endpoints will block new user creation. Existing accounts can still sign in.
+              </span>
+            </span>
+          </label>
+
+          <div className="pt-2 border-t border-gray-800 flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">System-wide setting for user onboarding.</p>
+            <button
+              type="button"
+              onClick={handleSaveRegistrationSettings}
+              disabled={registrationSettingsSaving}
+              className="flex items-center gap-2 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-50 rounded-sm cursor-pointer"
+            >
+              {registrationSettingsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Access Setting
+            </button>
           </div>
         </div>
       </div>

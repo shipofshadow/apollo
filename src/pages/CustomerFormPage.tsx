@@ -5,7 +5,14 @@ import PageSEO from '../components/PageSEO';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { BACKEND_URL } from '../config';
-import { fetchInquiryAvailabilityApi, fetchShopClosedDatesApi, fetchShopHoursApi, joinWaitlistApi, fetchServicesApi } from '../services/api';
+import {
+  fetchInquiryAvailabilityApi,
+  fetchShopClosedDatesApi,
+  fetchShopHoursApi,
+  fetchSiteSettingsApi,
+  joinWaitlistApi,
+  fetchServicesApi
+} from '../services/api';
 import type { ShopDayHours } from '../types';
 import CustomCalendar from '../components/CustomCalendar';
 import TurnstileWidget from '../components/TurnstileWidget';
@@ -13,18 +20,13 @@ import TurnstileWidget from '../components/TurnstileWidget';
 // Icons
 import {
   FaUser,
-  FaMapMarkerAlt,
-  FaPhone,
-  FaEnvelope,
-  FaFacebook,
   FaCar,
   FaCalendarAlt,
   FaClock,
   FaWrench,
-  FaIdBadge,
   FaBell
 } from 'react-icons/fa';
-import { Loader2, ArrowRight, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck } from 'lucide-react';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -71,15 +73,16 @@ function formatCloseTimeString(closeTime: string, openMinutes?: number): string 
   return format(d, 'h:mm aa');
 }
 
-function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>, weeks: number = 2): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter((hour) => hour.isOpen).map((hour) => hour.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]);
 
+  const targetCount = Math.max(1, weeks) * 7;
   const dates: Date[] = [];
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
-  while (dates.length < 14) {
+  while (dates.length < targetCount) {
     const iso = formatDateYMD(cursor);
     if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
@@ -102,7 +105,7 @@ const INITIAL_FORM_STATE = {
   productToPurchase: ''
 };
 
-const inputClass = "w-full bg-black/20 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all rounded-sm text-sm";
+const inputClass = "w-full h-11 bg-black/40 border border-gray-800 text-white px-3.5 py-2.5 rounded-lg text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange/50 transition-all duration-200";
 
 export default function CustomerFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -132,8 +135,9 @@ export default function CustomerFormPage() {
   const [searchParams] = useSearchParams();
   const [services, setServices] = useState<any[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [bookingHorizonWeeks, setBookingHorizonWeeks] = useState(2);
 
-  const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet);
+  const availableDates = buildDateList(shopHoursLoaded ? shopHours : [], closedDatesSet, bookingHorizonWeeks);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -190,11 +194,12 @@ export default function CustomerFormPage() {
       return;
     }
 
-    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
-      .then(([{ hours }, closedDatesData]) => {
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi(), fetchSiteSettingsApi()])
+      .then(([{ hours }, closedDatesData, { settings }]) => {
         setShopHours(hours);
         const dates = (closedDatesData as { closedDates: { date: string }[] }).closedDates ?? [];
         setClosedDatesSet(new Set(dates.map((date) => date.date)));
+        setBookingHorizonWeeks(Math.max(1, parseInt(settings.booking_horizon_weeks ?? '2', 10) || 2));
       })
       .catch(() => { })
       .finally(() => setShopHoursLoaded(true));
@@ -271,8 +276,6 @@ export default function CustomerFormPage() {
 
       // 2. Main Backend API Push
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      // Include auth token when available so the backend links the inquiry
-      // directly to the logged-in user's account on creation.
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`${BACKEND_URL}/api/inquiries`, {
@@ -290,7 +293,7 @@ export default function CustomerFormPage() {
         throw new Error(result?.detail ?? 'Unable to submit inquiry to the database.');
       }
 
-      showToast('Form submitted successfully! A confirmation notification and a 3-hour prior appointment reminder have been scheduled.', 'success');
+      showToast('Form submitted successfully! A confirmation notification has been scheduled.', 'success');
 
       setSubmittedData({ ...formData });
       setSubmittedId(result?.inquiry?.id ?? null);
@@ -310,8 +313,10 @@ export default function CustomerFormPage() {
     }
   };
 
+  const selectedServiceObj = services.find((s: any) => String(s.id) === selectedServiceId);
+
   return (
-    <div className="pt-32 pb-24 min-h-screen bg-brand-darker">
+    <div className="pt-28 sm:pt-32 pb-24 min-h-screen bg-brand-darker text-gray-200 font-sans">
       <PageSEO
         title="1625 Autolab Schedule Request"
         description="Fill out this form to order products or schedule a service with 1625 Autolab."
@@ -320,126 +325,189 @@ export default function CustomerFormPage() {
       />
 
       <div className="container mx-auto px-4 md:px-6 max-w-7xl">
+        
+        {/* ── 1. Page Header & Process Bar ────────────────────────── */}
         {step === 1 && (
-          <div className="text-center mb-12 relative">
-            <div className="absolute inset-0 max-w-xl mx-auto h-32 bg-brand-orange/10 rounded-full blur-3xl -z-10 pointer-events-none" />
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-orange/10 border border-brand-orange/30 text-brand-orange font-mono font-bold uppercase tracking-widest text-xs mb-4">
-              <FaWrench className="w-3 h-3" /> Step 1 of 2: Details & Scheduling
-            </span>
-            <h1 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter mb-4">
-              Request <span className="text-brand-orange">Schedule</span>
+          <header className="mb-10 text-center relative">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-orange/10 border border-brand-orange/30 text-brand-orange text-[11px] font-bold uppercase tracking-[0.2em] mb-4">
+              <Sparkles className="w-3.5 h-3.5" /> 1625 Autolab Booking
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-white uppercase tracking-wide">
+              Request a <span className="text-brand-orange">Schedule</span>
             </h1>
-            <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            <p className="text-gray-400 text-xs sm:text-sm md:text-base max-w-xl mx-auto mt-2 leading-relaxed">
               Lock in your spot on the floor. Drop your details below and our team will confirm your appointment schedule.
             </p>
-          </div>
+
+            {/* Visual Process Indicator */}
+            <div className="mt-8 max-w-xl mx-auto flex items-center justify-between relative px-2">
+              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-800 -translate-y-1/2 -z-10" />
+              
+              {/* Step 1: Details */}
+              <div className="flex flex-col items-center gap-1.5 bg-brand-darker px-3">
+                <span className="w-7 h-7 rounded-full bg-brand-orange text-white font-mono font-bold text-xs flex items-center justify-center shadow-lg shadow-brand-orange/30">
+                  01
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-orange">Details</span>
+              </div>
+
+              {/* Step 2: Schedule */}
+              <div className="flex flex-col items-center gap-1.5 bg-brand-darker px-3">
+                <span className={`w-7 h-7 rounded-full font-mono font-bold text-xs flex items-center justify-center transition-colors ${
+                  selectedDate && selectedTime 
+                    ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/30' 
+                    : 'bg-gray-800 text-gray-400 border border-gray-700'
+                }`}>
+                  02
+                </span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                  selectedDate && selectedTime ? 'text-brand-orange' : 'text-gray-500'
+                }`}>
+                  Schedule
+                </span>
+              </div>
+
+              {/* Step 3: Confirmation */}
+              <div className="flex flex-col items-center gap-1.5 bg-brand-darker px-3">
+                <span className="w-7 h-7 rounded-full bg-gray-800 text-gray-500 border border-gray-700 font-mono font-bold text-xs flex items-center justify-center">
+                  03
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Confirm</span>
+              </div>
+            </div>
+          </header>
         )}
 
+        {/* ── Main Form Workflow (Step 1) ─────────────────────────── */}
         {step === 1 && (
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-            {/* Left Column (8 columns) */}
+            {/* Left Main Column (8 cols) */}
             <div className="lg:col-span-8 space-y-8">
-              <div className="bg-[#111111] border border-gray-800/80 p-6 md:p-8 rounded-xl shadow-2xl space-y-10 relative overflow-hidden">
+              
+              {/* Card Wrapper */}
+              <div className="bg-brand-dark border border-gray-800 rounded-xl p-5 sm:p-8 shadow-xl space-y-8">
 
-                {/* Personal Information */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-2 flex items-center gap-2 border-b border-gray-800 pb-4">
-                    <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaUser /></span>
-                    Client Details
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label htmlFor="fullName" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <FaUser className="text-gray-500" /> Full Name *
-                      </label>
-                      <input
-                        type="text" id="fullName" name="fullName" required
-                        value={formData.fullName} onChange={handleChange}
-                        className={inputClass}
-                        placeholder="Juan Dela Cruz"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label htmlFor="contactNumber" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <FaPhone className="text-gray-500" /> Contact Number *
-                      </label>
-                      <input
-                        type="tel" id="contactNumber" name="contactNumber" required
-                        value={formData.contactNumber} onChange={handleChange}
-                        className={inputClass}
-                        placeholder="0912 345 6789"
-                      />
+                {/* ── Section 01: Client Details ─────────────────────── */}
+                <section className="space-y-5 border-b border-gray-800/80 pb-8">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-brand-orange/10 border border-brand-orange/30 flex items-center justify-center text-brand-orange font-mono font-bold text-xs">
+                      01
+                    </span>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <FaUser className="text-brand-orange w-3.5 h-3.5" /> Client Details
+                      </h2>
+                      <p className="text-xs text-gray-400">How can our service team contact you?</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="address" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                      <FaMapMarkerAlt className="text-gray-500" /> Complete Address *
-                    </label>
-                    <input
-                      type="text" id="address" name="address" required
-                      value={formData.address} onChange={handleChange}
-                      className={inputClass}
-                      placeholder="Block, Lot, Street, City"
-                    />
-                  </div>
+                  <div className="space-y-4">
+                    {/* Row 1: Name & Phone */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label htmlFor="fullName" className="block text-xs font-semibold text-gray-300">
+                          Full Name <span className="text-brand-orange">*</span>
+                        </label>
+                        <input
+                          type="text" id="fullName" name="fullName" required
+                          value={formData.fullName} onChange={handleChange}
+                          className={inputClass}
+                          placeholder="Juan Dela Cruz"
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label htmlFor="emailAddress" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <FaEnvelope className="text-gray-500" /> Email Address *
+                      <div className="space-y-1.5">
+                        <label htmlFor="contactNumber" className="block text-xs font-semibold text-gray-300">
+                          Contact Number <span className="text-brand-orange">*</span>
+                        </label>
+                        <input
+                          type="tel" id="contactNumber" name="contactNumber" required
+                          value={formData.contactNumber} onChange={handleChange}
+                          className={inputClass}
+                          placeholder="0912 345 6789"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Email & Facebook */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label htmlFor="emailAddress" className="block text-xs font-semibold text-gray-300">
+                          Email Address <span className="text-brand-orange">*</span>
+                        </label>
+                        <input
+                          type="email" id="emailAddress" name="emailAddress" required
+                          value={formData.emailAddress} onChange={handleChange}
+                          className={inputClass}
+                          placeholder="juan@example.com"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label htmlFor="facebookName" className="block text-xs font-semibold text-gray-300">
+                          Facebook Profile <span className="text-brand-orange">*</span>
+                        </label>
+                        <input
+                          type="text" id="facebookName" name="facebookName" required
+                          value={formData.facebookName} onChange={handleChange}
+                          className={inputClass}
+                          placeholder="Profile Name or Facebook link"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 3: Address */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="address" className="block text-xs font-semibold text-gray-300">
+                        Complete Address <span className="text-brand-orange">*</span>
                       </label>
                       <input
-                        type="email" id="emailAddress" name="emailAddress" required
-                        value={formData.emailAddress} onChange={handleChange}
+                        type="text" id="address" name="address" required
+                        value={formData.address} onChange={handleChange}
                         className={inputClass}
-                        placeholder="juan@example.com"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="facebookName" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <FaFacebook className="text-gray-500" /> Facebook Profile *
-                      </label>
-                      <input
-                        type="text" id="facebookName" name="facebookName" required
-                        value={formData.facebookName} onChange={handleChange}
-                        className={inputClass}
-                        placeholder="Profile Name or URL link"
+                        placeholder="House/Block No., Street, Barangay, City/Province"
                       />
                     </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Vehicle Information */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-2 flex items-center gap-2 border-b border-gray-800 pb-4">
-                    <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaCar /></span>
-                    Vehicle Specs
-                  </h3>
+                {/* ── Section 02: Vehicle Specs ──────────────────────── */}
+                <section className="space-y-5 border-b border-gray-800/80 pb-8">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-brand-orange/10 border border-brand-orange/30 flex items-center justify-center text-brand-orange font-mono font-bold text-xs">
+                      02
+                    </span>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <FaCar className="text-brand-orange w-3.5 h-3.5" /> Vehicle Specs
+                      </h2>
+                      <p className="text-xs text-gray-400">Tell us about your vehicle setup.</p>
+                    </div>
+                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label htmlFor="plateNumber" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        <FaIdBadge className="text-gray-500" /> Plate Number
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label htmlFor="plateNumber" className="block text-xs font-semibold text-gray-300">
+                        Plate / CS Number <span className="text-gray-500 font-normal">(optional)</span>
                       </label>
                       <input
                         type="text" id="plateNumber" name="plateNumber"
                         value={formData.plateNumber} onChange={handleChange}
-                        className={inputClass}
-                        placeholder="ABC-1234"
+                        className={`${inputClass} uppercase font-mono`}
+                        placeholder="ABC-1234 / Concession"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label htmlFor="yearModel" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        Year *
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="yearModel" className="block text-xs font-semibold text-gray-300">
+                        Year Model <span className="text-brand-orange">*</span>
                       </label>
                       <select
                         id="yearModel" name="yearModel" required
                         value={formData.yearModel} onChange={handleChange}
-                        className={`${inputClass} appearance-none cursor-pointer`}
+                        className={`${inputClass} cursor-pointer`}
                       >
                         <option value="" disabled>Select Year</option>
                         {YEARS.map(year => (
@@ -447,42 +515,53 @@ export default function CustomerFormPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <label htmlFor="make" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">Make *</label>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="make" className="block text-xs font-semibold text-gray-300">
+                        Make <span className="text-brand-orange">*</span>
+                      </label>
                       <input
                         type="text" id="make" name="make" required
                         value={formData.make} onChange={handleChange}
                         className={inputClass}
-                        placeholder="e.g. Honda"
+                        placeholder="e.g. Honda / Toyota / Ford"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label htmlFor="model" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">Model *</label>
+                    <div className="space-y-1.5">
+                      <label htmlFor="model" className="block text-xs font-semibold text-gray-300">
+                        Model <span className="text-brand-orange">*</span>
+                      </label>
                       <input
                         type="text" id="model" name="model" required
                         value={formData.model} onChange={handleChange}
                         className={inputClass}
-                        placeholder="e.g. Civic RS"
+                        placeholder="e.g. Civic RS / Fortuner / Raptor"
                       />
                     </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Appointment Details */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-2 flex items-center gap-2 border-b border-gray-800 pb-4">
-                    <span className="w-8 h-8 rounded-full bg-brand-orange/10 flex items-center justify-center text-brand-orange text-sm"><FaCalendarAlt /></span>
-                    Scheduling & Request
-                  </h3>
+                {/* ── Section 03: Service & Request ──────────────────── */}
+                <section className="space-y-5 border-b border-gray-800/80 pb-8">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-brand-orange/10 border border-brand-orange/30 flex items-center justify-center text-brand-orange font-mono font-bold text-xs">
+                      03
+                    </span>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <FaWrench className="text-brand-orange w-3.5 h-3.5" /> Service &amp; Request
+                      </h2>
+                      <p className="text-xs text-gray-400">Choose a primary service or describe what you need.</p>
+                    </div>
+                  </div>
 
+                  {/* Selectable Service Cards */}
                   {services.length > 0 && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                          <FaWrench className="text-brand-orange" />Required Service or Product
-                        </label>
-                      </div>
+                      <label className="block text-xs font-semibold text-gray-300">
+                        Select Primary Service <span className="text-gray-500 font-normal">(optional)</span>
+                      </label>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {services.map((s: any) => {
@@ -491,31 +570,30 @@ export default function CustomerFormPage() {
                             <button
                               key={s.id}
                               type="button"
-                              onClick={() => {
-                                setSelectedServiceId(isSelected ? '' : String(s.id));
-                              }}
-                              className={`p-4 rounded-lg border text-left transition-all duration-300 flex flex-col justify-between group cursor-pointer ${isSelected
-                                ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/40 shadow-[0_0_20px_rgba(249,115,22,0.15)]'
-                                : 'border-gray-800 bg-[#121212] hover:border-gray-700 hover:bg-[#161616]'
-                                }`}
+                              onClick={() => setSelectedServiceId(isSelected ? '' : String(s.id))}
+                              className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
+                                isSelected
+                                  ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-md'
+                                  : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
+                              }`}
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <span className={`p-2 rounded-md ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400 group-hover:text-white'} transition-colors`}>
+                                <span className={`p-2 rounded-lg ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400'}`}>
                                   <FaWrench className="w-3.5 h-3.5" />
                                 </span>
-                                {isSelected && <CheckCircle className="w-4 h-4 text-brand-orange animate-in zoom-in duration-200" />}
+                                {isSelected && <Check className="w-4 h-4 text-brand-orange" />}
                               </div>
                               <div>
-                                <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
+                                <h3 className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
                                   {s.title}
-                                </h4>
+                                </h3>
                                 {s.startingPrice && (
                                   <p className="text-[10px] text-gray-400 font-mono">From {s.startingPrice}</p>
                                 )}
                               </div>
-                              <div className="mt-3 pt-2 border-t border-gray-800/60 flex items-center justify-between text-[9px] font-mono uppercase">
+                              <div className="mt-3 pt-2 border-t border-gray-800/80 flex items-center justify-between text-[9px] font-mono uppercase">
                                 <span className={isSelected ? 'text-brand-orange font-bold' : 'text-gray-500'}>
-                                  {isSelected ? 'Selected' : 'Select'}
+                                  {isSelected ? '✓ Selected' : 'Select'}
                                 </span>
                                 {s.variations?.length ? (
                                   <span className="text-gray-500">{s.variations.length} Options</span>
@@ -528,30 +606,41 @@ export default function CustomerFormPage() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <label htmlFor="productToPurchase" className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                      <FaWrench className="text-gray-500" /> Additional Information
+                  {/* Tell us what you need Textarea */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="productToPurchase" className="block text-xs font-semibold text-gray-300">
+                      Tell Us What You Need <span className="text-brand-orange">*</span>
                     </label>
                     <textarea
-                      id="productToPurchase" name="productToPurchase" required rows={3}
+                      id="productToPurchase" name="productToPurchase" required rows={4}
                       value={formData.productToPurchase} onChange={handleChange}
-                      className={`${inputClass} resize-none`}
-                      placeholder="Tell us what needs doing — e.g. full tint, brand preferences, concerns..."
+                      className="w-full bg-black/40 border border-gray-800 text-white px-3.5 py-3 rounded-lg text-sm placeholder-gray-600 focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange/50 transition-all resize-none leading-relaxed"
+                      placeholder="Tell us about the installation, vehicle setup, preferences, or anything our team should know."
                     />
                   </div>
+                </section>
 
-                  {/*
-                    Date/time split: this used to be xl:col-span-7 / xl:col-span-5, and
-                    the time-slot grid dropped from lg:grid-cols-4 down to xl:grid-cols-2
-                    right at the same breakpoint the two columns appear — so on desktop
-                    the slot list got squeezed into 2 narrow columns with a scrollbar the
-                    moment there was actually room for more. Balancing the split to 6/6
-                    and keeping the slot grid at 3 columns from lg upward fixes that.
-                  */}
-                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-stretch pt-2">
-                    <div className="xl:col-span-6 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm min-w-0">
-                      <p className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest text-brand-orange mb-6">
-                        <FaCalendarAlt className="w-4 h-4" /> Available Dates
+                {/* ── Section 04: Appointment Schedule ──────────────── */}
+                <section className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-brand-orange/10 border border-brand-orange/30 flex items-center justify-center text-brand-orange font-mono font-bold text-xs">
+                      04
+                    </span>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <FaCalendarAlt className="text-brand-orange w-3.5 h-3.5" /> Appointment Schedule
+                      </h2>
+                      <p className="text-xs text-gray-400">Choose your preferred date and time slot.</p>
+                    </div>
+                  </div>
+
+                  {/* Date & Time Grid */}
+                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch pt-2">
+                    
+                    {/* Left: Custom Calendar (6 cols) */}
+                    <div className="xl:col-span-6 flex flex-col bg-brand-darker/60 border border-gray-800 p-4 sm:p-5 rounded-xl min-w-0">
+                      <p className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest text-brand-orange mb-4">
+                        <FaCalendarAlt className="w-3.5 h-3.5" /> Select a Date
                       </p>
                       <div className="flex-1">
                         <CustomCalendar
@@ -565,31 +654,50 @@ export default function CustomerFormPage() {
                       </div>
                     </div>
 
-                    <div className="xl:col-span-6 h-full flex flex-col bg-black/20 border border-gray-800 p-4 md:p-6 rounded-sm min-w-0">
-                      <div className="flex items-center justify-between mb-6">
+                    {/* Right: Time Slots Panel (6 cols) */}
+                    <div className="xl:col-span-6 flex flex-col bg-brand-darker/60 border border-gray-800 p-4 sm:p-5 rounded-xl min-w-0">
+                      
+                      {/* Time Slots Header */}
+                      <div className="flex items-center justify-between mb-4">
                         <label className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
-                          <FaClock className="w-4 h-4" /> Appointment Time *
+                          <FaClock className="w-3.5 h-3.5" /> Select a Time
                         </label>
                         {availabilityLoading && (
-                          <span className="text-gray-500 text-xs flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Checking…
+                          <span className="text-gray-400 text-xs flex items-center gap-1.5 font-mono">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-orange" /> Checking slots…
                           </span>
                         )}
                       </div>
 
+                      {/* Selected Date Summary Badge */}
+                      {selectedDate && (
+                        <div className="mb-4 p-2.5 rounded-lg bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Selected Date</span>
+                          <span className="text-xs font-semibold text-white">
+                            {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Empty State: No Date Selected */}
                       {!selectedDate ? (
-                        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-800 rounded-sm p-8 text-center bg-black/10">
-                          <FaCalendarAlt className="mb-3 text-4xl text-gray-700" />
-                          <p className="text-gray-500 text-sm">Select a date to view available time slots.</p>
+                        <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-gray-800 rounded-lg p-8 text-center bg-black/20">
+                          <FaCalendarAlt className="mb-3 text-3xl text-gray-600" />
+                          <h3 className="text-xs font-bold uppercase tracking-widest text-gray-300">Choose a Date</h3>
+                          <p className="text-xs text-gray-500 mt-1 max-w-xs">
+                            Select an available date on the calendar to view open appointment time slots.
+                          </p>
                         </div>
                       ) : (
                         <div className="flex-1">
+                          
+                          {/* Closed Day Notice */}
                           {!availabilityLoading && !shopDayIsOpen && (
-                            <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-3 rounded-sm text-center">
-                              <p className="text-sm text-amber-300">
+                            <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg text-center">
+                              <p className="text-xs font-semibold text-amber-400">
                                 {closureReason
-                                  ? `Currently not accepting appointments - ${closureReason}.`
-                                  : 'Currently not accepting appointments for this date.'}
+                                  ? `Shop closed: ${closureReason}`
+                                  : 'Not accepting appointments for this date.'}
                               </p>
                             </div>
                           )}
@@ -624,19 +732,34 @@ export default function CustomerFormPage() {
 
                             return (
                               <>
-                                <p className="text-xs text-gray-500 mb-4 pb-4 border-b border-gray-800">
-                                  {shopDayIsOpen
-                                    ? `Accepting appointments from 6:00 AM to ${formatCloseTimeString(shopCloseTime)}.`
-                                    : 'Not accepting appointments for this date.'}
+                                <p className="text-[11px] text-gray-400 mb-3 pb-3 border-b border-gray-800">
+                                  Operating hours: 6:00 AM to {formatCloseTimeString(shopCloseTime)}.
                                 </p>
+                                
                                 <div className="w-full">
-                                  {visibleSlots.length === 0 && !isTodaySelected && (
-                                    <div className="space-y-3 rounded-sm border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center">
-                                      <p className="text-sm text-brand-orange/80">No available slots for this date.</p>
+                                  {/* No Slots Available & Waitlist Workflow */}
+                                  {visibleSlots.length === 0 && (
+                                    <div className="space-y-3 rounded-lg border border-brand-orange/20 bg-brand-orange/5 p-5 text-center">
+                                      <FaClock className="w-6 h-6 text-brand-orange mx-auto opacity-80" />
+                                      <div>
+                                        <h3 className="text-xs font-bold uppercase tracking-widest text-brand-orange">
+                                          No Appointments Available
+                                        </h3>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                          {isTodaySelected 
+                                            ? 'No slots remaining for today.' 
+                                            : 'There are currently no available slots for this date.'}
+                                        </p>
+                                      </div>
+
                                       {(() => {
                                         const slotKey = `${selectedDate ? formatDateYMD(selectedDate) : ''}|all`;
                                         if (waitlistJoined === slotKey) {
-                                          return <p className="text-xs font-semibold text-green-400">✓ On waitlist.</p>;
+                                          return (
+                                            <p className="text-xs font-semibold text-green-400 flex items-center justify-center gap-1.5 pt-1">
+                                              <CheckCircle className="w-3.5 h-3.5" /> You are on the waitlist!
+                                            </p>
+                                          );
                                         }
                                         return (
                                           <button
@@ -662,29 +785,27 @@ export default function CustomerFormPage() {
                                                 setWaitlistJoining(false);
                                               }
                                             }}
-                                            className="inline-flex items-center gap-2 rounded-sm bg-brand-orange px-4 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors disabled:opacity-50 cursor-pointer"
                                           >
-                                            <FaBell className="w-3.5 h-3.5" />
-                                            {waitlistJoining ? 'Joining…' : 'Join Waitlist'}
+                                            <FaBell className="w-3 h-3 text-brand-orange" />
+                                            {waitlistJoining ? 'Joining Waitlist…' : 'Join Waitlist'}
                                           </button>
                                         );
                                       })()}
                                     </div>
                                   )}
-                                  {visibleSlots.length === 0 && isTodaySelected && (
-                                    <p className="rounded-sm border border-brand-orange/10 bg-brand-orange/5 px-4 py-6 text-center text-sm text-brand-orange/80">
-                                      No slots left for today.
-                                    </p>
-                                  )}
+
+                                  {/* Available Slots Grid */}
                                   {visibleSlots.length > 0 && (
                                     <>
                                       {visibleSlots.length > 6 && (
-                                        <div className="mb-2 flex items-center gap-2 rounded-sm border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-400">
-                                          <span className="font-semibold text-brand-orange">Scroll</span> to see more available times.
+                                        <div className="mb-2 text-[10px] text-gray-500 font-mono flex items-center justify-between">
+                                          <span>{visibleSlots.length} slots available</span>
+                                          <span>Scroll for more slots ↓</span>
                                         </div>
                                       )}
-                                      <div className="max-h-80 overflow-y-auto pr-2 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(249,115,22,0.7)_rgba(17,24,39,0.8)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-800/80 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-orange-500/80 [&::-webkit-scrollbar-thumb]:to-amber-500/70 hover:[&::-webkit-scrollbar-thumb]:from-orange-400 hover:[&::-webkit-scrollbar-thumb]:to-amber-400">
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2 sm:gap-3">
+                                      <div className="max-h-80 overflow-y-auto pr-1.5 scroll-smooth [scrollbar-width:thin]">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                                           {visibleSlots.map((time) => {
                                             const isSelected = selectedTime === time;
                                             const takenCount = slotCounts[time] ?? 0;
@@ -696,17 +817,22 @@ export default function CustomerFormPage() {
                                                 key={time}
                                                 type="button"
                                                 onClick={() => handleTimeSelect(time)}
-                                                className={`flex min-h-[72px] sm:min-h-[80px] w-full flex-col items-center justify-center rounded-sm border p-2.5 sm:p-3 text-center transition-all duration-200 focus:outline-none ${isSelected
-                                                  ? 'border-brand-orange bg-brand-orange text-white shadow-[0_0_10px_rgba(255,102,0,0.3)]'
-                                                  : 'border-gray-700 bg-black/20 text-gray-300 hover:border-brand-orange/70 hover:bg-black/40 hover:text-white'
-                                                  }`}
+                                                className={`p-3 rounded-lg border text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer focus:outline-none ${
+                                                  isSelected
+                                                    ? 'border-brand-orange bg-brand-orange text-white shadow-lg'
+                                                    : 'border-gray-800 bg-brand-dark hover:border-brand-orange/60 hover:bg-black/40 text-gray-200'
+                                                }`}
                                               >
-                                                <span className="text-xs sm:text-sm font-bold tracking-wide whitespace-nowrap">{time}</span>
-                                                {spotsLeft > 0 && (
-                                                  <span className={`mt-1 text-[9px] sm:text-[10px] font-semibold whitespace-nowrap ${isSelected ? 'text-white' : almostFull ? 'text-brand-orange' : 'text-gray-500'}`}>
-                                                    {almostFull ? 'Last spot!' : `${spotsLeft} spots left`}
-                                                  </span>
-                                                )}
+                                                <span className="text-xs font-bold font-mono tracking-wide">{time}</span>
+                                                <span className={`text-[10px] font-semibold mt-0.5 ${
+                                                  isSelected
+                                                    ? 'text-white/90'
+                                                    : almostFull
+                                                    ? 'text-brand-orange'
+                                                    : 'text-gray-500'
+                                                }`}>
+                                                  {isSelected ? '✓ SELECTED' : almostFull ? 'LAST SPOT' : `${spotsLeft} spots left`}
+                                                </span>
                                               </button>
                                             );
                                           })}
@@ -720,78 +846,89 @@ export default function CustomerFormPage() {
                           })()}
                         </div>
                       )}
+
                     </div>
+
                   </div>
-                </div>
+                </section>
 
               </div>
             </div>
 
-            {/* Right Column (4 columns) - Inquiry Summary */}
+            {/* ── Right Column: Sticky Booking Summary (4 cols) ────── */}
             <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
-              <div className="bg-[#111111] border border-gray-800/80 p-6 md:p-8 rounded-xl shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-orange via-orange-500 to-amber-500" />
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
-
-                <h3 className="text-base font-display font-bold uppercase tracking-widest text-white mb-6 flex items-center justify-between border-b border-gray-800 pb-4">
-                  <span>Inquiry Summary</span>
-                  <span className="text-[10px] font-mono uppercase bg-brand-orange/10 text-brand-orange border border-brand-orange/30 px-2 py-0.5 rounded-full">
+              <div className="bg-brand-dark border border-gray-800 p-5 sm:p-6 rounded-xl shadow-xl space-y-6">
+                
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Request Summary</span>
+                    <h2 className="text-base font-bold uppercase tracking-wider text-white">Your Request</h2>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase bg-brand-orange/15 border border-brand-orange/30 text-brand-orange px-2.5 py-1 rounded-full font-bold">
                     Live Draft
                   </span>
-                </h3>
-
-                <div className="space-y-4 mb-8 text-xs font-mono">
-                  <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Client Details</span>
-                    <span className="text-white font-sans text-sm font-semibold block">{formData.fullName || <span className="text-gray-600 italic font-normal">Not provided</span>}</span>
-                    {formData.contactNumber && <span className="text-gray-400 block">{formData.contactNumber}</span>}
-                    {formData.address && <span className="text-gray-400 block">{formData.address}</span>}
-                    {formData.emailAddress && <span className="text-gray-400 block">{formData.emailAddress}</span>}
-                    {formData.facebookName && <span className="text-gray-400 block">fb: {formData.facebookName}</span>}
-                  </div>
-
-                  <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Vehicle Specs</span>
-                    <span className="text-white font-sans text-sm font-semibold block">
-                      {formData.yearModel || formData.make || formData.model
-                        ? `${formData.yearModel} ${formData.make} ${formData.model}`.trim()
-                        : <span className="text-gray-600 italic font-normal">Not provided</span>}
-                    </span>
-                    {formData.plateNumber && <span className="text-gray-400 uppercase block">Plate: {formData.plateNumber}</span>}
-                  </div>
-
-                  <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Service</span>
-                    <span className="text-brand-orange font-sans text-sm font-semibold block leading-snug">
-                      {selectedServiceId
-                        ? services.find((s: any) => String(s.id) === selectedServiceId)?.title || <span className="text-gray-600 italic font-normal">Unknown service</span>
-                        : <span className="text-gray-600 italic font-normal">No service selected</span>}
-                    </span>
-                  </div>
-
-                  <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Additional Information</span>
-                    <span className="text-gray-300 font-sans text-sm block leading-snug">
-                      {formData.productToPurchase || <span className="text-gray-600 italic font-normal">None provided</span>}
-                    </span>
-                  </div>
-
-                  <div className="bg-[#151515] border border-gray-800/80 p-3.5 rounded-lg space-y-1">
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold block">Appointment Schedule</span>
-                    <span className="text-white font-sans text-sm font-semibold block">
-                      {formData.appointmentDate
-                        ? format(new Date(`${formData.appointmentDate}T00:00:00`), 'EEE, MMM d, yyyy')
-                        : <span className="text-gray-600 italic font-normal">Date not selected</span>}
-                    </span>
-                    {formData.appointmentTime ? (
-                      <span className="text-brand-orange font-bold block">{formData.appointmentTime}</span>
-                    ) : (
-                      <span className="text-gray-600 italic block font-sans">Time slot not selected</span>
-                    )}
-                  </div>
                 </div>
 
-                <div className="mb-6 flex justify-center relative z-10">
+                {/* Summary Rows */}
+                <div className="space-y-3.5 text-xs font-mono">
+                  
+                  {/* Client */}
+                  <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
+                    <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Client</span>
+                    <span className="text-white font-sans font-semibold text-xs block">
+                      {formData.fullName || <span className="text-gray-600 font-normal italic">Not provided</span>}
+                    </span>
+                    {formData.contactNumber && <span className="text-gray-400 text-[11px] block">{formData.contactNumber}</span>}
+                  </div>
+
+                  {/* Vehicle */}
+                  <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
+                    <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Vehicle</span>
+                    <span className="text-white font-sans font-semibold text-xs block">
+                      {formData.yearModel || formData.make || formData.model
+                        ? `${formData.yearModel} ${formData.make} ${formData.model}`.trim()
+                        : <span className="text-gray-600 font-normal italic">Not provided</span>}
+                    </span>
+                    {formData.plateNumber && <span className="text-gray-400 text-[11px] block uppercase">Plate: {formData.plateNumber}</span>}
+                  </div>
+
+                  {/* Service */}
+                  <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
+                    <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Primary Service</span>
+                    <span className="text-brand-orange font-sans font-semibold text-xs block leading-snug">
+                      {selectedServiceObj ? selectedServiceObj.title : <span className="text-gray-600 font-normal italic">None selected</span>}
+                    </span>
+                  </div>
+
+                  {/* Appointment Schedule Highlight */}
+                  <div className={`p-3 rounded-lg border transition-all ${
+                    formData.appointmentDate && formData.appointmentTime
+                      ? 'bg-brand-orange/10 border-brand-orange/40 ring-1 ring-brand-orange/20'
+                      : 'bg-brand-darker/70 border-gray-800/80'
+                  }`}>
+                    <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Appointment</span>
+                    {formData.appointmentDate ? (
+                      <span className="text-white font-sans font-semibold text-xs block">
+                        {format(new Date(`${formData.appointmentDate}T00:00:00`), 'EEEE, MMM d, yyyy')}
+                      </span>
+                    ) : (
+                      <span className="text-gray-600 font-normal italic text-xs block">Date not selected</span>
+                    )}
+
+                    {formData.appointmentTime ? (
+                      <span className="text-brand-orange font-bold text-xs block mt-0.5">
+                        {formData.appointmentTime}
+                      </span>
+                    ) : (
+                      <span className="text-gray-600 font-normal italic text-[11px] block mt-0.5">Time slot not selected</span>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* Security Turnstile Widget */}
+                <div className="pt-2 flex justify-center">
                   <TurnstileWidget
                     onVerify={setTurnstileToken}
                     onExpire={() => setTurnstileToken('')}
@@ -799,111 +936,130 @@ export default function CustomerFormPage() {
                   />
                 </div>
 
+                {/* Submit Action */}
                 <button
                   type="submit"
                   disabled={isSubmitting || !turnstileToken}
-                  title={!turnstileToken ? 'Please complete the CAPTCHA' : undefined}
-                  className="w-full relative z-10 bg-brand-orange hover:bg-orange-600 text-white px-8 py-4 font-bold uppercase tracking-widest disabled:opacity-50 transition-all flex items-center justify-center gap-3 rounded-lg shadow-xl  active:scale-[0.99] cursor-pointer"
+                  title={!turnstileToken ? 'Please complete the security check above' : undefined}
+                  className="w-full bg-brand-orange hover:bg-orange-600 text-white py-3.5 rounded-lg font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Submitting Request...</span>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Submitting Request…</span>
                     </>
                   ) : (
                     <>
-                      Submit Appointment <ArrowRight className="w-5 h-5" />
+                      <span>Request Appointment</span>
+                      <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
+
+                <p className="text-[10px] text-gray-500 text-center flex items-center justify-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-gray-400" /> Secure 1625 Autolab Reservation
+                </p>
+
               </div>
             </div>
+
           </form>
         )}
 
+        {/* ── 16. Confirmation Success View (Step 2) ──────────────── */}
         {step === 2 && submittedData && (
-          <div className="text-center py-16 animate-in zoom-in-95 duration-500">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-brand-orange/10 mb-8 shadow-[0_0_30px_rgba(255,102,0,0.2)]">
-              <CheckCircle className="w-12 h-12 text-brand-orange" />
+          <div className="max-w-3xl mx-auto py-12 px-4 text-center space-y-8 animate-fadeIn">
+            
+            {/* Success Check Icon */}
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 border border-green-500/30 shadow-xl text-green-400 mb-2">
+              <CheckCircle className="w-10 h-10" />
             </div>
 
-            <h2 className="text-3xl md:text-5xl font-display font-black text-white uppercase tracking-tight mb-4">
-              You're All Set!
-            </h2>
+            <div className="space-y-2">
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-brand-orange">Request Received</span>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold text-white uppercase tracking-tight">
+                You're All Set!
+              </h1>
+              <p className="text-gray-300 text-sm sm:text-base max-w-xl mx-auto pt-2 leading-relaxed">
+                Your appointment request has been successfully submitted. We've sent a confirmation notification to <strong className="text-white font-mono">{submittedData.emailAddress}</strong>. Our team will confirm your slot shortly.
+              </p>
+            </div>
 
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-12">
-              Your inquiry has been successfully submitted. We've sent a confirmation to <strong className="text-white">{submittedData.emailAddress}</strong>. Our team will review your request and confirm your schedule shortly.
-            </p>
-
-            <div className="bg-brand-dark/50 border border-gray-800 rounded-sm p-6 md:p-8 max-w-2xl mx-auto mb-12 text-left space-y-4">
-              <h3 className="text-xl font-display font-bold uppercase tracking-widest text-white mb-6 border-b border-gray-800 pb-4">
-                Inquiry Details
-              </h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Name</span>
-                  <span className="text-white">{submittedData.fullName}</span>
-                </div>
-                <div>
-                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Vehicle</span>
-                  <span className="text-white">{submittedData.yearModel} {submittedData.make} {submittedData.model}</span>
-                </div>
-                <div>
-                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Schedule</span>
-                  <span className="text-white">
-                    {submittedData.appointmentDate ? format(new Date(`${submittedData.appointmentDate}T00:00:00`), 'MMM d, yyyy') : 'N/A'} at {submittedData.appointmentTime || 'N/A'}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Service Requested</span>
-                  <span className="text-white">{submittedData.productToPurchase}</span>
-                </div>
+            {/* Appointment Summary Card */}
+            <div className="bg-brand-dark border border-gray-800 rounded-xl p-6 sm:p-8 text-left space-y-6 shadow-xl">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+                <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest text-white flex items-center gap-2">
+                  <FaCalendarAlt className="text-brand-orange" /> Appointment Summary
+                </h2>
                 {submittedId && (
-                  <div className="col-span-2 pt-2 border-t border-gray-800/60">
-                    <span className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-1">Reference ID</span>
-                    <span className="text-gray-400 font-mono text-xs">{submittedId}</span>
-                  </div>
+                  <span className="text-[10px] font-mono uppercase bg-brand-darker border border-gray-800 text-gray-400 px-2.5 py-1 rounded">
+                    ID: {submittedId}
+                  </span>
                 )}
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                <div className="bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">
+                  <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Client Name</span>
+                  <span className="text-white font-sans font-semibold text-sm">{submittedData.fullName}</span>
+                </div>
+
+                <div className="bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">
+                  <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Vehicle</span>
+                  <span className="text-white font-sans font-semibold text-sm">
+                    {submittedData.yearModel} {submittedData.make} {submittedData.model}
+                  </span>
+                </div>
+
+                <div className="bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">
+                  <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Requested Date</span>
+                  <span className="text-white font-sans font-semibold text-sm">
+                    {submittedData.appointmentDate ? format(new Date(`${submittedData.appointmentDate}T00:00:00`), 'MMM d, yyyy') : 'N/A'}
+                  </span>
+                </div>
+
+                <div className="bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">
+                  <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Requested Time</span>
+                  <span className="text-brand-orange font-sans font-bold text-sm">{submittedData.appointmentTime || 'N/A'}</span>
+                </div>
+
+                <div className="sm:col-span-2 bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">
+                  <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Request Notes</span>
+                  <span className="text-gray-300 font-sans text-xs">{submittedData.productToPurchase || 'None provided'}</span>
+                </div>
+              </div>
             </div>
 
-            {/* Guest: explain email-match linking before CTA */}
-            {!user && (
-              <div className="max-w-2xl mx-auto mb-8 rounded-xl border border-brand-orange/30 bg-brand-orange/5 px-6 py-5 text-left">
-                <p className="text-xs font-bold uppercase tracking-widest text-brand-orange mb-2">💡 Track your inquiry</p>
-                <p className="text-sm text-gray-300 leading-relaxed">
-                  Create a free account using <strong className="text-white">{submittedData.emailAddress}</strong> — the same email you used for this inquiry — and it will <strong className="text-white">automatically appear on your dashboard</strong> so you can follow the status in real time.
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
               {user ? (
                 <Link
                   to="/client/inquiries"
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-4 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm shadow-[0_0_15px_rgba(255,102,0,0.2)] hover:shadow-[0_0_20px_rgba(255,102,0,0.4)]"
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3.5 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-lg text-xs shadow-lg"
                 >
                   View My Inquiries
                 </Link>
               ) : (
                 <Link
-                  to={`/register?redirect=/client/inquiries&source=inquiry&name=${encodeURIComponent(submittedData.fullName)}&email=${encodeURIComponent(submittedData.emailAddress)}`}
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-4 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-sm shadow-[0_0_15px_rgba(255,102,0,0.2)] hover:shadow-[0_0_20px_rgba(255,102,0,0.4)]"
+                  to="/"
+                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3.5 font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 rounded-lg text-xs shadow-lg"
                 >
-                  Create Account to Track Inquiry
+                  Return to Home
                 </Link>
               )}
 
               <button
+                type="button"
                 onClick={() => setStep(1)}
-                className="w-full sm:w-auto bg-transparent border-2 border-gray-700 text-white px-8 py-4 font-bold uppercase tracking-widest hover:border-gray-500 hover:bg-gray-800/50 transition-all flex items-center justify-center gap-2 rounded-sm"
+                className="w-full sm:w-auto bg-brand-dark border border-gray-700 text-white px-8 py-3.5 font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 rounded-lg text-xs cursor-pointer"
               >
-                Submit Another
+                Submit Another Request
               </button>
             </div>
+
           </div>
         )}
+
       </div>
     </div>
   );

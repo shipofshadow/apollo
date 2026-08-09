@@ -1,19 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import TurnstileWidget from '../../components/TurnstileWidget';
 import { verifyEmailApi, resendVerificationApi } from '../../services/api';
 import PageSEO from '../../components/PageSEO';
+import { fetchSiteSettingsAsync } from '../../store/siteSettingsSlice';
+import type { AppDispatch, RootState } from '../../store';
 
 export default function LoginPage() {
   const navigate   = useNavigate();
   const [params]   = useSearchParams();
   const redirect   = params.get('redirect') ?? '';
 
+  const dispatch = useDispatch<AppDispatch>();
+  const siteSettings = useSelector((state: RootState) => state.siteSettings.settings);
+  const isRegistrationDisabled = siteSettings.disable_registration === '1';
+
   const { user, status, error, login, clearError } = useAuth();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    dispatch(fetchSiteSettingsAsync());
+  }, [dispatch]);
 
   const [email,    setEmail]    = useState(params.get('email') ?? '');
   const [password, setPassword] = useState('');
@@ -183,15 +194,17 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-gray-500 text-sm mt-6">
-            Don't have an account?{' '}
-            <Link
-              to={redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'}
-              className="text-brand-orange hover:text-orange-400 font-bold transition-colors"
-            >
-              Create one
-            </Link>
-          </p>
+          {!isRegistrationDisabled && (
+            <p className="text-center text-gray-500 text-sm mt-6">
+              Don't have an account?{' '}
+              <Link
+                to={redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'}
+                className="text-brand-orange hover:text-orange-400 font-bold transition-colors"
+              >
+                Create one
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>

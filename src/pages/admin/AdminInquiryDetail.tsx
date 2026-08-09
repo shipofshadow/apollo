@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import {
-  ArrowLeft, CheckCircle2, Clock,
+  ArrowLeft, CheckCircle2,
   Trash2, AlertTriangle, User, Car, Activity,
   ChevronLeft, ChevronRight, ChevronDown, Calendar, ClipboardList,
-  StickyNote, FileText, Save, X, Send, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Lock
+  StickyNote, FileText, Save, Send, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Lock, Mail, Phone
 } from 'lucide-react';
 import {
   fetchInquiryByIdApi,
@@ -18,6 +18,7 @@ import {
   generateInquiryChecklistPdfApi,
   fetchShopHoursApi,
   fetchShopClosedDatesApi,
+  fetchSiteSettingsApi,
   fetchInquiryChecklistsApi,
   sendInquiryChecklistPhaseApi
 } from '../../services/api';
@@ -28,14 +29,15 @@ import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 import InquiryChecklistModal from './InquiryChecklistModal';
 
-function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>): Date[] {
+function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>, weeks: number = 4): Date[] {
   const openDays = shopHours.length
     ? new Set(shopHours.filter(h => h.isOpen).map(h => h.dayOfWeek))
     : new Set([1, 2, 3, 4, 5, 6]);
   const dates: Date[] = [];
   const cursor = new Date();
   cursor.setDate(cursor.getDate() + 1);
-  while (dates.length < 30) {
+  const targetCount = Math.max(1, weeks) * 7;
+  while (dates.length < targetCount) {
     const iso = cursor.toISOString().slice(0, 10);
     if (openDays.has(cursor.getDay()) && !closedDatesSet.has(iso)) dates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + 1);
@@ -59,6 +61,7 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
 
   const [shopHours, setShopHours] = useState<ShopDayHours[]>([]);
   const [closedDatesSet, setClosedDatesSet] = useState<Set<string>>(new Set());
+  const [bookingHorizonWeeks, setBookingHorizonWeeks] = useState(4);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -72,16 +75,17 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi()])
-      .then(([{ hours }, cdData]) => {
+    Promise.all([fetchShopHoursApi(), fetchShopClosedDatesApi(), fetchSiteSettingsApi()])
+      .then(([{ hours }, cdData, { settings }]) => {
         setShopHours(hours);
         const cd = (cdData as { closedDates: { date: string }[] }).closedDates ?? [];
         setClosedDatesSet(new Set(cd.map(d => d.date)));
+        setBookingHorizonWeeks(Math.max(1, parseInt(settings.booking_horizon_weeks ?? '4', 10) || 4));
       })
       .catch(() => { });
   }, []);
 
-  const availableDates = buildDateList(shopHours, closedDatesSet);
+  const availableDates = buildDateList(shopHours, closedDatesSet, bookingHorizonWeeks);
 
   const handleDateSelect = async (date: Date) => {
     setSelectedDate(date);
@@ -129,15 +133,15 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
     : false;
 
   return (
-    <div className="space-y-5 bg-[#121212] border border-gray-800 p-5 rounded mt-4">
+    <div className="space-y-5 bg-brand-darker border border-gray-800 p-5 rounded-xl mt-4">
       {/* Target Date Carousel */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3">Target Date</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3">Select Date</p>
         <div className="relative">
           <button
             type="button"
             onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-[#151515] border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange -translate-x-3 transition-colors"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-brand-dark border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange -translate-x-3 transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
@@ -154,16 +158,17 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
                   key={i}
                   type="button"
                   onClick={() => handleDateSelect(date)}
-                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded relative ${active
-                    ? 'border-brand-orange bg-brand-orange/10'
-                    : 'border-gray-800 hover:border-gray-600 bg-[#181818]'
-                    }`}
+                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded-lg relative cursor-pointer ${
+                    active
+                      ? 'border-brand-orange bg-brand-orange/15 shadow-md'
+                      : 'border-gray-800 hover:border-gray-700 bg-brand-dark'
+                  }`}
                 >
-                  <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">
+                  <div className="text-[10px] text-gray-400 uppercase font-mono mb-0.5">
                     {date.toLocaleDateString('en-PH', { weekday: 'short', timeZone: 'Asia/Manila' })}
                   </div>
-                  <div className="text-xl font-bold text-white">{date.getDate()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase font-mono mt-1">
+                  <div className="text-lg font-mono font-bold text-white">{date.getDate()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase font-mono mt-0.5">
                     {date.toLocaleDateString('en-PH', { month: 'short', timeZone: 'Asia/Manila' })}
                   </div>
                   {isCurrentInquiryDate && (
@@ -178,13 +183,13 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
           <button
             type="button"
             onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-[#151515] border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange translate-x-3 transition-colors"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-brand-dark border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:border-brand-orange translate-x-3 transition-colors cursor-pointer"
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
         {selectedDate && (
-          <p className="text-[10px] font-mono uppercase tracking-widest text-brand-orange mt-3">
+          <p className="text-[11px] font-mono text-brand-orange mt-3 font-semibold">
             Selection: {selectedDate.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}
           </p>
         )}
@@ -192,22 +197,22 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
 
       {/* Target Time Slots */}
       {selectedDate && (
-        <div className="pt-4 border-t border-gray-800/50">
+        <div className="pt-4 border-t border-gray-800">
           <p className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-3 flex items-center gap-2">
-            Target Time
+            Select Time Slot
             {slotsLoading && (
-              <span className="text-gray-500 font-mono flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Polling...
+              <span className="text-gray-500 font-mono flex items-center gap-1 text-xs">
+                <Loader2 className="w-3 h-3 animate-spin text-brand-orange" /> Checking availability…
               </span>
             )}
           </p>
           {!slotsLoading && !shopDayIsOpen && (
-            <p className="text-xs text-red-400 font-mono bg-red-500/10 border border-red-500/20 px-4 py-3 rounded">
-              [SYSTEM] Shop closed on selected date.
+            <p className="text-xs text-red-400 font-mono bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-lg">
+              Shop closed on selected date.
             </p>
           )}
           {!slotsLoading && shopDayIsOpen && openSlots.length === 0 && (
-            <p className="text-xs text-gray-500 font-mono py-2">[SYSTEM] Zero capacity for selected date.</p>
+            <p className="text-xs text-gray-400 font-mono py-2">No available time slots for this date.</p>
           )}
           {!slotsLoading && shopDayIsOpen && openSlots.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -220,16 +225,18 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
                     key={slot}
                     type="button"
                     onClick={() => setSelectedTime(slot)}
-                    className={`flex flex-col items-center justify-center p-3 rounded border font-mono transition-all ${isSelected
-                      ? 'bg-brand-orange/20 border-brand-orange text-brand-orange shadow-[inset_0_0_10px_rgba(249,115,22,0.2)]'
-                      : 'bg-[#181818] border-gray-800 text-gray-300 hover:border-gray-500 hover:text-white'
-                      }`}
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-brand-orange text-white border-brand-orange shadow-lg font-bold'
+                        : 'bg-brand-dark border-gray-800 text-gray-300 hover:border-gray-700 hover:text-white'
+                    }`}
                   >
-                    <span className="text-sm font-bold">{slot}</span>
+                    <span className="text-xs font-bold font-mono">{slot}</span>
                     {spotsLeft > 0 && (
-                      <span className={`text-[9px] uppercase tracking-wider mt-1.5 ${isSelected ? 'text-brand-orange' : almostFull ? 'text-yellow-500' : 'text-gray-600'
-                        }`}>
-                        {almostFull ? 'Critical' : `CAP: ${spotsLeft}`}
+                      <span className={`text-[10px] font-semibold mt-1 ${
+                        isSelected ? 'text-white/90' : almostFull ? 'text-brand-orange' : 'text-gray-500'
+                      }`}>
+                        {almostFull ? '1 spot left' : `${spotsLeft} spots available`}
                       </span>
                     )}
                   </button>
@@ -245,24 +252,24 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
         <button
           onClick={handleSave}
           disabled={saveBusy || !selectedDate || !selectedTime || unchanged}
-          className="flex-1 flex items-center justify-center gap-2 bg-brand-orange text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors rounded disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all rounded-lg disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md"
         >
           {saveBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-          Execute Reschedule
+          Save New Appointment
         </button>
         <button
           onClick={onCancel}
           disabled={saveBusy}
-          className="px-5 py-2.5 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 text-xs font-bold uppercase tracking-widest transition-colors rounded disabled:opacity-30"
+          className="px-5 py-2.5 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-600 text-xs font-bold uppercase tracking-wider transition-all rounded-lg disabled:opacity-40 cursor-pointer"
         >
-          Abort
+          Cancel
         </button>
       </div>
     </div>
   );
 }
 
-const STATUS_STYLES: Record<string, string> = {
+const STATUS_BADGE_STYLE: Record<string, string> = {
   'pending': 'bg-amber-500/10 text-amber-400 border border-amber-500/30',
   'confirmed': 'bg-blue-500/10 text-blue-400 border border-blue-500/30',
   'in_progress': 'bg-brand-orange/10 text-brand-orange border border-brand-orange/30',
@@ -270,6 +277,13 @@ const STATUS_STYLES: Record<string, string> = {
   'cancelled': 'bg-red-500/10 text-red-400 border border-red-500/30',
 };
 
+const STATUS_DOT_STYLE: Record<string, string> = {
+  'pending': 'bg-amber-400',
+  'confirmed': 'bg-blue-400',
+  'in_progress': 'bg-brand-orange',
+  'completed': 'bg-emerald-400',
+  'cancelled': 'bg-red-400',
+};
 
 type InquiryActivityLog = {
   id: number;
@@ -279,7 +293,6 @@ type InquiryActivityLog = {
   createdAt: string;
   actorName?: string | null;
 };
-
 
 interface Props {
   inquiryId: string;
@@ -292,6 +305,23 @@ type ConfirmDialogState = {
   confirmLabel: string;
   tone?: 'default' | 'danger';
 };
+
+/* ── Detail Page Skeleton Loader ───────────────────────────────── */
+function DetailSkeleton() {
+  return (
+    <div className="w-full space-y-8 animate-pulse">
+      <div className="h-8 w-40 bg-brand-dark border border-gray-800 rounded-lg" />
+      <div className="h-32 bg-brand-dark border border-gray-800 rounded-xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8 space-y-6">
+          <div className="h-14 bg-brand-dark border border-gray-800 rounded-xl" />
+          <div className="h-80 bg-brand-dark border border-gray-800 rounded-xl" />
+        </div>
+        <div className="lg:col-span-4 h-96 bg-brand-dark border border-gray-800 rounded-xl" />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const { token } = useAuth();
@@ -355,7 +385,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   const isStatusLocked = inquiry?.status === 'completed' && isAfterSubmitted;
 
   // Activity log pagination
-  const ACTIVITY_PAGE_SIZE = 3;
+  const ACTIVITY_PAGE_SIZE = 5;
   const [activityPage, setActivityPage] = useState(0);
 
   const blobUrlsRef = useRef<string[]>([]);
@@ -387,7 +417,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     try {
       await sendInquiryChecklistPhaseApi(token, inquiry.id.replace('inq-', ''), phase);
       showToast(`Inspection report PDF sent to client & shop owners.`, 'success');
-      await loadChecklistsState(); // reload to get sentAt
+      await loadChecklistsState();
       const activitiesRes = await fetchInquiryActivityApi(token, String(id));
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
     } catch (err: any) {
@@ -451,8 +481,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
     try {
       const res = await updateInquiryStatusApi(token, inquiry.id, newStatus);
       setInquiry({ ...inquiry, status: res.inquiry.status });
-      showToast('Status updated.', 'success');
-      // Refresh activities
+      showToast('Status updated successfully.', 'success');
       const activitiesRes = await fetchInquiryActivityApi(token, String(id));
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
       return true;
@@ -471,7 +500,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       const res = await updateInquiryInternalNotesApi(token, inquiry.id, editNotes);
       setInquiry({ ...inquiry, internalNotes: res.inquiry.internalNotes });
       setIsEditingNotes(false);
-      showToast('Internal notes updated.', 'success');
+      showToast('Internal notes saved.', 'success');
       const activitiesRes = await fetchInquiryActivityApi(token, String(id));
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
     } catch (err) {
@@ -506,7 +535,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
         {
           title: 'Change Linked Service',
           message: `Are you sure you want to link this inquiry to "${serviceName}"? This will change the active checklist template.`,
-          confirmLabel: 'Confirm',
+          confirmLabel: 'Change Service',
           tone: 'default',
         },
         updateService
@@ -515,8 +544,6 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
       updateService();
     }
   };
-
-
 
   const handleDelete = async () => {
     if (!token || !inquiry) return;
@@ -555,84 +582,103 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
   };
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-brand-orange">
-          <Clock className="w-8 h-8 animate-spin" />
-          <p className="text-sm font-semibold uppercase tracking-widest">Loading Inquiry Details...</p>
-        </div>
-      </div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (error || !inquiry) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-red-400 bg-red-500/10 px-8 py-6 rounded-lg border border-red-500/20 text-center shadow-lg">
+        <div className="flex flex-col items-center gap-3 text-red-400 bg-red-950/40 px-8 py-6 rounded-xl border border-red-500/30 text-center shadow-xl">
           <AlertTriangle className="w-10 h-10" />
-          <p className="text-sm font-semibold">{error || 'Inquiry not found'}</p>
-          <button onClick={onBack} className="mt-4 text-xs font-bold uppercase tracking-widest underline hover:text-white transition-colors">Go Back</button>
+          <p className="text-sm font-semibold">{error || 'Inquiry record not found.'}</p>
+          <button
+            onClick={onBack}
+            className="mt-2 text-xs font-bold uppercase tracking-widest text-brand-orange hover:underline cursor-pointer"
+          >
+            Return to Appointments
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      {/* Header */}
-      <div className="flex flex-col gap-4 mb-8">
+    <div className="space-y-6 pb-20 font-sans">
+      
+      {/* ── Top Back Navigation ──────────────────────────────────── */}
+      <div>
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-orange text-[10px] font-mono uppercase tracking-widest transition-colors w-fit"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-brand-orange text-xs font-mono uppercase tracking-widest transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Return to Appointments
+          <ArrowLeft className="w-4 h-4" /> Return to Appointments
         </button>
-
-        <div className="relative border border-gray-800/80 rounded-lg bg-[#121212] overflow-hidden shadow-2xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-orange via-brand-orange/50 to-transparent" />
-
-          <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-start justify-between gap-6">
-            <div className="space-y-3 flex-1">
-              <div className="flex items-center gap-4">
-                <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-brand-orange/80">
-                  Inquiry Details
-                </p>
-                <span className={`px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest rounded border ${STATUS_STYLES[inquiry.status] || 'bg-gray-800 text-gray-300'}`}>
-                  {formatStatus(inquiry.status as any)}
-                </span>
-              </div>
-
-              <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
-                Inquiry <span className="text-gray-500/50 text-2xl">#{inquiry.id.substring(0, 8)}</span>
-              </h1>
-
-              <div className="flex items-center gap-3 pt-2 text-xs font-mono">
-                <span className="text-gray-500 bg-[#181818] px-2.5 py-1 rounded border border-gray-800">
-                  Submitted by {inquiry.fullName}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center justify-end">
-              <button
-                onClick={() => handlePreviewPdf('after')}
-                disabled={previewLoading === 'after'}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-widest text-xs border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white transition-all shadow-lg shadow-brand-orange/10 disabled:opacity-50 cursor-pointer"
-              >
-                {previewLoading === 'after' ? <Clock className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                Preview Installation Checklist
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Tabbed Content */}
+      {/* ── 2. Inquiry Header Card ────────────────────────────────── */}
+      <header className="bg-brand-dark border border-gray-800 rounded-xl p-5 sm:p-7 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Inquiry Record</span>
+              <span className="text-gray-600">•</span>
+              <span className="text-xs font-mono text-gray-400">#{inquiry.id.substring(0, 8)}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-white uppercase tracking-tight">
+              {inquiry.fullName}
+            </h1>
+          </div>
+
+          {/* Status Badge */}
+          <div className="flex items-center gap-3 self-start md:self-auto">
+            <div className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 border ${
+              STATUS_BADGE_STYLE[inquiry.status] || 'bg-gray-800 text-gray-300 border-gray-700'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${STATUS_DOT_STYLE[inquiry.status] || 'bg-gray-400'}`} />
+              <span>{formatStatus(inquiry.status)}</span>
+            </div>
+
+            <button
+              onClick={() => handlePreviewPdf('after')}
+              disabled={previewLoading === 'after'}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold uppercase tracking-wider text-xs border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white transition-all shadow-md disabled:opacity-50 cursor-pointer"
+            >
+              {previewLoading === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              <span>Preview Report</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Compact Metadata Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono text-gray-300">
+          <div className="flex items-center gap-2">
+            <Car className="w-4 h-4 text-brand-orange shrink-0" />
+            <span className="truncate">
+              {inquiry.make} {inquiry.model} {inquiry.year ? `(${inquiry.year})` : ''}
+              {inquiry.plateNumber ? ` • ${inquiry.plateNumber}` : ''}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-brand-orange shrink-0" />
+            <span className="truncate">{inquiry.emailAddress || 'No email'}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Phone className="w-4 h-4 text-brand-orange shrink-0" />
+            <span className="truncate">{inquiry.contactNumber || 'No phone'}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main Layout Grid (8 cols left / 4 cols right) ─────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        {/* Left Column: Segmented Tabs & Content (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
 
-          {/* Tab Navigation */}
-          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-2 flex overflow-x-auto hide-scrollbar shadow-xl">
+          {/* ── 4. Segmented Tab Navigation ───────────────────────── */}
+          <div className="bg-brand-dark border border-gray-800 rounded-xl p-1.5 flex overflow-x-auto [scrollbar-width:none] shadow-lg gap-1">
             {[
               { id: 'overview', label: 'Overview', icon: <FileText className="w-4 h-4" /> },
               { id: 'checklists', label: 'Checklists', icon: <ClipboardList className="w-4 h-4" /> },
@@ -641,16 +687,20 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
             ].map((tab) => (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id as TabType)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-md text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id
-                  ? 'bg-brand-orange text-white shadow-md'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
-                  }`}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'bg-brand-orange text-white shadow-md'
+                    : 'text-gray-400 hover:text-white hover:bg-brand-darker/60'
+                }`}
               >
                 {tab.icon}
-                {tab.label}
+                <span>{tab.label}</span>
                 {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-black leading-none ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono leading-none ${
+                    activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-400'
+                  }`}>
                     {tab.badge}
                   </span>
                 )}
@@ -658,92 +708,105 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
             ))}
           </div>
 
+          {/* ── Tab Content: Overview ─────────────────────────────── */}
           {activeTab === 'overview' && (
-            <div className="space-y-8">
-              {/* Inquiry Details (Client + Vehicle) */}
-              <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg relative overflow-hidden shadow-xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-
-                  {/* Client Column */}
-                  <div>
-                    <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                      <User className="w-4 h-4 text-brand-orange" /> Client Details
-                    </h3>
-                    <div className="space-y-5">
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Full Name</p>
-                        <p className="text-white font-medium text-sm">{inquiry.fullName}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Email Address</p>
-                        <p className="text-white font-medium text-sm">{inquiry.emailAddress || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Contact Number</p>
-                        <p className="text-white font-medium text-sm">{inquiry.contactNumber || 'N/A'}</p>
-                      </div>
-                      {inquiry.facebookName && (
-                        <div>
-                          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Facebook Name</p>
-                          <p className="text-white font-medium text-sm">{inquiry.facebookName}</p>
-                        </div>
-                      )}
+            <div className="space-y-6">
+              
+              {/* Customer & Vehicle Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 5. Customer Card */}
+                <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2 border-b border-gray-800 pb-3">
+                    <User className="w-4 h-4" /> Customer Details
+                  </h2>
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Full Name</span>
+                      <span className="text-white font-semibold text-sm block mt-0.5">{inquiry.fullName}</span>
                     </div>
-                  </div>
 
-                  {/* Vehicle Column */}
-                  <div>
-                    <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                      <Car className="w-4 h-4 text-brand-orange" /> Vehicle Info
-                    </h3>
-                    <div className="space-y-5">
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Make & Model</p>
-                        <p className="text-white font-medium text-sm">{inquiry.make} {inquiry.model} {inquiry.year || ''}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-mono mb-1">Plate Number</p>
-                        <p className="text-white font-medium text-sm uppercase">{inquiry.plateNumber || 'N/A'}</p>
-                      </div>
-                      <div className="bg-brand-orange/5 border border-brand-orange/20 rounded p-4 mt-2">
-                        <p className="text-[10px] text-brand-orange/80 uppercase tracking-widest font-mono mb-1">Product / Service</p>
-                        <p className="text-brand-orange font-bold text-sm leading-relaxed">{inquiry.productToPurchase || 'Service inquiry'}</p>
-                      </div>
+                    <div>
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Email Address</span>
+                      <span className="text-gray-300 font-mono block mt-0.5">{inquiry.emailAddress || 'Not provided'}</span>
                     </div>
-                  </div>
 
+                    <div>
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Contact Number</span>
+                      <span className="text-gray-300 font-mono block mt-0.5">{inquiry.contactNumber || 'Not provided'}</span>
+                    </div>
+
+                    {inquiry.facebookName && (
+                      <div>
+                        <span className="text-[10px] font-mono text-gray-500 uppercase block">Facebook Profile</span>
+                        <span className="text-gray-300 font-medium block mt-0.5">{inquiry.facebookName}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* 5. Vehicle Card */}
+                <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2 border-b border-gray-800 pb-3">
+                    <Car className="w-4 h-4" /> Vehicle Specs
+                  </h2>
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Make &amp; Model</span>
+                      <span className="text-white font-bold text-sm block mt-0.5">
+                        {inquiry.make} {inquiry.model} {inquiry.year ? `(${inquiry.year})` : ''}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Plate / CS Number</span>
+                      <span className="text-gray-300 font-mono uppercase font-bold block mt-0.5">
+                        {inquiry.plateNumber || 'N/A'}
+                      </span>
+                    </div>
+
+                    <div className="bg-brand-orange/10 border border-brand-orange/20 p-3 rounded-lg mt-2">
+                      <span className="text-[10px] font-mono text-brand-orange uppercase block font-bold">Product / Service Request</span>
+                      <p className="text-white font-medium text-xs mt-1 leading-relaxed">
+                        {inquiry.productToPurchase || 'Service inquiry'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
-
-              <div className="bg-[#121212] border border-gray-800/80 p-6 rounded-lg shadow-xl relative overflow-hidden">
-                <h3 className="text-[10px] font-bold text-brand-orange uppercase tracking-widest mb-6 flex items-center justify-between border-b border-gray-800/80 pb-4">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> Appointment Schedule
-                  </div>
+              {/* 6. Appointment Schedule Card */}
+              <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                    <Calendar className="w-4 h-4" /> Appointment Schedule
+                  </h2>
                   {!isEditingSchedule && inquiry.status !== 'completed' && inquiry.status !== 'cancelled' && (
                     <button
+                      type="button"
                       onClick={() => setIsEditingSchedule(true)}
-                      className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1"
+                      className="text-xs font-bold uppercase tracking-wider text-brand-orange hover:text-orange-400 transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Calendar className="w-3 h-3" /> Reschedule
+                      <RefreshCw className="w-3.5 h-3.5" /> Reschedule
                     </button>
                   )}
-                </h3>
+                </div>
 
                 {!isEditingSchedule ? (
-                  <div className="space-y-3">
-                    <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
-                      <span className="text-xs text-gray-500 font-mono">Target Date</span>
-                      <span className="text-sm font-bold text-gray-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-brand-darker border border-gray-800/80 p-4 rounded-lg">
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Appointment Date</span>
+                      <span className="text-white font-bold text-sm block mt-1">
                         {inquiry.appointmentDate
-                          ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                          ? new Date(inquiry.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
                           : 'Not Scheduled'}
                       </span>
                     </div>
-                    <div className="bg-[#181818] border border-gray-800 rounded p-4 flex justify-between items-center">
-                      <span className="text-xs text-gray-500 font-mono">Target Time</span>
-                      <span className="text-sm font-bold text-brand-orange">
+
+                    <div className="bg-brand-darker border border-gray-800/80 p-4 rounded-lg">
+                      <span className="text-[10px] font-mono text-gray-500 uppercase block">Appointment Time</span>
+                      <span className="text-brand-orange font-mono font-bold text-sm block mt-1">
                         {inquiry.appointmentTime || 'Not Scheduled'}
                       </span>
                     </div>
@@ -768,67 +831,67 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                   )
                 )}
               </div>
+
             </div>
           )}
 
+          {/* ── Tab Content: Checklists ──────────────────────────── */}
           {activeTab === 'checklists' && (
-            <div className="space-y-8">
-
-
-              {/* Linked Service Section */}
-              <div className="bg-[#121212] border border-gray-800/80 p-6 lg:p-8 rounded-lg shadow-xl relative overflow-hidden">
-                <div className="flex items-center justify-between border-b border-gray-800/80 pb-4 mb-4">
-                  <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                    <Wrench className="w-4 h-4 text-brand-orange" /> Linked Service & Checklist Template
-                  </h3>
+            <div className="space-y-6">
+              
+              {/* Linked Service Card */}
+              <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                    <Wrench className="w-4 h-4" /> Linked Service Template
+                  </h2>
                   {inquiry.serviceId ? (
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3 h-3" /> Inquiry Linked
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/10 border border-green-500/30 text-green-400 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Linked
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                      <AlertTriangle className="w-3 h-3" /> Unlinked Inquiry
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Unlinked
                     </span>
                   )}
                 </div>
 
                 {inquiry.serviceId && !isChangingService ? (
-                  /* Summary Card for Inquiry with Linked Service */
                   (() => {
                     const linkedSvc = services.find(s => s.id === inquiry.serviceId);
                     return (
-                      <div className="bg-[#151515] border border-brand-orange/40 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3.5 rounded-lg bg-brand-orange/20 border border-brand-orange/30 text-brand-orange shrink-0">
-                            <Wrench className="w-6 h-6" />
+                      <div className="bg-brand-darker border border-brand-orange/30 p-4 rounded-lg flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-3 rounded-lg bg-brand-orange/20 text-brand-orange">
+                            <Wrench className="w-5 h-5" />
                           </div>
                           <div>
-                            <h4 className="text-base font-bold text-white uppercase tracking-wider mt-0.5">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                               {linkedSvc ? linkedSvc.title : `Service #${inquiry.serviceId}`}
-                            </h4>
+                            </h3>
+                            <p className="text-xs text-gray-400">Active checklist template</p>
                           </div>
                         </div>
 
                         <button
                           type="button"
                           onClick={() => setIsChangingService(true)}
-                          className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
+                          className="px-4 py-2 border border-gray-700 hover:border-brand-orange text-gray-300 hover:text-brand-orange text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
                         >
-                          Change Checklist
+                          Change Service
                         </button>
                       </div>
                     );
                   })()
                 ) : (
-                  /* Full Service Selector Grid for Old Inquiries or when Changing Service */
-                  <div>
-                    <p className="text-xs text-gray-400 mb-4">
+                  <div className="space-y-4">
+                    <p className="text-xs text-gray-400">
                       {!inquiry.serviceId
-                        ? 'This inquiry has no linked service template yet. Select a service below to enable installation checklists:'
+                        ? 'Select a service below to attach an installation checklist template:'
                         : 'Select a service below to update the active checklist template:'}
                     </p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {services.map(s => {
                         const isSelected = inquiry.serviceId === s.id;
                         return (
@@ -842,35 +905,26 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                                 setIsChangingService(false);
                               }
                             }}
-                            className={`relative flex flex-col justify-between p-4 rounded-lg border text-left transition-all duration-300 group cursor-pointer ${isSelected
-                              ? 'border-brand-orange bg-brand-orange/10 shadow-[0_0_20px_rgba(249,115,22,0.15)] ring-1 ring-brand-orange/40'
-                              : 'border-gray-800 bg-[#151515] hover:border-gray-600 hover:bg-[#1a1a1a]'
-                              }`}
+                            className={`p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                              isSelected
+                                ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/40 shadow-md'
+                                : 'border-gray-800 bg-brand-darker hover:border-gray-700 hover:bg-black/30'
+                            }`}
                           >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`p-2 rounded-lg ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400'}`}>
+                                <Wrench className="w-4 h-4" />
+                              </span>
+                              {isSelected && <CheckCircle2 className="w-4 h-4 text-brand-orange" />}
+                            </div>
+
                             <div>
-                              <div className="flex items-center justify-between mb-3">
-                                <div className={`p-2.5 rounded-md ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800/80 text-gray-400 group-hover:text-white group-hover:bg-gray-700'} transition-colors`}>
-                                  <Wrench className="w-4 h-4" />
-                                </div>
-                                {isSelected && (
-                                  <CheckCircle2 className="w-4 h-4 text-brand-orange animate-in zoom-in duration-200" />
-                                )}
-                              </div>
                               <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-brand-orange' : 'text-white'}`}>
                                 {s.title}
                               </h4>
                               {s.startingPrice && (
-                                <p className="text-[10px] font-mono text-gray-400 mb-2">From {s.startingPrice}</p>
+                                <p className="text-[10px] font-mono text-gray-400">From {s.startingPrice}</p>
                               )}
-                            </div>
-
-                            <div className="mt-3 pt-2 border-t border-gray-800/60 flex items-center justify-between text-[10px]">
-                              <span className={`font-mono uppercase ${isSelected ? 'text-brand-orange font-bold' : 'text-gray-500'}`}>
-                                {isSelected ? 'Active Service' : 'Select'}
-                              </span>
-                              {s.variations?.length ? (
-                                <span className="text-gray-600 font-mono">{s.variations.length} Options</span>
-                              ) : null}
                             </div>
                           </button>
                         );
@@ -878,260 +932,274 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     </div>
 
                     {isChangingService && inquiry.serviceId && (
-                      <div className="mt-3 text-right">
+                      <div className="text-right pt-2">
                         <button
                           type="button"
                           onClick={() => setIsChangingService(false)}
                           className="text-xs text-gray-500 hover:text-gray-300 font-mono uppercase underline cursor-pointer"
                         >
-                          Cancel Service Change
+                          Cancel Change
                         </button>
                       </div>
                     )}
                   </div>
                 )}
+              </div>
 
-                {servicesLoading && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-xs rounded-lg">
-                    <div className="flex items-center gap-3 bg-[#121212] px-6 py-3.5 rounded-full border border-gray-800 shadow-2xl">
-                      <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Updating Linked Service...</span>
+              {/* 11. Checklists UI (Pre & Post Service Cards) */}
+              {inquiry.serviceId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* Pre-Service Inspection Card */}
+                  <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg flex flex-col justify-between space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Pre-Service</span>
+                        {checklistsState.before?.submittedAt ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
+                            ✓ Completed
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wide">Vehicle Inspection</h3>
+                      <p className="text-xs text-gray-400 mt-1">Pre-service vehicle condition and component inspection template.</p>
                     </div>
+
+                    {['pending', 'confirmed'].includes(inquiry.status) ? (
+                      <div className="p-3 rounded-lg border border-dashed border-gray-800 bg-brand-darker text-center text-xs text-gray-500 font-mono">
+                        🔒 Available after service starts
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setActiveChecklistPhase('before')}
+                        className="w-full py-3 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md cursor-pointer"
+                      >
+                        Open Pre-Service Checklist
+                      </button>
+                    )}
                   </div>
+
+                  {/* Post-Service Inspection Card */}
+                  <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg flex flex-col justify-between space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Post-Service</span>
+                        {isAfterSent ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
+                            ✓ Report Sent
+                          </span>
+                        ) : isAfterSubmitted ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                            ✓ Completed
+                          </span>
+                        ) : null}
+                      </div>
+                      <h3 className="text-base font-bold text-white uppercase tracking-wide">Final Inspection</h3>
+                      <p className="text-xs text-gray-400 mt-1">Post-service quality checklist & orientation report.</p>
+                    </div>
+
+                    {inquiry.status !== 'completed' ? (
+                      <div className="p-3 rounded-lg border border-dashed border-gray-800 bg-brand-darker text-center text-xs text-gray-500 font-mono">
+                        🔒 Available after service completion
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setActiveChecklistPhase('after')}
+                        className="w-full py-3 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md cursor-pointer"
+                      >
+                        Open Final Checklist
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ── Tab Content: Internal Notes ───────────────────────── */}
+          {activeTab === 'notes' && (
+            <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                  <StickyNote className="w-4 h-4" /> Internal Workspace Notes
+                </h2>
+                {!isEditingNotes && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditNotes(inquiry.internalNotes || '');
+                      setIsEditingNotes(true);
+                    }}
+                    className="text-xs font-bold uppercase tracking-wider text-brand-orange hover:text-orange-400 transition-colors cursor-pointer"
+                  >
+                    {inquiry.internalNotes ? 'Edit Notes' : '+ Add Note'}
+                  </button>
                 )}
               </div>
 
-              {/* Checklists Section */}
-              {inquiry.serviceId && (
-                <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
-                  <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6 pb-4 border-b border-gray-800/80">
-                    <ClipboardList className="w-4 h-4 text-brand-orange" /> Installation Checklists
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                    {/* Before Checklist Card */}
-                    <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-bold text-white uppercase tracking-widest">Before Installation</h4>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-6 flex-1">Pre-installation inspection checklist to verify vehicle condition before work begins.</p>
-
-                      {['pending', 'confirmed'].includes(inquiry.status) ? (
-                        <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
-                          Locked. Unlocks when status is In Progress.
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setActiveChecklistPhase('before')}
-                          className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
-                        >
-                          Before Installation Checklist
-                        </button>
-                      )}
-                    </div>
-
-                    {/* After Checklist Card */}
-                    <div className="bg-brand-dark border border-gray-800 rounded p-5 flex flex-col relative">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-bold text-white uppercase tracking-widest">After Installation</h4>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-6 flex-1">Post-installation quality check and customer orientation to verify functionality.</p>
-
-                      {inquiry.status !== 'completed' ? (
-                        <div className="flex items-center justify-center p-3 border border-dashed border-gray-700 rounded bg-black/20 text-xs text-gray-500 text-center">
-                          Locked. Unlocks when status is Completed.
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setActiveChecklistPhase('after')}
-                            className="flex-1 py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-widest rounded transition-colors cursor-pointer"
-                          >
-                            After Installation Checklist
-                          </button>
-
-                        </div>
-                      )}
-                    </div>
-
+              {isEditingNotes ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Add internal notes about customer preferences, vehicle condition, or service details..."
+                    className="w-full bg-black/40 border border-gray-800 rounded-lg p-4 text-sm text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none min-h-[140px] resize-y leading-relaxed"
+                  />
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingNotes(false)}
+                      className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border border-gray-800 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNotesSave}
+                      disabled={notesLoading}
+                      className="px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-brand-orange hover:bg-orange-600 text-white transition-colors shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {notesLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      <span>Save Notes</span>
+                    </button>
                   </div>
+                </div>
+              ) : (
+                <div className="bg-brand-darker rounded-lg p-5 border border-gray-800/80 min-h-[100px] flex flex-col justify-between">
+                  {inquiry.internalNotes ? (
+                    <>
+                      <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{inquiry.internalNotes}</p>
+                      {lastNoteUpdate && (
+                        <p className="text-[10px] text-gray-500 font-mono text-right mt-4 pt-2 border-t border-gray-800">
+                          Last updated by <span className="text-gray-300 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-gray-800 rounded-lg p-6">
+                      <StickyNote className="w-8 h-8 text-gray-600 mb-2" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-300">No internal notes yet</h3>
+                      <p className="text-xs text-gray-500 mt-1 max-w-xs">
+                        Add notes about customer preferences, vehicle condition, or service details.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {activeTab === 'notes' && (
-            <div className="space-y-8">
-              {/* Internal Notes Section */}
-              <div className="bg-[#121212] border border-gray-800/80 p-8 rounded-lg shadow-xl relative overflow-hidden">
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800/80">
-                  <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                    <StickyNote className="w-4 h-4 text-brand-orange" /> Internal Notes
-                  </h3>
-                  {!isEditingNotes && (
-                    <button
-                      onClick={() => {
-                        setEditNotes(inquiry.internalNotes || '');
-                        setIsEditingNotes(true);
-                      }}
-                      className="text-[10px] font-bold uppercase tracking-widest text-brand-orange hover:text-white transition-colors"
-                    >
-                      Edit Notes
-                    </button>
-                  )}
-                </div>
+          {/* ── Tab Content: Activity Log ─────────────────────────── */}
+          {activeTab === 'activity' && (
+            <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2 border-b border-gray-800 pb-3">
+                <Activity className="w-4 h-4" /> Activity History Timeline
+              </h2>
 
-                {isEditingNotes ? (
-                  <div className="space-y-4">
-                    <textarea
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Add internal notes about this inquiry..."
-                      className="w-full bg-black/40 border border-gray-700 rounded-sm p-4 text-sm text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none min-h-[120px] resize-y"
-                    />
-                    <div className="flex gap-3 justify-end">
-                      <button
-                        onClick={() => setIsEditingNotes(false)}
-                        className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-2"
-                      >
-                        <X className="w-3.5 h-3.5" /> Cancel
-                      </button>
-                      <button
-                        onClick={handleNotesSave}
-                        disabled={notesLoading}
-                        className="px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-widest bg-brand-orange text-white hover:bg-orange-600 transition-colors shadow-lg shadow-brand-orange/20 flex items-center gap-2 disabled:opacity-50"
-                      >
-                        <Save className="w-3.5 h-3.5" /> {notesLoading ? 'Saving...' : 'Save Notes'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-black/20 rounded p-5 border border-gray-800/50 min-h-[80px] flex flex-col justify-between">
-                    {inquiry.internalNotes ? (
-                      <>
-                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap mb-4">{inquiry.internalNotes}</p>
-                        {lastNoteUpdate && (
-                          <p className="text-[10px] text-gray-500 font-mono text-right mt-2 border-t border-gray-800/50 pt-2">
-                            Last updated by <span className="text-gray-400 font-bold">{lastNoteUpdate.actorName || 'System'}</span> on {new Date(lastNoteUpdate.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })}
+              {activityLogs.length === 0 ? (
+                <div className="py-12 text-center text-xs text-gray-500 font-mono">No activity recorded for this inquiry.</div>
+              ) : (() => {
+                const reversed = activityLogs.slice().reverse();
+                const totalPages = Math.ceil(reversed.length / ACTIVITY_PAGE_SIZE);
+                const pageEntries = reversed.slice(activityPage * ACTIVITY_PAGE_SIZE, (activityPage + 1) * ACTIVITY_PAGE_SIZE);
+                return (
+                  <div className="space-y-6">
+                    <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-800">
+                      {pageEntries.map((entry) => (
+                        <div key={entry.id} className="relative">
+                          <span className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full bg-brand-orange border-2 border-brand-dark" />
+                          <p className="text-[10px] font-mono text-gray-500 mb-0.5">
+                            {new Date(entry.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </p>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-4 text-gray-600 gap-2">
-                        <FileText className="w-6 h-6 opacity-30" />
-                        <p className="text-[10px] uppercase tracking-widest font-bold">No internal notes</p>
+                          <p className="text-xs font-bold text-white uppercase tracking-wide">
+                            {entry.action}
+                            {entry.actorName && (
+                              <span className="text-gray-400 font-normal lowercase tracking-normal ml-1">by {entry.actorName}</span>
+                            )}
+                          </p>
+                          {entry.detail && (
+                            <p className="text-xs text-gray-400 mt-1 bg-brand-darker border border-gray-800/80 p-2.5 rounded-lg leading-relaxed">
+                              {entry.detail}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-800 font-mono text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setActivityPage(p => Math.max(0, p - 1))}
+                          disabled={activityPage === 0}
+                          className="flex items-center gap-1 px-3 py-1.5 border border-gray-800 rounded-lg text-gray-400 hover:text-white hover:border-gray-700 disabled:opacity-30 transition-colors cursor-pointer"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                        </button>
+                        <span className="text-gray-500">
+                          Page {activityPage + 1} / {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActivityPage(p => Math.min(totalPages - 1, p + 1))}
+                          disabled={activityPage >= totalPages - 1}
+                          className="flex items-center gap-1 px-3 py-1.5 border border-gray-800 rounded-lg text-gray-400 hover:text-white hover:border-gray-700 disabled:opacity-30 transition-colors cursor-pointer"
+                        >
+                          Next <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
             </div>
           )}
 
-          {activeTab === 'activity' && (
-            <div className="space-y-8">
-              {/* Activity Timeline */}
-              <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-8 shadow-xl">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6 flex items-center gap-2 border-b border-gray-800/80 pb-4">
-                  <Activity className="w-4 h-4 text-brand-orange" /> Activity Log
-                </p>
-                {activityLogs.length === 0 ? (
-                  <p className="text-gray-600 text-xs font-mono text-center py-4">No activity recorded.</p>
-                ) : (() => {
-                  const reversed = activityLogs.slice().reverse();
-                  const totalPages = Math.ceil(reversed.length / ACTIVITY_PAGE_SIZE);
-                  const pageEntries = reversed.slice(activityPage * ACTIVITY_PAGE_SIZE, (activityPage + 1) * ACTIVITY_PAGE_SIZE);
-                  return (
-                    <>
-                      <div className="space-y-5 font-mono">
-                        {pageEntries.map((entry) => (
-                          <div key={entry.id} className="border-b border-gray-800/40 pb-4 last:border-0 last:pb-0">
-                            <p className="text-[10px] text-brand-orange mb-1.5">
-                              {new Date(entry.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                            </p>
-                            <p className="text-xs text-gray-300 uppercase font-bold tracking-wide">
-                              {entry.action}
-                              {entry.actorName && (
-                                <span className="text-gray-500 font-normal lowercase tracking-normal ml-1"> by {entry.actorName}</span>
-                              )}
-                            </p>
-                            {entry.detail && (
-                              <p className="text-[11px] text-gray-500 mt-2 pl-3 border-l-2 border-gray-700 leading-relaxed">{entry.detail}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800">
-                          <button
-                            onClick={() => setActivityPage(p => Math.max(0, p - 1))}
-                            disabled={activityPage === 0}
-                            className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
-                          >
-                            <ChevronLeft className="w-3 h-3" /> Prev
-                          </button>
-                          <span className="text-[10px] font-mono text-gray-500">
-                            Page {activityPage + 1} / {totalPages}
-                          </span>
-                          <button
-                            onClick={() => setActivityPage(p => Math.min(totalPages - 1, p + 1))}
-                            disabled={activityPage >= totalPages - 1}
-                            className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-gray-700 rounded text-gray-400 hover:text-white hover:border-gray-500 disabled:opacity-30 transition-colors"
-                          >
-                            Next <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-
-            </div>
-          )}
         </div>
 
-        {/* Right Column: Schedule & Status Actions Workflow */}
-        <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-6 self-start">
-          {/* Status Workflow & Actions */}
-          <div className="bg-[#121212] border border-gray-800/80 rounded-lg p-6 shadow-xl relative overflow-hidden space-y-6">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-orange flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-brand-orange" /> Actions
-              </p>
-              <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full ${STATUS_STYLES[inquiry.status] || 'bg-gray-800 text-gray-300'}`}>
+        {/* ── 8. Right Column: Workflow Control Panel (4 cols) ──────── */}
+        <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
+          <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-xl space-y-6">
+            
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" /> Workflow Actions
+              </h2>
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                STATUS_BADGE_STYLE[inquiry.status] || 'bg-gray-800 text-gray-300'
+              }`}>
                 {formatStatus(inquiry.status)}
               </span>
             </div>
 
-            {/* Visual Workflow Stepper Bar */}
-            <div className="bg-[#161616] border border-gray-800 p-4 rounded-lg">
+            {/* 9. Workflow Progress Stepper */}
+            <div className="bg-brand-darker border border-gray-800 p-4 rounded-xl space-y-3">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block font-bold">Service Workflow Progress</span>
 
               <div className="relative">
-                {/* Connecting Line */}
-                <div className="absolute top-3 left-[12%] right-[12%] h-0.5 bg-gray-800 z-0" />
-
-                {/* Progress Fill */}
+                {/* Stepper Progress Line */}
+                <div className="absolute top-3 left-[10%] right-[10%] h-0.5 bg-gray-800 -z-0" />
                 {(() => {
                   const stages = INQUIRY_STAGES;
                   const currentIndex = stages.indexOf(inquiry.status as any);
-                  const widthPct = currentIndex > 0 ? (currentIndex / (stages.length - 1)) * 76 : 0;
+                  const widthPct = currentIndex > 0 ? (currentIndex / (stages.length - 1)) * 80 : 0;
                   return (
                     <div
-                      className="absolute top-3 left-[12%] h-0.5 bg-gradient-to-r from-amber-500 via-brand-orange to-emerald-500 z-0 transition-all duration-500"
+                      className="absolute top-3 left-[10%] h-0.5 bg-brand-orange transition-all duration-300 -z-0"
                       style={{ width: `${widthPct}%` }}
                     />
                   );
                 })()}
 
-                {/* Grid Steps */}
                 <div className="grid grid-cols-4 relative z-10">
                   {[
-                    { key: 'pending', label: 'Pending', activeColor: 'bg-amber-500 text-black ring-amber-500/30' },
-                    { key: 'confirmed', label: 'Confirmed', activeColor: 'bg-blue-500 text-white ring-blue-500/30' },
-                    { key: 'in_progress', label: 'In Progress', activeColor: 'bg-brand-orange text-white ring-brand-orange/30' },
-                    { key: 'completed', label: 'Completed', activeColor: 'bg-emerald-500 text-white ring-emerald-500/30' },
+                    { key: 'pending', label: 'Pending' },
+                    { key: 'confirmed', label: 'Confirmed' },
+                    { key: 'in_progress', label: 'In Progress' },
+                    { key: 'completed', label: 'Completed' },
                   ].map((step, idx) => {
                     const stages = INQUIRY_STAGES;
                     const currentIndex = stages.indexOf(inquiry.status as any);
@@ -1140,16 +1208,18 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
 
                     return (
                       <div key={step.key} className="flex flex-col items-center text-center">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300 ${isCurrent
-                          ? `${step.activeColor} ring-4 scale-110 shadow-lg font-black`
-                          : isDone
-                            ? 'bg-gray-700 text-green-400 border border-green-500/50'
-                            : 'bg-[#222] text-gray-600 border border-gray-800'
-                          }`}>
+                        <div className={`w-6 h-6 rounded-full font-mono text-[10px] font-bold flex items-center justify-center transition-all ${
+                          isCurrent
+                            ? 'bg-brand-orange text-white ring-4 ring-brand-orange/30 shadow-lg scale-110'
+                            : isDone
+                            ? 'bg-gray-700 text-green-400 border border-green-500/40'
+                            : 'bg-gray-800 text-gray-500 border border-gray-700'
+                        }`}>
                           {isDone ? '✓' : idx + 1}
                         </div>
-                        <span className={`text-[9px] font-mono uppercase tracking-wider mt-2.5 whitespace-nowrap ${isCurrent ? 'text-white font-bold' : isDone ? 'text-gray-300' : 'text-gray-600'
-                          }`}>
+                        <span className={`text-[8px] font-mono uppercase tracking-wider mt-2 ${
+                          isCurrent ? 'text-brand-orange font-bold' : isDone ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
                           {step.label}
                         </span>
                       </div>
@@ -1159,80 +1229,71 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               </div>
             </div>
 
-            {/* Recommended Next Action / Primary Execution Card */}
+            {/* 10. Next Action Card */}
             <div className="space-y-3">
-              <p className="text-[9px] font-mono uppercase tracking-widest text-gray-500">Next Step</p>
+              <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block font-bold">Recommended Next Action</span>
 
               {inquiry.status === 'pending' && (
-                <div className="bg-green-500/5 border border-green-500/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-green-400">Confirm Appointment</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">Confirm the customer's appointment date and time.</p>
-                    </div>
-                    <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-green-400">Confirm Appointment</h3>
+                    <p className="text-xs text-gray-300 mt-1">Review and confirm the customer's scheduled appointment date and time.</p>
                   </div>
                   <button
                     onClick={() => requestConfirmation(
                       {
-                        title: 'Confirm Inquiry?',
-                        message: 'Confirm this inquiry appointment date & time.',
-                        confirmLabel: 'Confirm Inquiry',
+                        title: 'Confirm Appointment?',
+                        message: 'Are you sure you want to confirm this appointment schedule?',
+                        confirmLabel: 'Confirm Appointment',
                       },
                       () => handleStatusChange('confirmed')
                     )}
                     disabled={statusLoading}
-                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
-                    {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    Confirm Inquiry Now
+                    {statusLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Confirm Appointment
                   </button>
                 </div>
               )}
 
               {inquiry.status === 'confirmed' && (
-                <div className="bg-blue-500/5 border border-blue-500/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400">Start Service</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">The vehicle has arrived. Start the service to begin work.</p>
-                    </div>
-                    <Wrench className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Start Service</h3>
+                    <p className="text-xs text-gray-300 mt-1">The customer has arrived and the service can begin.</p>
                   </div>
                   <button
                     onClick={() => requestConfirmation(
                       {
                         title: 'Start Service?',
-                        message: 'Set inquiry status to In Progress to begin work.',
+                        message: 'Set inquiry status to In Progress to begin work on the vehicle.',
                         confirmLabel: 'Start Service',
                       },
                       () => handleStatusChange('in_progress')
                     )}
                     disabled={statusLoading}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
-                    {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
-                    Start Service (In Progress)
+                    {statusLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
+                    Start Service
                   </button>
                 </div>
               )}
 
               {inquiry.status === 'in_progress' && (
-                <div className="bg-brand-orange/5 border border-brand-orange/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-brand-orange">Service In Progress</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">Fill out the inspection checklist or mark the service as completed.</p>
-                    </div>
-                    <BadgeCheck className="w-5 h-5 text-brand-orange shrink-0 mt-0.5" />
+                <div className="bg-brand-orange/10 border border-brand-orange/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-brand-orange">Service In Progress</h3>
+                    <p className="text-xs text-gray-300 mt-1">Complete the pre-service inspection or mark the service as completed.</p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
                       onClick={() => setActiveChecklistPhase('before')}
-                      className="py-3 px-4 bg-[#1a1a1a] border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="py-2.5 px-3 bg-brand-dark border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <FileText className="w-3.5 h-3.5" /> Pre-Service Checklist
+                      <FileText className="w-3.5 h-3.5" /> Pre-Checklist
                     </button>
                     <button
                       onClick={() => requestConfirmation(
@@ -1247,64 +1308,51 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                         }
                       )}
                       disabled={statusLoading}
-                      className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                      className="py-2.5 px-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                     >
-                      {statusLoading ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
-                      Mark Completed
+                      {statusLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
+                      Mark Done
                     </button>
                   </div>
                 </div>
               )}
 
               {inquiry.status === 'completed' && (
-                <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service Completed</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        {!isAfterSubmitted
-                          ? 'The service is finished. Please complete the final checklist before sending the report to the customer.'
-                          : !isAfterSent
-                            ? 'The service is finished and the final checklist is complete. You can now send the final report to the customer.'
-                            : 'The final report has been sent to the customer and shop owners.'}
-                      </p>
-                    </div>
-                    {isAfterSent ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    ) : (
-                      <BadgeCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    )}
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service Completed</h3>
+                    <p className="text-xs text-gray-300 mt-1">
+                      {!isAfterSubmitted
+                        ? 'Complete the final checklist before sending the report to the customer.'
+                        : !isAfterSent
+                        ? 'Final checklist is ready. You can now send the report.'
+                        : 'Final report has been sent to client and shop owners.'}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-2">
+
+                  <div className="space-y-2">
                     <button
                       onClick={() => setActiveChecklistPhase('after')}
-                      className="py-3 px-4 bg-[#1a1a1a] border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-2.5 bg-brand-dark border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <ClipboardList className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View Installation Checklists' : 'Final Installation Checklist'}
-                    </button>
-                    <button
-                      onClick={() => handlePreviewPdf('after')}
-                      disabled={previewLoading === 'after'}
-                      className="py-3 px-4 bg-[#1a1a1a] border border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      {previewLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />} Preview Report
+                      <ClipboardList className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View Final Checklist' : 'Final Checklist'}
                     </button>
                     {isAfterSent ? (
                       <button
                         onClick={() => handleSendPdf('after')}
                         disabled={!!sendPdfLoading}
-                        className="py-3 px-4 bg-[#1a1a1a] border border-brand-orange/40 text-brand-orange hover:bg-orange-600 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                        className="w-full py-2.5 bg-brand-dark border border-brand-orange/40 text-brand-orange hover:bg-orange-600 hover:text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                       >
-                        {sendPdfLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        {sendPdfLoading === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                         Re-send Report
                       </button>
                     ) : (
                       <button
                         onClick={() => handleSendPdf('after')}
                         disabled={!!sendPdfLoading}
-                        className="py-3 px-4 bg-brand-orange hover:bg-orange-600 text-white text-[10px] font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-brand-orange/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                        className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                       >
-                        {sendPdfLoading === 'after' ? <Clock className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                        {sendPdfLoading === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                         Send Report
                       </button>
                     )}
@@ -1313,44 +1361,40 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
               )}
 
               {inquiry.status === 'cancelled' && (
-                <div className="bg-red-500/5 border border-red-500/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-400">Service Cancelled</h4>
-                      <p className="text-[11px] text-gray-400 mt-1">This service has been cancelled.</p>
-                    </div>
-                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-red-400">Service Cancelled</h3>
+                    <p className="text-xs text-gray-300 mt-1">This inquiry service has been cancelled.</p>
                   </div>
                   <button
                     onClick={() => requestConfirmation(
                       {
                         title: 'Re-open Service?',
                         message: 'Re-open this service back to pending status.',
-                        confirmLabel: 'Re-open',
+                        confirmLabel: 'Re-open Service',
                       },
                       () => handleStatusChange('pending')
                     )}
                     disabled={statusLoading}
-                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-widest rounded transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
-                    {statusLoading ? <Clock className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    {statusLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     Re-open Service
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Quick Utility Actions */}
-            <div className="pt-4 border-t border-gray-800 space-y-3 relative">
-              <p className="text-[9px] uppercase font-mono tracking-widest text-gray-500">More Actions</p>
+            {/* Other Actions Dropdown & Delete */}
+            <div className="pt-4 border-t border-gray-800 space-y-3">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block font-bold">More Actions</span>
 
               {/* Status Dropdown */}
               <div ref={statusDropdownRef} className="relative">
                 {isStatusLocked ? (
-                  <div className="w-full flex items-center justify-between bg-emerald-950/30 border border-emerald-800/40 rounded p-3 text-xs font-bold uppercase tracking-widest text-emerald-300">
+                  <div className="w-full flex items-center justify-between bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-3 text-xs font-bold uppercase tracking-wider text-emerald-300">
                     <span className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-emerald-400" />
-                      Status Locked (Completed & Finalized)
+                      <Lock className="w-4 h-4 text-emerald-400" /> Status Locked
                     </span>
                     <BadgeCheck className="w-4 h-4 text-emerald-400" />
                   </div>
@@ -1358,34 +1402,23 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                   <button
                     onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
                     disabled={statusLoading}
-                    className="w-full flex items-center justify-between bg-[#161616] border border-gray-700 hover:border-brand-orange/50 rounded p-3 text-xs font-bold uppercase tracking-widest text-white transition-all disabled:opacity-50 group cursor-pointer"
+                    className="w-full flex items-center justify-between bg-brand-darker border border-gray-800 hover:border-brand-orange/50 rounded-lg p-3 text-xs font-bold uppercase tracking-wider text-white transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <span className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-brand-orange" />
-                      Change Status Manually ({formatStatus(inquiry.status)})
+                      <CheckCircle2 className="w-4 h-4 text-brand-orange" /> Change Status
                     </span>
                     {statusLoading ? (
-                      <Clock className="w-4 h-4 text-brand-orange animate-spin" />
+                      <Loader2 className="w-4 h-4 text-brand-orange animate-spin" />
                     ) : (
-                      <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-300 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
                     )}
                   </button>
                 )}
 
                 {isStatusDropdownOpen && (
-                  <div className="absolute bottom-full mb-2 inset-x-0 bg-[#1a1a1a] border border-gray-700 rounded-md shadow-2xl z-50 overflow-hidden">
+                  <div className="absolute bottom-full mb-2 inset-x-0 bg-brand-dark border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
                     {[...INQUIRY_STAGES, 'cancelled'].map((s) => {
                       if (s === inquiry.status) return null;
-
-                      let hoverClass = 'hover:bg-gray-800';
-                      let textClass = 'text-gray-300';
-
-                      if (s === 'confirmed') { hoverClass = 'hover:bg-blue-500/10 hover:text-blue-400'; }
-                      else if (s === 'in_progress') { hoverClass = 'hover:bg-brand-orange/10 hover:text-brand-orange'; }
-                      else if (s === 'completed') { hoverClass = 'hover:bg-emerald-500/10 hover:text-emerald-400'; }
-                      else if (s === 'cancelled') { hoverClass = 'hover:bg-red-500/10 hover:text-red-400'; }
-                      else if (s === 'pending') { hoverClass = 'hover:bg-amber-500/10 hover:text-amber-400'; }
-
                       return (
                         <button
                           key={s}
@@ -1395,15 +1428,15 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                               {
                                 title: 'Update Status?',
                                 message: `Change inquiry status to ${formatStatus(s as any)}?`,
-                                confirmLabel: 'Confirm',
+                                confirmLabel: 'Update Status',
                                 tone: s === 'cancelled' ? 'danger' : 'default',
                               },
                               () => handleStatusChange(s)
                             );
                           }}
-                          className={`w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest transition-colors border-b border-gray-800 last:border-0 flex items-center justify-between cursor-pointer ${textClass} ${hoverClass}`}
+                          className="w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-wider transition-colors border-b border-gray-800/80 last:border-0 flex items-center justify-between hover:bg-brand-darker hover:text-brand-orange cursor-pointer text-gray-300"
                         >
-                          {formatStatus(s as any)}
+                          <span>{formatStatus(s as any)}</span>
                           <ChevronRight className="w-3.5 h-3.5 opacity-40" />
                         </button>
                       );
@@ -1412,7 +1445,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                 )}
               </div>
 
-              {/* Cancel Button (if active) */}
+              {/* Cancel Button */}
               {inquiry.status !== 'cancelled' && inquiry.status !== 'completed' && (
                 <button
                   onClick={() => requestConfirmation(
@@ -1425,10 +1458,10 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                     () => handleStatusChange('cancelled')
                   )}
                   disabled={statusLoading}
-                  className="w-full flex justify-between items-center px-4 py-3 bg-[#161616] border border-red-500/30 text-red-400 hover:bg-red-500/10 text-[10px] font-bold uppercase tracking-widest rounded transition-all disabled:opacity-30 group cursor-pointer"
+                  className="w-full flex justify-between items-center px-4 py-3 bg-brand-darker border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-bold uppercase tracking-wider rounded-lg transition-all disabled:opacity-40 cursor-pointer"
                 >
                   <span>Cancel Inquiry</span>
-                  <XCircle className="w-4 h-4 opacity-50 group-hover:opacity-100" />
+                  <XCircle className="w-4 h-4 opacity-60" />
                 </button>
               )}
 
@@ -1444,48 +1477,56 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
                   handleDelete
                 )}
                 disabled={isDeleting}
-                className="w-full flex justify-between items-center px-4 py-3 bg-transparent border border-red-500/40 text-red-500 hover:bg-red-500/10 hover:border-red-500 text-[10px] font-bold uppercase tracking-widest rounded transition-all disabled:opacity-30 group cursor-pointer"
+                className="w-full flex justify-between items-center px-4 py-3 bg-transparent border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-bold uppercase tracking-wider rounded-lg transition-all disabled:opacity-40 cursor-pointer"
               >
-                <span>{isDeleting ? 'Deleting...' : 'Delete Inquiry Record'}</span>
-                {isDeleting ? <Clock className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-70 group-hover:opacity-100" />}
+                <span>{isDeleting ? 'Deleting…' : 'Delete Record'}</span>
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 opacity-60" />}
               </button>
             </div>
+
           </div>
         </div>
+
       </div>
 
-      {/* Action Confirmation Modal */}
+      {/* ── 15. Action Confirmation Modal ──────────────────────────── */}
       {confirmDialog && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded border border-gray-700 bg-[#121212] p-6 shadow-2xl">
-            <h3 className={`text-[10px] font-mono font-bold uppercase tracking-widest mb-4 border-b border-gray-800 pb-2 ${confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-brand-orange'}`}>
-              {confirmDialog.tone === 'danger' ? '// Action Required' : '// Please Confirm'}
+          <div className="w-full max-w-md rounded-xl border border-gray-700 bg-brand-dark p-6 shadow-2xl space-y-4">
+            <h3 className={`text-xs font-mono font-bold uppercase tracking-widest border-b border-gray-800 pb-2 ${
+              confirmDialog.tone === 'danger' ? 'text-red-400' : 'text-brand-orange'
+            }`}>
+              Confirm Action
             </h3>
-            <p className="text-lg font-bold text-white mb-2">{confirmDialog.title}</p>
-            <p className="text-sm text-gray-400 mb-6">{confirmDialog.message}</p>
-            <div className="flex items-center justify-end gap-3">
+            <div>
+              <p className="text-base font-bold text-white uppercase tracking-wide">{confirmDialog.title}</p>
+              <p className="text-xs text-gray-300 mt-1 leading-relaxed">{confirmDialog.message}</p>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={closeConfirmation}
                 disabled={confirmBusy}
-                className="px-4 py-2 rounded border border-gray-700 text-xs font-bold uppercase tracking-widest text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-30 transition-colors"
+                className="px-4 py-2 rounded-lg border border-gray-800 text-xs font-bold uppercase tracking-wider text-gray-400 hover:border-gray-700 hover:text-white disabled:opacity-40 transition-colors cursor-pointer"
               >
-                Abort
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={() => void runConfirmedAction()}
                 disabled={confirmBusy}
-                className={`px-4 py-2 rounded text-xs font-bold uppercase tracking-widest text-white disabled:opacity-30 transition-colors ${confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
-                  }`}
+                className={`px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-white disabled:opacity-40 transition-colors shadow-md cursor-pointer ${
+                  confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
+                }`}
               >
-                {confirmBusy ? 'Executing...' : confirmDialog.confirmLabel}
+                {confirmBusy ? 'Executing…' : confirmDialog.confirmLabel}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── Installation Checklist Modal ──────────────────────────── */}
       {activeChecklistPhase && token && (
         <InquiryChecklistModal
           inquiryId={inquiry.id}
@@ -1497,6 +1538,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack }: Props) {
           }}
         />
       )}
+
     </div>
   );
 }

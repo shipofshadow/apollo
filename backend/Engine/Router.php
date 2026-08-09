@@ -824,6 +824,16 @@ class Router
     /** @param array<string, string> $vars */
     private function handleAuthRegister(array $vars = []): void
     {
+        $siteSettings = (new SiteSettingsService())->getAll();
+        if (($siteSettings['disable_registration'] ?? '0') === '1') {
+            http_response_code(403);
+            echo json_encode([
+                'error' => 'Registration is currently unavailable.',
+                'detail' => 'User registration is currently disabled.'
+            ]);
+            return;
+        }
+
         $data   = $this->jsonBody();
         $this->validateTurnstile($data);
         $result = (new UserService())->register($data);

@@ -596,6 +596,8 @@ export interface SiteSettings {
   contact_emails?: string;
   staff_can_view_all_bookings?: string;
   staff_can_manage_all_bookings?: string;
+  disable_registration?: string;
+  booking_horizon_weeks?: string;
   [key: string]: string | undefined;
 }
 
