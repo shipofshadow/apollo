@@ -55,6 +55,7 @@ export interface Service {
   startingPrice: string;     // e.g. "₱13,750"
   features: string[];        // Key Features & Benefits
   variations: ServiceVariation[];
+  category?: string;
   sortOrder: number;
   isActive: boolean;
   createdAt: string;
@@ -1029,6 +1030,7 @@ export type InquiryStage = typeof INQUIRY_STAGES[number];
 
 export interface Inquiry {
   id: string;
+  referenceNumber?: string;
   fullName: string;
   contactNumber: string;
   emailAddress: string;

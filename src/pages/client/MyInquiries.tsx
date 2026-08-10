@@ -243,6 +243,11 @@ export default function MyInquiries() {
                       <p className="text-white font-bold text-sm md:text-base truncate">
                         {i.productToPurchase || 'General Inquiry'}
                       </p>
+                      {(i.referenceNumber || i.id) && (
+                        <span className="inline-flex px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded bg-brand-orange/10 border border-brand-orange/30 text-brand-orange">
+                          {i.referenceNumber || `#${i.id.substring(0, 8)}`}
+                        </span>
+                      )}
                       {/* Mobile status badge */}
                       <span className={`sm:hidden inline-flex px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded-md border ${STATUS_STYLES[i.status] ?? 'bg-gray-500'}`}>
                         {formatStatus(i.status)}
@@ -333,8 +338,8 @@ export default function MyInquiries() {
 
                     {/* Inquiry reference ID */}
                     <div className="mt-4 pt-3 border-t border-gray-800/50 flex items-center justify-between flex-wrap gap-2">
-                      <p className="text-[10px] text-gray-600 font-mono truncate">
-                        Ref: {i.id}
+                      <p className="text-[10px] text-gray-400 font-mono truncate">
+                        Reference No: <span className="text-brand-orange font-bold">{i.referenceNumber || i.id}</span>
                       </p>
                       {i.createdAt && (
                         <p className="text-[10px] text-gray-600">

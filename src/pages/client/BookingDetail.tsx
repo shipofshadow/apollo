@@ -21,7 +21,6 @@ import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 import BookingReviewWidget from '../../components/BookingReviewWidget';
 import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
-import ClientChecklistPanel from './ClientChecklistPanel';
 import PageSEO from '../../components/PageSEO';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1053,10 +1052,6 @@ export default function BookingDetail() {
         </div>
       )}
 
-      {/* Checklists Panel */}
-      {token && booking && booking.id && (
-        <ClientChecklistPanel inquiryId={booking.id} token={token} />
-      )}
 
       {/* Build Showcase link – only for completed bookings with a build slug */}
       {booking.status === 'completed' && booking.buildSlug && (

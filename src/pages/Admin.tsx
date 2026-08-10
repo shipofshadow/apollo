@@ -127,10 +127,11 @@ export default function AdminPage() {
     {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
-        { key: 'services',   label: 'Services',   icon: Wrench },
+        {key: 'services',   label: 'Services',   icon: Wrench },
         { key: 'products',   label: 'Products',   icon: Package },
         { key: 'orders',     label: 'Orders',     icon: Package },
         { key: 'inventory',  label: 'Inventory',  icon: Boxes },
+        { key: 'checklists', label: 'Checklists', icon: ShieldCheck },
         { key: 'shop-hours', label: 'Shop Hours', icon: Clock },
       ]
     },

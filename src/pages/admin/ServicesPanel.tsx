@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Wrench, Loader2, AlertCircle, Plus, Pencil, Trash2, Save, X, Upload,
-  Search, EyeOff, Clock, Tag, Layers, ListCheck, ArrowLeft,
+  Search, EyeOff, Clock, Tag, Layers, ArrowLeft,
   CheckCircle2, Sparkles
 } from 'lucide-react';
 import {
@@ -13,7 +13,6 @@ import type { AppDispatch, RootState } from '../../store';
 import type { Service, ServiceVariation } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import VariationsManager from '../../components/VariationsManager';
-import ServiceChecklistItemsManager from './ServiceChecklistItemsManager';
 import { formatPrice } from '../../utils/formatPrice';
 
 const ICON_OPTIONS = ['Lightbulb', 'MonitorPlay', 'ShieldAlert', 'CarFront', 'Zap', 'Wrench'];
@@ -432,23 +431,6 @@ export default function ServicesPanel() {
                 parentType="service"
                 token={token}
                 onSaved={v => setVariations(v as ServiceVariation[])}
-              />
-            </div>
-          </div>
-        )}
-
-        {editId !== null && token && (
-          <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl">
-            <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
-                <ListCheck className="w-4 h-4" /> Service Inspection Checklist Template
-              </h3>
-              <span className="text-[10px] font-mono text-gray-500">Preset inspection &amp; task items for PDF reports</span>
-            </div>
-            <div className="p-6">
-              <ServiceChecklistItemsManager
-                serviceId={editId}
-                token={token}
               />
             </div>
           </div>

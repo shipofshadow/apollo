@@ -47,6 +47,7 @@ const Admin = lazy(() => import('./pages/Admin'));
 const BuildShowcase = lazy(() => import('./pages/BuildShowcase'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const CustomerFormPage = lazy(() => import('./pages/CustomerFormPage'));
+const ChecklistPage = lazy(() => import('./pages/ChecklistPage'));
 
 function RouteFallback() {
   return (
@@ -115,6 +116,8 @@ function AppInner() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/order" element={<CustomerFormPage />} />
+            <Route path="/checklist" element={<ChecklistPage />} />
+            <Route path="/checklist/:serviceSlug/:phaseSlug" element={<ChecklistPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/calender" element={<Navigate to="/calendar" replace />} />
             <Route path="*" element={<NotFoundPage />} />

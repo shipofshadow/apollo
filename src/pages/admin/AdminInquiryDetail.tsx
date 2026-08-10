@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   ArrowLeft, CheckCircle2,
-  Trash2, AlertTriangle, User, Car, Activity,
+  Trash2, AlertTriangle, User, Car, Activity, Tag,
   ChevronLeft, ChevronRight, ChevronDown, Calendar, ClipboardList,
-  StickyNote, FileText, Save, Send, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Lock, Mail, Phone
+  StickyNote, FileText, Save, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Mail, Phone
 } from 'lucide-react';
 import {
   fetchInquiryByIdApi,
@@ -15,19 +15,17 @@ import {
   updateInquiryInternalNotesApi,
   fetchServicesApi,
   updateInquiryServiceIdApi,
-  generateInquiryChecklistPdfApi,
   fetchShopHoursApi,
   fetchShopClosedDatesApi,
   fetchSiteSettingsApi,
-  fetchInquiryChecklistsApi,
-  sendInquiryChecklistPhaseApi
+  fetchPublicChecklistSubmissionApi,
 } from '../../services/api';
 import type { ShopDayHours, Inquiry, Service } from '../../types';
 import { INQUIRY_STAGES } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
-import InquiryChecklistModal from './InquiryChecklistModal';
+import { BACKEND_URL } from '../../config';
 
 function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>, weeks: number = 4): Date[] {
   const openDays = shopHours.length
@@ -158,11 +156,10 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
                   key={i}
                   type="button"
                   onClick={() => handleDateSelect(date)}
-                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded-lg relative cursor-pointer ${
-                    active
+                  className={`snap-start shrink-0 w-20 p-3 border text-center transition-all rounded-lg relative cursor-pointer ${active
                       ? 'border-brand-orange bg-brand-orange/15 shadow-md'
                       : 'border-gray-800 hover:border-gray-700 bg-brand-dark'
-                  }`}
+                    }`}
                 >
                   <div className="text-[10px] text-gray-400 uppercase font-mono mb-0.5">
                     {date.toLocaleDateString('en-PH', { weekday: 'short', timeZone: 'Asia/Manila' })}
@@ -225,17 +222,15 @@ function AdminInquiryReschedulePanel({ inquiry, token, onSuccess, onCancel }: Re
                     key={slot}
                     type="button"
                     onClick={() => setSelectedTime(slot)}
-                    className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer ${
-                      isSelected
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer ${isSelected
                         ? 'bg-brand-orange text-white border-brand-orange shadow-lg font-bold'
                         : 'bg-brand-dark border-gray-800 text-gray-300 hover:border-gray-700 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="text-xs font-bold font-mono">{slot}</span>
                     {spotsLeft > 0 && (
-                      <span className={`text-[10px] font-semibold mt-1 ${
-                        isSelected ? 'text-white/90' : almostFull ? 'text-brand-orange' : 'text-gray-500'
-                      }`}>
+                      <span className={`text-[10px] font-semibold mt-1 ${isSelected ? 'text-white/90' : almostFull ? 'text-brand-orange' : 'text-gray-500'
+                        }`}>
                         {almostFull ? '1 spot left' : `${spotsLeft} spots available`}
                       </span>
                     )}
@@ -371,19 +366,15 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
     };
   }, [isStatusDropdownOpen]);
 
+  // Notes & Activity
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editNotes, setEditNotes] = useState('');
   const [notesLoading, setNotesLoading] = useState(false);
 
-  // Checklists
-  const [checklistsState, setChecklistsState] = useState<{ before?: any; after?: any }>({});
-  const [activeChecklistPhase, setActiveChecklistPhase] = useState<'before' | 'after' | null>(null);
-  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
-  const [sendPdfLoading, setSendPdfLoading] = useState<string | null>(null);
-
-  const isAfterSubmitted = Boolean(checklistsState.after?.submittedAt);
-  const isAfterSent = Boolean(checklistsState.after?.sentAt);
-  const isStatusLocked = inquiry?.status === 'completed' && isAfterSubmitted;
+  // Checklist Submissions State & Preview Phase & View Mode
+  const [submissionsState, setSubmissionsState] = useState<{ before?: any; after?: any }>({});
+  const [previewPhase, setPreviewPhase] = useState<'before' | 'after'>('before');
+  const [viewMode, setViewMode] = useState<'visual' | 'pdf'>('visual');
 
   // Activity log pagination
   const ACTIVITY_PAGE_SIZE = 5;
@@ -396,49 +387,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
 
   const id = inquiryId.replace('inq-', '');
 
-  const handlePreviewPdf = async (phase: string = 'after') => {
-    if (!token || !inquiry) return;
-    setPreviewLoading(phase);
-    try {
-      const blob = await generateInquiryChecklistPdfApi(token, inquiry.id.replace('inq-', ''), phase);
-      const url = URL.createObjectURL(blob);
-      blobUrlsRef.current.push(url);
-      window.open(url, '_blank');
-    } catch (err: any) {
-      console.error(err);
-      showToast('Failed to generate PDF: ' + err.message, 'error');
-    } finally {
-      setPreviewLoading(null);
-    }
-  };
-
-  const handleSendPdf = async (phase: string = 'after') => {
-    if (!token || !inquiry) return;
-    setSendPdfLoading(phase);
-    try {
-      await sendInquiryChecklistPhaseApi(token, inquiry.id.replace('inq-', ''), phase);
-      showToast(`Inspection report PDF sent to client & shop owners.`, 'success');
-      await loadChecklistsState();
-      const activitiesRes = await fetchInquiryActivityApi(token, String(id));
-      setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
-    } catch (err: any) {
-      showToast('Failed to send PDF: ' + err.message, 'error');
-    } finally {
-      setSendPdfLoading(null);
-    }
-  };
-
   const lastNoteUpdate = activityLogs.slice().reverse().find(log => log.eventType === 'inquiry_internal_notes_updated');
-
-  const loadChecklistsState = async () => {
-    if (!token || !id) return;
-    try {
-      const res = await fetchInquiryChecklistsApi(token, String(id));
-      setChecklistsState(res || {});
-    } catch (err) {
-      console.error('Failed to load checklists state', err);
-    }
-  };
 
   const fetchData = async () => {
     if (!token) return;
@@ -450,7 +399,19 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
       ]);
       setInquiry((res as { inquiry: any }).inquiry);
       setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
-      await loadChecklistsState();
+
+      const ref = (res as any).inquiry?.referenceNumber || (res as any).inquiry?.id;
+      if (ref) {
+        Promise.all([
+          fetchPublicChecklistSubmissionApi(ref, 'before').catch(() => ({ submission: null })),
+          fetchPublicChecklistSubmissionApi(ref, 'after').catch(() => ({ submission: null })),
+        ]).then(([beforeRes, afterRes]) => {
+          setSubmissionsState({
+            before: beforeRes.submission,
+            after: afterRes.submission,
+          });
+        });
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -605,7 +566,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
 
   return (
     <div className="space-y-6 pb-20 font-sans">
-      
+
       {/* ── Top Back Navigation ──────────────────────────────────── */}
       <div>
         <button
@@ -620,38 +581,52 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
       <header className="bg-brand-dark border border-gray-800 rounded-xl p-5 sm:p-7 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Inquiry Record</span>
               <span className="text-gray-600">•</span>
               <span className="text-xs font-mono text-gray-400">#{inquiry.id.substring(0, 8)}</span>
+              {inquiry.referenceNumber && (
+                <>
+                  <span className="text-gray-600">•</span>
+                  <span className="text-xs font-mono font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/40 px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-sm">
+                    <Tag className="w-3 h-3 text-brand-orange" />
+                    <span>REF: {inquiry.referenceNumber}</span>
+                  </span>
+                </>
+              )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-white uppercase tracking-tight">
               {inquiry.fullName}
             </h1>
           </div>
 
-          {/* Status Badge */}
-          <div className="flex items-center gap-3 self-start md:self-auto">
-            <div className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 border ${
-              STATUS_BADGE_STYLE[inquiry.status] || 'bg-gray-800 text-gray-300 border-gray-700'
-            }`}>
+          {/* Status Badge & Open Public Checklist Button */}
+          <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+            <div className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 border ${STATUS_BADGE_STYLE[inquiry.status] || 'bg-gray-800 text-gray-300 border-gray-700'
+              }`}>
               <span className={`w-2 h-2 rounded-full ${STATUS_DOT_STYLE[inquiry.status] || 'bg-gray-400'}`} />
               <span>{formatStatus(inquiry.status)}</span>
             </div>
 
-            <button
-              onClick={() => handlePreviewPdf('after')}
-              disabled={previewLoading === 'after'}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold uppercase tracking-wider text-xs border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white transition-all shadow-md disabled:opacity-50 cursor-pointer"
+            <a
+              href={`/checklist?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold uppercase tracking-wider text-xs border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white transition-all shadow-md cursor-pointer"
             >
-              {previewLoading === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-              <span>Preview Report</span>
-            </button>
+              <FileText className="w-3.5 h-3.5" />
+              <span>Open Public Checklist</span>
+            </a>
           </div>
         </div>
 
         {/* Compact Metadata Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono text-gray-300">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono text-gray-300">
+          <div className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-brand-orange shrink-0" />
+            <span className="truncate">Ref: <strong className="text-white">{inquiry.referenceNumber || 'N/A'}</strong></span>
+          </div>
+
           <div className="flex items-center gap-2">
             <Car className="w-4 h-4 text-brand-orange shrink-0" />
             <span className="truncate">
@@ -690,18 +665,16 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as TabType)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${activeTab === tab.id
                     ? 'bg-brand-orange text-white shadow-md'
                     : 'text-gray-400 hover:text-white hover:bg-brand-darker/60'
-                }`}
+                  }`}
               >
                 {tab.icon}
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono leading-none ${
-                    activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-400'
-                  }`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono leading-none ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-800 text-gray-400'
+                    }`}>
                     {tab.badge}
                   </span>
                 )}
@@ -712,10 +685,10 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
           {/* ── Tab Content: Overview ─────────────────────────────── */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              
+
               {/* Customer & Vehicle Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
+
                 {/* 5. Customer Card */}
                 <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
                   <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2 border-b border-gray-800 pb-3">
@@ -839,7 +812,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
           {/* ── Tab Content: Checklists ──────────────────────────── */}
           {activeTab === 'checklists' && (
             <div className="space-y-6">
-              
+
               {/* Linked Service Card */}
               <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
                 <div className="flex items-center justify-between border-b border-gray-800 pb-3">
@@ -906,11 +879,10 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                                 setIsChangingService(false);
                               }
                             }}
-                            className={`p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                              isSelected
+                            className={`p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${isSelected
                                 ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/40 shadow-md'
                                 : 'border-gray-800 bg-brand-darker hover:border-gray-700 hover:bg-black/30'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between mb-2">
                               <span className={`p-2 rounded-lg ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400'}`}>
@@ -947,74 +919,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                 )}
               </div>
 
-              {/* 11. Checklists UI (Pre & Post Service Cards) */}
-              {inquiry.serviceId && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Pre-Service Inspection Card */}
-                  <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg flex flex-col justify-between space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Pre-Service</span>
-                        {checklistsState.before?.submittedAt ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
-                            ✓ Completed
-                          </span>
-                        ) : null}
-                      </div>
-                      <h3 className="text-base font-bold text-white uppercase tracking-wide">Vehicle Inspection</h3>
-                      <p className="text-xs text-gray-400 mt-1">Pre-service vehicle condition and component inspection template.</p>
-                    </div>
 
-                    {['pending', 'confirmed'].includes(inquiry.status) ? (
-                      <div className="p-3 rounded-lg border border-dashed border-gray-800 bg-brand-darker text-center text-xs text-gray-500 font-mono">
-                        🔒 Available after service starts
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setActiveChecklistPhase('before')}
-                        className="w-full py-3 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md cursor-pointer"
-                      >
-                        Open Pre-Service Checklist
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Post-Service Inspection Card */}
-                  <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg flex flex-col justify-between space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Post-Service</span>
-                        {isAfterSent ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
-                            ✓ Report Sent
-                          </span>
-                        ) : isAfterSubmitted ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                            ✓ Completed
-                          </span>
-                        ) : null}
-                      </div>
-                      <h3 className="text-base font-bold text-white uppercase tracking-wide">Final Inspection</h3>
-                      <p className="text-xs text-gray-400 mt-1">Post-service quality checklist & orientation report.</p>
-                    </div>
-
-                    {inquiry.status !== 'completed' ? (
-                      <div className="p-3 rounded-lg border border-dashed border-gray-800 bg-brand-darker text-center text-xs text-gray-500 font-mono">
-                        🔒 Available after service completion
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setActiveChecklistPhase('after')}
-                        className="w-full py-3 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md cursor-pointer"
-                      >
-                        Open Final Checklist
-                      </button>
-                    )}
-                  </div>
-
-                </div>
-              )}
 
             </div>
           )}
@@ -1092,6 +997,326 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
             </div>
           )}
 
+          {/* ── Tab Content: Checklists Live Visual & PDF Preview ────── */}
+          {activeTab === 'checklists' && (
+            <div className="space-y-6 font-sans">
+              
+              {/* Phase Selector & View Mode Toolbar */}
+              <div className="bg-brand-dark border border-gray-800 rounded-xl p-4 sm:p-5 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                
+                {/* Left: Phase Switcher (Before / After) */}
+                <div className="bg-brand-darker border border-gray-800 rounded-lg p-1 flex items-center gap-1 self-start">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPhase('before')}
+                    className={`px-3.5 py-2 rounded-md text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+                      previewPhase === 'before'
+                        ? 'bg-brand-orange text-white shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Pre-Service (Before)</span>
+                    {submissionsState.before ? (
+                      <span className="w-2 h-2 rounded-full bg-green-400" title="Submitted" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-amber-400" title="Not submitted" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPhase('after')}
+                    className={`px-3.5 py-2 rounded-md text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+                      previewPhase === 'after'
+                        ? 'bg-brand-orange text-white shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Post-Service (After)</span>
+                    {submissionsState.after ? (
+                      <span className="w-2 h-2 rounded-full bg-green-400" title="Submitted" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-amber-400" title="Not submitted" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Right: View Mode Toggle & Action Buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {submissionsState[previewPhase] && (
+                    <div className="bg-brand-darker border border-gray-800 rounded-lg p-1 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('visual')}
+                        className={`px-3 py-1.5 rounded-md text-[11px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          viewMode === 'visual'
+                            ? 'bg-gray-700 text-white shadow'
+                            : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        Visual Checklist
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('pdf')}
+                        className={`px-3 py-1.5 rounded-md text-[11px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                          viewMode === 'pdf'
+                            ? 'bg-gray-700 text-white shadow'
+                            : 'text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        PDF Document
+                      </button>
+                    </div>
+                  )}
+
+                  {submissionsState[previewPhase] ? (
+                    <>
+                      <a
+                        href={`${BACKEND_URL}/api/public/checklist/pdf?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}&phase=${previewPhase}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 bg-brand-darker hover:bg-gray-800 border border-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-brand-orange" />
+                        <span>Open PDF</span>
+                      </a>
+                      <a
+                        href={`${BACKEND_URL}/api/public/checklist/pdf?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}&phase=${previewPhase}`}
+                        download={`1625_Autolab_${inquiry.referenceNumber || inquiry.id}_${previewPhase.toUpperCase()}_Checklist.pdf`}
+                        className="px-3.5 py-1.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Download PDF</span>
+                      </a>
+                    </>
+                  ) : (
+                    <a
+                      href={`/checklist?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Open Public Checklist to Complete</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Checklist Preview Body */}
+              {submissionsState[previewPhase] ? (() => {
+                const currentSub = submissionsState[previewPhase];
+                const currentPayload = currentSub.payload || {};
+
+                return viewMode === 'visual' ? (
+                  /* ── 1. NATIVE REACT VISUAL CHECKLIST PREVIEW ────────────── */
+                  <div className="bg-brand-dark border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+                    
+                    {/* Header Banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 font-mono text-[10px] font-bold text-brand-orange uppercase tracking-widest">
+                          <span>1625 AUTOLAB QUALITY CONTROL &amp; INSPECTION REPORT</span>
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-display font-black text-white uppercase tracking-tight">
+                          {previewPhase === 'before' ? 'Pre-Service Inspection (Before Work)' : 'Post-Service Inspection (After Work)'}
+                        </h2>
+                      </div>
+
+                      <div className="flex items-center gap-2 font-mono text-xs text-gray-400 bg-brand-darker border border-gray-800 px-3 py-1.5 rounded-lg shrink-0">
+                        <span>REF:</span>
+                        <strong className="text-brand-orange">{inquiry.referenceNumber || inquiry.id}</strong>
+                      </div>
+                    </div>
+
+                    {/* Customer & Vehicle Info Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-brand-darker border border-gray-800/80 p-4 rounded-xl text-xs font-mono">
+                      <div>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold block mb-0.5">Customer Name</span>
+                        <span className="text-white font-bold">{currentPayload.customerName || inquiry.fullName || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold block mb-0.5">Vehicle Details</span>
+                        <span className="text-gray-200">{currentPayload.vehicle || `${inquiry.make} ${inquiry.model} (${inquiry.year})`}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold block mb-0.5">Plate Number</span>
+                        <span className="text-brand-orange font-bold">{currentPayload.plateNumber || inquiry.plateNumber || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold block mb-0.5">Installer / Tech</span>
+                        <span className="text-white font-bold">{currentSub.installer_name || 'Shop Technician'}</span>
+                      </div>
+                    </div>
+
+                    {/* Service & Package Spec */}
+                    <div className="p-4 bg-gradient-to-r from-[#181818] via-brand-darker to-[#181818] border border-gray-800 rounded-xl space-y-1">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">Service &amp; Package Specification</span>
+                      <p className="text-sm font-display font-bold text-white uppercase">
+                        {currentPayload.serviceFieldValue || currentSub.service_title || inquiry.productToPurchase || 'Vehicle Service Package'}
+                      </p>
+                    </div>
+
+                    {/* Inspection Checklist Items Grid */}
+                    {Array.isArray(currentPayload.responses) && currentPayload.responses.length > 0 && (
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between font-mono text-xs border-b border-gray-800/80 pb-2">
+                          <span className="font-bold uppercase tracking-wider text-gray-300">Inspection Checklist Verification</span>
+                          <span className="text-gray-400">
+                            Passed: <strong className="text-green-400">{currentPayload.responses.filter((r: any) => r.isChecked).length}</strong> / {currentPayload.responses.length}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {currentPayload.responses.map((resp: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className={`p-3.5 rounded-xl border flex flex-col justify-between space-y-2 transition-all ${
+                                resp.isChecked
+                                  ? 'bg-brand-darker border-green-500/30 shadow-sm'
+                                  : 'bg-brand-darker/50 border-gray-800'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="text-xs font-semibold text-gray-200">
+                                  {resp.label}
+                                </span>
+                                {resp.isChecked ? (
+                                  <span className="text-[10px] font-mono font-bold uppercase text-green-400 bg-green-500/10 border border-green-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                                    <CheckCircle2 className="w-3 h-3" /> Pass
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-mono font-bold uppercase text-gray-500 bg-gray-800/80 px-2 py-0.5 rounded-full shrink-0">
+                                    Skipped
+                                  </span>
+                                )}
+                              </div>
+
+                              {resp.notes && (
+                                <p className="text-[11px] font-mono text-amber-300 bg-amber-950/20 border border-amber-500/20 p-2 rounded-lg">
+                                  <strong className="text-amber-400">Note:</strong> {resp.notes}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Post-Service Orientation Checks (if after phase) */}
+                    {previewPhase === 'after' && Array.isArray(currentPayload.orientationResponses) && currentPayload.orientationResponses.length > 0 && (
+                      <div className="space-y-3 pt-4 border-t border-gray-800">
+                        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-orange">
+                          Post-Service Orientation &amp; Customer Walkthrough
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+                          {['Orientation Completed', 'Functions Demonstrated', 'Customer Satisfaction'].map((title, idx) => {
+                            const isDone = Boolean(currentPayload.orientationResponses[idx]);
+                            return (
+                              <div key={idx} className="p-3 bg-brand-darker border border-gray-800 rounded-xl flex items-center justify-between">
+                                <span className="text-gray-300">{title}</span>
+                                <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${isDone ? 'text-green-400 bg-green-500/10 border border-green-500/30' : 'text-gray-500 bg-gray-800'}`}>
+                                  {isDone ? '✓ Verified' : 'Pending'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* General Technician Notes */}
+                    {currentSub.general_notes && (
+                      <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl space-y-1.5 font-mono text-xs">
+                        <span className="text-brand-orange font-bold uppercase text-[10px] tracking-wider block">Technician Final Notes</span>
+                        <p className="text-gray-300 leading-relaxed">{currentSub.general_notes}</p>
+                      </div>
+                    )}
+
+                    {/* Signature Block */}
+                    {currentSub.signature_data && (
+                      <div className="pt-4 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-6">
+                        <div className="space-y-1 text-xs font-mono">
+                          <span className="text-gray-400 uppercase font-bold block">Customer Acknowledgment &amp; Approval</span>
+                          <p className="text-gray-500 text-[11px] max-w-sm">
+                            Inspection verified and acknowledged by customer / representative.
+                          </p>
+                        </div>
+
+                        <div className="bg-brand-darker border border-gray-800 rounded-xl p-4 text-center space-y-2 w-full sm:w-64">
+                          <div className="h-20 flex items-center justify-center bg-black/40 rounded-lg p-2 border border-gray-800/80">
+                            <img
+                              src={currentSub.signature_data}
+                              alt="Customer Signature"
+                              className="max-h-full max-w-full object-contain filter drop-shadow-md"
+                            />
+                          </div>
+                          <div className="border-t border-gray-800 pt-1 text-[10px] font-mono text-gray-400 uppercase">
+                            Authorized Customer Signature
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                ) : (
+                  /* ── 2. EMBEDDED PDF DOCUMENT VIEW ───────────────────────── */
+                  <div className="bg-brand-dark border border-gray-800 rounded-xl overflow-hidden shadow-2xl space-y-0">
+                    <div className="bg-[#141414] px-4 py-2.5 border-b border-gray-800 flex items-center justify-between text-xs font-mono text-gray-400">
+                      <span className="flex items-center gap-2 text-white font-bold uppercase">
+                        <FileText className="w-4 h-4 text-brand-orange" />
+                        <span>Official PDF Document View — {previewPhase.toUpperCase()} INSPECTION</span>
+                      </span>
+                      <span className="text-[10px] text-brand-orange font-bold uppercase bg-brand-orange/10 border border-brand-orange/30 px-2 py-0.5 rounded">
+                        PDF Engine Render
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-[#1e1e1e] relative min-h-[650px] sm:min-h-[750px]">
+                      <iframe
+                        key={`${inquiry.referenceNumber || inquiry.id}-${previewPhase}`}
+                        src={`${BACKEND_URL}/api/public/checklist/pdf?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}&phase=${previewPhase}#toolbar=0&navpanes=0`}
+                        title={`Checklist PDF Preview - ${previewPhase}`}
+                        className="w-full h-[650px] sm:h-[750px] border-0 rounded-b-xl"
+                      />
+                    </div>
+                  </div>
+                );
+              })() : (
+                /* ── 3. NOT SUBMITTED YET WARNING CARD ───────────────────── */
+                <div className="bg-brand-dark border border-gray-800 rounded-xl p-10 text-center space-y-4 shadow-xl font-sans">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto text-amber-400">
+                    <AlertTriangle className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1 max-w-md mx-auto">
+                    <h3 className="text-base font-display font-bold text-white uppercase tracking-wider">
+                      {previewPhase === 'before' ? 'Pre-Service Inspection' : 'Post-Service Inspection'} Not Available Yet
+                    </h3>
+                    <p className="text-xs text-gray-400 leading-relaxed font-mono">
+                      No inspection submission was recorded for this inquiry phase yet. The technician or customer can complete the inspection on the shop tablet.
+                    </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <a
+                      href={`/checklist?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors shadow-lg cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Open Public Checklist to Complete</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
           {/* ── Tab Content: Activity Log ─────────────────────────── */}
           {activeTab === 'activity' && (
             <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-lg space-y-4">
@@ -1163,15 +1388,14 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
         {/* ── 8. Right Column: Workflow Control Panel (4 cols) ──────── */}
         <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
           <div className="bg-brand-dark border border-gray-800 p-6 rounded-xl shadow-xl space-y-6">
-            
+
             {/* Sidebar Header */}
             <div className="flex items-center justify-between border-b border-gray-800 pb-3">
               <h2 className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" /> Workflow Actions
+                <Wrench className="w-4 h-4" /> Workflow Actions
               </h2>
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                STATUS_BADGE_STYLE[inquiry.status] || 'bg-gray-800 text-gray-300'
-              }`}>
+              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${STATUS_BADGE_STYLE[inquiry.status] || 'bg-gray-800 text-gray-300'
+                }`}>
                 {formatStatus(inquiry.status)}
               </span>
             </div>
@@ -1209,18 +1433,16 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
 
                     return (
                       <div key={step.key} className="flex flex-col items-center text-center">
-                        <div className={`w-6 h-6 rounded-full font-mono text-[10px] font-bold flex items-center justify-center transition-all ${
-                          isCurrent
+                        <div className={`w-6 h-6 rounded-full font-mono text-[10px] font-bold flex items-center justify-center transition-all ${isCurrent
                             ? 'bg-brand-orange text-white ring-4 ring-brand-orange/30 shadow-lg scale-110'
                             : isDone
-                            ? 'bg-gray-700 text-green-400 border border-green-500/40'
-                            : 'bg-gray-800 text-gray-500 border border-gray-700'
-                        }`}>
+                              ? 'bg-gray-700 text-green-400 border border-green-500/40'
+                              : 'bg-gray-800 text-gray-500 border border-gray-700'
+                          }`}>
                           {isDone ? '✓' : idx + 1}
                         </div>
-                        <span className={`text-[8px] font-mono uppercase tracking-wider mt-2 ${
-                          isCurrent ? 'text-brand-orange font-bold' : isDone ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <span className={`text-[8px] font-mono uppercase tracking-wider mt-2 ${isCurrent ? 'text-brand-orange font-bold' : isDone ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
                           {step.label}
                         </span>
                       </div>
@@ -1286,78 +1508,33 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                 <div className="bg-brand-orange/10 border border-brand-orange/30 rounded-xl p-4 space-y-3">
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-brand-orange">Service In Progress</h3>
-                    <p className="text-xs text-gray-300 mt-1">Complete the pre-service inspection or mark the service as completed.</p>
+                    <p className="text-xs text-gray-300 mt-1">Installation or service work is currently in progress.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setActiveChecklistPhase('before')}
-                      className="py-2.5 px-3 bg-brand-dark border border-brand-orange/40 text-brand-orange hover:bg-brand-orange hover:text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <FileText className="w-3.5 h-3.5" /> Pre-Checklist
-                    </button>
-                    <button
-                      onClick={() => requestConfirmation(
-                        {
-                          title: 'Complete Service?',
-                          message: 'Mark this service as completed. You will then be able to fill out the final checklist.',
-                          confirmLabel: 'Mark Completed',
-                        },
-                        async () => {
-                          const success = await handleStatusChange('completed');
-                          if (success) setActiveChecklistPhase('after');
-                        }
-                      )}
-                      disabled={statusLoading}
-                      className="py-2.5 px-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                    >
-                      {statusLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
-                      Mark Done
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => requestConfirmation(
+                      {
+                        title: 'Complete Service?',
+                        message: 'Are you sure you want to mark this service as completed?',
+                        confirmLabel: 'Mark Completed',
+                      },
+                      async () => {
+                        await handleStatusChange('completed');
+                      }
+                    )}
+                    disabled={statusLoading}
+                    className="w-full py-2.5 px-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {statusLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BadgeCheck className="w-3.5 h-3.5" />}
+                    Mark Done
+                  </button>
                 </div>
               )}
 
               {inquiry.status === 'completed' && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-3">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service Completed</h3>
-                    <p className="text-xs text-gray-300 mt-1">
-                      {!isAfterSubmitted
-                        ? 'Complete the final checklist before sending the report to the customer.'
-                        : !isAfterSent
-                        ? 'Final checklist is ready. You can now send the report.'
-                        : 'Final report has been sent to client and shop owners.'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setActiveChecklistPhase('after')}
-                      className="w-full py-2.5 bg-brand-dark border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600 hover:text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <ClipboardList className="w-3.5 h-3.5" /> {isAfterSubmitted ? 'View Final Checklist' : 'Final Checklist'}
-                    </button>
-                    {isAfterSent ? (
-                      <button
-                        onClick={() => handleSendPdf('after')}
-                        disabled={!!sendPdfLoading}
-                        className="w-full py-2.5 bg-brand-dark border border-brand-orange/40 text-brand-orange hover:bg-orange-600 hover:text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                      >
-                        {sendPdfLoading === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                        Re-send Report
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleSendPdf('after')}
-                        disabled={!!sendPdfLoading}
-                        className="w-full py-2.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                      >
-                        {sendPdfLoading === 'after' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                        Send Report
-                      </button>
-                    )}
-                  </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service Completed</h3>
+                  <p className="text-xs text-gray-300">Service has been successfully completed.</p>
                 </div>
               )}
 
@@ -1392,29 +1569,20 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
 
               {/* Status Dropdown */}
               <div ref={statusDropdownRef} className="relative">
-                {isStatusLocked ? (
-                  <div className="w-full flex items-center justify-between bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-3 text-xs font-bold uppercase tracking-wider text-emerald-300">
-                    <span className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-emerald-400" /> Status Locked
-                    </span>
-                    <BadgeCheck className="w-4 h-4 text-emerald-400" />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                    disabled={statusLoading}
-                    className="w-full flex items-center justify-between bg-brand-darker border border-gray-800 hover:border-brand-orange/50 rounded-lg p-3 text-xs font-bold uppercase tracking-wider text-white transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-brand-orange" /> Change Status
-                    </span>
-                    {statusLoading ? (
-                      <Loader2 className="w-4 h-4 text-brand-orange animate-spin" />
-                    ) : (
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  disabled={statusLoading}
+                  className="w-full flex items-center justify-between bg-brand-darker border border-gray-800 hover:border-brand-orange/50 rounded-lg p-3 text-xs font-bold uppercase tracking-wider text-white transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-brand-orange" /> Change Status
+                  </span>
+                  {statusLoading ? (
+                    <Loader2 className="w-4 h-4 text-brand-orange animate-spin" />
+                  ) : (
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                  )}
+                </button>
 
                 {isStatusDropdownOpen && (
                   <div className="absolute bottom-full mb-2 inset-x-0 bg-brand-dark border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
@@ -1494,9 +1662,8 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
       {confirmDialog && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl border border-gray-700 bg-brand-dark p-6 shadow-2xl space-y-4">
-            <h3 className={`text-xs font-mono font-bold uppercase tracking-widest border-b border-gray-800 pb-2 ${
-              confirmDialog.tone === 'danger' ? 'text-red-400' : 'text-brand-orange'
-            }`}>
+            <h3 className={`text-xs font-mono font-bold uppercase tracking-widest border-b border-gray-800 pb-2 ${confirmDialog.tone === 'danger' ? 'text-red-400' : 'text-brand-orange'
+              }`}>
               Confirm Action
             </h3>
             <div>
@@ -1516,28 +1683,14 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                 type="button"
                 onClick={() => void runConfirmedAction()}
                 disabled={confirmBusy}
-                className={`px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-white disabled:opacity-40 transition-colors shadow-md cursor-pointer ${
-                  confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
-                }`}
+                className={`px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider text-white disabled:opacity-40 transition-colors shadow-md cursor-pointer ${confirmDialog.tone === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-brand-orange hover:bg-orange-600'
+                  }`}
               >
                 {confirmBusy ? 'Executing…' : confirmDialog.confirmLabel}
               </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* ── Installation Checklist Modal ──────────────────────────── */}
-      {activeChecklistPhase && token && (
-        <InquiryChecklistModal
-          inquiryId={inquiry.id}
-          initialPhase={activeChecklistPhase}
-          token={token}
-          onClose={() => setActiveChecklistPhase(null)}
-          onSaved={() => {
-            fetchData();
-          }}
-        />
       )}
 
     </div>

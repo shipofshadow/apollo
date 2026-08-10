@@ -24,8 +24,9 @@
     # Content-Type.
     Header always set X-Content-Type-Options "nosniff"
 
-    # Deny framing of this backend by any page (the backend serves only JSON).
-    Header always set X-Frame-Options "DENY"
+    # Remove X-Frame-Options completely across both Apache header tables
+    Header unset X-Frame-Options
+    Header always unset X-Frame-Options
 
     # Only send the origin (no path/query) in the Referer header on cross-origin
     # requests; send nothing when downgrading from HTTPS to HTTP.

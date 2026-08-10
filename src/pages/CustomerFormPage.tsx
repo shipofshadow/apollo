@@ -26,7 +26,7 @@ import {
   FaWrench,
   FaBell
 } from 'react-icons/fa';
-import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck, Copy } from 'lucide-react';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -113,6 +113,7 @@ export default function CustomerFormPage() {
   const [step, setStep] = useState(1);
   const [submittedData, setSubmittedData] = useState<typeof formData | null>(null);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [submittedRef, setSubmittedRef] = useState<string | null>(null);
   const { showToast } = useToast();
   const { user, token } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -303,6 +304,7 @@ export default function CustomerFormPage() {
 
       setSubmittedData({ ...formData });
       setSubmittedId(result?.inquiry?.id ?? null);
+      setSubmittedRef(result?.inquiry?.referenceNumber ?? result?.inquiry?.reference_number ?? null);
 
       setFormData(INITIAL_FORM_STATE);
       setSelectedDate(null);
@@ -1016,15 +1018,44 @@ export default function CustomerFormPage() {
               </p>
             </div>
 
+            {/* Reference Number Hero Banner */}
+            {submittedRef && (
+              <div className="bg-gradient-to-r from-brand-darker via-brand-dark to-brand-darker border-2 border-brand-orange/40 rounded-xl p-6 text-center space-y-3 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 px-3 py-1 bg-brand-orange text-black font-mono font-extrabold text-[10px] uppercase rounded-bl-lg">
+                  Official Reference
+                </div>
+                <p className="text-xs uppercase tracking-widest text-gray-400 font-bold">Inquiry Reference Number</p>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-2xl sm:text-3xl md:text-4xl font-mono font-extrabold text-brand-orange tracking-widest">
+                    {submittedRef}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(submittedRef);
+                      showToast('Reference Number copied to clipboard!', 'success');
+                    }}
+                    className="p-2.5 bg-brand-dark hover:bg-gray-800 border border-brand-orange/40 hover:border-brand-orange text-white rounded-lg transition-colors cursor-pointer"
+                    title="Copy Reference Number"
+                  >
+                    <Copy className="w-4 h-4 text-brand-orange" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 max-w-md mx-auto">
+                  Please save this reference number (<strong className="text-white font-mono">{submittedRef}</strong>) to track or reference your inquiry with 1625 Autolab support.
+                </p>
+              </div>
+            )}
+
             {/* Appointment Summary Card */}
             <div className="bg-brand-dark border border-gray-800 rounded-xl p-6 sm:p-8 text-left space-y-6 shadow-xl">
               <div className="flex items-center justify-between border-b border-gray-800 pb-4">
                 <h2 className="text-xs sm:text-sm font-bold uppercase tracking-widest text-white flex items-center gap-2">
                   <FaCalendarAlt className="text-brand-orange" /> Appointment Summary
                 </h2>
-                {submittedId && (
-                  <span className="text-[10px] font-mono uppercase bg-brand-darker border border-gray-800 text-gray-400 px-2.5 py-1 rounded">
-                    ID: {submittedId}
+                {(submittedRef || submittedId) && (
+                  <span className="text-[10px] font-mono uppercase bg-brand-darker border border-gray-800 text-brand-orange px-2.5 py-1 rounded font-bold">
+                    REF: {submittedRef || submittedId}
                   </span>
                 )}
               </div>

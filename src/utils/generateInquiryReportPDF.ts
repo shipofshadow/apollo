@@ -5,6 +5,7 @@ import type { SiteSettings } from '../types';
 
 type Inquiry = {
   id: string;
+  referenceNumber?: string;
   fullName: string;
   contactNumber: string;
   emailAddress: string;
@@ -120,7 +121,7 @@ export async function generateInquiryReportPDF(
     startY: y,
     margin: { left: 12, right: 12 },
     body: [
-      ['Inquiry ID', valueOrDash(inquiry.id)],
+      ['Reference Number', valueOrDash(inquiry.referenceNumber || inquiry.id)],
       ['Submitted Date', createdDate],
       ['Current Status', valueOrDash(inquiry.status).toUpperCase()],
     ],
@@ -220,5 +221,5 @@ export async function generateInquiryReportPDF(
     doc.text(`Generated: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`, 12, 285, { align: 'left' });
   }
 
-  doc.save(`inquiry-${inquiry.id.substring(0, 8) || 'report'}.pdf`);
+  doc.save(`inquiry-${inquiry.referenceNumber || inquiry.id.substring(0, 8) || 'report'}.pdf`);
 }

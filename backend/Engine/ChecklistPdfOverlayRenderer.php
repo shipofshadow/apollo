@@ -7,27 +7,30 @@ use setasign\Fpdi\Tcpdf\Fpdi;
 require_once __DIR__ . '/ChecklistPdfTemplates.php';
 
 /**
- * Renders a filled checklist PDF by importing the original flat PDF page as a
- * template (via FPDI) and drawing text + checkmarks on top of it at fixed
- * coordinates (via TCPDF), instead of rebuilding the document as HTML.
+ * Renders a filled checklist PDF by importing the original flat PDF template
+ * page via FPDI and drawing header text, checkmarks, and the signature on top.
  *
- * Requires: composer require setasign/fpdi setasign/fpdi-tcpdf tecnickcom/tcpdf
+ * All coordinates in the template config are in MILLIMETRES and are used
+ * directly with TCPDF (which operates in mm when the page unit is 'mm').
  */
 final class ChecklistPdfOverlayRenderer
 {
-    private const INK_COLOR = [30, 41, 59];   // #1e293b - matches the template's dark navy text
-    private const CHECK_COLOR = [249, 115, 22]; // #f97316 - brand orange, for checkmarks
+    /** Dark navy for body text */
+    private const INK       = [30, 41, 59];
+    /** Brand orange for checkmarks */
+    private const CHECK_INK = [249, 115, 22];
 
     /**
-     * @param array<string, mixed> $checklist Result of InquiryChecklistService::formatChecklistResponse()
-     * @param array<string, mixed> $inquiry   Row from customer_inquiries (array or mapped assoc array)
-     * @param array<string, mixed> $template  ChecklistPdfTemplates::forServiceTitle() result
-     * @return string Raw PDF bytes
+     * @param array<string, mixed> $payload  Decoded JSON payload from the frontend
+     * @param array<string, mixed> $template Template config from ChecklistPdfTemplates
+     * @return string Raw PDF binary string
      */
-    public function render(array $checklist, array $inquiry, array $template, ?array $beforeChecklist = null): string
+    public function renderPublicChecklist(array $payload, array $template): string
     {
-        if (!is_file($template['template_path'])) {
-            throw new RuntimeException("Checklist template PDF not found at: {$template['template_path']}");
+        $templatePath = $template['template_path'];
+
+        if (!is_file($templatePath)) {
+            throw new RuntimeException("Checklist template PDF not found: {$templatePath}");
         }
 
         $pdf = new Fpdi('P', 'mm', 'A4');
@@ -35,183 +38,299 @@ final class ChecklistPdfOverlayRenderer
         $pdf->SetMargins(0, 0, 0);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
+        $pdf->SetFont('helvetica', '', 9);
 
-        $pageCount = $pdf->setSourceFile($template['template_path']);
-        $templateId = $pdf->importPage(1);
-        $size = $pdf->getTemplateSize($templateId);
+        $pdf->setSourceFile($templatePath);
+        $tplId = $pdf->importPage(1);
+        $size  = $pdf->getTemplateSize($tplId);
 
         $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
-        $pdf->useTemplate($templateId, 0, 0, $size['width'], $size['height'], true);
+        $pdf->useTemplate($tplId, 0, 0, $size['width'], $size['height'], true);
 
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(...self::INK_COLOR);
+        // 1. Header fields
+        $this->drawHeader($pdf, $template, $payload);
 
-        $this->drawHeaderFields($pdf, $template, $checklist, $inquiry);
-
-        if ($checklist['phase'] === 'before') {
-            $this->drawBeforeTable($pdf, $template, $checklist);
-        } else {
-            // For after phase: draw the before section using before checklist data,
-            // then draw the after sections using the after checklist data.
-            if ($beforeChecklist !== null && isset($template['before'])) {
-                $this->drawBeforeTable($pdf, $template, $beforeChecklist);
-            }
-            $this->drawAfterSections($pdf, $template, $checklist);
+        // 2. Checklist items
+        if (!empty($template['checklist']) && !empty($payload['responses'])) {
+            $this->drawChecklistRows($pdf, $template['checklist'], $payload['responses']);
         }
 
-        if (!empty($checklist['customerAcknowledged'])) {
-            $this->drawAcknowledgement($pdf, $template);
+        // 3. Orientation items (after-phase templates)
+        if (!empty($template['orientation']) && !empty($payload['orientationResponses'])) {
+            $this->drawOrientationRows($pdf, $template['orientation'], $payload['orientationResponses']);
+        }
+
+        // 4. Additional notes text
+        $notesText = $this->str($payload, 'additionalNotes', 'additional_notes', 'notes');
+        if ($notesText !== '' && !empty($template['additional_notes'])) {
+            $this->drawAdditionalNotes($pdf, $template['additional_notes'], $notesText);
+        }
+
+        // 5. Customer signature image
+        if (!empty($payload['signature']) && !empty($template['signature'])) {
+            $this->drawSignature($pdf, $template['signature'], (string)$payload['signature']);
+        }
+
+        // 6. Signature date text
+        if (!empty($template['sig_date'])) {
+            $dateStr = $this->formatDate($this->str($payload, 'date'));
+            $this->drawSigDate($pdf, $template['sig_date'], $dateStr);
         }
 
         return $pdf->Output('', 'S');
     }
 
-    private function px(float $px): float
-    {
-        return ChecklistPdfTemplates::toMM($px);
-    }
+    // ─── Header ─────────────────────────────────────────────────────────────
 
-    /**
-     * @param array<string, mixed> $template
-     * @param array<string, mixed> $checklist
-     * @param array<string, mixed> $inquiry
-     */
-    private function drawHeaderFields(Fpdi $pdf, array $template, array $checklist, array $inquiry): void
+    private function drawHeader(Fpdi $pdf, array $template, array $payload): void
     {
         $fields = $template['header_fields'];
+        $pdf->SetTextColor(...self::INK);
+        $pdf->SetFont('helvetica', '', 9);
 
-        $customerName = (string) ($inquiry['fullName'] ?? $inquiry['full_name'] ?? '');
-        $vehicle = trim(
-            (string) ($inquiry['make'] ?? '') . ' ' .
-            (string) ($inquiry['model'] ?? '') . ' ' .
-            (string) ($inquiry['yearModel'] ?? $inquiry['year_model'] ?? '')
-        );
-        $plateNumber = (string) ($inquiry['plateNumber'] ?? $inquiry['plate_number'] ?? '');
-        $installerName = (string) ($checklist['installerName'] ?? '');
-        $serviceFieldValue = (string) ($checklist['serviceFieldValue'] ?? ''); // headlight setup / head unit model
-
-        // Use the appointment/booking date from the inquiry as the PDF date
-        $dateSource = $inquiry['appointment_date'] ?? $inquiry['created_at'] ?? $checklist['createdAt'] ?? null;
-        $date = $dateSource ? date('M j, Y', strtotime((string) $dateSource)) : date('M j, Y');
-
-
-        $this->text($pdf, $fields['customer_name'], $customerName);
-        $this->text($pdf, $fields['date'], $date);
-        $this->text($pdf, $fields['vehicle'], $vehicle);
-        $this->text($pdf, $fields['plate_number'], $plateNumber);
-        $this->text($pdf, $fields['service_field'], $serviceFieldValue);
-        $this->text($pdf, $fields['installer_name'], $installerName);
-    }
-
-    /**
-     * @param array{x:int,y:int} $pos px coordinates (baseline, left-aligned)
-     */
-    private function text(Fpdi $pdf, array $pos, string $value): void
-    {
-        if ($value === '') {
-            return;
+        $customerName  = $this->str($payload, 'customerName', 'fullName');
+        $date          = $this->formatDate($this->str($payload, 'date'));
+        $vehicle       = $this->str($payload, 'vehicle');
+        $plateNumber   = $this->str($payload, 'plateNumber');
+        $serviceObj = is_array($payload['service'] ?? null) ? $payload['service'] : [];
+        $serviceField  = $this->str($payload, 'serviceFieldValue', 'headUnitModel', 'headlightSetup', 'variationName', 'customVariation');
+        if ($serviceField === '' && !empty($serviceObj)) {
+            $serviceField = trim((string)($serviceObj['variationName'] ?? $serviceObj['customVariation'] ?? $serviceObj['serviceName'] ?? ''));
         }
-        // Available width to the right edge of the header box (~1150px) minus x.
-        $maxWidthPx = 1140 - $pos['x'];
-        $pdf->SetXY($this->px((float) $pos['x']), $this->px((float) $pos['y']) - 3.2);
-        $pdf->Cell($this->px((float) $maxWidthPx), 5, $value, 0, 0, 'L');
+        $installerName = $this->str($payload, 'installerName');
+
+        $this->cell($pdf, $fields['customer_name'],  $customerName);
+        $this->cell($pdf, $fields['date'],           $date);
+        $this->cell($pdf, $fields['vehicle'],        $vehicle);
+        $this->cell($pdf, $fields['plate_number'],   $plateNumber);
+        $this->cell($pdf, $fields['service_field'],  $serviceField);
+        $this->cell($pdf, $fields['installer_name'], $installerName);
     }
 
-    /**
-     * @param array<string, mixed> $template
-     * @param array<string, mixed> $checklist
-     */
-    private function drawBeforeTable(Fpdi $pdf, array $template, array $checklist): void
-    {
-        $cfg = $template['before'];
-        $rowsY = $cfg['rows_y'];
-        $boxSize = (float) $cfg['checkbox_size'];
-        $checkboxX = (float) $cfg['checkbox_x'];
-        $notesX = (float) $cfg['notes_x'];
+    // ─── Checklist rows ──────────────────────────────────────────────────────
 
-        $responses = $checklist['responses'];
+    private function drawChecklistRows(Fpdi $pdf, array $cfg, array $responses): void
+    {
+        $cbX    = (float)$cfg['checkbox_x'];
+        $cbSize = (float)$cfg['checkbox_size'];
+        $notesX = (float)$cfg['notes_x'];
+        $rowsY  = $cfg['rows_y'];
 
         foreach ($rowsY as $i => $yTop) {
             if (!isset($responses[$i])) {
                 continue;
             }
             $resp = $responses[$i];
-            $centerY = $yTop + $boxSize / 2;
+            $isChecked = is_array($resp)
+                ? (!empty($resp['isChecked']) || !empty($resp['checked']))
+                : (bool)$resp;
 
-            if (!empty($resp['isChecked'])) {
-                $this->drawCheckmark($pdf, $checkboxX, $yTop, $boxSize);
+            if ($isChecked) {
+                $this->drawCheckmark($pdf, $cbX, (float)$yTop, $cbSize);
             }
 
-            $notes = trim((string) ($resp['notes'] ?? ''));
+            $notes = is_array($resp) ? trim((string)($resp['notes'] ?? '')) : '';
             if ($notes !== '') {
+                $pdf->SetFont('helvetica', '', 7.5);
+                $pdf->SetTextColor(...self::INK);
+                $pdf->SetXY($notesX, (float)$yTop + 0.5);
+                $pdf->Cell(195 - $notesX, 4, $notes, 0, 0, 'L');
                 $pdf->SetFont('helvetica', '', 9);
-                $pdf->SetXY($this->px($notesX), $this->px($centerY) - 3);
-                $pdf->Cell($this->px(1149 - $notesX), 5, $notes, 0, 0, 'L');
-                $pdf->SetFont('helvetica', '', 10);
             }
         }
     }
 
-    /**
-     * @param array<string, mixed> $template
-     * @param array<string, mixed> $checklist
-     */
-    private function drawAfterSections(Fpdi $pdf, array $template, array $checklist): void
+    // ─── Orientation rows ────────────────────────────────────────────────────
+
+    private function drawOrientationRows(Fpdi $pdf, array $cfg, array $responses): void
     {
-        // Group responses by section (uppercased) to match the template keys.
-        $bySection = [];
-        foreach ($checklist['responses'] as $resp) {
-            $section = strtoupper((string)($resp['item']['section'] ?? ''));
-            $bySection[$section][] = $resp;
-        }
+        $cbX    = (float)$cfg['checkbox_x'];
+        $cbSize = (float)$cfg['checkbox_size'];
+        $rowsY  = $cfg['rows_y'];
 
-        foreach ($template['after_sections'] as $sectionKey => $cfg) {
-            $items = $bySection[strtoupper($sectionKey)] ?? [];
-            $boxSize = (float) $cfg['checkbox_size'];
-            $checkboxX = (float) $cfg['checkbox_x'];
-
-            foreach ($cfg['rows_y'] as $i => $yTop) {
-                if (!isset($items[$i])) {
-                    continue;
-                }
-                if (!empty($items[$i]['isChecked'])) {
-                    $this->drawCheckmark($pdf, $checkboxX, $yTop, $boxSize);
-                }
+        foreach ($rowsY as $i => $yTop) {
+            $isChecked = !empty($responses[$i]);
+            if ($isChecked) {
+                $this->drawCheckmark($pdf, $cbX, (float)$yTop, $cbSize);
             }
         }
     }
 
-    /**
-     * @param array<string, mixed> $template
-     */
-    private function drawAcknowledgement(Fpdi $pdf, array $template): void
+    // ─── Signature ───────────────────────────────────────────────────────────
+
+    private function drawSignature(Fpdi $pdf, array $cfg, string $dataUrl): void
     {
-        $cfg = $template['acknowledgement'];
-        $this->drawCheckmark($pdf, (float) $cfg['checkbox_x'], (float) $cfg['checkbox_y'], (float) $cfg['checkbox_size']);
+        if (!str_contains($dataUrl, 'data:image')) {
+            return;
+        }
+
+        $parts = explode(',', $dataUrl, 2);
+        if (count($parts) !== 2) {
+            return;
+        }
+
+        $rawImg = base64_decode($parts[1]);
+        if ($rawImg === false || strlen($rawImg) < 100) {
+            return;
+        }
+
+        try {
+            // Process signature via GD to make white/light background 100% transparent
+            if (function_exists('imagecreatefromstring')) {
+                $gdImg = @imagecreatefromstring($rawImg);
+                if ($gdImg !== false) {
+                    $width  = imagesx($gdImg);
+                    $height = imagesy($gdImg);
+
+                    $transparentImg = imagecreatetruecolor($width, $height);
+                    imagealphablending($transparentImg, false);
+                    imagesavealpha($transparentImg, true);
+
+                    $transColor = imagecolorallocatealpha($transparentImg, 0, 0, 0, 127);
+                    imagefill($transparentImg, 0, 0, $transColor);
+
+                    for ($x = 0; $x < $width; $x++) {
+                        for ($y = 0; $y < $height; $y++) {
+                            $rgba = imagecolorat($gdImg, $x, $y);
+                            $r = ($rgba >> 16) & 0xFF;
+                            $g = ($rgba >> 8) & 0xFF;
+                            $b = $rgba & 0xFF;
+                            $a = ($rgba >> 24) & 0x7F;
+
+                            // Convert white and light background pixels (R,G,B > 190) to 100% transparent
+                            if ($a > 100 || ($r > 190 && $g > 190 && $b > 190)) {
+                                imagesetpixel($transparentImg, $x, $y, $transColor);
+                            } else {
+                                $inkColor = imagecolorallocatealpha($transparentImg, $r, $g, $b, $a);
+                                imagesetpixel($transparentImg, $x, $y, $inkColor);
+                            }
+                        }
+                    }
+
+                    ob_start();
+                    imagepng($transparentImg);
+                    $processedPng = ob_get_clean();
+                    imagedestroy($gdImg);
+                    imagedestroy($transparentImg);
+
+                    if ($processedPng !== false && strlen($processedPng) > 100) {
+                        $rawImg = $processedPng;
+                    }
+                }
+            }
+
+            $pdf->Image(
+                '@' . $rawImg,
+                (float)$cfg['x'],
+                (float)$cfg['y'],
+                (float)$cfg['w'],
+                (float)$cfg['h'],
+                'PNG'
+            );
+        } catch (\Throwable $e) {
+            error_log('PDF signature embed failed: ' . $e->getMessage());
+        }
+    }
+
+    // ─── Additional Notes ────────────────────────────────────────────────────
+
+    private function drawAdditionalNotes(Fpdi $pdf, array $cfg, string $text): void
+    {
+        if (trim($text) === '') {
+            return;
+        }
+
+        $pdf->SetTextColor(...self::INK);
+        $pdf->SetFont('helvetica', '', 8);
+        $x = (float)$cfg['x'];
+        $y = (float)$cfg['y'];
+        $w = (float)($cfg['w'] ?? 180.0);  // default width spans most of the page
+        $h = (float)($cfg['h'] ?? 30.0);
+
+        $pdf->SetXY($x, $y);
+        $pdf->MultiCell($w, 4.5, $text, 0, 'L', false, 1, $x, $y, true, 0, false, true, $h, 'T');
+        $pdf->SetFont('helvetica', '', 9);
+    }
+
+    // ─── Signature Date ──────────────────────────────────────────────────────
+
+    private function drawSigDate(Fpdi $pdf, array $cfg, string $dateStr): void
+    {
+        if ($dateStr === '') {
+            return;
+        }
+
+        $pdf->SetTextColor(...self::INK);
+        $pdf->SetFont('helvetica', '', 9);
+        $x = (float)$cfg['x'];
+        $y = (float)$cfg['y'];
+        $w = (float)($cfg['w'] ?? 45.0);
+
+        $pdf->SetXY($x, $y);
+        $pdf->Cell($w, 4.5, $dateStr, 0, 0, 'C');
+    }
+
+    // ─── Drawing primitives ──────────────────────────────────────────────────
+
+    /**
+     * Write text into a field position defined by x, y, w in mm.
+     */
+    private function cell(Fpdi $pdf, array $pos, string $value): void
+    {
+        if ($value === '') {
+            return;
+        }
+        $pdf->SetXY((float)$pos['x'], (float)$pos['y']);
+        $pdf->Cell((float)$pos['w'], 4.5, $value, 0, 0, 'L');
     }
 
     /**
-     * Draws a simple two-stroke checkmark centered inside a checkbox square
-     * given in px (150dpi) coordinates: top-left x, top-left y, side length.
+     * Draw a checkmark (✓ shape) centred inside the given checkbox rectangle.
+     * All parameters are in mm.
      */
-    private function drawCheckmark(Fpdi $pdf, float $boxLeftPx, float $boxTopPx, float $sizePx): void
+    private function drawCheckmark(Fpdi $pdf, float $x, float $y, float $size): void
     {
-        $left = $this->px($boxLeftPx);
-        $top = $this->px($boxTopPx);
-        $size = $this->px($sizePx);
+        // Inset the checkmark slightly from the square edges
+        $inset = $size * 0.15;
 
-        // Tick proportions relative to the box, inset ~18% on each side.
-        $inset = $size * 0.18;
-        $x1 = $left + $inset;
-        $y1 = $top + $size * 0.55;
-        $x2 = $left + $size * 0.42;
-        $y2 = $top + $size - $inset;
-        $x3 = $left + $size - $inset;
-        $y3 = $top + $inset;
+        // Three points: left-mid, bottom-centre, top-right
+        $x1 = $x + $inset;
+        $y1 = $y + $size * 0.55;
 
-        $pdf->SetLineWidth(0.6);
-        $pdf->SetDrawColor(...self::CHECK_COLOR);
+        $x2 = $x + $size * 0.42;
+        $y2 = $y + $size - $inset;
+
+        $x3 = $x + $size - $inset;
+        $y3 = $y + $inset;
+
+        $pdf->SetDrawColor(...self::CHECK_INK);
+        $pdf->SetLineWidth(0.65);
         $pdf->Line($x1, $y1, $x2, $y2);
         $pdf->Line($x2, $y2, $x3, $y3);
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /** Get the first non-empty string from multiple payload keys. */
+    private function str(array $payload, string ...$keys): string
+    {
+        foreach ($keys as $k) {
+            $v = trim((string)($payload[$k] ?? ''));
+            if ($v !== '') {
+                return $v;
+            }
+        }
+        return '';
+    }
+
+    private function formatDate(string $date): string
+    {
+        if ($date === '') {
+            return date('M j, Y');
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return date('M j, Y', (int)strtotime($date));
+        }
+        return $date;
     }
 }

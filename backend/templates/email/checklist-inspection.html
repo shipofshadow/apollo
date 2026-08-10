@@ -1,0 +1,47 @@
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  
+  <!-- Header Title Banner -->
+  <div style="text-align:center;margin-bottom:24px;border-bottom:1px solid #1e293b;padding-bottom:16px;">
+    <span style="color:#ea580c;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:4px;">
+      1625 AUTOLAB QUALITY CONTROL &amp; INSPECTION REPORT
+    </span>
+    <h2 style="color:#f8fafc;font-size:20px;font-weight:800;text-transform:uppercase;margin:0;">
+      {{ phase_title }}
+    </h2>
+  </div>
+
+  <p style="margin:0 0 16px;color:#e2e8f0;font-size:15px;">
+    Hello <strong style="color:#ffffff;">{{ customer_name }}</strong>,
+  </p>
+
+  <p style="margin:0 0 20px;color:#94a3b8;font-size:14px;line-height:1.6;">
+    Attached is the official <strong style="color:#ea580c;">{{ phase_title }}</strong> inspection report for your vehicle.
+  </p>
+
+  <!-- Inspection Metadata Details Box -->
+  <div style="background-color:#1e293b;border-left:4px solid #ea580c;padding:18px 20px;margin:20px 0;border-radius:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;color:#cbd5e1;">
+      <tr>
+        <td style="padding:4px 0;width:140px;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Reference Number:</td>
+        <td style="padding:4px 0;color:#ea580c;font-weight:bold;font-family:monospace;">{{ reference_number }}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Service Package:</td>
+        <td style="padding:4px 0;color:#ffffff;font-weight:bold;">{{ service_title }}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Vehicle Details:</td>
+        <td style="padding:4px 0;color:#f1f5f9;">{{ vehicle }}</td>
+      </tr>
+      <tr>
+        <td style="padding:4px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Technician / Installer:</td>
+        <td style="padding:4px 0;color:#f1f5f9;">{{ installer }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <p style="margin:20px 0 0;font-size:13px;color:#64748b;line-height:1.5;">
+    Please review the attached PDF document(s) for complete item verification, technician notes, orientation checks, and authorized signature acknowledgment.
+  </p>
+
+</div>

@@ -1657,17 +1657,39 @@ class NotificationService
     /** @return string[] */
     private function adminRecipients(): array
     {
-        $parts = preg_split('/\s*,\s*/', (string) MAIL_ADMIN) ?: [];
         $emails = [];
+
+        // 1. MAIL_ADMIN from .env
+        $parts = preg_split('/\s*,\s*/', (string) MAIL_ADMIN) ?: [];
         foreach ($parts as $part) {
-            $email = trim($part);
-            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                continue;
+            $email = strtolower(trim($part));
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $emails[$email] = true;
             }
-            $emails[] = strtolower($email);
         }
 
-        return array_values(array_unique($emails));
+        // 2. DB accounts with role IN ('admin', 'owner', 'manager')
+        try {
+            if (DB_NAME !== '') {
+                $db = Database::getInstance();
+                $stmt = $db->query(
+                    "SELECT email FROM users
+                      WHERE role IN ('admin', 'owner', 'manager')
+                        AND is_active = 1
+                        AND email IS NOT NULL AND email != ''"
+                );
+                foreach ($stmt->fetchAll(\PDO::FETCH_COLUMN) as $dbEmail) {
+                    $dbEmail = strtolower(trim((string) $dbEmail));
+                    if ($dbEmail !== '' && filter_var($dbEmail, FILTER_VALIDATE_EMAIL)) {
+                        $emails[$dbEmail] = true;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[adminRecipients] DB query failed: ' . $e->getMessage());
+        }
+
+        return array_keys($emails);
     }
 
     private function smtpConfigured(): bool
@@ -1709,7 +1731,9 @@ class NotificationService
             $mail->Body    = $htmlBody;
             
             foreach ($attachments as $attachment) {
-                if (isset($attachment['path']) && file_exists($attachment['path'])) {
+                if (isset($attachment['data']) && isset($attachment['name'])) {
+                    $mail->addStringAttachment($attachment['data'], $attachment['name'], 'base64', 'application/pdf');
+                } elseif (isset($attachment['path']) && file_exists($attachment['path'])) {
                     $name = $attachment['name'] ?? basename($attachment['path']);
                     $mail->addAttachment($attachment['path'], $name);
                 }
@@ -1778,5 +1802,95 @@ class NotificationService
             'rawPlate'   => str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? '')),
             'rawOtherModel'=> str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? '')),
         ];
+    }
+
+    /**
+     * Send inspection checklist email with attached PDF report(s) to customer and admin(s).
+     * 
+     * @param array $payload Checklist payload data
+     * @param string $phase 'before', 'after', or 'final'
+     */
+    public function checklistInspectionNotification(array $payload, string $phase = 'before'): void
+    {
+        $customerEmail = strtolower(trim((string)($payload['customerEmail'] ?? $payload['customer']['email'] ?? '')));
+        $customerName  = trim((string)($payload['customerName']  ?? $payload['customer']['name']  ?? 'Valued Customer'));
+        $ref           = trim((string)($payload['referenceNumber'] ?? $payload['inquiryId'] ?? 'N/A'));
+        $vehicle       = trim((string)($payload['vehicle'] ?? ''));
+        $serviceTitle  = trim((string)($payload['serviceFieldValue'] ?? $payload['serviceTitle'] ?? '1625 AutoLab Service'));
+        $installer     = trim((string)($payload['installerName'] ?? 'Shop Technician'));
+
+        require_once __DIR__ . '/ChecklistPdfTemplates.php';
+        require_once __DIR__ . '/ChecklistPdfOverlayRenderer.php';
+
+        $attachments = [];
+        $serviceSlug = (string)($payload['serviceSlug'] ?? 'android-headunit');
+
+        if ($phase === 'before' || $phase === 'after') {
+            $template = ChecklistPdfTemplates::forServiceAndPhase($serviceSlug, $phase);
+            if ($template !== null) {
+                $renderer = new ChecklistPdfOverlayRenderer();
+                $pdfBinary = $renderer->renderPublicChecklist($payload, $template);
+                $phaseLabel = strtoupper($phase);
+                $attachments[] = [
+                    'data' => $pdfBinary,
+                    'name' => "1625_Autolab_{$ref}_{$phaseLabel}_Inspection.pdf",
+                ];
+            }
+        } elseif ($phase === 'final' || $phase === 'both') {
+            // Render BOTH before and after PDFs
+            $templateBefore = ChecklistPdfTemplates::forServiceAndPhase($serviceSlug, 'before');
+            if ($templateBefore !== null) {
+                $renderer = new ChecklistPdfOverlayRenderer();
+                $payloadBefore = $payload;
+                $payloadBefore['phase'] = 'before';
+                $payloadBefore['phaseSlug'] = 'before';
+                $pdfBefore = $renderer->renderPublicChecklist($payloadBefore, $templateBefore);
+                $attachments[] = [
+                    'data' => $pdfBefore,
+                    'name' => "1625_Autolab_{$ref}_BEFORE_Inspection.pdf",
+                ];
+            }
+
+            $templateAfter = ChecklistPdfTemplates::forServiceAndPhase($serviceSlug, 'after');
+            if ($templateAfter !== null) {
+                $renderer = new ChecklistPdfOverlayRenderer();
+                $payloadAfter = $payload;
+                $payloadAfter['phase'] = 'after';
+                $payloadAfter['phaseSlug'] = 'after';
+                $pdfAfter = $renderer->renderPublicChecklist($payloadAfter, $templateAfter);
+                $attachments[] = [
+                    'data' => $pdfAfter,
+                    'name' => "1625_Autolab_{$ref}_AFTER_Inspection.pdf",
+                ];
+            }
+        }
+
+        $phaseTitle = ($phase === 'before') 
+            ? 'Before Installation Checklist' 
+            : (($phase === 'after') ? 'After Installation Checklist' : 'Before/After Installation Checklist');
+
+        $subject = "1625 AutoLab - Inspection Report [REF: {$ref}] - {$phaseTitle}";
+
+        $htmlBody = $this->render('checklist-inspection', [
+            'phase_title'      => htmlspecialchars($phaseTitle),
+            'customer_name'    => htmlspecialchars($customerName),
+            'reference_number' => htmlspecialchars($ref),
+            'service_title'    => htmlspecialchars($serviceTitle),
+            'vehicle'          => htmlspecialchars($vehicle),
+            'installer'        => htmlspecialchars($installer),
+        ]);
+
+        // 1. Send to Customer if valid email exists
+        if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $this->send($customerEmail, $customerName, $subject, $htmlBody, $attachments);
+        }
+
+        // 2. Send to Owner / Admins (excluding customer email if customer is also an admin/owner/manager)
+        foreach ($this->adminRecipients() as $adminEmail) {
+            if ($customerEmail !== '' && strtolower(trim($adminEmail)) === $customerEmail) {
+                continue;
+            }
+            $this->send($adminEmail, '1625 AutoLab Admin', "[ADMIN COPY] " . $subject, $htmlBody, $attachments);
+        }
     }
 }

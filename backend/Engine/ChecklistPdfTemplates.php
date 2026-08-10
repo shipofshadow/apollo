@@ -3,231 +3,319 @@
 declare(strict_types=1);
 
 /**
- * Coordinate registry for the flat (non-fillable) 1625 Autolab checklist PDFs.
+ * Coordinate registry for the 1625 Autolab checklist PDF templates.
  *
- * IMPORTANT CONTEXT:
- * Both source PDFs (Headlight Retrofit, Android Head Unit) are single flattened
- * images with no real text/form layer (confirmed: 0 extractable chars, 1 image
- * per page). So there is nothing to "fill" via AcroForm fields - the only way to
- * put data on them is to overlay text/marks at fixed pixel coordinates on top of
- * the original page, which is what this file describes.
+ * IMPORTANT: All coordinate fields here are in MILLIMETRES (mm) because TCPDF/FPDI
+ * natively works in mm when the page unit is 'mm'. Previous versions stored px @150dpi
+ * which caused systematic offsets. All values in this file were measured directly
+ * from the template PDFs using a 5mm grid overlay probe, verified visually.
  *
- * All coordinates below were measured directly from the source PDFs by rendering
- * them at 150 DPI and detecting the underline positions (header fields) and
- * checkbox squares (body items) with OpenCV contour detection, then verified
- * visually. They are stored here in "px" at 150 DPI; toMM() converts to mm for
- * FPDI/TCPDF (which draws in mm on an A4 page: 210 x 297mm).
+ * A4 page = 210 × 297mm.
  *
- * Both templates are A4 portrait: 595.28 x 841.89 pt == 210 x 297mm.
+ * Coordinate system: (0,0) = top-left corner of the page.
+ * x increases to the right, y increases downward.
  */
 final class ChecklistPdfTemplates
 {
-    public const DPI = 150;
-
-    /** Convert a pixel measurement (at self::DPI) to millimeters. */
-    public static function toMM(float $px): float
-    {
-        return $px * (25.4 / self::DPI);
-    }
-
     /**
-     * Returns the template config array for a given service title, or null if
-     * no overlay template exists for it (caller should fall back to the
-     * generic mPDF HTML renderer in that case).
+     * Returns the template config array for a given service slug and phase.
+     * Coordinates are in MILLIMETRES, ready for TCPDF/FPDI Cell/Text calls.
      */
-    public static function forServiceTitle(string $serviceTitle): ?array
+    public static function forServiceAndPhase(string $serviceSlug, string $phase): ?array
     {
-        $t = strtolower($serviceTitle);
+        $s = strtolower($serviceSlug);
+        $p = strtolower($phase);
 
-        if (str_contains($t, 'headlight')) {
-            return self::headlightRetrofit();
+        if (str_contains($s, 'headlight') || str_contains($s, 'projector')) {
+            return $p === 'after' ? self::headlightAfter() : self::headlightBefore();
         }
 
-        if (str_contains($t, 'android') || str_contains($t, 'head unit')) {
-            return self::androidHeadUnit();
+        if (str_contains($s, 'android') || str_contains($s, 'headunit') || str_contains($s, 'head unit')) {
+            return $p === 'after' ? self::androidAfter() : self::androidBefore();
         }
 
         return null;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public static function headlightRetrofit(): array
+    // ─── Android Head Unit — BEFORE ──────────────────────────────────────────
+
+    public static function androidBefore(): array
     {
         return [
-            'key' => 'headlight_retrofit',
+            'key'          => 'android_head_unit_before',
+            'template_path' => __DIR__ . '/../templates/checklist/1625_Autolab_Android_Headunit_Before_Installation_Checklist.pdf',
+            'service_field_label' => 'headUnitModel',
+            'phase'        => 'before',
 
-            // Path to the blank source PDF on disk. Adjust to your actual storage path.
-            'template_path' => __DIR__ . '/../templates/checklist/1625_Autolab_Headlight_Retrofit_Checklist.pdf',
-
-            // Label shown in the "vehicle/service field" line (row 3, left column).
-            // For this template that's "Headlight Setup:".
-            'service_field_label' => 'headlightSetup',
-
-            // Header text fields. x/y are the TEXT BASELINE position in px (150dpi),
-            // i.e. where drawing should start, just above the printed underline.
+            // Header text fields – (x, y) = top-left where TCPDF Cell starts.
+            // y should sit just above the underline printed in the template.
+            // Measured using 5mm grid overlay probe (probe2_android_before.pdf).
             'header_fields' => [
-                'customer_name'   => ['x' => 282, 'y' => 234],
-                'date'            => ['x' => 756, 'y' => 234],
-                'vehicle'         => ['x' => 203, 'y' => 279],
-                'plate_number'    => ['x' => 839, 'y' => 279],
-                'service_field'   => ['x' => 282, 'y' => 325], // Headlight Setup
-                'installer_name'  => ['x' => 839, 'y' => 325],
+                // Row 1: Customer Name | Date  (underline at y≈43mm, text at y=40.5mm)
+                'customer_name'  => ['x' => 50.0, 'y' => 41.5, 'w' => 88.0],
+                'date'           => ['x' => 145.0, 'y' => 41.5, 'w' => 26.0],
+                // Row 2: Vehicle | Plate Number  (underline at y≈49mm, text at y=47mm)
+                'vehicle'        => ['x' => 50.0, 'y' => 51.5, 'w' => 95.0],
+                'plate_number'   => ['x' => 145.0, 'y' => 51.5, 'w' => 45.0],
+                // Row 3: Head Unit Model | Installer Name  (underline at y≈57mm, text at y=56.5mm)
+                'service_field'  => ['x' => 50.0, 'y' => 60.5, 'w' => 90.0],
+                'installer_name' => ['x' => 145.0, 'y' => 60.5, 'w' => 45.0],
             ],
 
-            // BEFORE INSTALLATION table. One row per service_checklist_items row
-            // (phase=before) in sort_order. Checkbox box size + notes column start x.
-            'before' => [
-                'checkbox_size' => 21,
-                'checkbox_x'    => 588, // left edge of checkbox square
-                'notes_x'       => 694,
-                // y = TOP edge of each checkbox square, in row order
-                'rows_y' => [464, 511, 556, 602, 647, 693, 739, 784, 830, 876, 921],
-                // Reference labels in PDF order (for sanity-checking DB item order;
-                // not required to match exactly, but count + order should).
-                'labels' => [
-                    'Low Beam', 'High Beam', 'Parklight', 'No Dashboard Error',
-                    'Left Turn Signal', 'Right Turn Signal', 'Foglights (if equipped)',
-                    'DRL (if equipped)', 'Hazzard Lights',
-                    'No Bumper and Headlight scratches', 'Complete Screws',
-                ],
-            ],
-
-            // AFTER INSTALLATION table, grouped into named sections/columns.
-            // Section key MUST match the `section` column value stored on
-            // service_checklist_items for phase=after.
-            'after_sections' => [
-                'FUNCTION CHECK' => [
-                    'checkbox_size' => 16,
-                    'checkbox_x'    => 104,
-                    'rows_y' => [1089, 1112, 1135, 1157, 1180, 1203, 1226, 1248],
-                    'labels' => [
-                        'Low Beam is working properly.', 'High Beam is working properly.',
-                        'Left Turn Signal is working.', 'Right Turn Signal is working.',
-                        'Parklight is working.', 'Foglights (if equipped) are working.',
-                        'DRL (if equipped) is working.', 'Hazzard Lights are working.',
-                    ],
-                ],
-                'VEHICLE CHECK' => [
-                    'checkbox_size' => 16,
-                    'checkbox_x'    => 104,
-                    'rows_y' => [1310, 1330, 1350, 1387],
-                    'labels' => [
-                        'No dashboard warning lights.', 'Headlights are securely installed.',
-                        'Front bumper and panels are properly reinstalled.',
-                        'Vehicle is free from any installation-related damage.',
-                    ],
-                ],
-                'ALIGNMENT & CONDITION' => [
-                    'checkbox_size' => 18,
-                    'checkbox_x'    => 478,
-                    'rows_y' => [1090, 1154, 1244, 1311],
-                    'labels' => [
-                        'Headlights are properly aimed and even.',
-                        'No visible moisture or condensation inside the headlights.',
-                        'Lenses are clean and free from scratches.',
-                        'No loose wiring or exposed connectors.',
-                    ],
-                ],
-                'EXPLANATION & DOCUMENTS' => [
-                    'checkbox_size' => 18,
-                    'checkbox_x'    => 827,
-                    'rows_y' => [1092, 1161, 1214, 1269],
-                    'labels' => [
-                        'Retrofit operation and features explained.',
-                        'Care instructions explained.',
-                        'Warranty document provided.',
-                        'Questions answered.',
-                    ],
+            // Checklist item rows (BEFORE table).
+            // checkbox_x = left edge of the checkbox square (mm).
+            // checkbox_size = square side length (mm).
+            // rows_y = top edge of each checkbox square, in row order (mm).
+            // notes_x = x position for optional row note text (mm).
+            'checklist' => [
+                'checkbox_x'    => 130,
+                'checkbox_size' => 4.5,
+                'notes_x'       => 145.0,
+                'rows_y' => [
+                    91.3,   // #1  Factory Radio / Head Unit Functioning
+                    100.6,   // #2  Steering Wheel Controls (if equipped)
+                    110.3,   // #3  Reverse Camera (if equipped)
+                    119.6,  // #4  Factory USB Port (if equipped)
+                    128.2,  // #5  Dashboard Warning Lights
+                    137.5,  // #6  Front & Rear Speakers
+                    147.1,   // #7  Wirings are in Good Setup/Condition
+                    155.4,   // #8  No Scratches on Dashboard/Trim Panels
+                    164.4,  // #9  All Dashboard Clips & Screws Complete
                 ],
             ],
 
-            // "I have inspected my vehicle..." checkbox.
-            'acknowledgement' => [
-                'checkbox_size' => 18,
-                'checkbox_x'    => 108,
-                'checkbox_y'    => 1618,
+            'additional_notes' => [
+                'x' => 15,
+                'y' => 188
+            ],
+
+            // Customer signature and date placement.
+            'signature' => [
+                'x' => 13.0,
+                'y' => 227.0,
+                'w' => 128.0,
+                'h' => 14.0,
+            ],
+            'sig_date' => [
+                'x' => 135.0,
+                'y' => 230.0,
+                'w' => 45.0,
+                'h' => 14.0,
             ],
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public static function androidHeadUnit(): array
+    // ─── Android Head Unit — AFTER ───────────────────────────────────────────
+
+    public static function androidAfter(): array
     {
         return [
-            'key' => 'android_head_unit',
-
-            'template_path' => __DIR__ . '/../templates/checklist/1625_Autolab_Android_Head_Unit_Installation_Checklist_v2(1).pdf',
-
+            'key'          => 'android_head_unit_after',
+            'template_path' => __DIR__ . '/../templates/checklist/1625_Autolab_Android_Headunit_After_Installation_Checklist.pdf',
             'service_field_label' => 'headUnitModel',
+            'phase'        => 'after',
+
+             'header_fields' => [
+                // Row 1: Customer Name | Date  (underline at y≈43mm, text at y=40.5mm)
+                'customer_name'  => ['x' => 50.0, 'y' => 34.5, 'w' => 88.0],
+                'date'           => ['x' => 145.0, 'y' => 34.5, 'w' => 26.0],
+                // Row 2: Vehicle | Plate Number  (underline at y≈49mm, text at y=47mm)
+                'vehicle'        => ['x' => 50.0, 'y' => 43.5, 'w' => 95.0],
+                'plate_number'   => ['x' => 145.0, 'y' => 43.5, 'w' => 45.0],
+                // Row 3: Head Unit Model | Installer Name  (underline at y≈57mm, text at y=56.5mm)
+                'service_field'  => ['x' => 50.0, 'y' => 50.5, 'w' => 90.0],
+                'installer_name' => ['x' => 145.0, 'y' => 50.5, 'w' => 45.0],
+            ],
+
+            // After checklist: 16 function/vehicle check items in a combined table.
+            // Items appear in a single list in the CHECK column (x≈119mm).
+            'checklist' => [
+                'checkbox_x'    => 129.5,
+                'checkbox_size' => 4.5,
+                'notes_x'       => 142.0,
+                'rows_y' => [
+                    75.3,   // #1  Android Head Unit Powers ON Properly
+                    82.4,   // #2  Touchscreen Responds Correctly
+                    90.2,   // #3  FM/AM Radio Working
+                    96.3,   // #4  Wi-Fi Connection Working
+                    103.2,  // #5  Apple CarPlay/Android Auto Working
+                    109.5,  // #6  GPS Navigation Working
+                    116.6,  // #7  USB Ports Working
+                    123.7,  // #8  Steering Wheel Controls (if equipped)
+                    130.8,  // #9  All Cameras Working Properly
+                    136.3,  // #10 All Speakers Producing Sound
+                    143.0,  // #11 Equalizer / Audio Settings Verified
+                    149.0,  // #12 No Dashboard Warning Lights
+                    157.2,  // #13 No Loose Trim or Rattling
+                    163.3,  // #14 No Exposed Wiring
+                    170.4,  // #15 Vehicle Starts Normally
+                    177.5,  // #16 Interior is Clean After Installation
+                ],
+            ],
+
+            // Customer orientation checkboxes (left section, below table).
+            // Orientation section header appears at y≈191mm.
+            'orientation' => [
+                'checkbox_x'    => 18.0,
+                'checkbox_size' => 4.0,
+                'rows_y' => [
+                    193.5,  // O#1 Basic operation demonstrated
+                    200.5,  // O#2 Customer's phone connected
+                    205.5,  // O#3 Apple CarPlay/Android Auto connected
+                    214.5,  // O#4 All cameras demonstrated
+                    220.5,  // O#5 Warranty explained
+                    226.5,  // O#6 Questions answered
+                ],
+            ],
+
+            'signature' => [
+                'x' => 13.0,
+                'y' => 253.0,
+                'w' => 128.0,
+                'h' => 13.0,
+            ],
+            'sig_date' => [
+                'x' => 130.0,
+                'y' => 253.0,
+                'w' => 45.0,
+                'h' => 13.0,
+            ],
+        ];
+    }
+
+    // ─── Projector Headlight — BEFORE ────────────────────────────────────────
+
+    public static function headlightBefore(): array
+    {
+        return [
+            'key'          => 'projector_headlight_before',
+            'template_path' => __DIR__ . '/../templates/checklist/1625_Autolab_Projector_Headlight_Before_Installation_Checklist_With_Logo.pdf',
+            'service_field_label' => 'headlightSetup',
+            'phase'        => 'before',
 
             'header_fields' => [
-                'customer_name'   => ['x' => 275, 'y' => 230],
-                'date'            => ['x' => 746, 'y' => 230],
-                'vehicle'         => ['x' => 193, 'y' => 276],
-                'plate_number'    => ['x' => 828, 'y' => 276],
-                'service_field'   => ['x' => 275, 'y' => 325], // Head Unit Model
-                'installer_name'  => ['x' => 828, 'y' => 325],
+                // Row 1: Customer Name | Date  (underline at y≈43mm, text at y=40.5mm)
+                'customer_name'  => ['x' => 50.0, 'y' => 41.5, 'w' => 88.0],
+                'date'           => ['x' => 145.0, 'y' => 41.5, 'w' => 26.0],
+                // Row 2: Vehicle | Plate Number  (underline at y≈49mm, text at y=47mm)
+                'vehicle'        => ['x' => 50.0, 'y' => 51.5, 'w' => 95.0],
+                'plate_number'   => ['x' => 145.0, 'y' => 51.5, 'w' => 45.0],
+                // Row 3: Head Unit Model | Installer Name  (underline at y≈57mm, text at y=56.5mm)
+                'service_field'  => ['x' => 50.0, 'y' => 60.5, 'w' => 90.0],
+                'installer_name' => ['x' => 145.0, 'y' => 60.5, 'w' => 45.0],
             ],
-
-            'before' => [
-                'checkbox_size' => 20,
-                'checkbox_x'    => 588,
-                'notes_x'       => 694,
-                'rows_y' => [479, 528, 578, 628, 678, 728, 778, 828, 878],
-                'labels' => [
-                    'Radio is functioning', 'Steering Wheel Controls (if equipped)',
-                    'Reverse Camera (if equipped)', 'Factory USB Port (if equipped)',
-                    'Dashboard Warning Lights', 'Speakers (Front & Rear)',
-                    'Wirings are in good setup/condition',
-                    'No scratches on dashboard/trim panels',
-                    'All dashboard clips & screws complete',
-                ],
-            ],
-
-            'after_sections' => [
-                'FUNCTION CHECK' => [
-                    'checkbox_size' => 18,
-                    'checkbox_x'    => 98,
-                    'rows_y' => [1057, 1087, 1116, 1145, 1174, 1204, 1232, 1261, 1289, 1340, 1369],
-                    'labels' => [
-                        'Android Head Unit powers ON properly', 'Touchscreen responds correctly',
-                        'FM/AM Radio working', 'Wi-Fi connection working',
-                        'Apple CarPlay/Android Auto working', 'GPS Navigation working',
-                        'USB ports working', 'Steering Wheel Controls working (if equipped)',
-                        'All Camera (Front, Rear, Left and Right) are working properly',
-                        'All speakers producing sound', 'Equalizer / Audio settings verified',
-                    ],
-                ],
-                'VEHICLE CHECK' => [
-                    'checkbox_size' => 18,
-                    'checkbox_x'    => 491,
-                    'rows_y' => [1058, 1106, 1157, 1208, 1260, 1311],
-                    'labels' => [
-                        'Dashboard panels properly reinstalled', 'No dashboard warning lights',
-                        'No loose trim or rattling', 'No exposed wiring',
-                        'Vehicle starts normally', 'Interior is clean after installation',
-                    ],
-                ],
-                'CUSTOMER ORIENTATION' => [
-                    'checkbox_size' => 18,
-                    'checkbox_x'    => 827,
-                    'rows_y' => [1058, 1106, 1175, 1247, 1295, 1344],
-                    'labels' => [
-                        'Demonstrated basic operation', "Connected customer's Bluetooth phone",
-                        'Apple CarPlay/Android Auto connected', 'Demonstrated all cameras',
-                        'Warranty explained', 'Questions answered',
-                    ],
+            'checklist' => [
+                'checkbox_x'    => 130.5,
+                'checkbox_size' => 4.5,
+                'notes_x'       => 147.0,
+                'rows_y' => [
+                    91.3,   // #1  Low Beam Functionality
+                    99.6,   // #2  High Beam Functionality
+                    107.9,   // #3  Left Turn Signal
+                    116.2,  // #4  Right Turn Signal
+                    124.5,  // #5  Parking Lights
+                    132.8,  // #6  DRL (if equipped)
+                    141.1,  // #7  Foglights (if equipped)
+                    149.4,  // #8  Hazard Lights
+                    157.7,  // #9  No Dashboard Error
+                    166.0,  // #10 No Scratches on Headlight/Bumper/Panel
+                    174.3,  // #11 Headlight Fitment/Condition
+                    182.6,  // #12 Complete Screws & Clips
+                    190.9,  // #13 Wirings are in Good Setup/Condition
                 ],
             ],
 
-            'acknowledgement' => [
-                'checkbox_size' => 20,
-                'checkbox_x'    => 101,
-                'checkbox_y'    => 1615,
+             'additional_notes' => [
+                'x' => 15,
+                'y' => 215
+            ],
+
+
+            'signature' => [
+                'x' => 13.0,
+                'y' => 255.0,
+                'w' => 128.0,
+                'h' => 14.0,
+            ],
+            'sig_date' => [
+                'x' => 130.0,
+                'y' => 255.0,
+                'w' => 45.0,
+                'h' => 14.0,
+            ],
+        ];
+    }
+
+    // ─── Projector Headlight — AFTER ─────────────────────────────────────────
+
+    public static function headlightAfter(): array
+    {
+        return [
+            'key'          => 'projector_headlight_after',
+            'template_path' => __DIR__ . '/../templates/checklist/1625_Autolab_Projector_Headlight_After_Installation_Checklist.pdf',
+            'service_field_label' => 'headlightSetup',
+            'phase'        => 'after',
+
+            'header_fields' => [
+                // Row 1: Customer Name | Date  (underline at y≈43mm, text at y=40.5mm)
+                'customer_name'  => ['x' => 50.0, 'y' => 34.5, 'w' => 88.0],
+                'date'           => ['x' => 145.0, 'y' => 34.5, 'w' => 26.0],
+                // Row 2: Vehicle | Plate Number  (underline at y≈49mm, text at y=47mm)
+                'vehicle'        => ['x' => 50.0, 'y' => 43.5, 'w' => 95.0],
+                'plate_number'   => ['x' => 145.0, 'y' => 43.5, 'w' => 45.0],
+                // Row 3: Head Unit Model | Installer Name  (underline at y≈57mm, text at y=56.5mm)
+                'service_field'  => ['x' => 50.0, 'y' => 50.5, 'w' => 90.0],
+                'installer_name' => ['x' => 145.0, 'y' => 50.5, 'w' => 45.0],
+            ],
+
+
+            'checklist' => [  
+                'checkbox_x'    => 129.5,
+                'checkbox_size' => 4.5,
+                'notes_x'       => 142.0,
+                'rows_y' => [
+                    75.3,   // #1  Low Beam Functioning
+                    82.4,   // #2  High Beam Functioning
+                    90.2,   // #3  Left Turn Signal Functioning
+                    96.3,   // #4  Right Turn Signal Functioning
+                    103.2,  // #5  Parking Lights Functioning
+                    109.5,  // #6  DRL Functioning (if equipped)
+                    116.6,  // #7  Foglights Functioning (if equipped)
+                    123.7,  // #8  Hazard Lights Functioning
+                    130.8,  // #9  No Dashboard Error
+                    136.3,  // #10 Projector Alignment Verified
+                    143.0,  // #11 Headlight Fitment & Gaps Verified
+                    149.0,  // #12 Bumper & Headlight Properly Reinstalled
+                    157.2,  // #13 All Screws & Clips Complete
+                    163.3,  // #14 Wiring Properly Secured
+                    170.4,  // #15 No Exposed or Loose Wiring
+                    177.5,  // #16 Headlight & Bumper Free From New Scratches
+                ],
+            ],
+
+            'orientation' => [
+                'checkbox_x'    => 18.0,
+                'checkbox_size' => 4.0,
+                'rows_y' => [
+                    194.5,  // O#1 Headlight functions demonstrated
+                    203,  // O#2 High/low beam operation explained
+                    209.5,  // O#3 Customer inspected completed installation
+                    216.5,  // O#4 Warranty coverage explained
+                    224.5,  // O#5 Customer questions answered
+                ],
+            ],
+
+            'signature' => [
+                'x' => 13.0,
+                'y' => 255.0,
+                'w' => 128.0,
+                'h' => 13.0,
+            ],
+            'sig_date' => [
+                'x' => 130.0,
+                'y' => 255.0,
+                'w' => 45.0,
+                'h' => 13.0,
             ],
         ];
     }

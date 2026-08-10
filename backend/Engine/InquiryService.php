@@ -17,6 +17,7 @@ class InquiryService
     {
         $this->useDb = DB_NAME !== '';
         $this->activity = new InquiryActivityService();
+        $this->ensureReferenceNumbers();
     }
 
     /**
@@ -37,8 +38,11 @@ class InquiryService
         if ($serviceId === null && !empty($normalized['productToPurchase']) && $this->useDb) {
             try {
                 $db = Database::getInstance();
-                $stmtService = $db->prepare('SELECT id FROM services WHERE LOWER(:prod) LIKE CONCAT("%", LOWER(title), "%") OR LOWER(title) LIKE CONCAT("%", LOWER(:prod), "%") LIMIT 1');
-                $stmtService->execute([':prod' => trim($normalized['productToPurchase'])]);
+                $stmtService = $db->prepare('SELECT id FROM services WHERE LOWER(:prod1) LIKE CONCAT("%", LOWER(title), "%") OR LOWER(title) LIKE CONCAT("%", LOWER(:prod2), "%") LIMIT 1');
+                $stmtService->execute([
+                    ':prod1' => trim($normalized['productToPurchase']),
+                    ':prod2' => trim($normalized['productToPurchase']),
+                ]);
                 if ($rowSvc = $stmtService->fetch(PDO::FETCH_ASSOC)) {
                     $serviceId = (int)$rowSvc['id'];
                 }
@@ -47,8 +51,11 @@ class InquiryService
             }
         }
 
+        $refNum = $this->generateReferenceNumber($normalized['appointmentDate']);
         $inquiry = [
             'id' => $this->uuid(),
+            'referenceNumber' => $refNum,
+            'reference_number' => $refNum,
             'user_id' => $data['userId'] ?? null,
             'service_id' => $serviceId,
             'fullName' => $normalized['fullName'],
@@ -107,7 +114,7 @@ class InquiryService
         }
         $db = Database::getInstance();
         $stmt = $db->prepare(
-                'SELECT id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
@@ -262,12 +269,6 @@ class InquiryService
                 ':service_id' => $serviceId,
                 ':id'         => $id,
             ]);
-
-            // Clear unsubmitted draft checklists so they re-sync with the new service template
-            $stmtDelChecklists = $db->prepare(
-                'DELETE FROM inquiry_checklists WHERE inquiry_id = :id AND submitted_at IS NULL'
-            );
-            $stmtDelChecklists->execute([':id' => $id]);
 
             if ($stmt->rowCount() === 0) {
                 // If it didn't change, we still return the full object
@@ -552,11 +553,11 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO customer_inquiries (
-                id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, created_at, updated_at
             ) VALUES (
-                :id, :user_id, :service_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
+                :id, :reference_number, :user_id, :service_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
                 :make, :model, :year_model, :product_to_purchase, :appointment_date,
                 :appointment_time, :status, :created_at, :updated_at
             )'
@@ -564,6 +565,7 @@ class InquiryService
 
         $stmt->execute([
             ':id' => (string) $inquiry['id'],
+            ':reference_number' => (string) ($inquiry['referenceNumber'] ?? $inquiry['reference_number'] ?? ''),
             ':user_id' => $inquiry['user_id'] ? (string) $inquiry['user_id'] : null,
             ':service_id' => $inquiry['service_id'] ?? null,
             ':full_name' => (string) $inquiry['fullName'],
@@ -700,7 +702,7 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->query(
-                'SELECT id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
@@ -731,6 +733,11 @@ class InquiryService
         if ($appointmentDate !== null) {
             $fields[] = 'appointment_date = :appointment_date';
             $params[':appointment_date'] = $appointmentDate;
+
+            // Update reference number to reflect rescheduled appointment date (1625_DDMM_0000)
+            $newRef = $this->generateReferenceNumber($appointmentDate);
+            $fields[] = 'reference_number = :new_reference_number';
+            $params[':new_reference_number'] = $newRef;
         }
 
         if ($appointmentTime !== null) {
@@ -772,14 +779,14 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            'SELECT id, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+            'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, internal_notes, created_at
              FROM customer_inquiries
-             WHERE id = :id
+             WHERE id = :id OR reference_number = :ref
              LIMIT 1'
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([':id' => $id, ':ref' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $this->mapDbRow($row);
     }
@@ -792,6 +799,7 @@ class InquiryService
     {
         return [
             'id' => (string) ($row['id'] ?? ''),
+            'referenceNumber' => (string) ($row['reference_number'] ?? ''),
             'userId' => $row['user_id'] ? (string) $row['user_id'] : null,
             'serviceId' => isset($row['service_id']) && $row['service_id'] !== null ? (int) $row['service_id'] : null,
             'fullName' => (string) ($row['full_name'] ?? ''),
@@ -810,6 +818,80 @@ class InquiryService
             'internalNotes' => $row['internal_notes'] ?? null,
             'createdAt' => (string) ($row['created_at'] ?? ''),
         ];
+    }
+
+    public function generateReferenceNumber(?string $appointmentDate = null): string
+    {
+        $dd = date('d');
+        $mm = date('m');
+        $yy = date('y');
+        if ($appointmentDate !== null && trim($appointmentDate) !== '') {
+            $ts = strtotime($appointmentDate);
+            if ($ts !== false) {
+                $dd = date('d', $ts);
+                $mm = date('m', $ts);
+                $yy = date('y', $ts);
+            }
+        }
+        $prefix = "1625_{$dd}{$mm}{$yy}_";
+
+        $nextSeq = 1;
+        if ($this->useDb) {
+            $db = Database::getInstance();
+            $stmt = $db->prepare('SELECT reference_number FROM customer_inquiries WHERE reference_number LIKE :prefix ORDER BY reference_number DESC LIMIT 1');
+            $stmt->execute([':prefix' => $prefix . '%']);
+            $lastRef = $stmt->fetchColumn();
+            if ($lastRef) {
+                $parts = explode('_', (string) $lastRef);
+                $lastSeq = (int) end($parts);
+                $nextSeq = $lastSeq + 1;
+            }
+        } else {
+            $items = $this->fileGetAll();
+            $maxSeq = 0;
+            foreach ($items as $item) {
+                $ref = (string) ($item['referenceNumber'] ?? $item['reference_number'] ?? '');
+                if (str_starts_with($ref, $prefix)) {
+                    $parts = explode('_', $ref);
+                    $seq = (int) end($parts);
+                    if ($seq > $maxSeq) {
+                        $maxSeq = $seq;
+                    }
+                }
+            }
+            $nextSeq = $maxSeq + 1;
+        }
+
+        return $prefix . sprintf('%04d', $nextSeq);
+    }
+
+    public function ensureReferenceNumbers(): void
+    {
+        if (!$this->useDb) {
+            return;
+        }
+        try {
+            $db = Database::getInstance();
+            $colCheck = $db->query("SHOW COLUMNS FROM customer_inquiries LIKE 'reference_number'");
+            if (!$colCheck->fetch()) {
+                return;
+            }
+            $stmt = $db->query("SELECT id, appointment_date, created_at FROM customer_inquiries WHERE reference_number IS NULL OR reference_number = '' ORDER BY created_at ASC");
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (empty($rows)) {
+                return;
+            }
+            foreach ($rows as $row) {
+                $id = (string) $row['id'];
+                $ts = !empty($row['appointment_date']) ? strtotime($row['appointment_date']) : strtotime($row['created_at'] ?? 'now');
+                if ($ts === false) $ts = time();
+                $refNum = $this->generateReferenceNumber(date('Y-m-d', $ts));
+                $stmtUpd = $db->prepare('UPDATE customer_inquiries SET reference_number = :ref WHERE id = :id');
+                $stmtUpd->execute([':ref' => $refNum, ':id' => $id]);
+            }
+        } catch (Exception $e) {
+            // Ignore if schema not migrated yet
+        }
     }
 
     /**

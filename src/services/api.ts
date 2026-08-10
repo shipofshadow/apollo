@@ -2066,3 +2066,61 @@ export async function fetchInquiryChecklistsApi(token: string, inquiryId: string
   ]);
   return { before, after };
 }
+
+// ── Reference Lookup API (Auto-fill for Checklists) ─────────────────────────
+export interface ReferenceLookupResult {
+  type: 'inquiry' | 'booking';
+  id: string;
+  referenceNumber: string;
+  customerName: string;
+  customerEmail: string;
+  contactNumber: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleYear: string;
+  plateNumber: string;
+  productToPurchase: string;
+  serviceId: number | null;
+  serviceName: string;
+  appointmentDate: string;
+}
+
+export const lookupReferenceApi = (q: string = '', token?: string | null) =>
+  apiFetch<{ results: ReferenceLookupResult[] }>(`/api/checklist/lookup?q=${encodeURIComponent(q)}`, {}, token || undefined);
+
+export const fetchPublicChecklistSubmissionApi = (ref: string, phase: string = 'before') =>
+  apiFetch<{ submission: any | null }>(`/api/checklist/submission?ref=${encodeURIComponent(ref)}&phase=${encodeURIComponent(phase)}`);
+
+// ── Admin Inquiry Checklists Management API ─────────────────────────────────
+export interface AdminChecklistOverviewItem {
+  inquiryId: string;
+  referenceNumber: string;
+  fullName: string;
+  emailAddress: string;
+  contactNumber: string;
+  make: string;
+  model: string;
+  yearModel: string;
+  plateNumber: string;
+  productToPurchase: string;
+  serviceId: number | null;
+  serviceTitle: string;
+  createdAt: string;
+  appointmentDate: string;
+  beforeId: string | null;
+  beforeStatus: 'not_started' | 'draft' | 'completed';
+  beforeSubmittedAt: string | null;
+  beforeInstaller: string | null;
+  afterId: string | null;
+  afterStatus: 'not_started' | 'draft' | 'completed';
+  afterSubmittedAt: string | null;
+  afterInstaller: string | null;
+}
+
+export const fetchAdminChecklistsApi = (token: string) =>
+  apiFetch<{ checklists: AdminChecklistOverviewItem[] }>('/api/admin/checklists', {}, token);
+
+export const resetAdminChecklistApi = (token: string, inquiryId: string) =>
+  apiFetch<{ message: string }>(`/api/admin/checklists/${inquiryId}`, { method: 'DELETE' }, token);
+
+

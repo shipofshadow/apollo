@@ -101,12 +101,6 @@ class Router
             $r->addRoute('PUT',    '/api/services/{id:\d+}',          'handleServiceUpdate');
             $r->addRoute('DELETE', '/api/services/{id:\d+}',          'handleServiceDelete');
             
-            // ── Service Checklist Templates ───────────────────────────────
-            $r->addRoute('GET',    '/api/services/{id:\d+}/checklist-items',        'handleServiceChecklistItemsGet');
-            $r->addRoute('POST',   '/api/services/{id:\d+}/checklist-items',        'handleServiceChecklistItemsCreate');
-            $r->addRoute('POST',   '/api/services/{id:\d+}/checklist-items/reorder','handleServiceChecklistItemsReorder');
-            $r->addRoute('PUT',    '/api/services/{sid:\d+}/checklist-items/{id:\d+}', 'handleServiceChecklistItemsUpdate');
-            $r->addRoute('DELETE', '/api/services/{sid:\d+}/checklist-items/{id:\d+}', 'handleServiceChecklistItemsDelete');
 
             // Service variations (admin write, public read via parent service)
             $r->addRoute('GET',    '/api/services/{id:\d+}/variations',              'handleServiceVariationList');
@@ -150,12 +144,11 @@ class Router
             $r->addRoute('DELETE','/api/inquiries/{id}',             'handleInquiryDelete');
             
             // ── Inquiry Checklists ─────────────────────────────────────────
-            $r->addRoute('GET',    '/api/inquiries/{id}/checklists',                 'handleInquiryChecklistsGet');
-            $r->addRoute('GET',    '/api/inquiries/{id}/checklists/{phase}',         'handleInquiryChecklistsGetPhase');
-            $r->addRoute('PUT',    '/api/inquiries/{id}/checklists/{phase}',         'handleInquiryChecklistsUpdatePhase');
-            $r->addRoute('POST',   '/api/inquiries/{id}/checklists/{phase}/submit',  'handleInquiryChecklistsSubmitPhase');
-            $r->addRoute('POST',   '/api/inquiries/{id}/checklists/{phase}/send',    'handleInquiryChecklistsSendPhase');
-            $r->addRoute('GET',    '/api/inquiries/{id}/checklists/{phase}/pdf',     'handleInquiryChecklistsGetPdf');
+            $r->addRoute('GET',    '/api/checklist/lookup',                          'handleChecklistLookup');
+            $r->addRoute('POST',   '/api/checklist/submit',                          'handlePublicChecklistSubmit');
+            $r->addRoute('GET',    '/api/checklist/submission',                      'handlePublicChecklistGetSubmission');
+            $r->addRoute('POST',   '/api/public/checklist/pdf',                      'handlePublicChecklistPdf');
+            $r->addRoute('GET',    '/api/public/checklist/pdf',                      'handlePublicChecklistPdfGet');
 
             $r->addRoute('GET',   '/api/bookings',                  'handleBookingList');
             $r->addRoute('GET',   '/api/bookings/mine',             'handleBookingMine');
@@ -1381,6 +1374,206 @@ class Router
             'slotCapacity'   => $availability['slotCapacity'],
             'slotCounts'     => $availability['slotCounts'],
         ]);
+    }
+
+    private function handleChecklistLookup(array $vars = []): void
+    {
+        $q = trim((string) ($_GET['q'] ?? $_GET['ref'] ?? ''));
+
+        $token = Auth::tokenFromHeader();
+        $isAdmin = false;
+        if ($token !== null) {
+            try {
+                $payload = Auth::decodeToken($token);
+                $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'bookings:manage');
+            } catch (\Throwable) {}
+        }
+
+        // Anti-scraping protection for unauthenticated requests:
+        // Requires query length >= 6 (valid ref number / plate) and strict exact matching
+        if (!$isAdmin && strlen($q) < 6) {
+            echo json_encode(['results' => []]);
+            return;
+        }
+
+        $db = Database::getInstance();
+        $results = [];
+
+        if ($isAdmin) {
+            // Admin full search (wildcard allowed)
+            if ($q !== '') {
+                $stmtInq = $db->prepare('
+                    SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
+                           ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
+                           ci.service_id, ci.appointment_date, s.title AS service_title
+                    FROM customer_inquiries ci
+                    LEFT JOIN services s ON s.id = ci.service_id
+                    WHERE ci.reference_number LIKE :q1
+                       OR ci.id = :exact
+                       OR ci.full_name LIKE :q2
+                       OR ci.plate_number LIKE :q3
+                       OR ci.contact_number LIKE :q4
+                       OR ci.email_address LIKE :q5
+                    ORDER BY ci.created_at DESC
+                    LIMIT 10
+                ');
+                $like = '%' . $q . '%';
+                $stmtInq->execute([
+                    ':q1' => $like,
+                    ':q2' => $like,
+                    ':q3' => $like,
+                    ':q4' => $like,
+                    ':q5' => $like,
+                    ':exact' => $q,
+                ]);
+            } else {
+                $stmtInq = $db->query('
+                    SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
+                           ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
+                           ci.service_id, ci.appointment_date, s.title AS service_title
+                    FROM customer_inquiries ci
+                    LEFT JOIN services s ON s.id = ci.service_id
+                    ORDER BY ci.created_at DESC
+                    LIMIT 10
+                ');
+            }
+            $rawRows = $stmtInq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } else {
+            // Unauthenticated strict lookup (no generic wildcard scraping)
+            $stmtInq = $db->prepare('
+                SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
+                       ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
+                       ci.service_id, ci.appointment_date, s.title AS service_title
+                FROM customer_inquiries ci
+                LEFT JOIN services s ON s.id = ci.service_id
+                WHERE ci.reference_number = :e1
+                   OR ci.id = :e2
+                   OR ci.plate_number = :e3
+                   OR ci.email_address = :e4
+                   OR ci.reference_number LIKE :e5
+                ORDER BY ci.created_at DESC
+                LIMIT 5
+            ');
+            $stmtInq->execute([
+                ':e1' => $q,
+                ':e2' => $q,
+                ':e3' => $q,
+                ':e4' => $q,
+                ':e5' => $q . '%',
+            ]);
+            $rawRows = $stmtInq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
+        foreach ($rawRows as $row) {
+            $results[] = [
+                'type' => 'inquiry',
+                'id' => (string) $row['id'],
+                'referenceNumber' => (string) ($row['reference_number'] ?? $row['id']),
+                'customerName' => (string) ($row['full_name'] ?? ''),
+                'customerEmail' => (string) ($row['email_address'] ?? ''),
+                'contactNumber' => (string) ($row['contact_number'] ?? ''),
+                'vehicleMake' => (string) ($row['make'] ?? ''),
+                'vehicleModel' => (string) ($row['model'] ?? ''),
+                'vehicleYear' => (string) ($row['year_model'] ?? ''),
+                'plateNumber' => (string) ($row['plate_number'] ?? ''),
+                'productToPurchase' => (string) ($row['product_to_purchase'] ?? ''),
+                'serviceId' => $row['service_id'] ? (int) $row['service_id'] : null,
+                'serviceName' => (string) ($row['service_title'] ?? $row['product_to_purchase'] ?? ''),
+                'appointmentDate' => (string) ($row['appointment_date'] ?? ''),
+            ];
+        }
+
+        // 2. Search bookings
+        $rawBookings = [];
+        if ($isAdmin) {
+            $like = '%' . $q . '%';
+            if ($q !== '') {
+                $stmtBk = $db->prepare('
+                    SELECT b.id, b.reference_number, b.name, b.email, b.phone,
+                           b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
+                           b.service_id, s.title AS service_name, b.appointment_date
+                    FROM bookings b
+                    LEFT JOIN services s ON s.id = b.service_id
+                    WHERE b.reference_number LIKE :q1
+                       OR b.id = :exact
+                       OR b.name LIKE :q2
+                       OR b.vehicle_info LIKE :q3
+                       OR b.phone LIKE :q4
+                       OR b.email LIKE :q5
+                    ORDER BY b.created_at DESC
+                    LIMIT 10
+                ');
+                $stmtBk->execute([
+                    ':q1' => $like,
+                    ':q2' => $like,
+                    ':q3' => $like,
+                    ':q4' => $like,
+                    ':q5' => $like,
+                    ':exact' => $q,
+                ]);
+            } else {
+                $stmtBk = $db->query('
+                    SELECT b.id, b.reference_number, b.name, b.email, b.phone,
+                           b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
+                           b.service_id, s.title AS service_name, b.appointment_date
+                    FROM bookings b
+                    LEFT JOIN services s ON s.id = b.service_id
+                    ORDER BY b.created_at DESC
+                    LIMIT 10
+                ');
+            }
+            $rawBookings = $stmtBk->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } else if ($q !== '') {
+            // Unauthenticated strict lookup on bookings
+            $stmtBk = $db->prepare('
+                SELECT b.id, b.reference_number, b.name, b.email, b.phone,
+                       b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
+                       b.service_id, s.title AS service_name, b.appointment_date
+                FROM bookings b
+                LEFT JOIN services s ON s.id = b.service_id
+                WHERE b.reference_number = :b1
+                   OR b.id = :b2
+                   OR b.email = :b3
+                   OR b.phone = :b4
+                   OR b.reference_number LIKE :b5
+                ORDER BY b.created_at DESC
+                LIMIT 5
+            ');
+            $stmtBk->execute([
+                ':b1' => $q,
+                ':b2' => $q,
+                ':b3' => $q,
+                ':b4' => $q,
+                ':b5' => $q . '%',
+            ]);
+            $rawBookings = $stmtBk->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
+        foreach ($rawBookings as $row) {
+            $plate = '';
+            $info = (string) ($row['vehicle_info'] ?? '');
+            if (preg_match('/[A-Z0-9]{2,4}[-\s]?[0-9]{3,4}/i', $info, $m)) {
+                $plate = strtoupper($m[0]);
+            }
+            $results[] = [
+                'type' => 'booking',
+                'id' => (string) $row['id'],
+                'referenceNumber' => (string) ($row['reference_number'] ?? $row['id']),
+                'customerName' => (string) ($row['name'] ?? ''),
+                'customerEmail' => (string) ($row['email'] ?? ''),
+                'contactNumber' => (string) ($row['phone'] ?? ''),
+                'vehicleMake' => (string) ($row['vehicle_make'] ?? ''),
+                'vehicleModel' => (string) ($row['vehicle_model'] ?? ''),
+                'vehicleYear' => (string) ($row['vehicle_year'] ?? ''),
+                'plateNumber' => $plate ?: $info,
+                'productToPurchase' => (string) ($row['service_name'] ?? ''),
+                'serviceId' => $row['service_id'] ? (int) $row['service_id'] : null,
+                'serviceName' => (string) ($row['service_name'] ?? ''),
+                'appointmentDate' => (string) ($row['appointment_date'] ?? ''),
+            ];
+        }
+
+        echo json_encode(['results' => $results]);
     }
 
     /** @param array<string, string> $vars */
@@ -4840,161 +5033,292 @@ class Router
         echo json_encode(['entry' => $entry]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Service Checklist Templates
-    // ─────────────────────────────────────────────────────────────────────────
 
-    private function handleServiceChecklistItemsGet(array $vars): void
+    private function savePublicChecklistSubmission(array $data): ?int
     {
-        $this->requirePermission('services:manage');
-        $serviceId = (int) ($vars['id'] ?? 0);
-        $items = (new ServiceChecklistService())->getItemsByService($serviceId);
-        echo json_encode(['items' => $items]);
-    }
+        $ref = trim((string)($data['referenceNumber'] ?? $data['inquiryId'] ?? ''));
 
-    private function handleServiceChecklistItemsCreate(array $vars): void
-    {
-        $this->requirePermission('services:manage');
-        $serviceId = (int) ($vars['id'] ?? 0);
-        $data = $this->jsonBody();
-        $item = (new ServiceChecklistService())->createItem($serviceId, $data);
-        http_response_code(201);
-        echo json_encode(['item' => $item]);
-    }
+        $phase = (string) ($data['phaseSlug'] ?? $data['phase'] ?? 'before');
+        $customer = is_array($data['customer'] ?? null) ? $data['customer'] : [];
+        $vehicle  = is_array($data['vehicle'] ?? null)  ? $data['vehicle']  : [];
 
-    private function handleServiceChecklistItemsUpdate(array $vars): void
-    {
-        $this->requirePermission('services:manage');
-        $id = (int) ($vars['id'] ?? 0);
-        $data = $this->jsonBody();
-        $item = (new ServiceChecklistService())->updateItem($id, $data);
-        echo json_encode(['item' => $item]);
-    }
+        $customerName  = trim((string)($customer['name']  ?? $data['customerName']  ?? ''));
+        $customerEmail = trim((string)($customer['email'] ?? $data['customerEmail'] ?? ''));
+        $contactNumber = trim((string)($customer['phone'] ?? $data['contactNumber'] ?? ''));
 
-    private function handleServiceChecklistItemsDelete(array $vars): void
-    {
-        $this->requirePermission('services:manage');
-        $id = (int) ($vars['id'] ?? 0);
-        (new ServiceChecklistService())->deleteItem($id);
-        echo json_encode(['message' => 'Item deleted.']);
-    }
+        $make        = trim((string)($vehicle['make']        ?? $data['make']        ?? ''));
+        $model       = trim((string)($vehicle['model']       ?? $data['model']       ?? ''));
+        $year        = trim((string)($vehicle['year']        ?? $data['yearModel']   ?? ''));
+        $plateNumber = trim((string)($vehicle['plateNumber'] ?? $data['plateNumber'] ?? ''));
 
-    private function handleServiceChecklistItemsReorder(array $vars): void
-    {
-        $this->requirePermission('services:manage');
-        $serviceId = (int) ($vars['id'] ?? 0);
-        $data = $this->jsonBody();
-        $orderedIds = $data['orderedIds'] ?? [];
-        if (is_array($orderedIds)) {
-            (new ServiceChecklistService())->reorderItems($serviceId, $orderedIds);
-        }
-        echo json_encode(['message' => 'Items reordered.']);
-    }
+        $serviceTitle  = trim((string)($data['serviceTitle']  ?? $data['productToPurchase'] ?? ''));
+        $installerName = trim((string)($data['installerName'] ?? $data['technicianName']    ?? 'Shop Technician'));
+        $generalNotes  = isset($data['generalNotes']) ? (string)$data['generalNotes'] : null;
+        $signatureData = isset($data['signatureData']) ? (string)$data['signatureData'] : null;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Inquiry Checklists
-    // ─────────────────────────────────────────────────────────────────────────
+        $db = Database::getInstance();
 
-    private function handleInquiryChecklistsGet(array $vars): void
-    {
-        $this->requirePermission('bookings:manage');
-        $inquiryId = $vars['id'] ?? '';
-        $checklists = (new InquiryChecklistService())->getForInquiry($inquiryId);
-        echo json_encode(['checklists' => $checklists]);
-    }
-
-    private function handleInquiryChecklistsGetPhase(array $vars): void
-    {
-        $inquiryId = $vars['id'] ?? '';
-        $phase = $vars['phase'] ?? '';
-        
-        $payload = $this->requireAuth();
-        $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'bookings:manage');
-        
-        if (!$isAdmin) {
-             // Client accessing their own
-             $db = Database::getInstance();
-             $stmt = $db->prepare('SELECT user_id FROM customer_inquiries WHERE id = :id');
-             $stmt->execute([':id' => $inquiryId]);
-             $ownerId = $stmt->fetchColumn();
-             if ((int)$ownerId !== (int)($payload['sub'] ?? 0)) {
-                 throw new RuntimeException("Unauthorized", 403);
-             }
-        }
-        
-        $checklist = (new InquiryChecklistService())->getOrInit($inquiryId, $phase);
-        echo json_encode(['checklist' => $checklist]);
-    }
-
-    private function handleInquiryChecklistsGetPdf(array $vars): void
-    {
-        $inquiryId = $vars['id'] ?? '';
-        $phase = $vars['phase'] ?? '';
-        
-        $payload = $this->requireAuth();
-        $isAdmin = $this->hasPermissionByRole((string) ($payload['role'] ?? ''), 'bookings:manage');
-        
-        if (!$isAdmin) {
-             // Client accessing their own
-             $db = Database::getInstance();
-             $stmt = $db->prepare('SELECT user_id FROM customer_inquiries WHERE id = :id');
-             $stmt->execute([':id' => $inquiryId]);
-             $ownerId = $stmt->fetchColumn();
-             if ((int)$ownerId !== (int)($payload['sub'] ?? 0)) {
-                 throw new RuntimeException("Unauthorized", 403);
-             }
+        // ── 4-Tier Smart Inquiry Matching (Reference # -> Plate # -> Email -> Phone) ──
+        $inquiryId = null;
+        if ($ref !== '') {
+            $stmtInq = $db->prepare('SELECT id, reference_number FROM customer_inquiries WHERE reference_number = :ref OR id = :id LIMIT 1');
+            $stmtInq->execute([':ref' => $ref, ':id' => $ref]);
+            $rowInq = $stmtInq->fetch(\PDO::FETCH_ASSOC);
+            if ($rowInq) {
+                $inquiryId = $rowInq['id'];
+                if (!empty($rowInq['reference_number'])) {
+                    $ref = $rowInq['reference_number'];
+                }
+            }
         }
 
-        // Increase time limit for PDF generation — overlay rendering can take several seconds.
-        @set_time_limit(120);
-        
-        $pdfContent = (new InquiryChecklistService())->getChecklistPdfPublic($inquiryId, $phase);
+        if (!$inquiryId && $plateNumber !== '') {
+            $stmtInq = $db->prepare('SELECT id, reference_number FROM customer_inquiries WHERE plate_number = :plate ORDER BY id DESC LIMIT 1');
+            $stmtInq->execute([':plate' => $plateNumber]);
+            $rowInq = $stmtInq->fetch(\PDO::FETCH_ASSOC);
+            if ($rowInq) {
+                $inquiryId = $rowInq['id'];
+                if ($ref === '' && !empty($rowInq['reference_number'])) {
+                    $ref = $rowInq['reference_number'];
+                }
+            }
+        }
+
+        if (!$inquiryId && $customerEmail !== '') {
+            $stmtInq = $db->prepare('SELECT id, reference_number FROM customer_inquiries WHERE email_address = :email ORDER BY id DESC LIMIT 1');
+            $stmtInq->execute([':email' => $customerEmail]);
+            $rowInq = $stmtInq->fetch(\PDO::FETCH_ASSOC);
+            if ($rowInq) {
+                $inquiryId = $rowInq['id'];
+                if ($ref === '' && !empty($rowInq['reference_number'])) {
+                    $ref = $rowInq['reference_number'];
+                }
+            }
+        }
+
+        if (!$inquiryId && $contactNumber !== '') {
+            $stmtInq = $db->prepare('SELECT id, reference_number FROM customer_inquiries WHERE contact_number = :phone ORDER BY id DESC LIMIT 1');
+            $stmtInq->execute([':phone' => $contactNumber]);
+            $rowInq = $stmtInq->fetch(\PDO::FETCH_ASSOC);
+            if ($rowInq) {
+                $inquiryId = $rowInq['id'];
+                if ($ref === '' && !empty($rowInq['reference_number'])) {
+                    $ref = $rowInq['reference_number'];
+                }
+            }
+        }
+
+        if ($ref === '') {
+            $ref = 'REF_' . date('Ymd_His');
+        }
+
+        $payloadJson = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $stmt = $db->prepare('
+            INSERT INTO public_checklist_submissions
+                (inquiry_id, reference_number, phase, customer_name, customer_email, contact_number,
+                 vehicle_make, vehicle_model, vehicle_year, plate_number, service_title, installer_name,
+                 general_notes, signature_data, payload_json, updated_at)
+            VALUES
+                (:inquiry_id, :reference_number, :phase, :customer_name, :customer_email, :contact_number,
+                 :vehicle_make, :vehicle_model, :vehicle_year, :plate_number, :service_title, :installer_name,
+                 :general_notes, :signature_data, :payload_json, NOW())
+            ON DUPLICATE KEY UPDATE
+                inquiry_id = VALUES(inquiry_id),
+                customer_name = VALUES(customer_name),
+                customer_email = VALUES(customer_email),
+                contact_number = VALUES(contact_number),
+                vehicle_make = VALUES(vehicle_make),
+                vehicle_model = VALUES(vehicle_model),
+                vehicle_year = VALUES(vehicle_year),
+                plate_number = VALUES(plate_number),
+                service_title = VALUES(service_title),
+                installer_name = VALUES(installer_name),
+                general_notes = VALUES(general_notes),
+                signature_data = VALUES(signature_data),
+                payload_json = VALUES(payload_json),
+                updated_at = NOW()
+        ');
+
+        $stmt->execute([
+            ':inquiry_id'       => $inquiryId,
+            ':reference_number' => $ref,
+            ':phase'            => $phase,
+            ':customer_name'    => $customerName,
+            ':customer_email'   => $customerEmail,
+            ':contact_number'   => $contactNumber,
+            ':vehicle_make'     => $make,
+            ':vehicle_model'    => $model,
+            ':vehicle_year'     => $year,
+            ':plate_number'     => $plateNumber,
+            ':service_title'    => $serviceTitle,
+            ':installer_name'   => $installerName,
+            ':general_notes'    => $generalNotes,
+            ':signature_data'   => $signatureData,
+            ':payload_json'     => $payloadJson,
+        ]);
+
+        if ($inquiryId) {
+            $phaseTitle = ($phase === 'before') ? 'Pre-Service' : 'Post-Service';
+            try {
+                (new InquiryActivityService())->add(
+                    (string)$inquiryId,
+                    'public_checklist_completed',
+                    "Public {$phaseTitle} Inspection Checklist Submitted",
+                    "Phase: {$phaseTitle} | Tech/Installer: {$installerName}",
+                    null,
+                    'system'
+                );
+            } catch (\Throwable) {}
+        }
+
+        return (int) $db->lastInsertId();
+    }
+
+    private function handlePublicChecklistSubmit(): void
+    {
+        $data = $this->jsonBody();
+        $id = $this->savePublicChecklistSubmission($data);
+
+        $sendEmail = !empty($data['sendEmail']);
+        $emailPhase = (string)($data['emailPhase'] ?? $data['phaseSlug'] ?? $data['phase'] ?? 'before');
+
+        if ($sendEmail) {
+            try {
+                require_once __DIR__ . '/NotificationJobQueueService.php';
+                (new NotificationJobQueueService())->dispatch('checklist_inspection_submitted', [
+                    'data'       => $data,
+                    'emailPhase' => $emailPhase,
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[ChecklistSubmit] Queue dispatch failed: ' . $e->getMessage());
+            }
+        }
+
+        echo json_encode(['success' => true, 'submissionId' => $id]);
+    }
+
+    private function handlePublicChecklistGetSubmission(): void
+    {
+        $ref = trim((string)($_GET['ref'] ?? $_GET['referenceNumber'] ?? $_GET['inquiryId'] ?? ''));
+        $phase = trim((string)($_GET['phase'] ?? 'before'));
+
+        if ($ref === '') {
+            throw new RuntimeException('Missing required reference parameter.', 400);
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('
+            SELECT * FROM public_checklist_submissions
+            WHERE (reference_number = :ref OR inquiry_id = :id) AND phase = :phase
+            ORDER BY id DESC LIMIT 1
+        ');
+        $stmt->execute([':ref' => $ref, ':id' => $ref, ':phase' => $phase]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            echo json_encode(['submission' => null]);
+            return;
+        }
+
+        $row['payload'] = json_decode($row['payload_json'], true);
+        echo json_encode(['submission' => $row]);
+    }
+
+    private function handlePublicChecklistPdfGet(): void
+    {
+        $ref = trim((string)($_GET['ref'] ?? $_GET['referenceNumber'] ?? $_GET['inquiryId'] ?? ''));
+        $phase = trim((string)($_GET['phase'] ?? 'before'));
+
+        if ($ref === '') {
+            throw new RuntimeException('Missing required reference parameter.', 400);
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('
+            SELECT payload_json FROM public_checklist_submissions
+            WHERE (reference_number = :ref OR inquiry_id = :id) AND phase = :phase
+            ORDER BY id DESC LIMIT 1
+        ');
+        $stmt->execute([':ref' => $ref, ':id' => $ref, ':phase' => $phase]);
+        $payloadJson = $stmt->fetchColumn();
+
+        if (!$payloadJson) {
+            $stmtInq = $db->prepare('SELECT * FROM customer_inquiries WHERE reference_number = :ref OR id = :id LIMIT 1');
+            $stmtInq->execute([':ref' => $ref, ':id' => $ref]);
+            $inquiry = $stmtInq->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$inquiry) {
+                throw new RuntimeException('No inquiry or saved checklist submission found for this reference.', 404);
+            }
+
+            $data = [
+                'referenceNumber' => $inquiry['reference_number'] ?? $ref,
+                'customer' => [
+                    'name'  => $inquiry['full_name'] ?? '',
+                    'email' => $inquiry['email_address'] ?? '',
+                    'phone' => $inquiry['contact_number'] ?? '',
+                ],
+                'vehicle' => [
+                    'make'        => $inquiry['make'] ?? '',
+                    'model'       => $inquiry['model'] ?? '',
+                    'year'        => $inquiry['year_model'] ?? '',
+                    'plateNumber' => $inquiry['plate_number'] ?? '',
+                ],
+                'serviceTitle'  => $inquiry['product_to_purchase'] ?? 'Vehicle Service',
+                'installerName' => 'Shop Technician',
+                'phase'         => $phase,
+            ];
+        } else {
+            $data = json_decode((string)$payloadJson, true);
+            if (!is_array($data)) {
+                $data = [];
+            }
+        }
+
+        $serviceSlug = (string) ($data['serviceSlug'] ?? 'android-headunit');
+        require_once __DIR__ . '/ChecklistPdfTemplates.php';
+        require_once __DIR__ . '/ChecklistPdfOverlayRenderer.php';
+
+        $template = ChecklistPdfTemplates::forServiceAndPhase($serviceSlug, $phase);
+        if ($template === null) {
+            throw new RuntimeException("No PDF template found for service {$serviceSlug} and phase {$phase}");
+        }
+
+        $renderer = new ChecklistPdfOverlayRenderer();
+        $pdfBinary = $renderer->renderPublicChecklist($data, $template);
+
+        header_remove('X-Frame-Options');
         header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="Installation Checklist.pdf"');
-        echo $pdfContent;
+        header('Content-Disposition: inline; filename="1625_Autolab_' . ucfirst($serviceSlug) . '_' . ucfirst($phase) . '_Checklist.pdf"');
+        header('Content-Length: ' . strlen($pdfBinary));
+        echo $pdfBinary;
+        exit;
     }
 
-    private function handleInquiryChecklistsUpdatePhase(array $vars): void
+    private function handlePublicChecklistPdf(): void
     {
-        $this->requirePermission('bookings:manage');
-        $phase = $vars['phase'] ?? '';
         $data = $this->jsonBody();
-        $inquiryId = $vars['id'] ?? '';
-        
-        $checklistId = (int) ($data['checklistId'] ?? 0);
-        $responses = $data['responses'] ?? [];
-        $generalNotes = $data['generalNotes'] ?? null;
-        $installerName = $data['installerName'] ?? null;
-        $customerAcknowledged = (bool)($data['customerAcknowledged'] ?? false);
-        $serviceFieldValue = isset($data['serviceFieldValue']) ? (string)$data['serviceFieldValue'] : null;
-        
-        $checklist = (new InquiryChecklistService())->saveResponses($checklistId, $responses, $generalNotes, $installerName, $customerAcknowledged, $serviceFieldValue);
-        echo json_encode(['checklist' => $checklist]);
-    }
+        $this->savePublicChecklistSubmission($data);
 
-    private function handleInquiryChecklistsSubmitPhase(array $vars): void
-    {
-        $payload = $this->requirePermission('bookings:manage');
-        $data = $this->jsonBody();
-        $userId = (int) ($payload['sub'] ?? 0);
-        
-        $checklistId = (int) ($data['checklistId'] ?? 0);
-        $installerName = $data['installerName'] ?? null;
-        $customerAcknowledged = (bool)($data['customerAcknowledged'] ?? false);
-        $serviceFieldValue = isset($data['serviceFieldValue']) ? (string)$data['serviceFieldValue'] : null;
-        
-        $checklist = (new InquiryChecklistService())->submit($checklistId, $userId, $installerName, $customerAcknowledged, $serviceFieldValue);
-        echo json_encode(['checklist' => $checklist]);
-    }
+        $serviceSlug = (string) ($data['serviceSlug'] ?? 'android-headunit');
+        $phase       = (string) ($data['phaseSlug'] ?? $data['phase'] ?? 'before');
 
-    private function handleInquiryChecklistsSendPhase(array $vars): void
-    {
-        $payload = $this->requirePermission('bookings:manage');
-        $inquiryId = $vars['id'] ?? '';
-        $phase = $vars['phase'] ?? '';
-        $userId = (int) ($payload['sub'] ?? 0);
-        
-        (new InquiryChecklistService())->sendToClient($inquiryId, $phase, $userId);
-        echo json_encode(['message' => 'Checklist sent to client.']);
+        require_once __DIR__ . '/ChecklistPdfTemplates.php';
+        require_once __DIR__ . '/ChecklistPdfOverlayRenderer.php';
+
+        $template = ChecklistPdfTemplates::forServiceAndPhase($serviceSlug, $phase);
+        if ($template === null) {
+            throw new RuntimeException("No PDF template found for service {$serviceSlug} and phase {$phase}");
+        }
+
+        $renderer = new ChecklistPdfOverlayRenderer();
+        $pdfBinary = $renderer->renderPublicChecklist($data, $template);
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="1625_Autolab_' . ucfirst($serviceSlug) . '_' . ucfirst($phase) . '_Checklist.pdf"');
+        header('Content-Length: ' . strlen($pdfBinary));
+        echo $pdfBinary;
+        exit;
     }
 }

@@ -40,10 +40,15 @@ class NotificationJobQueueService
             ':payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ':run_after' => $runAfter,
         ]);
+        $insertedJobId = (int) $this->db->lastInsertId();
 
         if ($immediate && PHP_SAPI !== 'cli' && ($runAfter === null || strtotime($runAfter) <= time())) {
             try {
-                $this->processPending(1);
+                if ($insertedJobId > 0) {
+                    $this->processJobById($insertedJobId);
+                } else {
+                    $this->processPending(1);
+                }
             } catch (\Throwable $e) {
                 error_log('[NotificationJobQueueService] Immediate queue processing failed: ' . $e->getMessage());
             }
@@ -81,6 +86,56 @@ class NotificationJobQueueService
     public function dispatchNow(string $event, array $payload): void
     {
         $this->handleNow($event, $payload);
+    }
+
+    public function processJobById(int $jobId): bool
+    {
+        if ($this->db === null || $jobId <= 0) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('SELECT * FROM notification_jobs WHERE id = :id AND status IN ("queued", "retry") LIMIT 1');
+        $stmt->execute([':id' => $jobId]);
+        $job = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$job) {
+            return false;
+        }
+
+        $lock = $this->db->prepare(
+            'UPDATE notification_jobs
+                SET status = "processing", attempts = attempts + 1
+              WHERE id = :id AND status IN ("queued", "retry")'
+        );
+        $lock->execute([':id' => $jobId]);
+        if ($lock->rowCount() === 0) {
+            return false;
+        }
+
+        $event = (string) ($job['event'] ?? '');
+        $payload = json_decode((string) ($job['payload'] ?? '{}'), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        try {
+            $this->handleNow($event, $payload);
+            $done = $this->db->prepare(
+                'UPDATE notification_jobs
+                    SET status = "done", processed_at = NOW(), error_message = NULL
+                  WHERE id = :id'
+            );
+            $done->execute([':id' => $jobId]);
+            return true;
+        } catch (\Throwable $e) {
+            $fail = $this->db->prepare(
+                'UPDATE notification_jobs
+                    SET status = "failed", error_message = :err
+                  WHERE id = :id'
+            );
+            $fail->execute([':id' => $jobId, ':err' => $e->getMessage()]);
+            return false;
+        }
     }
 
     public function processPending(?int $limit = null): array
@@ -557,6 +612,12 @@ class NotificationJobQueueService
                     error_log('[checklist_sent] PDF generation failed for inquiry ' . $inquiryId . ': ' . $e->getMessage());
                     throw $e; // re-throw so queue marks as retry/failed
                 }
+                return;
+
+            case 'checklist_inspection_submitted':
+                $checklistData = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+                $phase = (string) ($payload['emailPhase'] ?? $payload['phase'] ?? 'before');
+                (new NotificationService())->checklistInspectionNotification($checklistData, $phase);
                 return;
 
             case 'inquiry_rescheduled':
