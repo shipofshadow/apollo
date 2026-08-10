@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import PageSEO from '../components/PageSEO';
@@ -25,6 +25,7 @@ export default function CheckoutPage() {
   const [deliveryProvince, setDeliveryProvince] = useState('');
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
   const [notes, setNotes] = useState('');
+  const [privacyAgreed, setPrivacyAgreed] = useState(true);
 
   useEffect(() => {
     setItems(readCart());
@@ -45,6 +46,10 @@ export default function CheckoutPage() {
     }
     if (fulfillmentType === 'courier' && !deliveryAddress.trim()) {
       showToast('Delivery address is required for courier orders.', 'error');
+      return;
+    }
+    if (!privacyAgreed) {
+      showToast('Please agree to the Privacy Policy to place an order.', 'error');
       return;
     }
 
@@ -133,11 +138,30 @@ export default function CheckoutPage() {
             <p className="text-sm text-gray-300 flex justify-between mb-1"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></p>
             <p className="text-sm text-gray-300 flex justify-between mb-3"><span>Shipping</span><span>{formatPrice(shippingFee)}</span></p>
             <p className="text-base font-bold text-white flex justify-between mb-4"><span>Total</span><span>{formatPrice(total)}</span></p>
+            
+            <div className="mb-4 text-left">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={privacyAgreed}
+                  onChange={(e) => setPrivacyAgreed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-black/20 text-brand-orange focus:ring-brand-orange shrink-0 cursor-pointer"
+                />
+                <span className="text-xs text-gray-300 leading-relaxed">
+                  I agree to the collection and processing of my data in accordance with 1625 Autolab's{' '}
+                  <Link to="/privacy-policy" className="text-brand-orange underline hover:text-orange-400 font-semibold" target="_blank">
+                    Privacy Policy
+                  </Link>{' '}
+                  (RA 10173). *
+                </span>
+              </label>
+            </div>
+
             <button
               type="button"
               onClick={() => void placeOrder()}
-              disabled={busy || items.length === 0}
-              className="w-full bg-brand-orange text-white px-4 py-3 rounded-sm font-bold uppercase tracking-widest text-xs hover:bg-orange-600 transition-colors disabled:opacity-50"
+              disabled={busy || items.length === 0 || !privacyAgreed}
+              className="w-full bg-brand-orange text-white px-4 py-3 rounded-sm font-bold uppercase tracking-widest text-xs hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {busy ? 'Placing Order...' : 'Place Order'}
             </button>

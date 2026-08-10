@@ -227,3 +227,36 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #d65c19;
 }
+
+/* Mobile Touch Horizontal Scroll & Table Overflow Fixes */
+.overflow-x-auto,
+[class*="overflow-x-auto"] {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  max-width: 100%;
+}
+
+table {
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .overflow-x-auto,
+  [class*="overflow-x-auto"] {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-brand-orange) transparent;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar,
+  [class*="overflow-x-auto"]::-webkit-scrollbar {
+    height: 5px;
+    display: block;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb,
+  [class*="overflow-x-auto"]::-webkit-scrollbar-thumb {
+    background: var(--color-brand-orange);
+    border-radius: 999px;
+  }
+}

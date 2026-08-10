@@ -132,6 +132,7 @@ export default function CustomerFormPage() {
   const [waitlistJoined, setWaitlistJoined] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileKey, setTurnstileKey] = useState(0);
+  const [privacyAgreed, setPrivacyAgreed] = useState(true);
   const [searchParams] = useSearchParams();
   const [services, setServices] = useState<any[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
@@ -244,6 +245,11 @@ export default function CustomerFormPage() {
 
     if (!formData.appointmentDate || !formData.appointmentTime) {
       showToast('Please choose a date and time for your appointment.', 'error');
+      return;
+    }
+
+    if (!privacyAgreed) {
+      showToast('Please agree to the Privacy Policy to submit your schedule request.', 'error');
       return;
     }
 
@@ -936,11 +942,36 @@ export default function CustomerFormPage() {
                   />
                 </div>
 
+                {/* Privacy Policy Consent Agreement */}
+                <div className="pt-1 text-left">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={privacyAgreed}
+                      onChange={(e) => setPrivacyAgreed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-700 bg-brand-darker text-brand-orange focus:ring-brand-orange shrink-0 cursor-pointer"
+                    />
+                    <span className="text-xs text-gray-300 leading-relaxed">
+                      I agree to the collection and processing of my personal data in accordance with 1625 Autolab's{' '}
+                      <Link to="/privacy-policy" className="text-brand-orange underline font-semibold hover:text-orange-400" target="_blank">
+                        Privacy Policy
+                      </Link>{' '}
+                      (Republic Act No. 10173). *
+                    </span>
+                  </label>
+                </div>
+
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  disabled={isSubmitting || !turnstileToken}
-                  title={!turnstileToken ? 'Please complete the security check above' : undefined}
+                  disabled={isSubmitting || !turnstileToken || !privacyAgreed}
+                  title={
+                    !turnstileToken
+                      ? 'Please complete the security check above'
+                      : !privacyAgreed
+                      ? 'Please agree to the Privacy Policy'
+                      : undefined
+                  }
                   className="w-full bg-brand-orange hover:bg-orange-600 text-white py-3.5 rounded-lg font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isSubmitting ? (

@@ -379,7 +379,7 @@ export default function ManageUsersPanel() {
             <span>Loading user directory…</span>
           </div>
         ) : (
-          <div className="border border-gray-800 rounded-xl overflow-hidden bg-brand-darker">
+          <div className="border border-gray-800 rounded-xl overflow-x-auto bg-brand-darker">
             <table className="w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-gray-800 bg-black/40 text-gray-400 uppercase text-[10px] tracking-wider">

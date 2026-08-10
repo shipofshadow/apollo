@@ -172,8 +172,8 @@ export default function Footer() {
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
           <p>&copy; {new Date().getFullYear()} 1625 Autolab. All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-brand-orange transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-brand-orange transition-colors">Terms of Service</a>
+            <Link to="/privacy-policy" className="hover:text-brand-orange transition-colors">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-brand-orange transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>

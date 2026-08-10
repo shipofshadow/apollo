@@ -27,6 +27,8 @@ const Blog = lazy(() => import('./pages/Blog'));
 const BlogPostDetail = lazy(() => import('./pages/BlogPostDetail'));
 const FaqPage = lazy(() => import('./pages/Faq'));
 const ContactPage = lazy(() => import('./pages/Contact'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
@@ -104,6 +106,8 @@ function AppInner() {
             <Route path="/blog/:id" element={<BlogPostDetail />} />
             <Route path="/faq" element={<FaqPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/about" element={<About />} />
             <Route path="/booking" element={<Navigate to="/order" replace />} />
             <Route path="/login" element={<LoginPage />} />

@@ -267,7 +267,7 @@ export default function VariationGallery({
             )}
 
             {active.specs && active.specs.length > 0 && (
-              <div className="border border-white/[0.08] rounded-sm overflow-hidden bg-black/20">
+              <div className="border border-white/[0.08] rounded-sm overflow-x-auto bg-black/20">
                 <div className="px-4 py-2 border-b border-white/[0.07] bg-black/20">
                   <span className="text-[0.65rem] font-bold uppercase tracking-[0.12em] text-gray-500">
                     Specifications

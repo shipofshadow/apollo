@@ -173,8 +173,8 @@ export default function OrderReceiptPage() {
           </div>
 
           {/* Items table */}
-          <div className="px-10 py-6">
-            <table className="w-full text-sm">
+          <div className="px-4 sm:px-10 py-6 overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
                   <th className="text-left pb-2 font-medium">Item</th>
