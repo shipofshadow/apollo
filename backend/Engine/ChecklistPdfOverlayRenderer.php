@@ -33,51 +33,70 @@ final class ChecklistPdfOverlayRenderer
             throw new RuntimeException("Checklist template PDF not found: {$templatePath}");
         }
 
-        $pdf = new Fpdi('P', 'mm', 'A4');
-        $pdf->SetAutoPageBreak(false);
-        $pdf->SetMargins(0, 0, 0);
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
-        $pdf->SetFont('helvetica', '', 9);
+        $realPath = $templatePath;
+        $tmpNormalizedPath = null;
+        $rawContent = (string) file_get_contents($templatePath);
 
-        $pdf->setSourceFile($templatePath);
-        $tplId = $pdf->importPage(1);
-        $size  = $pdf->getTemplateSize($tplId);
-
-        $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
-        $pdf->useTemplate($tplId, 0, 0, $size['width'], $size['height'], true);
-
-        // 1. Header fields
-        $this->drawHeader($pdf, $template, $payload);
-
-        // 2. Checklist items
-        if (!empty($template['checklist']) && !empty($payload['responses'])) {
-            $this->drawChecklistRows($pdf, $template['checklist'], $payload['responses']);
+        // Normalize CRLF line endings to LF if git converted line endings on server deployment.
+        // This ensures FPDI xref offsets match 100% perfectly without any object type errors.
+        if (str_contains($rawContent, "\r\n")) {
+            $normalizedContent = str_replace("\r\n", "\n", $rawContent);
+            $tmpNormalizedPath = tempnam(sys_get_temp_dir(), 'tpl_norm_') . '.pdf';
+            file_put_contents($tmpNormalizedPath, $normalizedContent);
+            $realPath = $tmpNormalizedPath;
         }
 
-        // 3. Orientation items (after-phase templates)
-        if (!empty($template['orientation']) && !empty($payload['orientationResponses'])) {
-            $this->drawOrientationRows($pdf, $template['orientation'], $payload['orientationResponses']);
-        }
+        try {
+            $pdf = new Fpdi('P', 'mm', 'A4');
+            $pdf->SetAutoPageBreak(false);
+            $pdf->SetMargins(0, 0, 0);
+            $pdf->setPrintHeader(false);
+            $pdf->setPrintFooter(false);
+            $pdf->SetFont('helvetica', '', 9);
 
-        // 4. Additional notes text
-        $notesText = $this->str($payload, 'additionalNotes', 'additional_notes', 'notes');
-        if ($notesText !== '' && !empty($template['additional_notes'])) {
-            $this->drawAdditionalNotes($pdf, $template['additional_notes'], $notesText);
-        }
+            $pdf->setSourceFile($realPath);
+            $tplId = $pdf->importPage(1);
+            $size  = $pdf->getTemplateSize($tplId);
 
-        // 5. Customer signature image
-        if (!empty($payload['signature']) && !empty($template['signature'])) {
-            $this->drawSignature($pdf, $template['signature'], (string)$payload['signature']);
-        }
+            $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+            $pdf->useTemplate($tplId, 0, 0, $size['width'], $size['height'], true);
 
-        // 6. Signature date text
-        if (!empty($template['sig_date'])) {
-            $dateStr = $this->formatDate($this->str($payload, 'date'));
-            $this->drawSigDate($pdf, $template['sig_date'], $dateStr);
-        }
+            // 1. Header fields
+            $this->drawHeader($pdf, $template, $payload);
 
-        return $pdf->Output('', 'S');
+            // 2. Checklist items
+            if (!empty($template['checklist']) && !empty($payload['responses'])) {
+                $this->drawChecklistRows($pdf, $template['checklist'], $payload['responses']);
+            }
+
+            // 3. Orientation items (after-phase templates)
+            if (!empty($template['orientation']) && !empty($payload['orientationResponses'])) {
+                $this->drawOrientationRows($pdf, $template['orientation'], $payload['orientationResponses']);
+            }
+
+            // 4. Additional notes text
+            $notesText = $this->str($payload, 'additionalNotes', 'additional_notes', 'notes');
+            if ($notesText !== '' && !empty($template['additional_notes'])) {
+                $this->drawAdditionalNotes($pdf, $template['additional_notes'], $notesText);
+            }
+
+            // 5. Customer signature image
+            if (!empty($payload['signature']) && !empty($template['signature'])) {
+                $this->drawSignature($pdf, $template['signature'], (string)$payload['signature']);
+            }
+
+            // 6. Signature date text
+            if (!empty($template['sig_date'])) {
+                $dateStr = $this->formatDate($this->str($payload, 'date'));
+                $this->drawSigDate($pdf, $template['sig_date'], $dateStr);
+            }
+
+            return $pdf->Output('', 'S');
+        } finally {
+            if ($tmpNormalizedPath !== null && file_exists($tmpNormalizedPath)) {
+                @unlink($tmpNormalizedPath);
+            }
+        }
     }
 
     // ─── Header ─────────────────────────────────────────────────────────────
@@ -322,6 +341,8 @@ final class ChecklistPdfOverlayRenderer
         }
         return '';
     }
+
+
 
     private function formatDate(string $date): string
     {

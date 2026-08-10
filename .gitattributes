@@ -1,0 +1,10 @@
+# Enforce binary handling for PDF files to prevent line-ending corruption (xref stream corruption)
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
