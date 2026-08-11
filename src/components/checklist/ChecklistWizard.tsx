@@ -438,27 +438,6 @@ export default function ChecklistWizard() {
         if (!wizardState.after.confirmed) errors.push('Post-service customer confirmation checkbox is required.');
         if (!wizardState.after.signature) errors.push('Customer Post-Service signature is required.');
       }
-    } else if (step === 7) {
-      if (wizardState.inspectionMode === 'both') {
-        const serviceSlug = wizardState.service.type === 'headunit' ? 'android-headunit' : 'projector-headlight';
-        const afterDef = getChecklistTypeDef(serviceSlug, 'after');
-        if (afterDef) {
-          const unchecked = afterDef.items.filter((item) => !wizardState.after.itemResponses[item.id]?.checked);
-          if (unchecked.length > 0) {
-            errors.push(`Please check all ${afterDef.items.length} items in the After Checklist.`);
-          }
-          if (afterDef.orientationItems && afterDef.orientationItems.length > 0) {
-            const uncheckedOrient = afterDef.orientationItems.filter(
-              (_, idx) => !wizardState.after.orientationResponses[idx]
-            );
-            if (uncheckedOrient.length > 0) {
-              errors.push('Please check all customer orientation items.');
-            }
-          }
-        }
-        if (!wizardState.after.confirmed) errors.push('Post-service customer confirmation checkbox is required.');
-        if (!wizardState.after.signature) errors.push('Customer Post-Service signature is required.');
-      }
     }
 
     setValidationErrors(errors);
@@ -468,20 +447,14 @@ export default function ChecklistWizard() {
   const handleNextStep = () => {
     if (!validateCurrentStep()) return;
 
-    // Trigger Overview Modal on Step 6 (Before / After depending on mode) and Step 7 (After in combined mode)
+    // Trigger Overview Modal on Step 6 (Before / After depending on mode)
     if (wizardState.currentStep === 6) {
       const phase = wizardState.inspectionMode === 'after_only' ? 'after' : 'before';
       setOverviewPhase(phase);
       return;
     }
 
-    if (wizardState.currentStep === 7 && wizardState.inspectionMode === 'both') {
-      setOverviewPhase('after');
-      return;
-    }
-
-    const maxStep = wizardState.inspectionMode === 'both' ? 8 : 7;
-    const nextStep = Math.min(maxStep, wizardState.currentStep + 1);
+    const nextStep = Math.min(7, wizardState.currentStep + 1);
     setWizardState((prev) => ({ ...prev, currentStep: nextStep }));
     setMaxReachedStep((prev) => Math.max(prev, nextStep));
     setValidationErrors([]);
@@ -499,9 +472,8 @@ export default function ChecklistWizard() {
       sendPhaseSubmissionToDb('after', false);
     }
 
-    const nextStep = wizardState.inspectionMode === 'both' ? (targetPhase === 'before' ? 7 : 8) : 7;
-    setWizardState((prev) => ({ ...prev, currentStep: nextStep }));
-    setMaxReachedStep((prev) => Math.max(prev, nextStep));
+    setWizardState((prev) => ({ ...prev, currentStep: 7 }));
+    setMaxReachedStep((prev) => Math.max(prev, 7));
     setValidationErrors([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -552,10 +524,6 @@ export default function ChecklistWizard() {
       } else if (wizardState.inspectionMode === 'after_only') {
         // Send AFTER PDF report email only
         await sendPhaseSubmissionToDb('after', true, 'after');
-      } else {
-        // Full Combined mode: save BEFORE phase, then save AFTER phase & send FINAL combined email containing BOTH PDFs!
-        await sendPhaseSubmissionToDb('before', false);
-        await sendPhaseSubmissionToDb('after', true, 'final');
       }
 
       // Clear draft storage
@@ -901,76 +869,8 @@ export default function ChecklistWizard() {
             )
           )}
 
-          {/* Step 7: After Checklist (combined mode) OR Review Step (single mode) */}
+          {/* Step 7: Review Step */}
           {wizardState.currentStep === 7 && (
-            wizardState.inspectionMode === 'both' ? (
-              <AfterChecklistStep
-                state={wizardState}
-                onItemCheckChange={(itemId, checked) =>
-                  setWizardState((prev) => ({
-                    ...prev,
-                    after: {
-                      ...prev.after,
-                      itemResponses: {
-                        ...prev.after.itemResponses,
-                        [itemId]: {
-                          checked,
-                          notes: prev.after.itemResponses[itemId]?.notes || '',
-                        },
-                      },
-                    },
-                  }))
-                }
-                onItemNotesChange={(itemId, notes) =>
-                  setWizardState((prev) => ({
-                    ...prev,
-                    after: {
-                      ...prev.after,
-                      itemResponses: {
-                        ...prev.after.itemResponses,
-                        [itemId]: {
-                          checked: prev.after.itemResponses[itemId]?.checked || false,
-                          notes,
-                        },
-                      },
-                    },
-                  }))
-                }
-                onOrientationCheckChange={(index, checked) =>
-                  setWizardState((prev) => ({
-                    ...prev,
-                    after: {
-                      ...prev.after,
-                      orientationResponses: {
-                        ...prev.after.orientationResponses,
-                        [index]: checked,
-                      },
-                    },
-                  }))
-                }
-                onConfirmationChange={(confirmed) =>
-                  setWizardState((prev) => ({
-                    ...prev,
-                    after: { ...prev.after, confirmed },
-                  }))
-                }
-                onSignatureChange={(signature) =>
-                  setWizardState((prev) => ({
-                    ...prev,
-                    after: { ...prev.after, signature },
-                  }))
-                }
-              />
-            ) : (
-              <ReviewStep
-                state={wizardState}
-                onJumpToStep={handleJumpToStep}
-              />
-            )
-          )}
-
-          {/* Step 8: Review Step (combined mode) */}
-          {wizardState.currentStep === 8 && wizardState.inspectionMode === 'both' && (
             <ReviewStep
               state={wizardState}
               onJumpToStep={handleJumpToStep}
@@ -980,19 +880,17 @@ export default function ChecklistWizard() {
           {/* Navigation Controls Bar */}
           <WizardNavigation
             currentStep={wizardState.currentStep}
-            totalSteps={wizardState.inspectionMode === 'both' ? 8 : 7}
+            totalSteps={7}
             canContinue={true}
             isSubmitting={isSubmitting}
             onBack={handlePrevStep}
-            onContinue={wizardState.currentStep === (wizardState.inspectionMode === 'both' ? 8 : 7) ? handleFinalSubmit : handleNextStep}
+            onContinue={wizardState.currentStep === 7 ? handleFinalSubmit : handleNextStep}
             continueText={
               wizardState.currentStep === 6
                 ? (wizardState.inspectionMode === 'after_only' ? 'Review After Overview →' : 'Review Before Overview →')
                 : wizardState.currentStep === 7
-                  ? (wizardState.inspectionMode === 'both' ? 'Review After Overview →' : 'Submit Checklist')
-                  : wizardState.currentStep === 8
-                    ? 'Submit Checklist'
-                    : 'Continue'
+                  ? 'Submit Checklist'
+                  : 'Continue'
             }
           />
         </main>
