@@ -537,8 +537,9 @@ export default function ChecklistWizard() {
     }
   };
 
-  // Success view with dual download buttons and BACK TO CHECKLIST button
+  // Success view with download button and BACK TO CHECKLIST button
   if (submitSuccess) {
+    const completedPhase = wizardState.inspectionMode === 'after_only' ? 'after' : 'before';
     return (
       <div className="min-h-screen bg-brand-dark pt-28 sm:pt-36 pb-24 px-4 sm:px-6 lg:px-8 font-sans">
         <PageSEO title="Checklist Completed | 1625 Autolab" description="Checklist submitted and PDF report generated." />
@@ -552,46 +553,27 @@ export default function ChecklistWizard() {
             <span className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange">Workflow Success</span>
             <h1 className="text-2xl sm:text-3xl font-display font-black text-white uppercase tracking-tight">Installation Checklist Completed</h1>
             <p className="text-xs text-gray-400 font-mono max-w-md mx-auto leading-relaxed">
-              The PDF inspection report has been generated. You can download both BEFORE and AFTER inspection reports below.
+              The {completedPhase.toUpperCase()} inspection report has been generated. You can download it below.
             </p>
           </div>
 
-          {/* Dual PDF Download Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-800/80">
+          {/* PDF Download Button */}
+          <div className="pt-4 border-t border-gray-800/80">
             <button
               type="button"
-              onClick={() => downloadPhasePdf('before')}
-              disabled={downloadingPhase === 'before'}
-              className="px-5 py-3.5 bg-brand-darker border border-amber-500/40 hover:border-amber-500 text-amber-400 text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+              onClick={() => downloadPhasePdf(completedPhase)}
+              disabled={downloadingPhase === completedPhase}
+              className="w-full sm:w-auto px-5 py-3.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 mx-auto"
             >
-              {downloadingPhase === 'before' ? (
+              {downloadingPhase === completedPhase ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Generating BEFORE PDF...</span>
+                  <span>Generating {completedPhase.toUpperCase()} PDF...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>Download BEFORE PDF</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => downloadPhasePdf('after')}
-              disabled={downloadingPhase === 'after'}
-              className="px-5 py-3.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
-            >
-              {downloadingPhase === 'after' ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Generating AFTER PDF...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  <span>Download AFTER PDF</span>
+                  <span>Download {completedPhase.toUpperCase()} PDF</span>
                 </>
               )}
             </button>
