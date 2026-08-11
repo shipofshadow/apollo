@@ -40,7 +40,9 @@ interface InquiryEvent {
   contactNumber?: string;
   emailAddress?: string;
   facebookName?: string;
+  address?: string;
   plateNumber?: string;
+  yearModel?: string | number;
 }
 
 type PanelEventItem = (Booking & { eventType: 'booking' }) | (InquiryEvent & { eventType: 'inquiry' });
@@ -285,6 +287,90 @@ export default function BookingsPanel({ onView }: Props) {
                 </button>
               )}
             </div>
+
+            {/* Export CSV/Excel Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const headers = [
+                  'Timestamp',
+                  'Full Name',
+                  'Email address',
+                  'Address',
+                  'Contact Number',
+                  'Facebook Name',
+                  'Car Make',
+                  'Car Model',
+                  'Year Model',
+                  'Service Name',
+                  'Product to Purchase',
+                  'Plate Number',
+                  'Appointment Date',
+                  'Appointment Time',
+                  'Status',
+                  'Last Updated',
+                ];
+
+                const rows = filtered.map(item => {
+                  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                  if (item.eventType === 'inquiry') {
+                    return [
+                      item.appointmentDate ? `${item.appointmentDate} ${item.appointmentTime || ''}`.trim() : nowStr,
+                      item.fullName || '',
+                      item.emailAddress || '',
+                      item.address || '',
+                      item.contactNumber || '',
+                      item.facebookName || '',
+                      item.make || '',
+                      item.model || '',
+                      item.year || item.yearModel || '',
+                      item.productToPurchase || '',
+                      item.productToPurchase || '',
+                      item.plateNumber || '',
+                      item.appointmentDate || '',
+                      item.appointmentTime || '',
+                      item.status || '',
+                      nowStr,
+                    ];
+                  } else {
+                    return [
+                      item.appointmentDate ? `${item.appointmentDate} ${item.appointmentTime || ''}`.trim() : nowStr,
+                      item.name || '',
+                      item.email || '',
+                      '',
+                      item.phone || '',
+                      '',
+                      item.vehicleMake || '',
+                      item.vehicleModel || '',
+                      item.vehicleYear || '',
+                      item.serviceName || '',
+                      item.serviceName || '',
+                      '',
+                      item.appointmentDate || '',
+                      item.appointmentTime || '',
+                      item.status || '',
+                      nowStr,
+                    ];
+                  }
+                });
+
+                const escapeCsv = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+                const csvContent = [headers.map(escapeCsv).join(','), ...rows.map(r => r.map(escapeCsv).join(','))].join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `customer_inquiries_${new Date().toISOString().slice(0, 10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-brand-orange hover:bg-orange-600 text-white rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-lg cursor-pointer shrink-0"
+              title="Export filtered records to CSV/Excel format matching Google Sheets columns"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Excel (CSV)</span>
+            </button>
           </div>
         </div>
       </header>

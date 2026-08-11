@@ -256,6 +256,8 @@ class Router
             // ── Site settings (public read, admin write) ─────────────────────
             $r->addRoute('GET', '/api/site-settings', 'handleSiteSettingsGet');
             $r->addRoute('PUT', '/api/site-settings', 'handleSiteSettingsPut');
+            $r->addRoute('POST', '/api/admin/site-settings/test-sheets-webhook', 'handleTestSheetsWebhook');
+            $r->addRoute('POST', '/api/admin/site-settings/sync-all-sheets', 'handleSyncAllSheets');
 
             // ── Team members (public read, admin write) ──────────────────────
             $r->addRoute('GET',    '/api/team-members',          'handleTeamMemberList');
@@ -1270,8 +1272,9 @@ class Router
         }
 
         $inquiry = (new InquiryService())->create($data);
+        GoogleSheetsSyncService::syncInquiry($inquiry);
         $queue = new NotificationJobQueueService();
-        $queue->dispatch('customer_inquiry', ['data' => $data]);
+        $queue->dispatch('customer_inquiry', ['data' => $inquiry]);
 
         $date = (string) ($inquiry['appointmentDate'] ?? $data['appointmentDate'] ?? '');
         $time = (string) ($inquiry['appointmentTime'] ?? $data['appointmentTime'] ?? '');
@@ -1614,6 +1617,9 @@ class Router
             }
         }
 
+        // Sync updated inquiry details (including date, time, and status) to Google Sheets
+        GoogleSheetsSyncService::syncInquiry($inquiry);
+
         echo json_encode(['inquiry' => $inquiry]);
     }
 
@@ -1685,6 +1691,8 @@ class Router
             $serviceId,
             $userId
         );
+
+        GoogleSheetsSyncService::syncInquiry($inquiry);
 
         echo json_encode(['inquiry' => $inquiry]);
     }
@@ -2124,6 +2132,45 @@ class Router
         (new ShopHoursService())->removeClosedDate($date);
         $dates = (new ShopHoursService())->getClosedDates();
         echo json_encode(['closedDates' => $dates]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleTestSheetsWebhook(array $vars = []): void
+    {
+        $auth = $this->requireAuth();
+        if (($auth['role'] ?? '') === 'client') {
+            throw new RuntimeException('Permission denied.', 403);
+        }
+        $data = $this->jsonBody();
+        $url  = trim((string) ($data['url'] ?? ''));
+
+        if ($url === '') {
+            $settings = (new SiteSettingsService())->getAll();
+            $url = trim((string) ($settings['google_sheets_webhook_url'] ?? ''));
+        }
+
+        if ($url === '') {
+            throw new RuntimeException('Google Sheets Webhook URL is not configured.', 422);
+        }
+
+        $result = GoogleSheetsSyncService::testWebhook($url);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleSyncAllSheets(array $vars = []): void
+    {
+        $auth = $this->requireAuth();
+        if (($auth['role'] ?? '') === 'client') {
+            throw new RuntimeException('Permission denied.', 403);
+        }
+        $inquiries = (new InquiryService())->getAll();
+        $synced = 0;
+        foreach ($inquiries as $inquiry) {
+            GoogleSheetsSyncService::syncInquiry($inquiry);
+            $synced++;
+        }
+        echo json_encode(['success' => true, 'syncedCount' => $synced]);
     }
 
     /** @param array<string, string> $vars */
@@ -4480,7 +4527,10 @@ class Router
     /** @param array<string, string> $vars */
     private function handleSiteSettingsPut(array $vars = []): void
     {
-        $this->requirePermission('settings:manage');
+        $auth = $this->requireAuth();
+        if (($auth['role'] ?? '') === 'client') {
+            throw new RuntimeException('Permission denied.', 403);
+        }
         $data     = $this->jsonBody();
         $settings = (new SiteSettingsService())->update($data);
         echo json_encode(['settings' => $settings]);

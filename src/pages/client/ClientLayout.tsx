@@ -8,14 +8,16 @@ import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/logo.png';
 import NotificationBell from '../../components/NotificationBell';
 import { getDicebearAvatarDataUri } from '../../utils/avatar';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
 
-const navItems = [
-  { label: 'Dashboard',   href: '/client/dashboard', icon: LayoutDashboard },
-  { label: 'My Bookings', href: '/client/bookings',  icon: Calendar },
-  { label: 'My Inquiries',href: '/client/inquiries', icon: MessageSquare },
-  { label: 'My Orders',   href: '/client/orders',    icon: Package },
-  { label: 'My Garage',   href: '/client/garage',    icon: Car },
-  { label: 'Profile',     href: '/client/profile',   icon: User },
+const baseNavItems = [
+  { label: 'Dashboard',   href: '/client/dashboard', icon: LayoutDashboard, shopOnly: false },
+  { label: 'My Bookings', href: '/client/bookings',  icon: Calendar,         shopOnly: false },
+  { label: 'My Inquiries',href: '/client/inquiries', icon: MessageSquare,    shopOnly: false },
+  { label: 'My Orders',   href: '/client/orders',    icon: Package,          shopOnly: true  },
+  { label: 'My Garage',   href: '/client/garage',    icon: Car,              shopOnly: false },
+  { label: 'Profile',     href: '/client/profile',   icon: User,             shopOnly: false },
 ];
 
 export default function ClientLayout() {
@@ -25,6 +27,12 @@ export default function ClientLayout() {
   const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasCustomSidebarPref, setHasCustomSidebarPref] = useState(false);
+
+  const shopEnabled = useSelector((s: RootState) => {
+    const v = s.siteSettings.settings.shop_enabled;
+    return v === undefined || v === '1';
+  });
+  const navItems = baseNavItems.filter(item => !item.shopOnly || shopEnabled);
 
   useEffect(() => {
     const saved = window.localStorage.getItem('client-sidebar-collapsed');

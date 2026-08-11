@@ -20,6 +20,8 @@ import {
   runNotificationQueueWorkerApi,
   runWaitlistAutoFillWorkerApi,
   runAppointmentRemindersWorkerApi,
+  testSheetsWebhookApi,
+  syncAllSheetsApi,
   type AdminRole,
   type MigrationEntry,
 } from '../../services/api';
@@ -1559,6 +1561,17 @@ function SystemPanel() {
   const [registrationSettingsError, setRegistrationSettingsError] = useState<string | null>(null);
   const [registrationSettingsSuccess, setRegistrationSettingsSuccess] = useState(false);
 
+  const [shopEnabled, setShopEnabled] = useState(true);
+  const [shopSettingsSaving, setShopSettingsSaving] = useState(false);
+  const [shopSettingsError, setShopSettingsError] = useState<string | null>(null);
+  const [shopSettingsSuccess, setShopSettingsSuccess] = useState(false);
+
+  const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState('');
+  const [sheetsSettingsSaving, setSheetsSettingsSaving] = useState(false);
+  const [sheetsSettingsError, setSheetsSettingsError] = useState<string | null>(null);
+  const [sheetsSettingsSuccess, setSheetsSettingsSuccess] = useState(false);
+  const [testSheetsBusy, setTestSheetsBusy] = useState(false);
+
   const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
   const [migrTotal,     setMigrTotal]     = useState(0);
   const [migrPage,      setMigrPage]      = useState(1);
@@ -1571,6 +1584,7 @@ function SystemPanel() {
   const [cronBusy,      setCronBusy]      = useState<'queue' | 'waitlist' | 'reminders' | null>(null);
   const [cronResult,    setCronResult]    = useState<string | null>(null);
   const [cronError,     setCronError]     = useState<string | null>(null);
+  const [syncAllBusy,   setSyncAllBusy]   = useState(false);
 
   const loadStatus = useCallback(() => {
     if (!token) return;
@@ -1598,7 +1612,10 @@ function SystemPanel() {
       staff_can_manage_all_bookings: toBool(settings.staff_can_manage_all_bookings),
     });
     setDisableRegistration(toBool(settings.disable_registration));
-  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings, settings.disable_registration]);
+    // Default shop_enabled to true (1) if setting is not yet in DB
+    setShopEnabled(settings.shop_enabled === undefined ? true : toBool(settings.shop_enabled));
+    setGoogleSheetsWebhookUrl(settings.google_sheets_webhook_url ?? '');
+  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings, settings.disable_registration, settings.shop_enabled, settings.google_sheets_webhook_url]);
 
   const handleSaveRegistrationSettings = async () => {
     if (!token || registrationSettingsSaving) return;
@@ -1618,6 +1635,83 @@ function SystemPanel() {
       setRegistrationSettingsError((e as Error).message ?? 'Failed to save registration access settings.');
     } finally {
       setRegistrationSettingsSaving(false);
+    }
+  };
+
+  const handleSaveShopSettings = async () => {
+    if (!token || shopSettingsSaving) return;
+    setShopSettingsSaving(true);
+    setShopSettingsError(null);
+    setShopSettingsSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({
+        token,
+        data: { shop_enabled: shopEnabled ? '1' : '0' },
+      })).unwrap();
+      setShopSettingsSuccess(true);
+      setTimeout(() => setShopSettingsSuccess(false), 3000);
+    } catch (e: unknown) {
+      setShopSettingsError((e as Error).message ?? 'Failed to save shop settings.');
+    } finally {
+      setShopSettingsSaving(false);
+    }
+  };
+
+  const handleSaveSheetsSettings = async () => {
+    if (!token || sheetsSettingsSaving) return;
+    setSheetsSettingsSaving(true);
+    setSheetsSettingsError(null);
+    setSheetsSettingsSuccess(false);
+    try {
+      await dispatch(updateSiteSettingsAsync({
+        token,
+        data: { google_sheets_webhook_url: googleSheetsWebhookUrl.trim() },
+      })).unwrap();
+      setSheetsSettingsSuccess(true);
+      setTimeout(() => setSheetsSettingsSuccess(false), 3000);
+    } catch (e: unknown) {
+      setSheetsSettingsError((e as Error).message ?? 'Failed to save Google Sheets settings.');
+    } finally {
+      setSheetsSettingsSaving(false);
+    }
+  };
+
+  const handleTestSheetsWebhook = async () => {
+    if (!token || testSheetsBusy) return;
+    if (!googleSheetsWebhookUrl.trim()) {
+      setSheetsSettingsError('Please enter a Webhook URL first.');
+      return;
+    }
+    setTestSheetsBusy(true);
+    setSheetsSettingsError(null);
+    setSheetsSettingsSuccess(false);
+    try {
+      const data = await testSheetsWebhookApi(token, googleSheetsWebhookUrl.trim());
+      if (data.success === false) {
+        throw new Error(data.error || `HTTP ${data.httpCode || 500} — Webhook test failed.`);
+      }
+      setSheetsSettingsSuccess(true);
+      setTimeout(() => setSheetsSettingsSuccess(false), 5000);
+    } catch (e: unknown) {
+      setSheetsSettingsError((e as Error).message ?? 'Webhook test failed.');
+    } finally {
+      setTestSheetsBusy(false);
+    }
+  };
+
+  const handleSyncAllSheets = async () => {
+    if (!token || syncAllBusy) return;
+    setSyncAllBusy(true);
+    setSheetsSettingsError(null);
+    setSheetsSettingsSuccess(false);
+    try {
+      await syncAllSheetsApi(token);
+      setSheetsSettingsSuccess(true);
+      setTimeout(() => setSheetsSettingsSuccess(false), 5000);
+    } catch (e: unknown) {
+      setSheetsSettingsError((e as Error).message ?? 'Sync all failed.');
+    } finally {
+      setSyncAllBusy(false);
     }
   };
 
@@ -1878,6 +1972,128 @@ function SystemPanel() {
               className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50"
             >
               {registrationSettingsSaving ? 'Saving...' : 'Save Registration Policy'}
+            </button>
+          </div>
+        </div>
+
+        {/* Shop / E-Commerce Toggle */}
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div>
+            <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+              <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                <Layout className="w-4 h-4" /> Shop &amp; E-Commerce
+              </h4>
+              <span className="text-[10px] font-mono text-gray-500">Public Storefront</span>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {shopSettingsError && (
+                <div className="text-xs font-mono text-red-400 bg-red-950/50 p-3 rounded-lg border border-red-500/30">
+                  {shopSettingsError}
+                </div>
+              )}
+              {shopSettingsSuccess && (
+                <div className="text-xs font-mono text-emerald-400 bg-emerald-950/50 p-3 rounded-lg border border-emerald-500/30">
+                  Shop settings updated.
+                </div>
+              )}
+
+              <div className="flex items-center justify-between p-4 bg-brand-darker border border-gray-800 rounded-lg">
+                <div>
+                  <p className="text-xs font-mono font-bold uppercase text-white">Enable Shop / Products</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Shows Products nav, Cart, and My Orders across the site. Disable to hide all e-commerce UI.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={shopEnabled}
+                    onChange={e => setShopEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-3 bg-brand-dark/80 border-t border-gray-800/80 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSaveShopSettings}
+              disabled={shopSettingsSaving}
+              className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50"
+            >
+              {shopSettingsSaving ? 'Saving...' : 'Save Shop Policy'}
+            </button>
+          </div>
+        </div>
+
+        {/* Google Sheets Live Sync Setting */}
+        <div className="bg-[#121212] border border-gray-800/80 rounded-xl overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div>
+            <div className="px-6 py-4 border-b border-gray-800/80 bg-brand-dark/50 flex items-center justify-between">
+              <h4 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
+                <Database className="w-4 h-4" /> Google Sheets Live Sync
+              </h4>
+              <span className="text-[10px] font-mono text-gray-500">Spreadsheet Webhook</span>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {sheetsSettingsError && (
+                <div className="text-xs font-mono text-red-400 bg-red-950/50 p-3 rounded-lg border border-red-500/30">
+                  {sheetsSettingsError}
+                </div>
+              )}
+              {sheetsSettingsSuccess && (
+                <div className="text-xs font-mono text-emerald-400 bg-emerald-950/50 p-3 rounded-lg border border-emerald-500/30">
+                  Google Sheets Webhook URL saved successfully.
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-400">Google Apps Script / Webhook URL</label>
+                <input
+                  type="url"
+                  value={googleSheetsWebhookUrl}
+                  onChange={e => setGoogleSheetsWebhookUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-xs placeholder:text-gray-600 transition-colors"
+                />
+                <p className="text-[11px] text-gray-500">
+                  Inquiries automatically sync all 16 columns (Name, Email, Address, Contact, FB, Make, Model, Year, Service, Product, Plate, Date, Time, Status, Last Updated) when created, edited, rescheduled, or confirmed.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-3 bg-brand-dark/80 border-t border-gray-800/80 flex items-center justify-end gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSyncAllSheets}
+              disabled={syncAllBusy || !googleSheetsWebhookUrl.trim()}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2 border border-gray-700"
+            >
+              {syncAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-orange" /> : <RefreshCw className="w-3.5 h-3.5 text-brand-orange" />}
+              <span>{syncAllBusy ? 'Syncing All...' : 'Sync All Inquiries'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTestSheetsWebhook}
+              disabled={testSheetsBusy || !googleSheetsWebhookUrl.trim()}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2 border border-gray-700"
+            >
+              {testSheetsBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-orange" /> : <Play className="w-3.5 h-3.5 text-brand-orange" />}
+              <span>{testSheetsBusy ? 'Testing...' : 'Test Sync'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveSheetsSettings}
+              disabled={sheetsSettingsSaving}
+              className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer disabled:opacity-50"
+            >
+              {sheetsSettingsSaving ? 'Saving...' : 'Save Webhook URL'}
             </button>
           </div>
         </div>

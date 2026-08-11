@@ -262,31 +262,7 @@ export default function CustomerFormPage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Fire Google Sheets Webhook (Isolated so a failure here doesn't block the DB)
-      try {
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbxm860_AqLacRru8vXJ0NDfjl7gZgYcEB9rjqYXrvPEMph31vQ8kZQIHgbfeYWLHiTONw/exec';
-        const googleData = new URLSearchParams({
-          'Timestamp': new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-          'Full Name': formData.fullName,
-          'Address': formData.address,
-          'Contact Number': formData.contactNumber,
-          'Email address': formData.emailAddress,
-          'Facebook Name': formData.facebookName,
-          'Plate Number': formData.plateNumber,
-          'Car Make': formData.make,
-          'Car Model': formData.model,
-          'Year Model': formData.yearModel,
-          'Appointment Date': formData.appointmentDate,
-          'Appointment Time': formData.appointmentTime,
-          'Product to Purchase': formData.productToPurchase
-        });
-
-        await fetch(scriptURL, { method: 'POST', body: googleData, mode: 'no-cors' });
-      } catch (googleErr) {
-        console.warn('Google Sheets sync failed, but proceeding with API.', googleErr);
-      }
-
-      // 2. Main Backend API Push
+      // Submit Inquiry via Backend API (Backend automatically syncs to Google Sheets with Reference Number)
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 

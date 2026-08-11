@@ -598,6 +598,8 @@ export interface SiteSettings {
   staff_can_view_all_bookings?: string;
   staff_can_manage_all_bookings?: string;
   disable_registration?: string;
+  shop_enabled?: string;
+  google_sheets_webhook_url?: string;
   booking_horizon_weeks?: string;
   [key: string]: string | undefined;
 }

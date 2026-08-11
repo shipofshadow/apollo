@@ -2137,4 +2137,21 @@ export const fetchAdminChecklistsApi = (token: string) =>
 export const resetAdminChecklistApi = (token: string, inquiryId: string) =>
   apiFetch<{ message: string }>(`/api/admin/checklists/${inquiryId}`, { method: 'DELETE' }, token);
 
+export const testSheetsWebhookApi = (token: string, url: string) =>
+  apiFetch<{ success: boolean; httpCode?: number; response?: string; error?: string }>(
+    '/api/admin/site-settings/test-sheets-webhook',
+    {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    },
+    token
+  );
+
+export const syncAllSheetsApi = (token: string) =>
+  apiFetch<{ success: boolean; syncedCount: number }>(
+    '/api/admin/site-settings/sync-all-sheets',
+    { method: 'POST' },
+    token
+  );
+
 

@@ -102,6 +102,7 @@ export default function AdminPage() {
 
   const siteSettings = useSelector((state: RootState) => state.siteSettings.settings);
   const isRegistrationDisabled = siteSettings.disable_registration === '1';
+  const shopEnabled = siteSettings.shop_enabled === undefined || siteSettings.shop_enabled === '1';
 
   useEffect(() => {
     if (siteSettings.disable_registration === undefined) {
@@ -127,10 +128,12 @@ export default function AdminPage() {
     {
       isGroup: true, key: 'shop', label: 'Manage Shop', icon: Wrench,
       children: [
-        {key: 'services',   label: 'Services',   icon: Wrench },
-        { key: 'products',   label: 'Products',   icon: Package },
-        { key: 'orders',     label: 'Orders',     icon: Package },
-        { key: 'inventory',  label: 'Inventory',  icon: Boxes },
+        { key: 'services',   label: 'Services',   icon: Wrench },
+        ...(shopEnabled ? [
+          { key: 'products',   label: 'Products',   icon: Package },
+          { key: 'orders',     label: 'Orders',     icon: Package },
+          { key: 'inventory',  label: 'Inventory',  icon: Boxes },
+        ] : []),
         { key: 'checklists', label: 'Checklists', icon: ShieldCheck },
         { key: 'shop-hours', label: 'Shop Hours', icon: Clock },
       ]
@@ -228,12 +231,8 @@ export default function AdminPage() {
       return false;
     }
 
-    if (['products', 'orders'].includes(key)) {
-      return hasPermission('products:manage');
-    }
-
-    if (key === 'inventory') {
-      return hasPermission('products:manage');
+    if (['products', 'orders', 'inventory'].includes(key)) {
+      return shopEnabled && hasPermission('products:manage');
     }
 
     if (key === 'marketing-campaigns') {

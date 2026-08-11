@@ -13,6 +13,8 @@ import Footer from './components/Footer';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import WebsiteChatWidget from './components/chatbot/WebsiteChatWidget';
 import { useNotificationPoller } from './hooks/useNotificationPoller';
+import { useSelector } from 'react-redux';
+import type { RootState } from './store';
 
 const Home = lazy(() => import('./pages/Home'));
 const ServicesPage = lazy(() => import('./pages/ServicesPage'));
@@ -58,6 +60,15 @@ function RouteFallback() {
   );
 }
 
+/** Redirects to / when the shop/e-commerce feature is disabled. */
+function ShopRoute() {
+  const shopEnabled = useSelector((s: RootState) => {
+    const v = s.siteSettings.settings.shop_enabled;
+    return v === undefined || v === '1';
+  });
+  return shopEnabled ? <Outlet /> : <Navigate to="/" replace />;
+}
+
 /** Wraps public-facing routes with the site Header and Footer. */
 function PublicLayout() {
   return (
@@ -97,10 +108,13 @@ function AppInner() {
             <Route path="/" element={<Home />} />
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/services/:slug" element={<ServiceDetail />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/products/:id" element={<ProductDetail />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
+            {/* Shop routes — guarded by shop_enabled setting */}
+            <Route element={<ShopRoute />}>
+              <Route path="/products" element={<Products />} />
+              <Route path="/products/:id" element={<ProductDetail />} />
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
+            </Route>
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/builds/:slug" element={<BuildShowcase />} />
             <Route path="/blog" element={<Blog />} />

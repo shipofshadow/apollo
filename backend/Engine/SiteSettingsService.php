@@ -198,6 +198,8 @@ class SiteSettingsService
             'staff_can_view_all_bookings' => '0',
             'staff_can_manage_all_bookings' => '0',
             'disable_registration' => '0',
+            'shop_enabled' => '1',
+            'google_sheets_webhook_url' => '',
             // Contact page settings
             'contact_heading'  => 'Contact The Lab',
             'contact_tagline'  => 'Ready to upgrade your ride? Reach out and we\'ll get back to you within 24 hours.',
