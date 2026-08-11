@@ -468,6 +468,20 @@ export const rescheduleInquiryApi = (
     token
   );
 
+export const updateInquiryFullApi = (
+  token: string,
+  id: string,
+  payload: Record<string, any>
+) =>
+  apiFetch<{ inquiry: any }>(
+    `/api/inquiries/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+    token
+  );
+
 export const uploadBookingMediaApi = async (files: File[]): Promise<string[]> => {
   const form = new FormData();
   files.forEach(f => form.append('files[]', f));

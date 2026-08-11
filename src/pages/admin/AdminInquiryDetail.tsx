@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { formatStatus } from '../../utils/formatStatus';
 import { BACKEND_URL } from '../../config';
+import EditInquiryModal from '../../components/admin/EditInquiryModal';
 
 function buildDateList(shopHours: ShopDayHours[], closedDatesSet: Set<string>, weeks: number = 4): Date[] {
   const openDays = shopHours.length
@@ -341,6 +342,7 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
   const [isChangingService, setIsChangingService] = useState(false);
 
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
+  const [isEditInquiryModalOpen, setIsEditInquiryModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
@@ -720,6 +722,15 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
               <span className={`w-2 h-2 rounded-full ${STATUS_DOT_STYLE[inquiry.status] || 'bg-gray-400'}`} />
               <span>{formatStatus(inquiry.status)}</span>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsEditInquiryModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold uppercase tracking-wider text-xs border border-amber-500/50 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-md cursor-pointer"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>Edit Inquiry</span>
+            </button>
 
             <a
               href={`/checklist?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}`}
@@ -1943,6 +1954,24 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── 16. Edit Inquiry Modal ───────────────────────────────────── */}
+      {isEditInquiryModalOpen && inquiry && (
+        <EditInquiryModal
+          isOpen={isEditInquiryModalOpen}
+          inquiry={inquiry}
+          services={services}
+          onClose={() => setIsEditInquiryModalOpen(false)}
+          onSaveSuccess={(updatedInquiry) => {
+            setInquiry(updatedInquiry);
+            if (token) {
+              fetchInquiryActivityApi(token, String(id)).then((activitiesRes) => {
+                setActivityLogs((activitiesRes as InquiryActivityLog[]) || []);
+              });
+            }
+          }}
+        />
       )}
 
     </div>

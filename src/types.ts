@@ -1035,12 +1035,14 @@ export interface Inquiry {
   contactNumber: string;
   emailAddress: string;
   facebookName: string;
+  address?: string;
   plateNumber?: string;
   appointmentDate: string;
   appointmentTime: string;
   make: string;
   model: string;
   year?: string;
+  yearModel?: string;
   productToPurchase: string;
   status: string;
   internalNotes?: string | null;

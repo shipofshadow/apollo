@@ -252,6 +252,191 @@ class InquiryService
     }
 
     /**
+     * Comprehensive update for customer inquiry details by admin.
+     *
+     * @param string $id
+     * @param array<string, mixed> $data
+     * @param int|null $actorUserId
+     * @return array<string, mixed>
+     */
+    public function updateFullInquiry(string $id, array $data, ?int $actorUserId = null): array
+    {
+        $existing = $this->useDb ? $this->dbGetById($id) : $this->fileGetById($id);
+        if ($existing === null) {
+            throw new RuntimeException('Inquiry not found.', 404);
+        }
+
+        $fieldsToUpdate = [];
+
+        if (array_key_exists('fullName', $data) || array_key_exists('full_name', $data)) {
+            $val = trim((string)($data['fullName'] ?? $data['full_name'] ?? ''));
+            if ($val === '') throw new RuntimeException('Full name cannot be empty.', 422);
+            $fieldsToUpdate['full_name'] = $val;
+        }
+
+        if (array_key_exists('emailAddress', $data) || array_key_exists('email_address', $data)) {
+            $val = trim((string)($data['emailAddress'] ?? $data['email_address'] ?? ''));
+            if ($val === '' || !filter_var($val, FILTER_VALIDATE_EMAIL)) {
+                throw new RuntimeException('A valid email address is required.', 422);
+            }
+            $fieldsToUpdate['email_address'] = $val;
+        }
+
+        if (array_key_exists('contactNumber', $data) || array_key_exists('contact_number', $data)) {
+            $val = trim((string)($data['contactNumber'] ?? $data['contact_number'] ?? ''));
+            if ($val === '') throw new RuntimeException('Contact number cannot be empty.', 422);
+            $fieldsToUpdate['contact_number'] = $val;
+        }
+
+        if (array_key_exists('facebookName', $data) || array_key_exists('facebook_name', $data)) {
+            $fieldsToUpdate['facebook_name'] = trim((string)($data['facebookName'] ?? $data['facebook_name'] ?? ''));
+        }
+
+        if (array_key_exists('address', $data)) {
+            $fieldsToUpdate['address'] = trim((string)($data['address'] ?? ''));
+        }
+
+        if (array_key_exists('make', $data)) {
+            $val = trim((string)($data['make'] ?? ''));
+            if ($val === '') throw new RuntimeException('Make cannot be empty.', 422);
+            $fieldsToUpdate['make'] = $val;
+        }
+
+        if (array_key_exists('model', $data)) {
+            $val = trim((string)($data['model'] ?? ''));
+            if ($val === '') throw new RuntimeException('Model cannot be empty.', 422);
+            $fieldsToUpdate['model'] = $val;
+        }
+
+        if (array_key_exists('yearModel', $data) || array_key_exists('year_model', $data)) {
+            $val = trim((string)($data['yearModel'] ?? $data['year_model'] ?? ''));
+            if ($val === '') throw new RuntimeException('Year model cannot be empty.', 422);
+            $fieldsToUpdate['year_model'] = $val;
+        }
+
+        if (array_key_exists('plateNumber', $data) || array_key_exists('plate_number', $data)) {
+            $fieldsToUpdate['plate_number'] = trim((string)($data['plateNumber'] ?? $data['plate_number'] ?? ''));
+        }
+
+        if (array_key_exists('productToPurchase', $data) || array_key_exists('product_to_purchase', $data)) {
+            $val = trim((string)($data['productToPurchase'] ?? $data['product_to_purchase'] ?? ''));
+            if ($val === '') throw new RuntimeException('Product or service name cannot be empty.', 422);
+            $fieldsToUpdate['product_to_purchase'] = $val;
+        }
+
+        if (array_key_exists('serviceId', $data) || array_key_exists('service_id', $data)) {
+            $rawSvc = $data['serviceId'] ?? $data['service_id'] ?? null;
+            $fieldsToUpdate['service_id'] = ($rawSvc !== null && $rawSvc !== '') ? (int)$rawSvc : null;
+        }
+
+        if (array_key_exists('status', $data)) {
+            $status = trim((string)$data['status']);
+            $allowed = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
+            if (!in_array($status, $allowed, true)) {
+                throw new RuntimeException('Invalid inquiry status.', 422);
+            }
+            $fieldsToUpdate['status'] = $status;
+        }
+
+        if (array_key_exists('internalNotes', $data) || array_key_exists('internal_notes', $data)) {
+            $fieldsToUpdate['internal_notes'] = mb_substr((string)($data['internalNotes'] ?? $data['internal_notes'] ?? ''), 0, 5000);
+        }
+
+        $targetDate = array_key_exists('appointmentDate', $data) || array_key_exists('appointment_date', $data)
+            ? trim((string)($data['appointmentDate'] ?? $data['appointment_date'] ?? ''))
+            : (string)($existing['appointmentDate'] ?? '');
+        $targetTime = array_key_exists('appointmentTime', $data) || array_key_exists('appointment_time', $data)
+            ? trim((string)($data['appointmentTime'] ?? $data['appointment_time'] ?? ''))
+            : (string)($existing['appointmentTime'] ?? '');
+
+        if ($targetDate !== (string)($existing['appointmentDate'] ?? '') || $targetTime !== (string)($existing['appointmentTime'] ?? '')) {
+            if ($targetDate === '' || $targetTime === '') {
+                throw new RuntimeException('Appointment date and time are required.', 422);
+            }
+            $this->assertSlotCapacity($targetDate, $targetTime, $id);
+            $fieldsToUpdate['appointment_date'] = $targetDate;
+            $fieldsToUpdate['appointment_time'] = $targetTime;
+        }
+
+        if (empty($fieldsToUpdate)) {
+            return $existing;
+        }
+
+        if ($this->useDb) {
+            $db = Database::getInstance();
+            $setStatements = ['updated_at = CURRENT_TIMESTAMP'];
+            $params = [':id' => $id];
+            foreach ($fieldsToUpdate as $col => $val) {
+                $setStatements[] = "{$col} = :{$col}";
+                $params[":{$col}"] = $val;
+            }
+            $stmt = $db->prepare('UPDATE customer_inquiries SET ' . implode(', ', $setStatements) . ' WHERE id = :id');
+            $stmt->execute($params);
+
+            $updated = $this->dbGetById($id);
+            if ($updated === null) {
+                throw new RuntimeException('Failed to retrieve updated inquiry.', 500);
+            }
+            $this->syncOccupancyForInquiry($updated);
+
+            $this->activity->add(
+                $id,
+                ActivityEvents::INQUIRY_STATUS_CHANGED,
+                'Inquiry details updated by admin',
+                null,
+                $actorUserId,
+                $actorUserId ? 'admin' : 'system'
+            );
+
+            return $updated;
+        }
+
+        $inquiries = $this->fileGetAll();
+        foreach ($inquiries as &$item) {
+            if ((string) ($item['id'] ?? '') === $id) {
+                if (isset($fieldsToUpdate['full_name'])) $item['fullName'] = $fieldsToUpdate['full_name'];
+                if (isset($fieldsToUpdate['email_address'])) $item['emailAddress'] = $fieldsToUpdate['email_address'];
+                if (isset($fieldsToUpdate['contact_number'])) $item['contactNumber'] = $fieldsToUpdate['contact_number'];
+                if (isset($fieldsToUpdate['facebook_name'])) $item['facebookName'] = $fieldsToUpdate['facebook_name'];
+                if (isset($fieldsToUpdate['address'])) $item['address'] = $fieldsToUpdate['address'];
+                if (isset($fieldsToUpdate['make'])) $item['make'] = $fieldsToUpdate['make'];
+                if (isset($fieldsToUpdate['model'])) $item['model'] = $fieldsToUpdate['model'];
+                if (isset($fieldsToUpdate['year_model'])) $item['yearModel'] = $fieldsToUpdate['year_model'];
+                if (isset($fieldsToUpdate['plate_number'])) $item['plateNumber'] = $fieldsToUpdate['plate_number'];
+                if (isset($fieldsToUpdate['product_to_purchase'])) $item['productToPurchase'] = $fieldsToUpdate['product_to_purchase'];
+                if (array_key_exists('service_id', $fieldsToUpdate)) $item['serviceId'] = $fieldsToUpdate['service_id'];
+                if (isset($fieldsToUpdate['status'])) $item['status'] = $fieldsToUpdate['status'];
+                if (isset($fieldsToUpdate['internal_notes'])) $item['internalNotes'] = $fieldsToUpdate['internal_notes'];
+                if (isset($fieldsToUpdate['appointment_date'])) $item['appointmentDate'] = $fieldsToUpdate['appointment_date'];
+                if (isset($fieldsToUpdate['appointment_time'])) $item['appointmentTime'] = $fieldsToUpdate['appointment_time'];
+                $item['updatedAt'] = date('c');
+                break;
+            }
+        }
+        unset($item);
+
+        file_put_contents(self::$storageFile, json_encode($inquiries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $updated = array_values(array_filter($inquiries, fn ($item) => (string) ($item['id'] ?? '') === $id))[0] ?? null;
+        if (is_array($updated)) {
+            $this->syncOccupancyForInquiry($updated);
+        }
+        if (!is_array($updated)) {
+            throw new RuntimeException('Inquiry not found.', 404);
+        }
+
+        $this->activity->add(
+            $id,
+            ActivityEvents::INQUIRY_STATUS_CHANGED,
+            'Inquiry details updated by admin',
+            null,
+            $actorUserId,
+            $actorUserId ? 'admin' : 'system'
+        );
+
+        return $updated;
+    }
+
+    /**
      * @param string $id
      * @param string $notes
      * @param int|null $actorUserId

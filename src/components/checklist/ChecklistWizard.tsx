@@ -287,17 +287,17 @@ export default function ChecklistWizard() {
 
     const responses = checklistDef
       ? checklistDef.items.map((item) => ({
-          label: item.label,
-          isChecked: Boolean(
-            phase === 'before'
-              ? wizardState.before.itemResponses[item.id]?.checked
-              : wizardState.after.itemResponses[item.id]?.checked
-          ),
-          notes:
-            phase === 'before'
-              ? wizardState.before.itemResponses[item.id]?.notes || ''
-              : wizardState.after.itemResponses[item.id]?.notes || '',
-        }))
+        label: item.label,
+        isChecked: Boolean(
+          phase === 'before'
+            ? wizardState.before.itemResponses[item.id]?.checked
+            : wizardState.after.itemResponses[item.id]?.checked
+        ),
+        notes:
+          phase === 'before'
+            ? wizardState.before.itemResponses[item.id]?.notes || ''
+            : wizardState.after.itemResponses[item.id]?.notes || '',
+      }))
       : [];
 
     const orientationArray = phase === 'after' && checklistDef?.orientationItems
@@ -492,11 +492,11 @@ export default function ChecklistWizard() {
     const targetPhase = overviewPhase;
     setOverviewPhase(null);
 
-    // Save phase submission to DB (only trigger email if running in single-phase mode)
+    // Save phase submission to DB without sending email (email is sent upon final submission in handleFinalSubmit)
     if (targetPhase === 'before') {
-      sendPhaseSubmissionToDb('before', wizardState.inspectionMode === 'before_only', 'before');
+      sendPhaseSubmissionToDb('before', false);
     } else if (targetPhase === 'after') {
-      sendPhaseSubmissionToDb('after', wizardState.inspectionMode === 'after_only', 'after');
+      sendPhaseSubmissionToDb('after', false);
     }
 
     const nextStep = wizardState.inspectionMode === 'both' ? (targetPhase === 'before' ? 7 : 8) : 7;
@@ -989,10 +989,10 @@ export default function ChecklistWizard() {
               wizardState.currentStep === 6
                 ? (wizardState.inspectionMode === 'after_only' ? 'Review After Overview →' : 'Review Before Overview →')
                 : wizardState.currentStep === 7
-                ? (wizardState.inspectionMode === 'both' ? 'Review After Overview →' : 'Submit Checklist')
-                : wizardState.currentStep === 8
-                ? 'Submit Checklist'
-                : 'Continue'
+                  ? (wizardState.inspectionMode === 'both' ? 'Review After Overview →' : 'Submit Checklist')
+                  : wizardState.currentStep === 8
+                    ? 'Submit Checklist'
+                    : 'Continue'
             }
           />
         </main>

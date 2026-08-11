@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Calendar, Clock, Loader2, XCircle, Eye, Search, X as XIcon, Trash2, AlertTriangle, Download,
-  Car
+  Car, Wrench
 } from 'lucide-react';
 import { fetchAllBookingsAsync, updateBookingStatusAsync } from '../../store/bookingSlice';
 import type { AppDispatch, RootState } from '../../store';
@@ -16,6 +16,7 @@ import {
   fetchShopClosedDatesApi
 } from '../../services/api';
 import { generateJobCompletionPDF } from '../../utils/generateJobCompletionPDF';
+import EditInquiryModal from '../../components/admin/EditInquiryModal';
 
 const STATUS_STYLES: Record<string, string> = {
   pending:        'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30',
@@ -84,6 +85,7 @@ export default function BookingsPanel({ onView }: Props) {
   const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: 'booking' | 'inquiry' } | null>(null);
   const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
+  const [editingInquiry, setEditingInquiry] = useState<any | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -471,6 +473,17 @@ export default function BookingsPanel({ onView }: Props) {
                             <Eye className="w-4 h-4" />
                           </button>
 
+                          {!isBooking && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingInquiry(item)}
+                              title="Edit Inquiry"
+                              className="p-2 rounded-lg bg-brand-darker border border-gray-800 hover:border-amber-500 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer"
+                            >
+                              <Wrench className="w-4 h-4" />
+                            </button>
+                          )}
+
                           {isBooking && item.status === 'completed' && (
                             <button
                               type="button"
@@ -692,6 +705,38 @@ export default function BookingsPanel({ onView }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Inquiry Modal */}
+      {editingInquiry && (
+        <EditInquiryModal
+          isOpen={Boolean(editingInquiry)}
+          inquiry={editingInquiry}
+          onClose={() => setEditingInquiry(null)}
+          onSaveSuccess={(updatedInquiry) => {
+            setInquiries((prev) =>
+              prev.map((iq) =>
+                iq.id === updatedInquiry.id
+                  ? {
+                      ...iq,
+                      fullName: updatedInquiry.fullName || iq.fullName,
+                      contactNumber: updatedInquiry.contactNumber || iq.contactNumber,
+                      emailAddress: updatedInquiry.emailAddress || iq.emailAddress,
+                      make: updatedInquiry.make || iq.make,
+                      model: updatedInquiry.model || iq.model,
+                      year: updatedInquiry.year || iq.year,
+                      plateNumber: updatedInquiry.plateNumber || iq.plateNumber,
+                      productToPurchase: updatedInquiry.productToPurchase || iq.productToPurchase,
+                      status: updatedInquiry.status || iq.status,
+                      appointmentDate: updatedInquiry.appointmentDate || iq.appointmentDate,
+                      appointmentTime: updatedInquiry.appointmentTime || iq.appointmentTime,
+                    }
+                  : iq
+              )
+            );
+            setEditingInquiry(null);
+          }}
+        />
       )}
 
     </div>

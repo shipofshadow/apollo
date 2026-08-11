@@ -1542,21 +1542,20 @@ class Router
         $payload = $this->requirePermission('bookings:manage');
         $id = $vars['id'] ?? '';
         $data = $this->jsonBody();
-        $status = isset($data['status']) ? trim((string) $data['status']) : '';
-        $appointmentDate = array_key_exists('appointmentDate', $data) ? trim((string) $data['appointmentDate']) : null;
-        $appointmentTime = array_key_exists('appointmentTime', $data) ? trim((string) $data['appointmentTime']) : null;
 
-        if ($status === '' && $appointmentDate === null && $appointmentTime === null) {
+        if (empty($data)) {
             throw new RuntimeException('No changes were provided.', 422);
         }
 
-        $inquiry = (new InquiryService())->updateDetails(
+        $inquiry = (new InquiryService())->updateFullInquiry(
             $id,
-            $status !== '' ? $status : null,
-            $appointmentDate,
-            $appointmentTime,
+            $data,
             (int) ($payload['sub'] ?? 0) ?: null
         );
+
+        $status = isset($data['status']) ? trim((string) $data['status']) : '';
+        $appointmentDate = array_key_exists('appointmentDate', $data) || array_key_exists('appointment_date', $data) ? trim((string) ($data['appointmentDate'] ?? $data['appointment_date'])) : null;
+        $appointmentTime = array_key_exists('appointmentTime', $data) || array_key_exists('appointment_time', $data) ? trim((string) ($data['appointmentTime'] ?? $data['appointment_time'])) : null;
 
         // Re-queue the 3-hour appointment reminder when the schedule or status changes.
         try {
