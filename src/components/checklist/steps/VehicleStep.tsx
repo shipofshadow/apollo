@@ -35,7 +35,7 @@ export default function VehicleStep({ state, onChange }: Props) {
     <div className="space-y-6">
       <div className="space-y-1">
         <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">
-          STEP 2 OF 8
+          STEP 3 OF {state.inspectionMode === 'both' ? '8' : '7'}
         </span>
         <h2 className="text-2xl font-display font-black text-white uppercase tracking-tight">
           Vehicle Information

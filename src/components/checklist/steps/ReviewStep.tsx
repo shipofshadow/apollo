@@ -48,7 +48,7 @@ export default function ReviewStep({
     <div className="space-y-6 font-sans">
       <div className="space-y-1">
         <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">
-          STEP 7 OF 7
+          STEP {state.inspectionMode === 'both' ? '8 OF 8' : '7 OF 7'}
         </span>
         <h2 className="text-2xl font-display font-black text-white uppercase tracking-tight">
           Final Review &amp; PDF Submission
@@ -159,66 +159,72 @@ export default function ReviewStep({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Before Phase Verification */}
-          <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl space-y-3 font-mono text-xs">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-              <span className="font-bold text-white uppercase">Before Installation</span>
-              <button
-                type="button"
-                onClick={() => onJumpToStep(5)}
-                className="text-[11px] text-brand-orange hover:underline uppercase font-bold cursor-pointer"
-              >
-                Edit
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Checklist Items:</span>
-                <span className={`font-bold ${beforeCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {beforeCompleted ? '✓ Completed' : 'Incomplete'}
-                </span>
+          {state.inspectionMode !== 'after_only' && (
+            <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl space-y-3 font-mono text-xs">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                <span className="font-bold text-white uppercase">Before Installation</span>
+                <button
+                  type="button"
+                  onClick={() => onJumpToStep(5)}
+                  className="text-[11px] text-brand-orange hover:underline uppercase font-bold cursor-pointer"
+                >
+                  Edit
+                </button>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Pre-Service Signature:</span>
-                <span className={`font-bold ${hasBeforeSignature ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {hasBeforeSignature ? '✓ Signed' : 'Missing'}
-                </span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Checklist Items:</span>
+                  <span className={`font-bold ${beforeCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {beforeCompleted ? '✓ Completed' : 'Incomplete'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Pre-Service Signature:</span>
+                  <span className={`font-bold ${hasBeforeSignature ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {hasBeforeSignature ? '✓ Signed' : 'Missing'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* After Phase Verification */}
-          <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl space-y-3 font-mono text-xs">
-            <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-              <span className="font-bold text-white uppercase">After Installation</span>
-              <button
-                type="button"
-                onClick={() => onJumpToStep(6)}
-                className="text-[11px] text-brand-orange hover:underline uppercase font-bold cursor-pointer"
-              >
-                Edit
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Checklist Items:</span>
-                <span className={`font-bold ${afterCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {afterCompleted ? '✓ Completed' : 'Incomplete'}
-                </span>
+          {state.inspectionMode !== 'before_only' && (
+            <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl space-y-3 font-mono text-xs">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                <span className="font-bold text-white uppercase">After Installation</span>
+                <button
+                  type="button"
+                  onClick={() => onJumpToStep(state.inspectionMode === 'after_only' ? 5 : 6)}
+                  className="text-[11px] text-brand-orange hover:underline uppercase font-bold cursor-pointer"
+                >
+                  Edit
+                </button>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Post-Service Signature:</span>
-                <span className={`font-bold ${hasAfterSignature ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {hasAfterSignature ? '✓ Signed' : 'Missing'}
-                </span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Checklist Items:</span>
+                  <span className={`font-bold ${afterCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {afterCompleted ? '✓ Completed' : 'Incomplete'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Post-Service Signature:</span>
+                  <span className={`font-bold ${hasAfterSignature ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {hasAfterSignature ? '✓ Signed' : 'Missing'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {hasBeforeSignature && hasAfterSignature && (
+        {((state.inspectionMode === 'both' && hasBeforeSignature && hasAfterSignature) ||
+          (state.inspectionMode === 'before_only' && hasBeforeSignature) ||
+          (state.inspectionMode === 'after_only' && hasAfterSignature)) && (
           <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-xs font-mono text-emerald-300 flex items-center gap-2">
             <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Both Pre-Service and Post-Service customer signatures are captured. Ready for submission.</span>
+            <span>Inspection details and customer signatures captured. Ready for report submission.</span>
           </div>
         )}
       </div>

@@ -13,7 +13,7 @@ export default function TechnicianStep({ state, onChange }: Props) {
     <div className="space-y-6 font-sans">
       <div className="space-y-1">
         <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">
-          STEP 4 OF 7
+          STEP 5 OF {state.inspectionMode === 'both' ? '8' : '7'}
         </span>
         <h2 className="text-2xl font-display font-black text-white uppercase tracking-tight">
           Technician / Installer

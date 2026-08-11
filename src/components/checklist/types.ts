@@ -1,9 +1,11 @@
 import type { Service, ServiceVariation } from '../../types';
 
 export type ServiceTypeCategory = 'headlights' | 'headunit';
+export type InspectionPhaseMode = 'both' | 'before_only' | 'after_only';
 
 export interface ChecklistWizardState {
   draftId: string;
+  inspectionMode: InspectionPhaseMode;
   currentStep: number;
 
   customer: {

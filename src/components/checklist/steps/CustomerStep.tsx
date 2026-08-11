@@ -73,10 +73,6 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
         return;
       }
 
-      if (!canAutoFill && q.length < 5) {
-        return;
-      }
-
       setLoading(true);
       lookupReferenceApi(q, token)
         .then((res) => {
@@ -117,27 +113,27 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
       {/* Step Title Header */}
       <div className="space-y-1">
         <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">
-          STEP 1 OF 8
+          STEP 2 OF {state.inspectionMode === 'both' ? '8' : '7'}
         </span>
         <h2 className="text-2xl font-display font-black text-white uppercase tracking-tight">
           Customer Information
         </h2>
         <p className="text-xs text-gray-400 font-sans">
           {canAutoFill
-            ? "Enter the client's details manually or use the reference lookup bar below to auto-fill customer, vehicle specs, plate #, and service choice."
+            ? "Enter the client's details manually or search by Plate Number below to auto-fill customer, vehicle specs, and service choice."
             : "Enter the client's contact details for inspection documentation and report delivery."}
         </p>
       </div>
 
-      {/* ── 1. Reference Lookup Bar ─────────── */}
+      {/* ── 1. Plate Number Lookup Bar ─────────── */}
       <div className="relative font-sans" ref={dropdownRef}>
         <div className="bg-gradient-to-r from-brand-darker via-[#181818] to-brand-darker border border-brand-orange/40 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
           <div className="flex items-center justify-between">
             <label htmlFor="ref-lookup-input" className="text-xs font-mono font-bold uppercase tracking-wider text-brand-orange flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-brand-orange animate-pulse" />
-              Quick Auto-Fill Lookup
+              Plate Number Auto-Fill Lookup
             </label>
-            <span className="text-[10px] font-mono text-gray-500 uppercase">Search Inquiries & Bookings</span>
+            <span className="text-[10px] font-mono text-gray-500 uppercase">Search Vehicle Plate #</span>
           </div>
 
           <div className="relative">
@@ -151,7 +147,7 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
                 setShowDropdown(true);
               }}
               onFocus={() => setShowDropdown(true)}
-              placeholder="Enter Reference No (e.g. 1625-120826-0001), Plate #, Customer Name, or Email..."
+              placeholder="Enter Plate Number (e.g. ABC 1234 or ABC-1234)..."
               className="w-full bg-black/60 border border-gray-700/80 rounded-lg pl-10 pr-10 py-3 text-white placeholder-gray-500 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none text-sm font-mono"
             />
 
@@ -174,7 +170,7 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
           {/* Quick Suggestion Pills */}
           {recentItems.length > 0 && !searchQuery && (
             <div className="pt-1 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              <span className="text-[10px] text-gray-500 font-mono uppercase shrink-0">Recent Shop Items:</span>
+              <span className="text-[10px] text-gray-500 font-mono uppercase shrink-0">Recent Shop Vehicles:</span>
               {recentItems.slice(0, 4).map((item) => (
                 <button
                   key={item.id}
@@ -183,7 +179,11 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
                   className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 text-brand-orange text-xs font-mono font-bold transition-colors cursor-pointer"
                 >
                   <Tag className="w-3 h-3" />
-                  <span>{item.referenceNumber}</span>
+                  {item.plateNumber ? (
+                    <span className="text-emerald-400 font-extrabold">{item.plateNumber}</span>
+                  ) : (
+                    <span>{item.referenceNumber}</span>
+                  )}
                   <span className="text-gray-400 font-normal truncate max-w-[120px]">({item.customerName})</span>
                 </button>
               ))}
@@ -217,13 +217,13 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
         {showDropdown && (
           <div className="absolute z-30 left-0 right-0 top-full mt-2 bg-[#181818] border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto animate-in fade-in duration-150">
             <div className="p-2.5 bg-black/40 border-b border-gray-800 text-[10px] font-mono uppercase tracking-wider text-gray-400 flex items-center justify-between">
-              <span>{searchQuery ? `Search Results (${results.length})` : `Recent Shop Bookings & Inquiries`}</span>
+              <span>{searchQuery ? `Search Results (${results.length})` : `Recent Shop Vehicles & Inquiries`}</span>
               <span>Click item to auto-fill</span>
             </div>
 
             {displayList.length === 0 ? (
               <div className="p-6 text-center text-xs text-gray-500 font-mono">
-                {searchQuery ? 'No matching inquiry or booking reference found.' : 'No recent bookings available.'}
+                {searchQuery ? 'No matching inquiry or booking found for that Plate # or Reference No.' : 'No recent bookings available.'}
               </div>
             ) : (
               <div className="divide-y divide-gray-800/60">
@@ -236,6 +236,11 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
                   >
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {item.plateNumber ? (
+                          <span className="px-2 py-0.5 text-xs font-mono font-extrabold uppercase bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded shadow-sm">
+                            Plate: {item.plateNumber}
+                          </span>
+                        ) : null}
                         <span className="font-mono font-bold text-sm text-brand-orange group-hover:underline">
                           {item.referenceNumber}
                         </span>

@@ -244,6 +244,11 @@ export default function CustomerFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!formData.plateNumber.trim()) {
+      showToast('Please enter your Vehicle Plate / CS Number.', 'error');
+      return;
+    }
+
     if (!formData.appointmentDate || !formData.appointmentTime) {
       showToast('Please choose a date and time for your appointment.', 'error');
       return;
@@ -498,13 +503,13 @@ export default function CustomerFormPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label htmlFor="plateNumber" className="block text-xs font-semibold text-gray-300">
-                        Plate / CS Number <span className="text-gray-500 font-normal">(optional)</span>
+                        Plate / CS Number <span className="text-brand-orange">*</span>
                       </label>
                       <input
-                        type="text" id="plateNumber" name="plateNumber"
+                        type="text" id="plateNumber" name="plateNumber" required
                         value={formData.plateNumber} onChange={handleChange}
                         className={`${inputClass} uppercase font-mono`}
-                        placeholder="ABC-1234 / Concession"
+                        placeholder="ABC-1234 / CS Number"
                       />
                     </div>
 

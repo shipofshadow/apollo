@@ -133,7 +133,7 @@ export default function BeforeChecklistStep({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">
-            STEP 5 OF 7
+            STEP 6 OF {state.inspectionMode === 'both' ? '8' : '7'}
           </span>
           <h2 className="text-2xl font-display font-black text-white uppercase tracking-tight">
             BEFORE INSTALLATION CHECKLIST

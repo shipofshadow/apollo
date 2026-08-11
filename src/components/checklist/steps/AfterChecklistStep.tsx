@@ -140,7 +140,7 @@ export default function AfterChecklistStep({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-brand-orange">
-            STEP 6 OF 7
+            STEP {state.inspectionMode === 'both' ? '7 OF 8' : '6 OF 7'}
           </span>
           <h2 className="text-2xl font-display font-black text-white uppercase tracking-tight">
             AFTER INSTALLATION CHECKLIST

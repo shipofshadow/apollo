@@ -1394,79 +1394,100 @@ class Router
             } catch (\Throwable) {}
         }
 
-        // Anti-scraping protection for unauthenticated requests:
-        // Requires query length >= 6 (valid ref number / plate) and strict exact matching
-        if (!$isAdmin && strlen($q) < 6) {
-            echo json_encode(['results' => []]);
-            return;
-        }
-
         $db = Database::getInstance();
         $results = [];
 
-        if ($isAdmin) {
-            // Admin full search (wildcard allowed)
-            if ($q !== '') {
-                $stmtInq = $db->prepare('
-                    SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
-                           ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
-                           ci.service_id, ci.appointment_date, s.title AS service_title
-                    FROM customer_inquiries ci
-                    LEFT JOIN services s ON s.id = ci.service_id
-                    WHERE ci.reference_number LIKE :q1
-                       OR ci.id = :exact
-                       OR ci.full_name LIKE :q2
-                       OR ci.plate_number LIKE :q3
-                       OR ci.contact_number LIKE :q4
-                       OR ci.email_address LIKE :q5
-                    ORDER BY ci.created_at DESC
-                    LIMIT 10
-                ');
-                $like = '%' . $q . '%';
-                $stmtInq->execute([
-                    ':q1' => $like,
-                    ':q2' => $like,
-                    ':q3' => $like,
-                    ':q4' => $like,
-                    ':q5' => $like,
-                    ':exact' => $q,
-                ]);
-            } else {
-                $stmtInq = $db->query('
-                    SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
-                           ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
-                           ci.service_id, ci.appointment_date, s.title AS service_title
-                    FROM customer_inquiries ci
-                    LEFT JOIN services s ON s.id = ci.service_id
-                    ORDER BY ci.created_at DESC
-                    LIMIT 10
-                ');
-            }
-            $rawRows = $stmtInq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } else {
-            // Unauthenticated strict lookup (no generic wildcard scraping)
+        if ($q !== '') {
+            $likeQuery = '%' . $q . '%';
+            $alphanumericOnly = preg_replace('/[^A-Za-z0-9]/', '', $q);
+            $cleanQuery = '%' . ($alphanumericOnly !== '' ? $alphanumericOnly : $q) . '%';
+
+            // 1. Search customer inquiries by plate_number (raw & stripped), reference_number, name, email, phone, or make/model
             $stmtInq = $db->prepare('
                 SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
                        ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
                        ci.service_id, ci.appointment_date, s.title AS service_title
                 FROM customer_inquiries ci
                 LEFT JOIN services s ON s.id = ci.service_id
-                WHERE ci.reference_number = :e1
-                   OR ci.id = :e2
-                   OR ci.plate_number = :e3
-                   OR ci.email_address = :e4
-                   OR ci.reference_number LIKE :e5
+                WHERE ci.plate_number LIKE :q1
+                   OR REPLACE(REPLACE(REPLACE(COALESCE(ci.plate_number, ""), " ", ""), "-", ""), "_", "") LIKE :q2
+                   OR ci.reference_number LIKE :q3
+                   OR REPLACE(REPLACE(COALESCE(ci.reference_number, ""), "-", ""), "_", "") LIKE :q4
+                   OR ci.full_name LIKE :q5
+                   OR ci.email_address LIKE :q6
+                   OR ci.contact_number LIKE :q7
+                   OR ci.make LIKE :q8
+                   OR ci.model LIKE :q9
                 ORDER BY ci.created_at DESC
-                LIMIT 5
+                LIMIT 10
             ');
             $stmtInq->execute([
-                ':e1' => $q,
-                ':e2' => $q,
-                ':e3' => $q,
-                ':e4' => $q,
-                ':e5' => $q . '%',
+                ':q1' => $likeQuery,
+                ':q2' => $cleanQuery,
+                ':q3' => $likeQuery,
+                ':q4' => $cleanQuery,
+                ':q5' => $likeQuery,
+                ':q6' => $likeQuery,
+                ':q7' => $likeQuery,
+                ':q8' => $likeQuery,
+                ':q9' => $likeQuery,
             ]);
             $rawRows = $stmtInq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            // 2. Search bookings by vehicle_info (raw & stripped), plate_number, reference_number, name, email, phone, or make/model
+            $stmtBk = $db->prepare('
+                SELECT b.id, b.reference_number, b.name, b.email, b.phone,
+                       b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
+                       b.service_id, s.title AS service_name, b.appointment_date
+                FROM bookings b
+                LEFT JOIN services s ON s.id = b.service_id
+                WHERE b.vehicle_info LIKE :b1
+                   OR REPLACE(REPLACE(REPLACE(COALESCE(b.vehicle_info, ""), " ", ""), "-", ""), "_", "") LIKE :b2
+                   OR b.reference_number LIKE :b3
+                   OR REPLACE(REPLACE(COALESCE(b.reference_number, ""), "-", ""), "_", "") LIKE :b4
+                   OR b.name LIKE :b5
+                   OR b.email LIKE :b6
+                   OR b.phone LIKE :b7
+                   OR b.vehicle_make LIKE :b8
+                   OR b.vehicle_model LIKE :b9
+                ORDER BY b.created_at DESC
+                LIMIT 10
+            ');
+            $stmtBk->execute([
+                ':b1' => $likeQuery,
+                ':b2' => $cleanQuery,
+                ':b3' => $likeQuery,
+                ':b4' => $cleanQuery,
+                ':b5' => $likeQuery,
+                ':b6' => $likeQuery,
+                ':b7' => $likeQuery,
+                ':b8' => $likeQuery,
+                ':b9' => $likeQuery,
+            ]);
+            $rawBookings = $stmtBk->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } else {
+            // When query is empty (recent list overview for admin)
+            $stmtInq = $db->query('
+                SELECT ci.id, ci.reference_number, ci.full_name, ci.email_address, ci.contact_number,
+                       ci.make, ci.model, ci.year_model, ci.plate_number, ci.product_to_purchase,
+                       ci.service_id, ci.appointment_date, s.title AS service_title
+                FROM customer_inquiries ci
+                LEFT JOIN services s ON s.id = ci.service_id
+                ORDER BY ci.created_at DESC
+                LIMIT 10
+            ');
+            $rawRows = $stmtInq->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+            $stmtBk = $db->query('
+                SELECT b.id, b.reference_number, b.name, b.email, b.phone,
+                       b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
+                       b.service_id, s.title AS service_name, b.appointment_date
+                FROM bookings b
+                LEFT JOIN services s ON s.id = b.service_id
+                ORDER BY b.created_at DESC
+                LIMIT 10
+            ');
+            $rawBookings = $stmtBk->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         }
 
         foreach ($rawRows as $row) {
@@ -1486,72 +1507,6 @@ class Router
                 'serviceName' => (string) ($row['service_title'] ?? $row['product_to_purchase'] ?? ''),
                 'appointmentDate' => (string) ($row['appointment_date'] ?? ''),
             ];
-        }
-
-        // 2. Search bookings
-        $rawBookings = [];
-        if ($isAdmin) {
-            $like = '%' . $q . '%';
-            if ($q !== '') {
-                $stmtBk = $db->prepare('
-                    SELECT b.id, b.reference_number, b.name, b.email, b.phone,
-                           b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
-                           b.service_id, s.title AS service_name, b.appointment_date
-                    FROM bookings b
-                    LEFT JOIN services s ON s.id = b.service_id
-                    WHERE b.reference_number LIKE :q1
-                       OR b.id = :exact
-                       OR b.name LIKE :q2
-                       OR b.vehicle_info LIKE :q3
-                       OR b.phone LIKE :q4
-                       OR b.email LIKE :q5
-                    ORDER BY b.created_at DESC
-                    LIMIT 10
-                ');
-                $stmtBk->execute([
-                    ':q1' => $like,
-                    ':q2' => $like,
-                    ':q3' => $like,
-                    ':q4' => $like,
-                    ':q5' => $like,
-                    ':exact' => $q,
-                ]);
-            } else {
-                $stmtBk = $db->query('
-                    SELECT b.id, b.reference_number, b.name, b.email, b.phone,
-                           b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
-                           b.service_id, s.title AS service_name, b.appointment_date
-                    FROM bookings b
-                    LEFT JOIN services s ON s.id = b.service_id
-                    ORDER BY b.created_at DESC
-                    LIMIT 10
-                ');
-            }
-            $rawBookings = $stmtBk->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-        } else if ($q !== '') {
-            // Unauthenticated strict lookup on bookings
-            $stmtBk = $db->prepare('
-                SELECT b.id, b.reference_number, b.name, b.email, b.phone,
-                       b.vehicle_make, b.vehicle_model, b.vehicle_year, b.vehicle_info,
-                       b.service_id, s.title AS service_name, b.appointment_date
-                FROM bookings b
-                LEFT JOIN services s ON s.id = b.service_id
-                WHERE b.reference_number = :b1
-                   OR b.id = :b2
-                   OR b.email = :b3
-                   OR b.phone = :b4
-                   OR b.reference_number LIKE :b5
-                ORDER BY b.created_at DESC
-                LIMIT 5
-            ');
-            $stmtBk->execute([
-                ':b1' => $q,
-                ':b2' => $q,
-                ':b3' => $q,
-                ':b4' => $q,
-                ':b5' => $q . '%',
-            ]);
-            $rawBookings = $stmtBk->fetchAll(\PDO::FETCH_ASSOC) ?: [];
         }
 
         foreach ($rawBookings as $row) {
