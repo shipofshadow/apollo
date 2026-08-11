@@ -122,7 +122,7 @@ class NotificationJobQueueService
             $this->handleNow($event, $payload);
             $done = $this->db->prepare(
                 'UPDATE notification_jobs
-                    SET status = "done", processed_at = NOW(), error_message = NULL
+                    SET status = "done", processed_at = NOW(), last_error = NULL
                   WHERE id = :id'
             );
             $done->execute([':id' => $jobId]);
@@ -130,7 +130,7 @@ class NotificationJobQueueService
         } catch (\Throwable $e) {
             $fail = $this->db->prepare(
                 'UPDATE notification_jobs
-                    SET status = "failed", error_message = :err
+                    SET status = "failed", last_error = :err
                   WHERE id = :id'
             );
             $fail->execute([':id' => $jobId, ':err' => $e->getMessage()]);
@@ -150,6 +150,18 @@ class NotificationJobQueueService
         }
 
         $stats = ['processed' => 0, 'failed' => 0, 'retried' => 0];
+
+        // Auto-recover stale jobs stuck in 'processing' status (> 3 minutes)
+        try {
+            $this->db->exec(
+                "UPDATE notification_jobs 
+                    SET status = 'queued' 
+                  WHERE status = 'processing' 
+                    AND updated_at < DATE_SUB(NOW(), INTERVAL 3 MINUTE)"
+            );
+        } catch (\Throwable $e) {
+            // Ignore recovery errors
+        }
 
         $stmt = $this->db->prepare(
             'SELECT *

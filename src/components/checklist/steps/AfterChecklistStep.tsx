@@ -187,40 +187,70 @@ export default function AfterChecklistStep({
         </div>
       )}
 
-      {/* Progress Bar & Quick Pass Container */}
+      {/* Submitted / Saved Phase Banner */}
+      {state.after.signature && (
+        <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs text-emerald-300 shadow-md">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <div>
+              <strong className="text-emerald-400 uppercase tracking-wider block font-bold text-xs">✓ Post-Service Inspection Verified &amp; Signed</strong>
+              <span className="text-[11px] text-emerald-300/80">Checklist report submitted and saved to database for REF: {state.draftId || 'N/A'}.</span>
+            </div>
+          </div>
+          <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full shrink-0">
+            Phase Completed
+          </span>
+        </div>
+      )}
+
+      {/* Progress Bar & Quick Action Buttons Container */}
       <div className="bg-[#121212] border border-gray-800/80 rounded-xl p-5 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-mono text-xs text-brand-orange font-bold uppercase tracking-wider">
             <CheckSquare className="w-4 h-4" /> Checklist Progress
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono text-xs text-white font-bold">
               {completedItems} / {totalItems} COMPLETED ({progressPercent}%)
             </span>
 
-            <button
-              type="button"
-              onClick={() => {
-                const allChecked = completedItems === totalItems;
-                checklistDef.items.forEach((item) => {
-                  onItemCheckChange(item.id, !allChecked);
-                });
-                if (checklistDef.orientationItems) {
-                  checklistDef.orientationItems.forEach((_, idx) => {
-                    onOrientationCheckChange(idx, !allChecked);
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  checklistDef.items.forEach((item) => {
+                    onItemCheckChange(item.id, true);
                   });
-                }
-              }}
-              className={`px-3.5 py-1.5 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 shadow-md cursor-pointer ${
-                completedItems === totalItems
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-500/30'
-                  : 'bg-emerald-500 text-black hover:bg-emerald-400 font-extrabold shadow-emerald-500/20'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{completedItems === totalItems ? 'Uncheck All' : 'Check All Pass / OK'}</span>
-            </button>
+                  if (checklistDef.orientationItems) {
+                    checklistDef.orientationItems.forEach((_, idx) => {
+                      onOrientationCheckChange(idx, true);
+                    });
+                  }
+                }}
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-mono font-extrabold uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Select All Pass</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  checklistDef.items.forEach((item) => {
+                    onItemCheckChange(item.id, false);
+                  });
+                  if (checklistDef.orientationItems) {
+                    checklistDef.orientationItems.forEach((_, idx) => {
+                      onOrientationCheckChange(idx, false);
+                    });
+                  }
+                }}
+                className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
         </div>
 

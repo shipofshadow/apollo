@@ -376,6 +376,119 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
   const [previewPhase, setPreviewPhase] = useState<'before' | 'after'>('before');
   const [viewMode, setViewMode] = useState<'visual' | 'pdf'>('visual');
 
+  // Admin Checklist Control States & Handlers
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [isResettingPhase, setIsResettingPhase] = useState(false);
+  const [isEditingChecklist, setIsEditingChecklist] = useState(false);
+  const [editedPayload, setEditedPayload] = useState<any>(null);
+  const [isSavingChecklist, setIsSavingChecklist] = useState(false);
+
+  const handleResendChecklistEmail = async (phase: 'before' | 'after' | 'final') => {
+    if (!token || !inquiry) return;
+    const ref = inquiry.referenceNumber || inquiry.id;
+    try {
+      setIsResendingEmail(true);
+      const res = await fetch(`${BACKEND_URL}/api/admin/checklist/resend-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ref, phase }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Checklist PDF report email queued and sent (${phase.toUpperCase()}).`, 'success');
+      } else {
+        throw new Error(data.message || 'Failed to resend email.');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to resend email.', 'error');
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
+
+  const handleResetChecklistPhase = async (phase: 'before' | 'after') => {
+    if (!token || !inquiry) return;
+    const ref = inquiry.referenceNumber || inquiry.id;
+
+    if (!window.confirm(`Are you sure you want to reset the ${phase.toUpperCase()} inspection checklist? This will delete the submission and allow a fresh inspection to be recorded.`)) {
+      return;
+    }
+
+    try {
+      setIsResettingPhase(true);
+      const res = await fetch(`${BACKEND_URL}/api/admin/checklist/submission/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ref, phase }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Inspection submission for ${phase.toUpperCase()} phase reset successfully.`, 'success');
+        setIsEditingChecklist(false);
+        fetchData();
+      } else {
+        throw new Error(data.message || 'Failed to reset inspection.');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reset inspection.', 'error');
+    } finally {
+      setIsResettingPhase(false);
+    }
+  };
+
+  const handleStartEditingChecklist = () => {
+    const currentSub = submissionsState[previewPhase];
+    if (!currentSub) return;
+    const payload = JSON.parse(JSON.stringify(currentSub.payload || {}));
+    if (!payload.installerName && currentSub.installer_name) {
+      payload.installerName = currentSub.installer_name;
+    }
+    if (!payload.additionalNotes && currentSub.general_notes) {
+      payload.additionalNotes = currentSub.general_notes;
+    }
+    setEditedPayload(payload);
+    setIsEditingChecklist(true);
+  };
+
+  const handleSaveChecklistEdit = async () => {
+    if (!token || !inquiry || !editedPayload) return;
+    const ref = inquiry.referenceNumber || inquiry.id;
+
+    try {
+      setIsSavingChecklist(true);
+      const res = await fetch(`${BACKEND_URL}/api/admin/checklist/submission/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ref,
+          phase: previewPhase,
+          payload: editedPayload,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Checklist submission updated successfully.', 'success');
+        setIsEditingChecklist(false);
+        fetchData();
+      } else {
+        throw new Error(data.message || 'Failed to update checklist.');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update checklist.', 'error');
+    } finally {
+      setIsSavingChecklist(false);
+    }
+  };
+
   // Activity log pagination
   const ACTIVITY_PAGE_SIZE = 5;
   const [activityPage, setActivityPage] = useState(0);
@@ -1073,12 +1186,47 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                   )}
 
                   {submissionsState[previewPhase] ? (
-                    <>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleResendChecklistEmail(previewPhase)}
+                        disabled={isResendingEmail}
+                        className="px-3 py-1.5 bg-blue-950/60 hover:bg-blue-900/80 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="Resend official PDF report email to customer and shop admins"
+                      >
+                        {isResendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" /> : <Mail className="w-3.5 h-3.5 text-blue-400" />}
+                        <span>Resend Email</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={isEditingChecklist ? () => setIsEditingChecklist(false) : handleStartEditingChecklist}
+                        className={`px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+                          isEditingChecklist
+                            ? 'bg-amber-500 text-black font-extrabold shadow-md'
+                            : 'bg-brand-darker hover:bg-gray-800 border border-gray-700 text-amber-300 hover:text-amber-200'
+                        }`}
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>{isEditingChecklist ? 'Cancel Edit' : 'Edit Checklist'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleResetChecklistPhase(previewPhase)}
+                        disabled={isResettingPhase}
+                        className="px-3 py-1.5 bg-red-950/60 hover:bg-red-900/80 border border-red-500/40 text-red-300 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="Reset submission and delete record to re-allow fresh inspection"
+                      >
+                        {isResettingPhase ? <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" /> : <Trash2 className="w-3.5 h-3.5 text-red-400" />}
+                        <span>Reset</span>
+                      </button>
+
                       <a
                         href={`${BACKEND_URL}/api/public/checklist/pdf?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}&phase=${previewPhase}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3.5 py-1.5 bg-brand-darker hover:bg-gray-800 border border-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 bg-brand-darker hover:bg-gray-800 border border-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <FileText className="w-3.5 h-3.5 text-brand-orange" />
                         <span>Open PDF</span>
@@ -1086,12 +1234,12 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                       <a
                         href={`${BACKEND_URL}/api/public/checklist/pdf?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}&phase=${previewPhase}`}
                         download={`1625_Autolab_${inquiry.referenceNumber || inquiry.id}_${previewPhase.toUpperCase()}_Checklist.pdf`}
-                        className="px-3.5 py-1.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 bg-brand-orange hover:bg-orange-600 text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg transition-colors shadow-md flex items-center gap-1.5 cursor-pointer"
                       >
                         <Save className="w-3.5 h-3.5" />
-                        <span>Download PDF</span>
+                        <span>Download</span>
                       </a>
-                    </>
+                    </div>
                   ) : (
                     <a
                       href={`/checklist?ref=${encodeURIComponent(inquiry.referenceNumber || inquiry.id)}`}
@@ -1106,12 +1254,116 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                 </div>
               </div>
 
-              {/* Main Checklist Preview Body */}
+              {/* Main Checklist Preview & Editor Body */}
               {submissionsState[previewPhase] ? (() => {
                 const currentSub = submissionsState[previewPhase];
                 const currentPayload = currentSub.payload || {};
 
-                return viewMode === 'visual' ? (
+                return isEditingChecklist && editedPayload ? (
+                  /* ── ADMIN INTERACTIVE CHECKLIST EDITOR ────────────── */
+                  <div className="bg-brand-dark border border-amber-500/40 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block">ADMIN OVERRIDE MODE</span>
+                        <h2 className="text-lg font-display font-bold text-white uppercase">Editing {previewPhase.toUpperCase()} Inspection Checklist</h2>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveChecklistEdit}
+                          disabled={isSavingChecklist}
+                          className="px-4 py-2 bg-brand-orange hover:bg-orange-600 text-white font-mono text-xs font-bold uppercase tracking-wider rounded-lg shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingChecklist ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          <span>Save Changes</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingChecklist(false)}
+                          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-mono text-xs font-bold uppercase rounded-lg cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-brand-darker border border-gray-800 p-4 rounded-xl font-mono text-xs">
+                      <div>
+                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Technician / Installer Name</label>
+                        <input
+                          type="text"
+                          value={editedPayload.installerName || ''}
+                          onChange={(e) => setEditedPayload({ ...editedPayload, installerName: e.target.value })}
+                          className="w-full bg-brand-dark border border-gray-700 rounded-lg px-3 py-2 text-white font-bold focus:border-brand-orange focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Vehicle Details</label>
+                        <input
+                          type="text"
+                          value={editedPayload.vehicle || ''}
+                          onChange={(e) => setEditedPayload({ ...editedPayload, vehicle: e.target.value })}
+                          className="w-full bg-brand-dark border border-gray-700 rounded-lg px-3 py-2 text-gray-300 focus:border-brand-orange focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Editable Checklist Items */}
+                    {Array.isArray(editedPayload.responses) && (
+                      <div className="space-y-4 pt-2">
+                        <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 block border-b border-gray-800 pb-2">
+                          Edit Inspection Checkmarks &amp; Notes
+                        </span>
+                        <div className="grid grid-cols-1 gap-3">
+                          {editedPayload.responses.map((resp: any, idx: number) => (
+                            <div key={idx} className="p-4 bg-brand-darker border border-gray-800 rounded-xl space-y-3">
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-xs font-semibold text-white">{resp.label}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...editedPayload.responses];
+                                    next[idx].isChecked = !next[idx].isChecked;
+                                    setEditedPayload({ ...editedPayload, responses: next });
+                                  }}
+                                  className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider cursor-pointer border transition-all ${
+                                    resp.isChecked
+                                      ? 'bg-green-500/20 text-green-400 border-green-500/40'
+                                      : 'bg-red-500/20 text-red-400 border-red-500/40'
+                                  }`}
+                                >
+                                  {resp.isChecked ? '✓ Pass' : '✕ Fail / Skip'}
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Technician Notes (optional)..."
+                                value={resp.notes || ''}
+                                onChange={(e) => {
+                                  const next = [...editedPayload.responses];
+                                  next[idx].notes = e.target.value;
+                                  setEditedPayload({ ...editedPayload, responses: next });
+                                }}
+                                className="w-full bg-brand-dark border border-gray-800 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-mono focus:border-brand-orange focus:outline-none"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Editable General Notes */}
+                    <div className="space-y-2 pt-2">
+                      <label className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 block">General Technician Remarks</label>
+                      <textarea
+                        rows={3}
+                        value={editedPayload.additionalNotes || ''}
+                        onChange={(e) => setEditedPayload({ ...editedPayload, additionalNotes: e.target.value })}
+                        className="w-full bg-brand-darker border border-gray-800 rounded-xl p-3 text-xs text-white font-mono focus:border-brand-orange focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : viewMode === 'visual' ? (
                   /* ── 1. NATIVE REACT VISUAL CHECKLIST PREVIEW ────────────── */
                   <div className="bg-brand-dark border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
                     

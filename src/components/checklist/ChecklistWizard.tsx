@@ -17,7 +17,7 @@ import ReviewStep from './steps/ReviewStep';
 
 import { getChecklistTypeDef } from '../../data/checklistTypes';
 import { BACKEND_URL } from '../../config';
-import { fetchServicesApi, type ReferenceLookupResult } from '../../services/api';
+import { fetchServicesApi, fetchPublicChecklistSubmissionApi, type ReferenceLookupResult } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 function generateDraftId(): string {
@@ -163,6 +163,82 @@ export default function ChecklistWizard() {
       };
     }
 
+    const ref = match.referenceNumber || match.id;
+
+    let beforeItemResponses: Record<string, { checked: boolean; notes: string }> = {};
+    let beforeNotes = '';
+    let beforeConfirmed = false;
+    let beforeSignature = null;
+
+    let afterItemResponses: Record<string, { checked: boolean; notes: string }> = {};
+    let afterOrientation: Record<number, boolean> = {};
+    let afterConfirmed = false;
+    let afterSignature = null;
+    let techName = '';
+
+    if (ref) {
+      try {
+        const [beforeRes, afterRes] = await Promise.all([
+          fetchPublicChecklistSubmissionApi(ref, 'before').catch(() => ({ submission: null })),
+          fetchPublicChecklistSubmissionApi(ref, 'after').catch(() => ({ submission: null })),
+        ]);
+
+        const sSlug = serviceData.type === 'headunit' ? 'android-headunit' : 'projector-headlight';
+
+        if (beforeRes && beforeRes.submission && beforeRes.submission.payload) {
+          const p = beforeRes.submission.payload;
+          if (Array.isArray(p.responses)) {
+            const def = getChecklistTypeDef(sSlug, 'before');
+            if (def) {
+              def.items.forEach((item, idx) => {
+                if (p.responses[idx]) {
+                  beforeItemResponses[item.id] = {
+                    checked: Boolean(p.responses[idx].isChecked),
+                    notes: p.responses[idx].notes || '',
+                  };
+                }
+              });
+            }
+          }
+          beforeNotes = p.additionalNotes || beforeRes.submission.general_notes || '';
+          beforeConfirmed = Boolean(p.customerAcknowledged || beforeRes.submission.customer_name);
+          beforeSignature = p.signature || beforeRes.submission.signature_data || null;
+          if (beforeRes.submission.installer_name) {
+            techName = beforeRes.submission.installer_name;
+          }
+        }
+
+        if (afterRes && afterRes.submission && afterRes.submission.payload) {
+          const p = afterRes.submission.payload;
+          if (Array.isArray(p.responses)) {
+            const def = getChecklistTypeDef(sSlug, 'after');
+            if (def) {
+              def.items.forEach((item, idx) => {
+                if (p.responses[idx]) {
+                  afterItemResponses[item.id] = {
+                    checked: Boolean(p.responses[idx].isChecked),
+                    notes: p.responses[idx].notes || '',
+                  };
+                }
+              });
+            }
+          }
+          if (Array.isArray(p.orientationResponses)) {
+            p.orientationResponses.forEach((val: boolean, idx: number) => {
+              afterOrientation[idx] = Boolean(val);
+            });
+          }
+          afterConfirmed = Boolean(p.customerAcknowledged || afterRes.submission.customer_name);
+          afterSignature = p.signature || afterRes.submission.signature_data || null;
+          if (afterRes.submission.installer_name) {
+            techName = afterRes.submission.installer_name;
+          }
+        }
+      } catch {
+        // Ignore submission restore errors
+      }
+    }
+
     setWizardState((prev) => ({
       ...prev,
       draftId: match.referenceNumber || match.id || prev.draftId,
@@ -177,6 +253,22 @@ export default function ChecklistWizard() {
         plateNumber: match.plateNumber || prev.vehicle.plateNumber,
       },
       service: serviceData,
+      technician: {
+        id: prev.technician.id,
+        name: techName || prev.technician.name,
+      },
+      before: {
+        itemResponses: Object.keys(beforeItemResponses).length > 0 ? beforeItemResponses : prev.before.itemResponses,
+        additionalNotes: beforeNotes || prev.before.additionalNotes,
+        confirmed: beforeConfirmed || prev.before.confirmed,
+        signature: beforeSignature || prev.before.signature,
+      },
+      after: {
+        itemResponses: Object.keys(afterItemResponses).length > 0 ? afterItemResponses : prev.after.itemResponses,
+        orientationResponses: Object.keys(afterOrientation).length > 0 ? afterOrientation : prev.after.orientationResponses,
+        confirmed: afterConfirmed || prev.after.confirmed,
+        signature: afterSignature || prev.after.signature,
+      },
     }));
   };
 

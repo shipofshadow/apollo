@@ -833,16 +833,17 @@ class InquiryService
                 $yy = date('y', $ts);
             }
         }
-        $prefix = "1625_{$dd}{$mm}{$yy}_";
+        $prefixDash  = "1625-{$dd}{$mm}{$yy}-";
+        $prefixUnder = "1625_{$dd}{$mm}{$yy}_";
 
         $nextSeq = 1;
         if ($this->useDb) {
             $db = Database::getInstance();
-            $stmt = $db->prepare('SELECT reference_number FROM customer_inquiries WHERE reference_number LIKE :prefix ORDER BY reference_number DESC LIMIT 1');
-            $stmt->execute([':prefix' => $prefix . '%']);
+            $stmt = $db->prepare('SELECT reference_number FROM customer_inquiries WHERE reference_number LIKE :p1 OR reference_number LIKE :p2 ORDER BY id DESC LIMIT 1');
+            $stmt->execute([':p1' => $prefixDash . '%', ':p2' => $prefixUnder . '%']);
             $lastRef = $stmt->fetchColumn();
             if ($lastRef) {
-                $parts = explode('_', (string) $lastRef);
+                $parts = preg_split('/[-_]/', (string) $lastRef);
                 $lastSeq = (int) end($parts);
                 $nextSeq = $lastSeq + 1;
             }
@@ -851,8 +852,8 @@ class InquiryService
             $maxSeq = 0;
             foreach ($items as $item) {
                 $ref = (string) ($item['referenceNumber'] ?? $item['reference_number'] ?? '');
-                if (str_starts_with($ref, $prefix)) {
-                    $parts = explode('_', $ref);
+                if (str_starts_with($ref, $prefixDash) || str_starts_with($ref, $prefixUnder)) {
+                    $parts = preg_split('/[-_]/', $ref);
                     $seq = (int) end($parts);
                     if ($seq > $maxSeq) {
                         $maxSeq = $seq;
@@ -862,7 +863,7 @@ class InquiryService
             $nextSeq = $maxSeq + 1;
         }
 
-        return $prefix . sprintf('%04d', $nextSeq);
+        return $prefixDash . sprintf('%04d', $nextSeq);
     }
 
     public function ensureReferenceNumbers(): void

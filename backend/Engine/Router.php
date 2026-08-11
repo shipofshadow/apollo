@@ -367,6 +367,11 @@ class Router
             $r->addRoute('PUT',  '/api/admin/roles/{id:\d+}', 'handleAdminRoleUpdate');
             $r->addRoute('DELETE', '/api/admin/roles/{id:\d+}', 'handleAdminRoleDelete');
 
+            // ── Admin Checklist Management ──────────────────────────────────
+            $r->addRoute('POST', '/api/admin/checklist/resend-email',     'handleAdminChecklistResendEmail');
+            $r->addRoute('POST', '/api/admin/checklist/submission/delete', 'handleAdminChecklistDelete');
+            $r->addRoute('POST', '/api/admin/checklist/submission/update', 'handleAdminChecklistUpdate');
+
             // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
             $r->addRoute('GET', '/api/vehicles/models', 'handleVehicleModels');
@@ -5320,5 +5325,123 @@ class Router
         header('Content-Length: ' . strlen($pdfBinary));
         echo $pdfBinary;
         exit;
+    }
+
+    private function handleAdminChecklistResendEmail(): void
+    {
+        $user = $this->requireAuth();
+        $data = $this->jsonBody();
+        $ref = trim((string)($data['ref'] ?? $data['referenceNumber'] ?? $data['inquiryId'] ?? ''));
+        $phase = trim((string)($data['phase'] ?? 'before'));
+
+        if ($ref === '') {
+            throw new RuntimeException('Missing required reference parameter.', 400);
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('
+            SELECT payload_json FROM public_checklist_submissions
+            WHERE (reference_number = :ref OR inquiry_id = :id) AND phase = :phase
+            ORDER BY id DESC LIMIT 1
+        ');
+        $stmt->execute([':ref' => $ref, ':id' => $ref, ':phase' => ($phase === 'final' ? 'after' : $phase)]);
+        $payloadJson = $stmt->fetchColumn();
+
+        if (!$payloadJson) {
+            $stmtInq = $db->prepare('SELECT * FROM customer_inquiries WHERE reference_number = :ref OR id = :id LIMIT 1');
+            $stmtInq->execute([':ref' => $ref, ':id' => $ref]);
+            $inquiry = $stmtInq->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$inquiry) {
+                throw new RuntimeException('No inquiry or saved checklist submission found for this reference.', 404);
+            }
+
+            $payload = [
+                'referenceNumber' => $inquiry['reference_number'] ?? $ref,
+                'customerName'    => $inquiry['full_name'] ?? '',
+                'customerEmail'   => $inquiry['email_address'] ?? '',
+                'vehicle'         => trim(($inquiry['make'] ?? '') . ' ' . ($inquiry['model'] ?? '') . ' ' . ($inquiry['year_model'] ?? '')),
+                'plateNumber'     => $inquiry['plate_number'] ?? '',
+                'serviceFieldValue' => $inquiry['product_to_purchase'] ?? 'Vehicle Service',
+                'installerName'   => 'Shop Technician',
+                'phase'           => $phase,
+            ];
+        } else {
+            $payload = json_decode((string)$payloadJson, true) ?: [];
+        }
+
+        require_once __DIR__ . '/NotificationJobQueueService.php';
+        (new NotificationJobQueueService())->dispatch('checklist_inspection_submitted', [
+            'data'       => $payload,
+            'emailPhase' => $phase,
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Checklist inspection report email queued successfully.',
+        ]);
+    }
+
+    private function handleAdminChecklistDelete(): void
+    {
+        $user = $this->requireAuth();
+        $data = $this->jsonBody();
+        $ref = trim((string)($data['ref'] ?? $data['referenceNumber'] ?? $data['inquiryId'] ?? ''));
+        $phase = trim((string)($data['phase'] ?? 'before'));
+
+        if ($ref === '') {
+            throw new RuntimeException('Missing required reference parameter.', 400);
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('
+            DELETE FROM public_checklist_submissions
+            WHERE (reference_number = :ref OR inquiry_id = :id) AND phase = :phase
+        ');
+        $stmt->execute([':ref' => $ref, ':id' => $ref, ':phase' => $phase]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Inspection submission for {$phase} phase reset successfully.",
+        ]);
+    }
+
+    private function handleAdminChecklistUpdate(): void
+    {
+        $user = $this->requireAuth();
+        $data = $this->jsonBody();
+        $ref = trim((string)($data['ref'] ?? $data['referenceNumber'] ?? $data['inquiryId'] ?? ''));
+        $phase = trim((string)($data['phase'] ?? 'before'));
+        $payload = is_array($data['payload'] ?? null) ? $data['payload'] : [];
+
+        if ($ref === '' || empty($payload)) {
+            throw new RuntimeException('Missing required reference or payload parameter.', 400);
+        }
+
+        $installerName = (string)($payload['installerName'] ?? 'Shop Technician');
+        $additionalNotes = (string)($payload['additionalNotes'] ?? $payload['additional_notes'] ?? '');
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare('
+            UPDATE public_checklist_submissions
+               SET payload_json = :payload,
+                   installer_name = :installer,
+                   general_notes = :notes,
+                   updated_at = NOW()
+             WHERE (reference_number = :ref OR inquiry_id = :id) AND phase = :phase
+        ');
+        $stmt->execute([
+            ':payload'   => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ':installer' => $installerName,
+            ':notes'     => $additionalNotes,
+            ':ref'       => $ref,
+            ':id'        => $ref,
+            ':phase'     => $phase,
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Inspection checklist updated successfully.",
+        ]);
     }
 }

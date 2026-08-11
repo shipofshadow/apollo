@@ -151,7 +151,7 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
                 setShowDropdown(true);
               }}
               onFocus={() => setShowDropdown(true)}
-              placeholder="Enter Reference No (e.g. 1625_1108_0001), Plate #, Customer Name, or Email..."
+              placeholder="Enter Reference No (e.g. 1625-120826-0001), Plate #, Customer Name, or Email..."
               className="w-full bg-black/60 border border-gray-700/80 rounded-lg pl-10 pr-10 py-3 text-white placeholder-gray-500 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none text-sm font-mono"
             />
 

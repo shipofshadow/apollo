@@ -1593,8 +1593,37 @@ class NotificationService
     // Mailer
     // -------------------------------------------------------------------------
 
+    private function isRecipientDisabled(string $email): bool
+    {
+        $cleanEmail = strtolower(trim($email));
+        if ($cleanEmail === '') {
+            return false;
+        }
+
+        try {
+            if (defined('DB_NAME') && DB_NAME !== '') {
+                $db = Database::getInstance();
+                $stmt = $db->prepare('SELECT is_active FROM users WHERE LOWER(email) = :email LIMIT 1');
+                $stmt->execute([':email' => $cleanEmail]);
+                $isActive = $stmt->fetchColumn();
+                if ($isActive !== false && ((int)$isActive === 0)) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[NotificationService] isRecipientDisabled check failed: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
     private function send(string $to, string $toName, string $subject, string $htmlBody, array $attachments = []): void
     {
+        if ($this->isRecipientDisabled($to)) {
+            @error_log("[NotificationService] ACCOUNT DISABLED: Skipped sending email to {$to}");
+            return;
+        }
+
         if (defined('APP_ENV') && APP_ENV === 'development') {
             @error_log("[NotificationService] DEV MODE: Skipped sending email to {$to} - Subject: {$subject}");
             return;

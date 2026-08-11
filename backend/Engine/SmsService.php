@@ -484,8 +484,49 @@ public function customerInquiryAdmin(array $inquiry): void
      * Any exception is caught and logged to PHP's error log so the booking
      * flow is never interrupted by an SMS failure.
      */
+    private function isPhoneRecipientDisabled(string $phone): bool
+    {
+        $cleanPhone = preg_replace('/\D/', '', $phone);
+        if ($cleanPhone === '') {
+            return false;
+        }
+
+        $last10 = strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone;
+
+        try {
+            if (defined('DB_NAME') && DB_NAME !== '') {
+                $db = Database::getInstance();
+                $stmt = $db->prepare('
+                    SELECT is_active FROM users 
+                     WHERE (
+                       REPLACE(REPLACE(REPLACE(REPLACE(phone, "+", ""), " ", ""), "-", ""), "(", "") LIKE :likePhone
+                       OR phone = :exactPhone
+                     )
+                     LIMIT 1
+                ');
+                $stmt->execute([
+                    ':likePhone'  => '%' . $last10,
+                    ':exactPhone' => $phone,
+                ]);
+                $isActive = $stmt->fetchColumn();
+                if ($isActive !== false && ((int)$isActive === 0)) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[SmsService] isPhoneRecipientDisabled check failed: ' . $e->getMessage());
+        }
+
+        return false;
+    }
+
     private function send(string $to, string $body): void
     {
+        if ($this->isPhoneRecipientDisabled($to)) {
+            @error_log("[SmsService] ACCOUNT DISABLED: Skipped sending SMS to {$to}");
+            return;
+        }
+
         if (defined('APP_ENV') && APP_ENV === 'development') {
             @error_log("[SmsService] DEV MODE: Skipped sending SMS to {$to}");
             return;
@@ -496,10 +537,18 @@ public function customerInquiryAdmin(array $inquiry): void
         }
 
         try {
+            $verify = true;
+            if (defined('APP_ENV') && (APP_ENV === 'development' || APP_ENV === 'local')) {
+                $verify = false;
+            } elseif (DIRECTORY_SEPARATOR === '\\' && !ini_get('curl.cainfo')) {
+                $verify = false;
+            }
+
             $client = new \GuzzleHttp\Client([
                 'timeout' => 10,
                 'http_errors' => false,
                 'headers' => ['Accept' => 'application/json'],
+                'verify' => $verify,
             ]);
 
             $response = $client->post(self::API_URL, [
