@@ -660,9 +660,25 @@ class InquiryService
      */
     public function getById(string $id): ?array
     {
-        $items = $this->useDb ? $this->dbGetAll() : $this->fileGetAll();
+        if ($this->useDb) {
+            $found = $this->dbGetById($id);
+            if ($found) return $found;
+        }
+
+        $items = $this->fileGetAll();
+        $cleanId = str_starts_with($id, 'inq-') ? substr($id, 4) : $id;
+        $prefixedId = str_starts_with($id, 'inq-') ? $id : 'inq-' . $id;
+
         foreach ($items as $item) {
-            if ((string) ($item['id'] ?? '') === $id) {
+            $itemId = (string) ($item['id'] ?? '');
+            $itemRef = (string) ($item['referenceNumber'] ?? $item['reference_number'] ?? '');
+            if (
+                $itemId === $id ||
+                $itemId === $cleanId ||
+                $itemId === $prefixedId ||
+                $itemRef === $id ||
+                $itemRef === $cleanId
+            ) {
                 return $item;
             }
         }
@@ -963,15 +979,24 @@ class InquiryService
     private function dbGetById(string $id): ?array
     {
         $db = Database::getInstance();
+        $cleanId = str_starts_with($id, 'inq-') ? substr($id, 4) : $id;
+        $prefixedId = str_starts_with($id, 'inq-') ? $id : 'inq-' . $id;
+
         $stmt = $db->prepare(
             'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, internal_notes, created_at
              FROM customer_inquiries
-             WHERE id = :id OR reference_number = :ref
+             WHERE id = :id OR id = :cleanId OR id = :prefixedId OR reference_number = :ref OR reference_number = :cleanRef
              LIMIT 1'
         );
-        $stmt->execute([':id' => $id, ':ref' => $id]);
+        $stmt->execute([
+            ':id'         => $id,
+            ':cleanId'    => $cleanId,
+            ':prefixedId' => $prefixedId,
+            ':ref'        => $id,
+            ':cleanRef'   => $cleanId,
+        ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $this->mapDbRow($row);
     }

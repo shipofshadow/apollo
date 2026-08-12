@@ -56,7 +56,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       // Prevent toast spam when multiple requests fail simultaneously.
       if (now - lastOfflineToastAt.current < 5000) return;
       lastOfflineToastAt.current = now;
-      showToast('API is offline.', 'error');
+      showToast('System is offline. Please contact 1625autolab@gmail.com', 'error');
     };
 
     window.addEventListener(API_OFFLINE_EVENT, onApiOffline);

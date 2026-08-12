@@ -14,7 +14,7 @@ let lastApiSuccessAt = 0;
 let lastOfflineEventAt = 0;
 let offlineCheckInFlight: Promise<void> | null = null;
 
-async function probeBackendOnline(): Promise<boolean> {
+export async function probeBackendOnline(): Promise<boolean> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), OFFLINE_CHECK_TIMEOUT_MS);
 
@@ -58,7 +58,7 @@ function notifyApiOffline(): void {
   });
 }
 
-function markApiOnline(): void {
+export function markApiOnline(): void {
   lastApiSuccessAt = Date.now();
 }
 

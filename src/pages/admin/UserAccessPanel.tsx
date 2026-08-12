@@ -393,7 +393,7 @@ export default function UserAccessPanel() {
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (roleOptions.length === 0) {
-      showToast('API is offline.', 'error');
+      showToast('System is offline. Please contact 1625autolab@gmail.com', 'error');
       return;
     }
 

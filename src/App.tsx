@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter as Router, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
@@ -49,6 +49,8 @@ const Admin = lazy(() => import('./pages/Admin'));
 const BuildShowcase = lazy(() => import('./pages/BuildShowcase'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const CustomerFormPage = lazy(() => import('./pages/CustomerFormPage'));
+import { API_OFFLINE_EVENT } from './services/api';
+const ApiOfflinePage = lazy(() => import('./pages/ApiOfflinePage'));
 const ChecklistPage = lazy(() => import('./pages/ChecklistPage'));
 
 function RouteFallback() {
@@ -87,6 +89,13 @@ function PublicLayout() {
 function AppInner() {
   useNotificationPoller();
   const location = useLocation();
+  const [isApiOffline, setIsApiOffline] = useState(false);
+
+  useEffect(() => {
+    const onOffline = () => setIsApiOffline(true);
+    window.addEventListener(API_OFFLINE_EVENT, onOffline);
+    return () => window.removeEventListener(API_OFFLINE_EVENT, onOffline);
+  }, []);
 
   useEffect(() => {
     const path = location.pathname + location.search;
@@ -97,6 +106,14 @@ function AppInner() {
       sessionStorage.setItem('last_visited_page', path);
     }
   }, [location]);
+
+  if (isApiOffline) {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <ApiOfflinePage onRetrySuccess={() => setIsApiOffline(false)} />
+      </Suspense>
+    );
+  }
 
   return (
     <AppErrorBoundary>

@@ -1,23 +1,8 @@
-/**
- * VariationsManager
- *
- * Reusable admin UI to create / edit / delete variations for a service or product.
- * Each variation has a name, description, price, a multi-image gallery, and specs
- * (key-value pairs).
- *
- * Usage:
- *   <VariationsManager
- *     variations={service.variations}
- *     parentId={service.id}
- *     parentType="service"
- *     token={token}
- *     onSaved={updatedVariations => setVariations(updatedVariations)}
- *   />
- */
-
 import React, { useState } from 'react';
 import {
-  Plus, Trash2, Save, X, Upload, Loader2, ChevronDown, ChevronUp, GripVertical,
+  Plus, Trash2, Save, X, Upload, Loader2, ChevronDown, ChevronUp,
+  GripVertical, Layers, Tag, Image as ImageIcon, SlidersHorizontal,
+  Box, Pencil, AlertCircle, Sparkles
 } from 'lucide-react';
 import {
   createServiceVariationApi, updateServiceVariationApi, deleteServiceVariationApi,
@@ -254,128 +239,162 @@ export default function VariationsManager({ variations, parentId, parentType, to
 
   if (editingId !== null) {
     return (
-      <div className="border border-gray-700 rounded-sm p-5 space-y-5 bg-brand-darker">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-bold uppercase tracking-widest text-brand-orange">
-            {editingId === 'new' ? 'New Variation' : 'Edit Variation'}
-          </h4>
-          <button type="button" onClick={cancel} className="text-gray-500 hover:text-white transition-colors">
+      <div className="bg-[#121212] border border-gray-800/90 rounded-2xl p-5 sm:p-6 space-y-6 shadow-2xl animate-fade-in font-sans">
+        {/* Modal/Form Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-gray-800/80">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-brand-orange/10 border border-brand-orange/20 flex items-center justify-center text-brand-orange">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                {editingId === 'new' ? 'Add New Variation' : 'Edit Variation'}
+              </h4>
+              <p className="text-[11px] font-mono text-gray-500">Configure package tier, pricing, specifications, and gallery</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={cancel}
+            className="w-8 h-8 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-gray-700/50"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {saveError && (
-          <div className="text-red-400 text-xs bg-red-900/20 border border-red-500/30 px-3 py-2 rounded-sm">
-            {saveError}
+          <div className="flex items-center gap-2 text-xs font-mono text-red-400 bg-red-950/40 border border-red-500/30 p-3 rounded-xl">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+            <span>{saveError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Name *</label>
-              <input
-                required
-                value={form.name}
-                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="e.g. Basic Package"
+        <form onSubmit={handleSave} className="space-y-6">
+          {/* Section 1: Basic Information */}
+          <div className="space-y-4">
+            <div className="text-xs font-mono font-bold uppercase tracking-wider text-brand-orange flex items-center gap-2">
+              <Tag className="w-3.5 h-3.5" /> Basic Variation Info
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">
+                  Variation Name <span className="text-brand-orange">*</span>
+                </label>
+                <input
+                  required
+                  value={form.name}
+                  onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-orange placeholder:text-gray-600 transition-colors"
+                  placeholder="e.g. Stage 2 Bi-LED Retrofit"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">Price Display</label>
+                <input
+                  value={form.price}
+                  onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-orange placeholder:text-gray-600 transition-colors"
+                  placeholder="e.g. ₱18,500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">Description</label>
+              <textarea
+                rows={2}
+                value={form.description}
+                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-orange placeholder:text-gray-600 resize-none transition-colors"
+                placeholder="Brief summary of included components or upgrades..."
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Price</label>
+          </div>
+
+          {/* Section 2: Colors & Color-Specific Galleries */}
+          <div className="space-y-4 pt-2 border-t border-gray-800/80">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">
+                  Colors / Finish Variants <span className="font-normal text-gray-500">(comma-separated)</span>
+                </label>
+              </div>
               <input
-                value={form.price}
-                onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
-                className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm"
-                placeholder="e.g. ₱15,000"
+                value={form.colorsCsv}
+                onChange={e => setForm(p => ({ ...p, colorsCsv: e.target.value }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-orange placeholder:text-gray-600 transition-colors"
+                placeholder="e.g. Chrome, Matte Black, Gloss Carbon"
               />
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Description</label>
-            <textarea
-              rows={2}
-              value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-              className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm resize-none"
-              placeholder="Brief description of this variation…"
-            />
-          </div>
+            {parsedColors.length > 0 && (
+              <div className="space-y-3 bg-brand-darker/60 border border-gray-800 p-4 rounded-xl">
+                <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                  <ImageIcon className="w-3.5 h-3.5 text-brand-orange" /> Color-Specific Image Galleries
+                </label>
+                <div className="grid grid-cols-1 gap-3">
+                  {parsedColors.map(color => {
+                    const colorUrls = form.colorImages[color] ?? [];
+                    return (
+                      <div key={color} className="border border-gray-800 rounded-xl p-3 bg-brand-dark/60 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-gray-200 uppercase tracking-wider px-2 py-0.5 rounded bg-gray-800 border border-gray-700">
+                            {color}
+                          </span>
+                          <label className={`flex items-center gap-1.5 px-3 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white text-[11px] font-mono font-bold uppercase tracking-wider rounded-lg cursor-pointer transition-all ${imgBusy ? 'opacity-50 pointer-events-none' : ''}`}>
+                            {imgBusy ? <Loader2 className="w-3 h-3 animate-spin text-brand-orange" /> : <Upload className="w-3 h-3 text-brand-orange" />}
+                            Upload Image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={imgBusy}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleUploadColorImage(color, file);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-              Colors <span className="font-normal text-gray-600">(optional)</span>
-            </label>
-            <input
-              value={form.colorsCsv}
-              onChange={e => setForm(p => ({ ...p, colorsCsv: e.target.value }))}
-              className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm"
-              placeholder="e.g. Red, Matte Black, Gloss White"
-            />
-          </div>
-
-          {parsedColors.length > 0 && (
-            <div className="space-y-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                Color Images
-              </label>
-              {parsedColors.map(color => {
-                const colorUrls = form.colorImages[color] ?? [];
-                return (
-                  <div key={color} className="border border-gray-800 rounded-sm p-3 bg-brand-dark/40 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase tracking-widest text-gray-300">{color}</p>
-                      <label className={`flex items-center gap-1.5 px-2.5 py-1 border border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange text-[10px] font-bold uppercase tracking-widest rounded-sm cursor-pointer transition-colors ${imgBusy ? 'opacity-60 pointer-events-none' : ''}`}>
-                        {imgBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                        Add
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          disabled={imgBusy}
-                          onChange={e => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadColorImage(color, file);
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
-                    </div>
-                    {colorUrls.length > 0 ? (
-                      <div className="grid grid-cols-4 gap-2">
-                        {colorUrls.map((url, idx) => (
-                          <div key={idx} className="relative group aspect-square rounded-sm overflow-hidden border border-gray-700 bg-gray-800">
-                            <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            <button
-                              type="button"
-                              onClick={() => removeColorImage(color, idx)}
-                              className="absolute top-1 right-1 p-0.5 bg-black/70 hover:bg-red-600 text-white rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                        {colorUrls.length > 0 ? (
+                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                            {colorUrls.map((url, idx) => (
+                              <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-700 bg-gray-800">
+                                <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <button
+                                  type="button"
+                                  onClick={() => removeColorImage(color, idx)}
+                                  className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        ) : (
+                          <p className="text-gray-500 text-[11px] font-mono italic">No images uploaded for {color} yet.</p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-gray-600 text-xs italic">No images for this color yet.</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
-          {/* Images */}
-          <div className="space-y-2">
+          {/* Section 3: General Variation Images */}
+          <div className="space-y-3 pt-2 border-t border-gray-800/80">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                Images <span className="font-normal text-gray-600">({form.images.length})</span>
+              <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                <ImageIcon className="w-3.5 h-3.5 text-brand-orange" /> Main Gallery Images <span className="font-normal text-gray-500">({form.images.length})</span>
               </label>
-              <label className={`flex items-center gap-1.5 px-3 py-1.5 border border-gray-700 text-gray-400 hover:text-white hover:border-brand-orange text-xs font-bold uppercase tracking-widest rounded-sm cursor-pointer transition-colors ${imgBusy ? 'opacity-60 pointer-events-none' : ''}`}>
-                {imgBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                Add Image
+              <label className={`flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-lg cursor-pointer transition-all ${imgBusy ? 'opacity-50 pointer-events-none' : ''}`}>
+                {imgBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-orange" /> : <Upload className="w-3.5 h-3.5 text-brand-orange" />}
+                Add Photo
                 <input
                   type="file"
                   accept="image/*"
@@ -389,120 +408,140 @@ export default function VariationsManager({ variations, parentId, parentType, to
                 />
               </label>
             </div>
-            {form.images.length > 0 && (
-              <div className="grid grid-cols-4 gap-2">
+
+            {form.images.length > 0 ? (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
                 {form.images.map((url, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-sm overflow-hidden border border-gray-700 bg-gray-800">
+                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-700/80 bg-gray-900 shadow-md">
                     <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     {idx === 0 && (
-                      <span className="absolute top-1 left-1 text-[9px] font-bold bg-brand-orange text-white px-1 rounded-sm">Cover</span>
+                      <span className="absolute top-1.5 left-1.5 text-[9px] font-mono font-extrabold bg-brand-orange text-white px-1.5 py-0.5 rounded shadow-sm uppercase tracking-wider">
+                        Cover
+                      </span>
                     )}
                     <button
                       type="button"
                       onClick={() => removeImage(idx)}
-                      className="absolute top-1 right-1 p-0.5 bg-black/70 hover:bg-red-600 text-white rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1.5 right-1.5 p-1 bg-black/80 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
               </div>
-            )}
-            {form.images.length === 0 && (
-              <p className="text-gray-600 text-xs italic">No images yet — upload one above.</p>
+            ) : (
+              <p className="text-gray-500 text-xs font-mono italic bg-brand-darker p-3 rounded-xl border border-gray-800">
+                No gallery photos added yet. Upload photos to display in product/service showcase.
+              </p>
             )}
           </div>
 
-          {/* Specs */}
-          <div className="space-y-2">
+          {/* Section 4: Specifications */}
+          <div className="space-y-3 pt-2 border-t border-gray-800/80">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Specs</label>
+              <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-brand-orange" /> Technical Specs
+              </label>
               <button
                 type="button"
                 onClick={addSpec}
-                className="flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-brand-orange transition-colors"
+                className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-brand-orange hover:text-orange-400 transition-colors cursor-pointer"
               >
-                <Plus className="w-3 h-3" /> Add Spec
+                <Plus className="w-3.5 h-3.5" /> Add Spec
               </button>
             </div>
-            {form.specs.map((spec, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
-                <GripVertical className="w-3 h-3 text-gray-700 shrink-0" />
-                <input
-                  value={spec.label}
-                  onChange={e => updateSpec(idx, 'label', e.target.value)}
-                  placeholder="Label (e.g. Beam Pattern)"
-                  className="flex-1 bg-brand-dark border border-gray-700 text-white px-2 py-1.5 text-xs focus:outline-none focus:border-brand-orange rounded-sm"
-                />
-                <input
-                  value={spec.value}
-                  onChange={e => updateSpec(idx, 'value', e.target.value)}
-                  placeholder="Value (e.g. D-shape)"
-                  className="flex-1 bg-brand-dark border border-gray-700 text-white px-2 py-1.5 text-xs focus:outline-none focus:border-brand-orange rounded-sm"
-                />
-                <button type="button" onClick={() => removeSpec(idx)} className="text-gray-600 hover:text-red-400 transition-colors shrink-0">
-                  <X className="w-3 h-3" />
-                </button>
+
+            {form.specs.length > 0 ? (
+              <div className="space-y-2">
+                {form.specs.map((spec, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <GripVertical className="w-4 h-4 text-gray-700 shrink-0" />
+                    <input
+                      value={spec.label}
+                      onChange={e => updateSpec(idx, 'label', e.target.value)}
+                      placeholder="Label (e.g. Lens Pattern)"
+                      className="flex-1 bg-brand-darker border border-gray-800 text-white px-3 py-2 text-xs font-mono focus:outline-none focus:border-brand-orange rounded-xl placeholder:text-gray-600"
+                    />
+                    <input
+                      value={spec.value}
+                      onChange={e => updateSpec(idx, 'value', e.target.value)}
+                      placeholder="Value (e.g. Cut-off Line)"
+                      className="flex-1 bg-brand-darker border border-gray-800 text-white px-3 py-2 text-xs font-mono focus:outline-none focus:border-brand-orange rounded-xl placeholder:text-gray-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSpec(idx)}
+                      className="p-2 text-gray-500 hover:text-red-400 transition-colors shrink-0 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-            {form.specs.length === 0 && (
-              <p className="text-gray-600 text-xs italic">No specs yet — add one above.</p>
+            ) : (
+              <p className="text-gray-500 text-xs font-mono italic bg-brand-darker p-3 rounded-xl border border-gray-800">
+                No technical specifications configured.
+              </p>
             )}
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Sort Order</label>
-            <input
-              type="number"
-              min={0}
-              value={form.sortOrder}
-              onChange={e => setForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))}
-              className="w-24 bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm"
-            />
-          </div>
+          {/* Section 5: Order & Stock Controls */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-800/80">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">Sort Order Position</label>
+              <input
+                type="number"
+                min={0}
+                value={form.sortOrder}
+                onChange={e => setForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))}
+                className="w-full bg-brand-darker border border-gray-800 text-white px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-brand-orange rounded-xl"
+              />
+            </div>
 
-          {parentType === 'product' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Stock Quantity</label>
+            {parentType === 'product' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                    <Box className="w-3.5 h-3.5 text-brand-orange" /> Stock Quantity
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-xs font-mono font-bold uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={form.trackStock}
+                      onChange={e => setForm(p => ({ ...p, trackStock: e.target.checked }))}
+                      className="accent-brand-orange w-4 h-4 rounded cursor-pointer"
+                    />
+                    Track Inventory
+                  </label>
+                </div>
                 <input
                   type="number"
                   min={0}
                   value={form.stockQty}
                   disabled={!form.trackStock}
                   onChange={e => setForm(p => ({ ...p, stockQty: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                  className="w-full bg-brand-dark border border-gray-700 text-white px-3 py-2 text-sm focus:outline-none focus:border-brand-orange rounded-sm disabled:opacity-50"
+                  className="w-full bg-brand-darker border border-gray-800 text-white px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-brand-orange rounded-xl disabled:opacity-40"
                 />
               </div>
-              <div className="flex items-end pb-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-gray-300 text-xs font-bold uppercase tracking-widest">
-                  <input
-                    type="checkbox"
-                    checked={form.trackStock}
-                    onChange={e => setForm(p => ({ ...p, trackStock: e.target.checked }))}
-                    className="accent-brand-orange w-4 h-4"
-                  />
-                  Track Stock
-                </label>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div className="flex gap-3 pt-2 border-t border-gray-800">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-1.5 bg-brand-orange text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors disabled:opacity-60 rounded-sm"
-            >
-              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-              {editingId === 'new' ? 'Add Variation' : 'Save'}
-            </button>
+          {/* Form Actions */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800/90">
             <button
               type="button"
               onClick={cancel}
-              className="px-4 py-2 border border-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors rounded-sm"
+              className="px-5 py-2.5 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer"
             >
               Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-brand-orange hover:bg-orange-600 text-white px-6 py-2.5 text-xs font-mono font-bold uppercase tracking-wider transition-all disabled:opacity-50 rounded-xl shadow-lg cursor-pointer"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Save className="w-4 h-4" />}
+              <span>{editingId === 'new' ? 'Create Variation' : 'Save Changes'}</span>
             </button>
           </div>
         </form>
@@ -510,83 +549,142 @@ export default function VariationsManager({ variations, parentId, parentType, to
     );
   }
 
-  // ── Variations list view ───────────────────────────────────────────────────
+  // ── Variations List View ───────────────────────────────────────────────────
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className="bg-[#121212] border border-gray-800/80 rounded-2xl overflow-hidden shadow-2xl p-5 sm:p-6 space-y-4 font-sans">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between pb-3 border-b border-gray-800/80">
         <button
           type="button"
           onClick={() => setCollapsed(c => !c)}
-          className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-gray-300 hover:text-white transition-colors cursor-pointer"
         >
-          {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-          Variations ({variations.length})
+          {collapsed ? <ChevronDown className="w-4 h-4 text-brand-orange" /> : <ChevronUp className="w-4 h-4 text-brand-orange" />}
+          <span className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-brand-orange" />
+            <span>Variations ({variations.length})</span>
+          </span>
         </button>
+
         <button
           type="button"
           onClick={openNew}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-gray-600 text-gray-400 hover:text-brand-orange hover:border-brand-orange text-xs font-bold uppercase tracking-widest rounded-sm transition-colors"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-brand-orange/10 hover:bg-brand-orange border border-brand-orange/30 text-brand-orange hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm"
         >
-          <Plus className="w-3 h-3" /> Add Variation
+          <Plus className="w-3.5 h-3.5" /> Add Variation
         </button>
       </div>
 
       {saveError && (
-        <div className="text-red-400 text-xs bg-red-900/20 border border-red-500/30 px-3 py-2 rounded-sm">
-          {saveError}
+        <div className="flex items-center gap-2 text-xs font-mono text-red-400 bg-red-950/40 border border-red-500/30 p-3 rounded-xl">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <span>{saveError}</span>
         </div>
       )}
 
+      {/* Variations List */}
       {!collapsed && (
-        <div className="space-y-2">
-          {variations.length === 0 && (
-            <p className="text-gray-600 text-xs italic px-1">
-              No variations yet. Add one to give customers package options with their own images and specs.
-            </p>
-          )}
-          {variations.map(v => (
-            <div key={v.id} className="flex items-start gap-3 p-3 border border-gray-800 rounded-sm bg-brand-darker">
-              {v.images[0] && (
-                <img
-                  src={v.images[0]}
-                  alt={v.name}
-                  className="w-12 h-12 object-cover rounded-sm border border-gray-700 shrink-0"
-                  referrerPolicy="no-referrer"
-                />
-              )}
-              <div className="flex-grow min-w-0">
-                <p className="text-white text-sm font-bold truncate">{v.name}</p>
-                {v.price && (
-                  <p className="text-brand-orange text-xs font-bold">{v.price}</p>
-                )}
-                <div className="flex gap-2 mt-1 text-xs text-gray-600">
-                  <span>{v.images.length} image{v.images.length !== 1 ? 's' : ''}</span>
-                  {v.specs.length > 0 && <span>{v.specs.length} spec{v.specs.length !== 1 ? 's' : ''}</span>}
-                  {parentType === 'product' && 'trackStock' in v && v.trackStock && (
-                    <span>Stock: {'stockQty' in v ? (v.stockQty ?? 0) : 0}</span>
+        <div className="space-y-3 pt-1">
+          {variations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-brand-darker/60 border border-gray-800/80 rounded-xl space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-600">
+                <Sparkles className="w-6 h-6 text-brand-orange/50" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider">No Variations Configured</p>
+                <p className="text-[11px] font-mono text-gray-500 max-w-sm">
+                  Add variations to offer multiple tiers, color options, or custom packages with their own photos and specs.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openNew}
+                className="px-4 py-2 bg-brand-orange text-white text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                + Create First Variation
+              </button>
+            </div>
+          ) : (
+            variations.map(v => (
+              <div
+                key={v.id}
+                className="group relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border border-gray-800/90 rounded-xl bg-gradient-to-r from-brand-dark/90 via-[#161616] to-brand-dark hover:border-gray-700 transition-all shadow-md"
+              >
+                <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                  {v.images[0] ? (
+                    <img
+                      src={v.images[0]}
+                      alt={v.name}
+                      className="w-14 h-14 object-cover rounded-xl border border-gray-700/80 shrink-0 shadow-sm"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl border border-gray-800 bg-gray-900 flex items-center justify-center text-gray-600 shrink-0">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
                   )}
+
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <p className="text-sm font-mono font-bold text-white truncate">{v.name}</p>
+                      {v.price && (
+                        <span className="text-xs font-mono font-bold text-brand-orange bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/20">
+                          {v.price}
+                        </span>
+                      )}
+                    </div>
+
+                    {v.description && (
+                      <p className="text-xs font-mono text-gray-400 line-clamp-1">{v.description}</p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-gray-500 pt-0.5">
+                      <span className="flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3 text-gray-600" /> {v.images.length} photo{v.images.length !== 1 ? 's' : ''}
+                      </span>
+                      {v.specs.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <SlidersHorizontal className="w-3 h-3 text-gray-600" /> {v.specs.length} spec{v.specs.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {v.colors && v.colors.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-gray-600" /> {v.colors.length} color{v.colors.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {parentType === 'product' && 'trackStock' in v && v.trackStock && (
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <Box className="w-3 h-3 text-gray-500" /> Stock: {'stockQty' in v ? (v.stockQty ?? 0) : 0}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(v)}
+                    className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 hover:text-white text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-brand-orange" /> Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(v.id)}
+                    disabled={deleting === v.id}
+                    className="p-1.5 bg-gray-800/80 hover:bg-red-950/60 border border-gray-700 hover:border-red-500/50 text-gray-400 hover:text-red-400 rounded-xl transition-all disabled:opacity-50 cursor-pointer"
+                    title="Delete variation"
+                  >
+                    {deleting === v.id ? <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => openEdit(v)}
-                  className="px-2 py-1 border border-gray-700 text-gray-400 hover:border-brand-orange hover:text-brand-orange text-xs font-bold uppercase rounded-sm transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(v.id)}
-                  disabled={deleting === v.id}
-                  className="p-1 border border-gray-700 text-gray-500 hover:border-red-500/50 hover:text-red-400 rounded-sm transition-colors disabled:opacity-50"
-                >
-                  {deleting === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                </button>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
     </div>

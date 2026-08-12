@@ -23,14 +23,17 @@ class InquiryActivityService
             return [];
         }
 
+        $cleanId = str_starts_with($inquiryId, 'inq-') ? substr($inquiryId, 4) : $inquiryId;
+        $prefixedId = str_starts_with($inquiryId, 'inq-') ? $inquiryId : 'inq-' . $inquiryId;
+
         $stmt = Database::getInstance()->prepare(
             'SELECT a.id, a.inquiry_id, a.actor_user_id, a.actor_role, a.event_type, a.action, a.detail, a.created_at, u.name AS actor_name
              FROM inquiry_activity_logs a
              LEFT JOIN users u ON a.actor_user_id = u.id
-             WHERE a.inquiry_id = :inquiry_id
+             WHERE a.inquiry_id = :id OR a.inquiry_id = :cleanId OR a.inquiry_id = :prefixedId
              ORDER BY a.created_at ASC, a.id ASC'
         );
-        $stmt->execute([':inquiry_id' => $inquiryId]);
+        $stmt->execute([':id' => $inquiryId, ':cleanId' => $cleanId, ':prefixedId' => $prefixedId]);
 
         return array_map([$this, 'formatRow'], $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: []);
     }

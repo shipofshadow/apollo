@@ -148,7 +148,7 @@ export default function ManageUsersPanel() {
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roleOptions.length) { showToast('API is offline.', 'error'); return; }
+    if (!roleOptions.length) { showToast('System is offline. Please contact 1625autolab@gmail.com', 'error'); return; }
     const payload = { name: newUser.name.trim(), email: newUser.email.trim(), phone: newUser.phone.trim() || undefined, password: newUser.password, role: newUser.role };
     requestConfirmation({
       title: 'Create user account?',

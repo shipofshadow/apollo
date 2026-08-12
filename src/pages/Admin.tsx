@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
@@ -91,14 +91,28 @@ export default function AdminPage() {
   const fallbackAvatar = getDicebearAvatarDataUri({ id: user?.id, name: user?.name, email: user?.email });
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const activeTab = getAdminTabFromPath(location.pathname);
   const [collapsed,       setCollapsed]       = useState(false);
   const [mobileOpen,      setMobileOpen]      = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [activeClient,    setActiveClient]    = useState<ClientAdminSummary | null>(null);
+
+  const paramInquiryId = searchParams.get('inquiryId');
+  const paramBookingId = searchParams.get('bookingId');
+  const queryBookingId = paramInquiryId
+    ? (paramInquiryId.startsWith('inq-') ? paramInquiryId : `inq-${paramInquiryId}`)
+    : (paramBookingId ?? null);
+
   const routeState = location.state as { openBookingId?: string } | null;
-  const routeBookingId = routeState?.openBookingId ?? null;
+  const routeBookingId = routeState?.openBookingId ?? queryBookingId;
   const selectedBookingId = activeBookingId ?? routeBookingId;
+
+  useEffect(() => {
+    if (routeBookingId) {
+      setActiveBookingId(routeBookingId);
+    }
+  }, [routeBookingId]);
 
   const siteSettings = useSelector((state: RootState) => state.siteSettings.settings);
   const isRegistrationDisabled = siteSettings.disable_registration === '1';
@@ -302,7 +316,7 @@ export default function AdminPage() {
               <AdminInquiryDetail
                 inquiryId={selectedBookingId}
                 backLabel="Return to Calendar"
-                onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.calendar); }}
+                onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.calendar, { replace: true, state: {} }); }}
               />
             );
           }
@@ -310,7 +324,7 @@ export default function AdminPage() {
             <AdminBookingDetail
               bookingId={selectedBookingId}
               backLabel="Return to Calendar"
-              onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.calendar); }}
+              onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.calendar, { replace: true, state: {} }); }}
             />
           );
         }
@@ -325,7 +339,7 @@ export default function AdminPage() {
               <AdminInquiryDetail
                 inquiryId={selectedBookingId}
                 backLabel="Return to Appointments"
-                onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
+                onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments, { replace: true, state: {} }); }}
               />
             );
           }
@@ -333,7 +347,7 @@ export default function AdminPage() {
             <AdminBookingDetail
               bookingId={selectedBookingId}
               backLabel="Return to Appointments"
-              onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments); }}
+              onBack={() => { setActiveBookingId(null); navigate(TAB_PATHS.appointments, { replace: true, state: {} }); }}
             />
           );
         }
