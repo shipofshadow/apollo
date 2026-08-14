@@ -362,6 +362,8 @@ class InquiryService
             return $existing;
         }
 
+        $diff = $this->buildFieldDiff($existing, $fieldsToUpdate);
+
         if ($this->useDb) {
             $db = Database::getInstance();
             $setStatements = ['updated_at = CURRENT_TIMESTAMP'];
@@ -383,7 +385,7 @@ class InquiryService
                 $id,
                 ActivityEvents::INQUIRY_STATUS_CHANGED,
                 'Inquiry details updated by admin',
-                null,
+                $diff ?: null,
                 $actorUserId,
                 $actorUserId ? 'admin' : 'system'
             );
@@ -428,7 +430,7 @@ class InquiryService
             $id,
             ActivityEvents::INQUIRY_STATUS_CHANGED,
             'Inquiry details updated by admin',
-            null,
+            $diff ?: null,
             $actorUserId,
             $actorUserId ? 'admin' : 'system'
         );
@@ -1617,5 +1619,125 @@ class InquiryService
     private function uuid(): string
     {
         return bin2hex(random_bytes(16));
+    }
+
+    /**
+     * Build a friendly, human-readable summary of what changed for the activity log.
+     *
+     * Produces sentences like "Status updated to: Confirmed" that non-technical
+     * staff can read at a glance in the inquiry timeline.
+     *
+     * @param array<string, mixed> $existing       The inquiry snapshot before saving.
+     * @param array<string, mixed> $fieldsToUpdate Snake_case col => new value map.
+     * @return string  e.g. "Status updated to: Confirmed. Appointment changed to: Aug 15, 2026 at 9:00 AM."
+     */
+    private function buildFieldDiff(array $existing, array $fieldsToUpdate): string
+    {
+        // snake_case column -> camelCase key in $existing
+        $colToCamel = [
+            'full_name'           => 'fullName',
+            'email_address'       => 'emailAddress',
+            'contact_number'      => 'contactNumber',
+            'facebook_name'       => 'facebookName',
+            'address'             => 'address',
+            'make'                => 'make',
+            'model'               => 'model',
+            'year_model'          => 'yearModel',
+            'plate_number'        => 'plateNumber',
+            'product_to_purchase' => 'productToPurchase',
+            'service_id'          => 'serviceId',
+            'status'              => 'status',
+            'internal_notes'      => 'internalNotes',
+            'appointment_date'    => 'appointmentDate',
+            'appointment_time'    => 'appointmentTime',
+        ];
+
+        // Human-friendly label per column
+        $labels = [
+            'full_name'           => 'Name',
+            'email_address'       => 'Email',
+            'contact_number'      => 'Contact number',
+            'facebook_name'       => 'Facebook name',
+            'address'             => 'Address',
+            'make'                => 'Vehicle make',
+            'model'               => 'Vehicle model',
+            'year_model'          => 'Year model',
+            'plate_number'        => 'Plate number',
+            'product_to_purchase' => 'Product / service',
+            'service_id'          => 'Assigned service',
+            'status'              => 'Status',
+            'internal_notes'      => 'Internal notes',
+            'appointment_date'    => 'Appointment date',
+            'appointment_time'    => 'Appointment time',
+        ];
+
+        // Pretty-print status values
+        $statusLabels = [
+            'pending'     => 'Pending',
+            'confirmed'   => 'Confirmed',
+            'in_progress' => 'In Progress',
+            'completed'   => 'Completed',
+            'cancelled'   => 'Cancelled',
+        ];
+
+        $parts = [];
+
+        // Handle appointment date + time together for a nicer sentence
+        $dateChanged = isset($fieldsToUpdate['appointment_date']);
+        $timeChanged = isset($fieldsToUpdate['appointment_time']);
+
+        foreach ($fieldsToUpdate as $col => $newVal) {
+            // Merge date & time into one readable sentence
+            if ($col === 'appointment_date' || $col === 'appointment_time') {
+                if ($col === 'appointment_date') {
+                    $newDate = (string) ($fieldsToUpdate['appointment_date'] ?? $existing['appointmentDate'] ?? '');
+                    $newTime = (string) ($fieldsToUpdate['appointment_time'] ?? $existing['appointmentTime'] ?? '');
+
+                    $oldDate = (string) ($existing['appointmentDate'] ?? '');
+                    $oldTime = (string) ($existing['appointmentTime'] ?? '');
+
+                    $fmtDate = fn(string $d): string => $d !== ''
+                        ? date('M j, Y', strtotime($d))
+                        : $d;
+                    $fmtTime = fn(string $t): string => $t !== ''
+                        ? date('g:i A', strtotime($t))
+                        : $t;
+
+                    $oldFormatted = trim($fmtDate($oldDate) . ' at ' . $fmtTime($oldTime), ' at');
+                    $newFormatted = trim($fmtDate($newDate) . ' at ' . $fmtTime($newTime), ' at');
+
+                    if ($oldFormatted !== $newFormatted) {
+                        $parts[] = "Appointment changed to: {$newFormatted}";
+                    }
+                }
+                // Skip time-only — already handled above
+                continue;
+            }
+
+            $camel  = $colToCamel[$col] ?? $col;
+            $oldVal = (string) ($existing[$camel] ?? $existing[$col] ?? '');
+            $newStr = (string) ($newVal ?? '');
+
+            if ($oldVal === $newStr) {
+                continue;
+            }
+
+            $label = $labels[$col] ?? ucfirst(str_replace('_', ' ', $col));
+
+            if ($col === 'status') {
+                $newDisplay = $statusLabels[$newStr] ?? ucfirst($newStr);
+                $parts[] = "Status updated to: {$newDisplay}";
+            } elseif ($col === 'internal_notes') {
+                $parts[] = 'Internal notes updated';
+            } elseif ($col === 'service_id') {
+                $parts[] = $newStr !== '' && $newStr !== '0'
+                    ? "Service assigned (ID: {$newStr})"
+                    : 'Service assignment removed';
+            } else {
+                $parts[] = "{$label} updated to: {$newStr}";
+            }
+        }
+
+        return implode('. ', $parts);
     }
 }
