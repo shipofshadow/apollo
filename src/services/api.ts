@@ -2154,4 +2154,27 @@ export const syncAllSheetsApi = (token: string) =>
     token
   );
 
+export const pullSheetsApi = (token: string) =>
+  apiFetch<{
+    success: boolean;
+    total: number;
+    created: number;
+    updated: number;
+    unchanged: number;
+    errors: string[];
+    lastSyncAt: string;
+  }>(
+    '/api/admin/site-settings/pull-sheets',
+    { method: 'POST' },
+    token
+  );
+
+export const getSheetsScriptApi = (token: string) =>
+  apiFetch<{ success: boolean; script: string }>(
+    '/api/admin/site-settings/sheets-script',
+    {},
+    token
+  );
+
+
 

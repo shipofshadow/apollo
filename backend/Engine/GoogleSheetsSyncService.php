@@ -7,16 +7,20 @@ use GuzzleHttp\Client;
 /**
  * GoogleSheetsSyncService
  *
- * Posts customer inquiry updates directly to a Google Sheets Apps Script Webhook URL.
+ * Handles bidirectional (two-way) live synchronization between Apollo and Google Sheets:
+ *  - Outbound (Apollo -> Sheets): Pushes new/updated inquiries to Google Apps Script webhook.
+ *  - Inbound (Sheets -> Apollo): Processes row edits sent by Google Apps Script triggers.
+ *  - Pull (Sheets -> Apollo): Fetches all rows from Google Sheets on demand.
  */
 class GoogleSheetsSyncService
 {
     private Client $http;
+    private static bool $syncDisabled = false;
 
     public function __construct()
     {
         $this->http = new Client([
-            'timeout' => 10,
+            'timeout' => 15,
             'http_errors' => false,
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -26,12 +30,35 @@ class GoogleSheetsSyncService
     }
 
     /**
-     * Sends the inquiry data to the Google Sheets Webhook URL if configured.
+     * Executes a callback with outbound Google Sheets sync suppressed.
+     * Useful when processing inbound sync to prevent recursion/loops.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    public static function withoutSync(callable $callback): mixed
+    {
+        $prev = self::$syncDisabled;
+        self::$syncDisabled = true;
+        try {
+            return $callback();
+        } finally {
+            self::$syncDisabled = $prev;
+        }
+    }
+
+    /**
+     * Sends inquiry data to the Google Sheets Webhook URL if configured.
      *
      * @param array<string, mixed> $inquiry
      */
     public static function syncInquiry(array $inquiry): void
     {
+        if (self::$syncDisabled) {
+            return;
+        }
+
         try {
             $settings = (new SiteSettingsService())->getAll();
             $webhookUrl = trim((string) ($settings['google_sheets_webhook_url'] ?? ''));
@@ -77,6 +104,7 @@ class GoogleSheetsSyncService
             $dateVal = (string) ($inquiry['appointmentDate'] ?? $inquiry['appointment_date'] ?? '');
             $timeVal = (string) ($inquiry['appointmentTime'] ?? $inquiry['appointment_time'] ?? '');
             $statusVal = (string) ($inquiry['status'] ?? 'pending');
+            $notesVal = (string) ($inquiry['internalNotes'] ?? $inquiry['internal_notes'] ?? '');
             $createdVal = (string) ($inquiry['createdAt'] ?? $inquiry['created_at'] ?? date('Y-m-d H:i:s'));
             $nowStr = date('Y-m-d H:i:s');
 
@@ -98,6 +126,7 @@ class GoogleSheetsSyncService
                 'appointmentDate' => $dateVal,
                 'appointmentTime' => $timeVal,
                 'status' => $statusVal,
+                'internalNotes' => $notesVal,
                 'lastUpdated' => $nowStr,
                 'inquiryId' => $idVal,
                 'referenceNumber' => $refVal,
@@ -114,9 +143,10 @@ class GoogleSheetsSyncService
                 'plate_number' => $plateVal,
                 'appointment_date' => $dateVal,
                 'appointment_time' => $timeVal,
+                'internal_notes' => $notesVal,
                 'last_updated' => $nowStr,
 
-                // Header Name Aliases for e.parameter / header-matching scripts
+                // Header Name Aliases for header-matching scripts
                 'Timestamp' => $createdVal,
                 'Full Name' => $fullNameVal,
                 'Email address' => $emailVal,
@@ -132,6 +162,7 @@ class GoogleSheetsSyncService
                 'Appointment Date' => $dateVal,
                 'Appointment Time' => $timeVal,
                 'Status' => $statusVal,
+                'Internal Notes' => $notesVal,
                 'Last Updated' => $nowStr,
                 'Inquiry ID' => $idVal,
                 'Reference Number' => $refVal,
@@ -146,12 +177,12 @@ class GoogleSheetsSyncService
                 CURLOPT_POSTFIELDS => $jsonPayload,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_POSTREDIR => 7, // Preserve POST method on redirect (CURL_REDIR_POST_ALL)
+                CURLOPT_POSTREDIR => 7, // Preserve POST method on 301/302 redirects
                 CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
                 CURLOPT_MAXREDIRS => 5,
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json; charset=utf-8',
-                    'Content-Length: ' . strlen($jsonPayload),
+                    'Content-Length: ' . strlen((string)$jsonPayload),
                 ],
                 CURLOPT_TIMEOUT => 15,
                 CURLOPT_SSL_VERIFYPEER => false,
@@ -165,11 +196,477 @@ class GoogleSheetsSyncService
             if ($curlError !== '') {
                 error_log('[GoogleSheetsSyncService] cURL error: ' . $curlError);
             } else {
-                error_log("[GoogleSheetsSyncService] Webhook response ({$httpCode}): " . (string)$response);
+                error_log("[GoogleSheetsSyncService] Outbound Webhook response ({$httpCode}): " . (string)$response);
             }
         } catch (\Throwable $e) {
-            error_log('[GoogleSheetsSyncService] Webhook post failed: ' . $e->getMessage());
+            error_log('[GoogleSheetsSyncService] Outbound Webhook failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Processes an inbound inquiry payload sent from Google Sheets (onEdit trigger or manual sync).
+     *
+     * @param array<string, mixed> $data
+     * @param string|null $providedSecret
+     * @param bool $bypassSecretCheck
+     * @return array<string, mixed>
+     */
+    public static function processInboundSync(array $data, ?string $providedSecret = null, bool $bypassSecretCheck = false): array
+    {
+        $settings = (new SiteSettingsService())->getAll();
+
+        if (!$bypassSecretCheck) {
+            $configuredSecret = trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
+            if ($configuredSecret !== '') {
+                $candidate = trim((string) (
+                    $providedSecret
+                    ?? $data['secret']
+                    ?? $data['api_secret']
+                    ?? ($_SERVER['HTTP_X_SHEETS_SECRET'] ?? '')
+                    ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? '')
+                ));
+                if (str_starts_with($candidate, 'Bearer ')) {
+                    $candidate = substr($candidate, 7);
+                }
+                if ($candidate === '' || !hash_equals($configuredSecret, $candidate)) {
+                    throw new RuntimeException('Invalid or missing Google Sheets webhook secret key.', 401);
+                }
+            }
+        }
+
+        // Handle batch sync payload { action: 'sync_all', rows: [...] }
+        if (isset($data['action']) && $data['action'] === 'sync_all' && isset($data['rows']) && is_array($data['rows'])) {
+            $created = 0;
+            $updated = 0;
+            $unchanged = 0;
+            $errors = [];
+
+            foreach ($data['rows'] as $idx => $row) {
+                if (!is_array($row)) continue;
+                try {
+                    $res = self::processInboundSync($row, null, true);
+                    if (($res['action'] ?? '') === 'created') $created++;
+                    elseif (($res['action'] ?? '') === 'updated') $updated++;
+                    else $unchanged++;
+                } catch (\Throwable $e) {
+                    $errors[] = "Row #" . ($idx + 2) . ": " . $e->getMessage();
+                }
+            }
+
+            return [
+                'success' => true,
+                'action' => 'batch',
+                'total' => count($data['rows']),
+                'created' => $created,
+                'updated' => $updated,
+                'unchanged' => $unchanged,
+                'errors' => $errors,
+            ];
+        }
+
+        // Normalize incoming data from various header/key variations
+        $id = trim((string) ($data['id'] ?? $data['inquiryId'] ?? $data['inquiry_id'] ?? $data['Inquiry ID'] ?? $data['ID'] ?? ''));
+        $ref = trim((string) ($data['referenceNumber'] ?? $data['reference_number'] ?? $data['Reference Number'] ?? $data['ref'] ?? ''));
+        $fullName = trim((string) ($data['fullName'] ?? $data['full_name'] ?? $data['Full Name'] ?? $data['customerName'] ?? $data['name'] ?? ''));
+        $email = trim((string) ($data['emailAddress'] ?? $data['email_address'] ?? $data['Email address'] ?? $data['Email Address'] ?? $data['email'] ?? ''));
+        $phone = trim((string) ($data['contactNumber'] ?? $data['contact_number'] ?? $data['Contact Number'] ?? $data['phone'] ?? ''));
+        $address = trim((string) ($data['address'] ?? $data['Address'] ?? ''));
+        $fbName = trim((string) ($data['facebookName'] ?? $data['facebook_name'] ?? $data['Facebook Name'] ?? ''));
+        $make = trim((string) ($data['make'] ?? $data['Car Make'] ?? $data['Make'] ?? ''));
+        $model = trim((string) ($data['model'] ?? $data['Car Model'] ?? $data['Model'] ?? ''));
+        $year = trim((string) ($data['yearModel'] ?? $data['year_model'] ?? $data['Year Model'] ?? $data['year'] ?? ''));
+        $serviceOrProduct = trim((string) ($data['productToPurchase'] ?? $data['product_to_purchase'] ?? $data['Product to Purchase'] ?? $data['serviceName'] ?? $data['service_name'] ?? $data['Service Name'] ?? $data['service'] ?? ''));
+        $plate = trim((string) ($data['plateNumber'] ?? $data['plate_number'] ?? $data['Plate Number'] ?? ''));
+        $rawDate = trim((string) ($data['appointmentDate'] ?? $data['appointment_date'] ?? $data['Appointment Date'] ?? $data['date'] ?? ''));
+        $rawTime = trim((string) ($data['appointmentTime'] ?? $data['appointment_time'] ?? $data['Appointment Time'] ?? $data['time'] ?? ''));
+        $rawStatus = trim((string) ($data['status'] ?? $data['Status'] ?? ''));
+        $notes = trim((string) ($data['internalNotes'] ?? $data['internal_notes'] ?? $data['Internal Notes'] ?? $data['notes'] ?? ''));
+
+        // Normalize Date
+        $appDate = self::normalizeDate($rawDate);
+        // Normalize Time
+        $appTime = self::normalizeTime($rawTime);
+        // Normalize Status
+        $cleanStatus = self::normalizeStatus($rawStatus);
+
+        $inquirySvc = new InquiryService();
+        $existing = null;
+
+        // 1. Locate existing inquiry by Reference Number or ID
+        if ($ref !== '') {
+            $existing = $inquirySvc->getById($ref);
+        }
+        if ($existing === null && $id !== '') {
+            $existing = $inquirySvc->getById($id);
+        }
+
+        // 2. If not found by ID/Ref, try looking up by Plate + Date or Phone + Date
+        if ($existing === null && DB_NAME !== '') {
+            try {
+                $db = Database::getInstance();
+                if ($plate !== '' && $appDate !== '') {
+                    $stmt = $db->prepare('SELECT id FROM customer_inquiries WHERE plate_number = :plate AND appointment_date = :dt LIMIT 1');
+                    $stmt->execute([':plate' => $plate, ':dt' => $appDate]);
+                    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $existing = $inquirySvc->getById((string) $row['id']);
+                    }
+                }
+                if ($existing === null && $phone !== '' && $appDate !== '') {
+                    $stmt = $db->prepare('SELECT id FROM customer_inquiries WHERE contact_number = :phone AND appointment_date = :dt LIMIT 1');
+                    $stmt->execute([':phone' => $phone, ':dt' => $appDate]);
+                    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $existing = $inquirySvc->getById((string) $row['id']);
+                    }
+                }
+            } catch (\Throwable) {
+                // Ignore lookup errors
+            }
+        }
+
+        // Suppress outbound sync while updating/inserting to prevent sync echo loops
+        return self::withoutSync(function () use (
+            $existing,
+            $inquirySvc,
+            $id,
+            $ref,
+            $fullName,
+            $email,
+            $phone,
+            $address,
+            $fbName,
+            $make,
+            $model,
+            $year,
+            $serviceOrProduct,
+            $plate,
+            $appDate,
+            $appTime,
+            $cleanStatus,
+            $notes
+        ): array {
+            // Case A: Existing inquiry found -> Update
+            if ($existing !== null) {
+                $inqId = (string) $existing['id'];
+                $changes = [];
+
+                if ($fullName !== '' && $fullName !== (string) ($existing['fullName'] ?? '')) {
+                    $changes['fullName'] = $fullName;
+                }
+                if ($email !== '' && $email !== (string) ($existing['emailAddress'] ?? '') && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $changes['emailAddress'] = $email;
+                }
+                if ($phone !== '' && $phone !== (string) ($existing['contactNumber'] ?? '')) {
+                    $changes['contactNumber'] = $phone;
+                }
+                if ($address !== '' && $address !== (string) ($existing['address'] ?? '')) {
+                    $changes['address'] = $address;
+                }
+                if ($fbName !== '' && $fbName !== (string) ($existing['facebookName'] ?? '')) {
+                    $changes['facebookName'] = $fbName;
+                }
+                if ($make !== '' && $make !== (string) ($existing['make'] ?? '')) {
+                    $changes['make'] = $make;
+                }
+                if ($model !== '' && $model !== (string) ($existing['model'] ?? '')) {
+                    $changes['model'] = $model;
+                }
+                if ($year !== '' && $year !== (string) ($existing['yearModel'] ?? '')) {
+                    $changes['yearModel'] = $year;
+                }
+                if ($plate !== '' && $plate !== (string) ($existing['plateNumber'] ?? '')) {
+                    $changes['plateNumber'] = $plate;
+                }
+                if ($serviceOrProduct !== '' && $serviceOrProduct !== (string) ($existing['productToPurchase'] ?? '')) {
+                    $changes['productToPurchase'] = $serviceOrProduct;
+                }
+                if ($cleanStatus !== null && $cleanStatus !== (string) ($existing['status'] ?? '')) {
+                    $changes['status'] = $cleanStatus;
+                }
+                if ($notes !== '' && $notes !== (string) ($existing['internalNotes'] ?? '')) {
+                    $changes['internalNotes'] = $notes;
+                }
+
+                // Date/Time Schedule Changes
+                $targetDate = $appDate !== '' ? $appDate : (string) ($existing['appointmentDate'] ?? '');
+                $targetTime = $appTime !== '' ? $appTime : (string) ($existing['appointmentTime'] ?? '');
+                $isRescheduled = false;
+
+                if ($appDate !== '' && $appDate !== (string) ($existing['appointmentDate'] ?? '')) {
+                    $changes['appointmentDate'] = $appDate;
+                    $isRescheduled = true;
+                }
+                if ($appTime !== '' && $appTime !== (string) ($existing['appointmentTime'] ?? '')) {
+                    $changes['appointmentTime'] = $appTime;
+                    $isRescheduled = true;
+                }
+
+                if (empty($changes)) {
+                    return [
+                        'success' => true,
+                        'action' => 'unchanged',
+                        'message' => 'No changes detected for this inquiry.',
+                        'inquiry' => $existing,
+                        'inquiryId' => $inqId,
+                        'referenceNumber' => $existing['referenceNumber'] ?? '',
+                    ];
+                }
+
+                $updated = $inquirySvc->updateFullInquiry($inqId, $changes, null);
+
+                // Notifications on status change or reschedule
+                if (isset($changes['status'])) {
+                    try {
+                        (new NotificationJobQueueService())->dispatch('inquiry_status_changed', [
+                            'inquiry' => $updated,
+                        ]);
+                    } catch (\Throwable $e) {
+                        error_log('[processInboundSync] Notification failed: ' . $e->getMessage());
+                    }
+                }
+
+                if ($isRescheduled) {
+                    try {
+                        (new NotificationJobQueueService())->dispatch('inquiry_rescheduled', [
+                            'inquiry' => $updated,
+                        ]);
+                    } catch (\Throwable $e) {
+                        error_log('[processInboundSync] Reschedule notification failed: ' . $e->getMessage());
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'action' => 'updated',
+                    'message' => 'Inquiry updated successfully from Google Sheets.',
+                    'inquiry' => $updated,
+                    'inquiryId' => $inqId,
+                    'referenceNumber' => $updated['referenceNumber'] ?? $existing['referenceNumber'] ?? '',
+                ];
+            }
+
+            // Case B: No existing inquiry found -> Create New Inquiry
+            if ($fullName === '' && $phone === '' && $email === '') {
+                return [
+                    'success' => false,
+                    'action' => 'skipped',
+                    'error' => 'Row does not have enough information to create a new inquiry (Full Name or Contact required).',
+                ];
+            }
+
+            $validEmail = filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : 'customer@1625autolab.local';
+            $validDate = $appDate !== '' ? $appDate : date('Y-m-d');
+            $validTime = $appTime !== '' ? $appTime : '10:00 AM';
+
+            $newPayload = [
+                'fullName' => $fullName !== '' ? $fullName : 'Google Sheets Customer',
+                'contactNumber' => $phone !== '' ? $phone : '09000000000',
+                'emailAddress' => $validEmail,
+                'address' => $address !== '' ? $address : 'N/A',
+                'facebookName' => $fbName,
+                'make' => $make !== '' ? $make : 'General',
+                'model' => $model !== '' ? $model : 'Vehicle',
+                'yearModel' => $year !== '' ? $year : date('Y'),
+                'productToPurchase' => $serviceOrProduct !== '' ? $serviceOrProduct : 'General Inquiry',
+                'plateNumber' => $plate,
+                'appointmentDate' => $validDate,
+                'appointmentTime' => $validTime,
+                'status' => $cleanStatus ?? 'pending',
+                'internalNotes' => $notes,
+            ];
+
+            $created = $inquirySvc->create($newPayload);
+
+            // Dispatch customer inquiry notification
+            try {
+                (new NotificationJobQueueService())->dispatch('customer_inquiry', ['data' => $created]);
+            } catch (\Throwable $e) {
+                error_log('[processInboundSync] New inquiry notification dispatch failed: ' . $e->getMessage());
+            }
+
+            return [
+                'success' => true,
+                'action' => 'created',
+                'message' => 'New inquiry created in Apollo from Google Sheets.',
+                'inquiry' => $created,
+                'inquiryId' => $created['id'] ?? '',
+                'referenceNumber' => $created['referenceNumber'] ?? $created['reference_number'] ?? '',
+            ];
+        });
+    }
+
+    /**
+     * Pulls all inquiries from the configured Google Sheets Web App URL into Apollo.
+     *
+     * @return array<string, mixed>
+     */
+    public static function pullAllFromSheets(): array
+    {
+        $settings = (new SiteSettingsService())->getAll();
+        $webhookUrl = trim((string) ($settings['google_sheets_webhook_url'] ?? ''));
+
+        if ($webhookUrl === '') {
+            throw new RuntimeException('Google Sheets Webhook URL is not configured in Site Settings.', 422);
+        }
+
+        $urlWithAction = $webhookUrl . (str_contains($webhookUrl, '?') ? '&' : '?') . 'action=get_all';
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $urlWithAction,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_TIMEOUT => 35,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($curlErr !== '') {
+            throw new RuntimeException('Failed to connect to Google Sheets Web App: ' . $curlErr, 500);
+        }
+
+        $json = json_decode((string) $response, true);
+        if (!is_array($json) || !isset($json['data']) || !is_array($json['data'])) {
+            $respPreview = mb_substr((string) $response, 0, 300);
+            throw new RuntimeException("Invalid response from Google Sheets Web App (HTTP {$httpCode}): {$respPreview}", 502);
+        }
+
+        $rows = $json['data'];
+        $created = 0;
+        $updated = 0;
+        $unchanged = 0;
+        $errors = [];
+
+        self::$syncDisabled = true;
+        try {
+            foreach ($rows as $index => $row) {
+                if (!is_array($row)) continue;
+                try {
+                    $res = self::processInboundSync($row, null, true);
+                    if (($res['action'] ?? '') === 'created') {
+                        $created++;
+                    } elseif (($res['action'] ?? '') === 'updated') {
+                        $updated++;
+                    } else {
+                        $unchanged++;
+                    }
+                } catch (\Throwable $e) {
+                    $errors[] = "Row #" . ($index + 2) . ": " . $e->getMessage();
+                }
+            }
+        } finally {
+            self::$syncDisabled = false;
+        }
+
+        $nowStr = date('Y-m-d H:i:s');
+        (new SiteSettingsService())->update([
+            'google_sheets_last_sync_at' => $nowStr,
+        ]);
+
+        return [
+            'success' => true,
+            'total' => count($rows),
+            'created' => $created,
+            'updated' => $updated,
+            'unchanged' => $unchanged,
+            'errors' => $errors,
+            'lastSyncAt' => $nowStr,
+        ];
+    }
+
+    /**
+     * Generates a pre-filled Google Apps Script (Code.gs) template.
+     */
+    public static function getAppsScriptTemplate(?string $siteUrl = null, ?string $secret = null): string
+    {
+        $settings = (new SiteSettingsService())->getAll();
+        $configuredSecret = $secret ?? trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
+        
+        $baseInboundUrl = $siteUrl ?? (
+            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https://' : 'http://')
+            . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+            . '/api/integrations/google-sheets/inbound'
+        );
+
+        $templatePath = __DIR__ . '/../google-sheets/Code.gs';
+        if (file_exists($templatePath)) {
+            $code = (string) file_get_contents($templatePath);
+            // Replace DEFAULT_API_URL and DEFAULT_SECRET
+            $code = preg_replace("/DEFAULT_API_URL:\s*'[^']*'/", "DEFAULT_API_URL: '" . addslashes($baseInboundUrl) . "'", $code);
+            $code = preg_replace("/DEFAULT_SECRET:\s*'[^']*'/", "DEFAULT_SECRET: '" . addslashes($configuredSecret) . "'", $code);
+            return (string) $code;
+        }
+
+        return "// Template file Code.gs not found.";
+    }
+
+    /**
+     * Normalizes various date string formats to Y-m-d.
+     */
+    private static function normalizeDate(string $rawDate): string
+    {
+        $raw = trim($rawDate);
+        if ($raw === '') return '';
+
+        // If already in Y-m-d format
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            return $raw;
+        }
+
+        // Try standard parsing
+        $ts = strtotime($raw);
+        if ($ts !== false && $ts > 0) {
+            return date('Y-m-d', $ts);
+        }
+
+        return '';
+    }
+
+    /**
+     * Normalizes time strings to clean standard format (e.g. 10:00 AM).
+     */
+    private static function normalizeTime(string $rawTime): string
+    {
+        $raw = trim($rawTime);
+        if ($raw === '') return '';
+
+        $ts = strtotime($raw);
+        if ($ts !== false) {
+            return date('g:i A', $ts);
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Normalizes status to accepted enum values.
+     */
+    private static function normalizeStatus(string $rawStatus): ?string
+    {
+        $st = strtolower(trim($rawStatus));
+        if ($st === '') return null;
+
+        $map = [
+            'pending' => 'pending',
+            'confirmed' => 'confirmed',
+            'in_progress' => 'in_progress',
+            'in progress' => 'in_progress',
+            'in-progress' => 'in_progress',
+            'completed' => 'completed',
+            'done' => 'completed',
+            'finished' => 'completed',
+            'cancelled' => 'cancelled',
+            'canceled' => 'cancelled',
+        ];
+
+        return $map[$st] ?? null;
     }
 
     /**
@@ -195,6 +692,7 @@ class GoogleSheetsSyncService
             'appointmentDate' => date('Y-m-d'),
             'appointmentTime' => '10:00 AM',
             'status' => 'confirmed',
+            'internalNotes' => 'Test internal notes from Apollo sync',
             'lastUpdated' => date('Y-m-d H:i:s'),
             'inquiryId' => 'test-id-0000',
             'referenceNumber' => '1625-TEST-0001',
@@ -212,7 +710,7 @@ class GoogleSheetsSyncService
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json; charset=utf-8',
-                'Content-Length: ' . strlen($jsonPayload),
+                'Content-Length: ' . strlen((string)$jsonPayload),
             ],
             CURLOPT_TIMEOUT => 15,
             CURLOPT_SSL_VERIFYPEER => false,

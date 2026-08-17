@@ -600,6 +600,8 @@ export interface SiteSettings {
   disable_registration?: string;
   shop_enabled?: string;
   google_sheets_webhook_url?: string;
+  google_sheets_sync_secret?: string;
+  google_sheets_last_sync_at?: string;
   booking_horizon_weeks?: string;
   [key: string]: string | undefined;
 }

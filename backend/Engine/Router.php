@@ -256,8 +256,12 @@ class Router
             // ── Site settings (public read, admin write) ─────────────────────
             $r->addRoute('GET', '/api/site-settings', 'handleSiteSettingsGet');
             $r->addRoute('PUT', '/api/site-settings', 'handleSiteSettingsPut');
+            $r->addRoute('POST', '/api/integrations/google-sheets/inbound', 'handleGoogleSheetsInbound');
+            $r->addRoute('GET',  '/api/integrations/google-sheets/all-inquiries', 'handleGoogleSheetsAllInquiries');
             $r->addRoute('POST', '/api/admin/site-settings/test-sheets-webhook', 'handleTestSheetsWebhook');
             $r->addRoute('POST', '/api/admin/site-settings/sync-all-sheets', 'handleSyncAllSheets');
+            $r->addRoute('POST', '/api/admin/site-settings/pull-sheets', 'handlePullSheets');
+            $r->addRoute('GET',  '/api/admin/site-settings/sheets-script', 'handleGetSheetsScript');
 
             // ── Team members (public read, admin write) ──────────────────────
             $r->addRoute('GET',    '/api/team-members',          'handleTeamMemberList');
@@ -1662,6 +1666,7 @@ class Router
             $userId,
             $userRole
         );
+        GoogleSheetsSyncService::syncInquiry($inquiry);
         echo json_encode(['inquiry' => $inquiry]);
     }
 
@@ -2171,6 +2176,62 @@ class Router
             $synced++;
         }
         echo json_encode(['success' => true, 'syncedCount' => $synced]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleGoogleSheetsInbound(array $vars = []): void
+    {
+        $data = $this->jsonBody();
+        $secret = $_SERVER['HTTP_X_SHEETS_SECRET'] ?? null;
+        $result = GoogleSheetsSyncService::processInboundSync($data, $secret);
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleGoogleSheetsAllInquiries(array $vars = []): void
+    {
+        $settings = (new SiteSettingsService())->getAll();
+        $configuredSecret = trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
+        if ($configuredSecret !== '') {
+            $candidate = trim((string) (
+                ($_SERVER['HTTP_X_SHEETS_SECRET'] ?? '')
+                ?? ($_GET['secret'] ?? '')
+                ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? '')
+            ));
+            if (str_starts_with($candidate, 'Bearer ')) {
+                $candidate = substr($candidate, 7);
+            }
+            if ($candidate === '' || !hash_equals($configuredSecret, $candidate)) {
+                throw new RuntimeException('Invalid or missing Google Sheets webhook secret key.', 401);
+            }
+        }
+
+        $inquiries = (new InquiryService())->getAll();
+        echo json_encode(['success' => true, 'inquiries' => $inquiries]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handlePullSheets(array $vars = []): void
+    {
+        $auth = $this->requireAuth();
+        if (($auth['role'] ?? '') === 'client') {
+            throw new RuntimeException('Permission denied.', 403);
+        }
+
+        $result = GoogleSheetsSyncService::pullAllFromSheets();
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleGetSheetsScript(array $vars = []): void
+    {
+        $auth = $this->requireAuth();
+        if (($auth['role'] ?? '') === 'client') {
+            throw new RuntimeException('Permission denied.', 403);
+        }
+
+        $script = GoogleSheetsSyncService::getAppsScriptTemplate();
+        echo json_encode(['success' => true, 'script' => $script]);
     }
 
     /** @param array<string, string> $vars */
