@@ -49,18 +49,18 @@ function CompanyInfoPanel() {
   const { settings, status } = useSelector((s: RootState) => s.siteSettings);
 
   const [form, setForm] = useState({
-    about_heading:         '',
+    about_heading: '',
     company_description_1: '',
     company_description_2: '',
-    company_phones:        '',
-    company_emails:        '',
-    about_image_url:       '',
-    map_embed_url:         '',
-    map_link_url:          '',
+    company_phones: '',
+    company_emails: '',
+    about_image_url: '',
+    map_embed_url: '',
+    map_link_url: '',
   });
-  const [saving,       setSaving]       = useState(false);
-  const [saveError,    setSaveError]    = useState<string | null>(null);
-  const [saveSuccess,  setSaveSuccess]  = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [imgUploading, setImgUploading] = useState(false);
 
   useEffect(() => {
@@ -69,14 +69,14 @@ function CompanyInfoPanel() {
 
   useEffect(() => {
     setForm({
-      about_heading:         settings.about_heading         ?? '',
+      about_heading: settings.about_heading ?? '',
       company_description_1: settings.company_description_1 ?? '',
       company_description_2: settings.company_description_2 ?? '',
-      company_phones:        settings.company_phones        ?? settings.footer_phones ?? settings.contact_phones ?? '',
-      company_emails:        settings.company_emails        ?? settings.footer_emails ?? settings.contact_emails ?? '',
-      about_image_url:       settings.about_image_url       ?? '',
-      map_embed_url:         settings.map_embed_url         ?? '',
-      map_link_url:          settings.map_link_url          ?? '',
+      company_phones: settings.company_phones ?? settings.footer_phones ?? settings.contact_phones ?? '',
+      company_emails: settings.company_emails ?? settings.footer_emails ?? settings.contact_emails ?? '',
+      about_image_url: settings.about_image_url ?? '',
+      map_embed_url: settings.map_embed_url ?? '',
+      map_link_url: settings.map_link_url ?? '',
     });
   }, [settings]);
 
@@ -344,14 +344,14 @@ function TeamMembersPanel() {
   const { token } = useAuth();
   const { members, status } = useSelector((s: RootState) => s.siteSettings);
 
-  const [editing,      setEditing]      = useState(false);
-  const [current,      setCurrent]      = useState<MemberForm>(EMPTY_MEMBER);
-  const [saving,       setSaving]       = useState(false);
-  const [saveError,    setSaveError]    = useState<string | null>(null);
-  const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [current, setCurrent] = useState<MemberForm>(EMPTY_MEMBER);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteConf, setDeleteConf] = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
-  const [roleCatalog,  setRoleCatalog]  = useState<AdminRole[]>([]);
-  const [userCatalog,  setUserCatalog]  = useState<AdminManagedUser[]>([]);
+  const [roleCatalog, setRoleCatalog] = useState<AdminRole[]>([]);
+  const [userCatalog, setUserCatalog] = useState<AdminManagedUser[]>([]);
   const [linkedUserSearch, setLinkedUserSearch] = useState('');
 
   useEffect(() => {
@@ -543,9 +543,8 @@ function TeamMembersPanel() {
                       key={u.id}
                       type="button"
                       onClick={() => handleSelectUser(u)}
-                      className={`w-full text-left px-3 py-1.5 rounded text-xs font-mono flex items-center justify-between transition-colors ${
-                        current.userId === u.id ? 'bg-brand-orange/20 text-brand-orange font-bold' : 'hover:bg-gray-800 text-gray-300'
-                      }`}
+                      className={`w-full text-left px-3 py-1.5 rounded text-xs font-mono flex items-center justify-between transition-colors ${current.userId === u.id ? 'bg-brand-orange/20 text-brand-orange font-bold' : 'hover:bg-gray-800 text-gray-300'
+                        }`}
                     >
                       <span>{u.name} ({u.email})</span>
                       <span className="text-[10px] uppercase text-gray-500">{roleLabelByKey[u.role] || u.role}</span>
@@ -887,11 +886,11 @@ function TestimonialsPanel() {
   const { token } = useAuth();
   const { testimonials, status } = useSelector((s: RootState) => s.siteSettings);
 
-  const [editing,      setEditing]      = useState(false);
-  const [current,      setCurrent]      = useState<TestimonialForm>(EMPTY_TESTIMONIAL);
-  const [saving,       setSaving]       = useState(false);
-  const [saveError,    setSaveError]    = useState<string | null>(null);
-  const [deleteConf,   setDeleteConf]   = useState<number | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [current, setCurrent] = useState<TestimonialForm>(EMPTY_TESTIMONIAL);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteConf, setDeleteConf] = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
 
   useEffect(() => {
@@ -1246,10 +1245,10 @@ function ContactPanel() {
     contact_heading: '',
     contact_tagline: '',
     contact_address: '',
-    contact_hours:   '',
+    contact_hours: '',
   });
-  const [saving,      setSaving]      = useState(false);
-  const [saveError,   setSaveError]   = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => { dispatch(fetchSiteSettingsAsync()); }, [dispatch]);
@@ -1259,7 +1258,7 @@ function ContactPanel() {
       contact_heading: settings.contact_heading ?? '',
       contact_tagline: settings.contact_tagline ?? '',
       contact_address: settings.contact_address ?? '',
-      contact_hours:   settings.contact_hours   ?? '',
+      contact_hours: settings.contact_hours ?? '',
     });
   }, [settings]);
 
@@ -1391,25 +1390,25 @@ function FooterSettingsPanel() {
   const { settings, status } = useSelector((s: RootState) => s.siteSettings);
 
   const [form, setForm] = useState({
-    footer_tagline:   '',
-    footer_address:   '',
+    footer_tagline: '',
+    footer_address: '',
     footer_instagram: '',
-    footer_facebook:  '',
-    footer_youtube:   '',
+    footer_facebook: '',
+    footer_youtube: '',
   });
-  const [saving,      setSaving]      = useState(false);
-  const [saveError,   setSaveError]   = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => { dispatch(fetchSiteSettingsAsync()); }, [dispatch]);
 
   useEffect(() => {
     setForm({
-      footer_tagline:   settings.footer_tagline   ?? '',
-      footer_address:   settings.footer_address   ?? '',
+      footer_tagline: settings.footer_tagline ?? '',
+      footer_address: settings.footer_address ?? '',
       footer_instagram: settings.footer_instagram ?? '',
-      footer_facebook:  settings.footer_facebook  ?? '',
-      footer_youtube:   settings.footer_youtube   ?? '',
+      footer_facebook: settings.footer_facebook ?? '',
+      footer_youtube: settings.footer_youtube ?? '',
     });
   }, [settings]);
 
@@ -1544,8 +1543,8 @@ function FooterSettingsPanel() {
 // ── Sub-panel: System Info & Migrations ───────────────────────────────────────
 
 const APP_VERSION = '1.0.0';
-const APP_NAME    = '1625 Auto Lab';
-const TECH_STACK  = 'React 19 · Redux Toolkit · Tailwind CSS · PHP 8 · MySQL';
+const APP_NAME = '1625 Auto Lab';
+const TECH_STACK = 'React 19 · Redux Toolkit · Tailwind CSS · PHP 8 · MySQL';
 
 function SystemPanel() {
   const dispatch = useDispatch<AppDispatch>();
@@ -1576,7 +1575,7 @@ function SystemPanel() {
   const [sheetsSettingsError, setSheetsSettingsError] = useState<string | null>(null);
   const [sheetsSettingsSuccess, setSheetsSettingsSuccess] = useState<string | null>(null);
   const [testSheetsBusy, setTestSheetsBusy] = useState(false);
-  const [syncAllBusy,   setSyncAllBusy]   = useState(false);
+  const [syncAllBusy, setSyncAllBusy] = useState(false);
   const [pullSheetsBusy, setPullSheetsBusy] = useState(false);
   const [pullResult, setPullResult] = useState<{ total: number; updated: number; created: number; unchanged: number; errors: string[] } | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
@@ -1587,21 +1586,21 @@ function SystemPanel() {
   const [copiedScript, setCopiedScript] = useState(false);
 
   const inboundWebhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/integrations/google-sheets/inbound`
+    ? `https://api.1625autolab.com/api/integrations/google-sheets/inbound`
     : '/api/integrations/google-sheets/inbound';
 
-  const [migrations,    setMigrations]    = useState<MigrationEntry[]>([]);
-  const [migrTotal,     setMigrTotal]     = useState(0);
-  const [migrPage,      setMigrPage]      = useState(1);
+  const [migrations, setMigrations] = useState<MigrationEntry[]>([]);
+  const [migrTotal, setMigrTotal] = useState(0);
+  const [migrPage, setMigrPage] = useState(1);
   const migrPageSize = 5;
-  const [migrCounts,    setMigrCounts]    = useState<{ ran: number; pending: number; total: number }>({ ran: 0, pending: 0, total: 0 });
-  const [migrLoading,   setMigrLoading]   = useState(true);
-  const [running,       setRunning]       = useState(false);
-  const [runResult,     setRunResult]     = useState<{ ran: string[]; skipped: string[]; total: number } | null>(null);
-  const [runError,      setRunError]      = useState<string | null>(null);
-  const [cronBusy,      setCronBusy]      = useState<'queue' | 'waitlist' | 'reminders' | null>(null);
-  const [cronResult,    setCronResult]    = useState<string | null>(null);
-  const [cronError,     setCronError]     = useState<string | null>(null);
+  const [migrCounts, setMigrCounts] = useState<{ ran: number; pending: number; total: number }>({ ran: 0, pending: 0, total: 0 });
+  const [migrLoading, setMigrLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<{ ran: string[]; skipped: string[]; total: number } | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [cronBusy, setCronBusy] = useState<'queue' | 'waitlist' | 'reminders' | null>(null);
+  const [cronResult, setCronResult] = useState<string | null>(null);
+  const [cronError, setCronError] = useState<string | null>(null);
 
   const loadStatus = useCallback(() => {
     if (!token) return;
@@ -1612,7 +1611,7 @@ function SystemPanel() {
         setMigrTotal(res.total);
         setMigrCounts(res.counts);
       })
-      .catch(e  => setRunError((e as Error).message))
+      .catch(e => setRunError((e as Error).message))
       .finally(() => setMigrLoading(false));
   }, [token, migrPage, migrPageSize]);
 
@@ -1813,8 +1812,8 @@ function SystemPanel() {
   };
 
   const pendingCount = migrCounts.pending;
-  const ranCount     = migrCounts.ran;
-  const totalPages   = Math.max(1, Math.ceil(migrTotal / migrPageSize));
+  const ranCount = migrCounts.ran;
+  const totalPages = Math.max(1, Math.ceil(migrTotal / migrPageSize));
 
   const handleRunQueueWorker = async () => {
     if (!token || cronBusy) return;
@@ -2667,12 +2666,12 @@ export default function SiteSettingsPanel() {
 
       {/* Active Sub-Panel Workspace */}
       <section className="rounded-xl border border-gray-800/80 bg-[#121212] p-6 shadow-2xl">
-        {activeTab === 'company'      && <CompanyInfoPanel />}
-        {activeTab === 'contact'      && <ContactPanel />}
-        {activeTab === 'footer'       && <FooterSettingsPanel />}
-        {activeTab === 'team'         && <TeamMembersPanel />}
+        {activeTab === 'company' && <CompanyInfoPanel />}
+        {activeTab === 'contact' && <ContactPanel />}
+        {activeTab === 'footer' && <FooterSettingsPanel />}
+        {activeTab === 'team' && <TeamMembersPanel />}
         {activeTab === 'testimonials' && <TestimonialsPanel />}
-        {activeTab === 'system'       && <SystemPanel />}
+        {activeTab === 'system' && <SystemPanel />}
       </section>
     </div>
   );
