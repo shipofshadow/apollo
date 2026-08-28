@@ -5425,10 +5425,12 @@ class Router
                 'referenceNumber' => $inquiry['reference_number'] ?? $ref,
                 'customerName'    => $inquiry['full_name'] ?? '',
                 'customerEmail'   => $inquiry['email_address'] ?? '',
+                'contactNumber'   => $inquiry['contact_number'] ?? '',
                 'vehicle'         => trim(($inquiry['make'] ?? '') . ' ' . ($inquiry['model'] ?? '') . ' ' . ($inquiry['year_model'] ?? '')),
                 'plateNumber'     => $inquiry['plate_number'] ?? '',
                 'serviceFieldValue' => $inquiry['product_to_purchase'] ?? 'Vehicle Service',
                 'installerName'   => 'Shop Technician',
+                'date'            => $inquiry['appointment_date'] ?? date('Y-m-d'),
                 'phase'           => $phase,
             ];
         } else {

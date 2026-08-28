@@ -19,23 +19,43 @@
   </p>
 
   <!-- Inspection Metadata Details Box -->
-  <div style="background-color:#1e293b;border-left:4px solid #ea580c;padding:18px 20px;margin:20px 0;border-radius:6px;">
+  <div style="background-color:#162032;border:1px solid #334155;border-left:4px solid #ea580c;padding:18px 20px;margin:20px 0;border-radius:8px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;color:#cbd5e1;">
       <tr>
-        <td style="padding:4px 0;width:140px;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Reference Number:</td>
-        <td style="padding:4px 0;color:#ea580c;font-weight:bold;font-family:monospace;">{{ reference_number }}</td>
+        <td style="padding:8px 0;width:150px;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Reference Number:</td>
+        <td style="padding:8px 0;color:#ea580c;font-weight:bold;font-family:monospace;font-size:14px;border-bottom:1px solid #243248;">{{ reference_number }}</td>
       </tr>
       <tr>
-        <td style="padding:4px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Service Package:</td>
-        <td style="padding:4px 0;color:#ffffff;font-weight:bold;">{{ service_title }}</td>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Inspection Date:</td>
+        <td style="padding:8px 0;color:#f1f5f9;border-bottom:1px solid #243248;">{{ inspection_date }}</td>
       </tr>
       <tr>
-        <td style="padding:4px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Vehicle Details:</td>
-        <td style="padding:4px 0;color:#f1f5f9;">{{ vehicle }}</td>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Customer Name:</td>
+        <td style="padding:8px 0;color:#ffffff;font-weight:bold;border-bottom:1px solid #243248;">{{ customer_name }}</td>
       </tr>
       <tr>
-        <td style="padding:4px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;">Technician / Installer:</td>
-        <td style="padding:4px 0;color:#f1f5f9;">{{ installer }}</td>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Phone Number:</td>
+        <td style="padding:8px 0;color:#f1f5f9;border-bottom:1px solid #243248;">{{ customer_phone }}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Email Address:</td>
+        <td style="padding:8px 0;color:#f1f5f9;border-bottom:1px solid #243248;">{{ customer_email }}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Vehicle Details:</td>
+        <td style="padding:8px 0;color:#f1f5f9;border-bottom:1px solid #243248;">{{ vehicle }}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Plate Number:</td>
+        <td style="padding:8px 0;color:#f1f5f9;border-bottom:1px solid #243248;"><span style="background:#0f172a;color:#38bdf8;border:1px solid #0284c7;padding:3px 8px;border-radius:4px;font-family:monospace;font-weight:bold;font-size:12px;letter-spacing:1px;">{{ plate_number }}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid #243248;">Service Package:</td>
+        <td style="padding:8px 0;color:#ffffff;font-weight:bold;border-bottom:1px solid #243248;">{{ service_title }}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:0.5px;">Technician / Installer:</td>
+        <td style="padding:8px 0;color:#f1f5f9;">{{ installer }}</td>
       </tr>
     </table>
   </div>

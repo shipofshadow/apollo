@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Calendar, Search, Sparkles, CheckCircle2, Loader2, X, Car, Tag } from 'lucide-react';
+import { User, Mail, Phone, Calendar, Search, Sparkles, CheckCircle2, Loader2, X, Car, Tag } from 'lucide-react';
 import type { ChecklistWizardState } from '../types';
 import { lookupReferenceApi, type ReferenceLookupResult } from '../../../services/api';
 
@@ -7,7 +7,7 @@ interface Props {
   state: ChecklistWizardState;
   token?: string | null;
   canAutoFill?: boolean;
-  onChange: (customer: { name: string; email: string }) => void;
+  onChange: (customer: { name: string; email: string; phone?: string }) => void;
   onAutoFillAll?: (match: ReferenceLookupResult) => Promise<void> | void;
 }
 
@@ -97,6 +97,7 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
       onChange({
         name: item.customerName || state.customer.name,
         email: item.customerEmail || state.customer.email,
+        phone: item.contactNumber || state.customer.phone || '',
       });
     }
 
@@ -313,6 +314,19 @@ export default function CustomerStep({ state, token, canAutoFill, onChange, onAu
             value={state.customer.email}
             onChange={(e) => onChange({ ...state.customer, email: e.target.value })}
             placeholder="juan@example.com"
+            className="w-full bg-[#121212] border border-gray-800 rounded-lg p-3.5 text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none text-sm font-mono"
+          />
+        </div>
+
+        <div className="space-y-2 font-sans">
+          <label className="block text-xs font-mono font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+            <Phone className="w-3.5 h-3.5 text-brand-orange" /> Contact Phone Number
+          </label>
+          <input
+            type="tel"
+            value={state.customer.phone || ''}
+            onChange={(e) => onChange({ ...state.customer, phone: e.target.value })}
+            placeholder="0912 345 6789"
             className="w-full bg-[#121212] border border-gray-800 rounded-lg p-3.5 text-white placeholder-gray-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none text-sm font-mono"
           />
         </div>

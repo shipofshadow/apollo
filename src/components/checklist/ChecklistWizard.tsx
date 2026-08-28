@@ -39,7 +39,7 @@ export default function ChecklistWizard() {
       draftId: generateDraftId(),
       inspectionMode: initialMode,
       currentStep: 1,
-      customer: { name: '', email: '' },
+      customer: { name: '', email: '', phone: '' },
       date: new Date().toISOString().split('T')[0],
       vehicle: { make: '', model: '', year: '', plateNumber: '' },
       service: {
@@ -254,6 +254,7 @@ export default function ChecklistWizard() {
       customer: {
         name: match.customerName || prev.customer.name,
         email: match.customerEmail || prev.customer.email,
+        phone: match.contactNumber || prev.customer.phone || '',
       },
       vehicle: {
         make: match.vehicleMake || prev.vehicle.make,
@@ -328,6 +329,7 @@ export default function ChecklistWizard() {
       phase: phase,
       customerName: wizardState.customer.name,
       customerEmail: wizardState.customer.email,
+      contactNumber: wizardState.customer.phone || '',
       date: wizardState.date,
       vehicle: fullVehicleText,
       vehicleMake: wizardState.vehicle.make,
@@ -606,7 +608,7 @@ export default function ChecklistWizard() {
                   draftId: generateDraftId(),
                   inspectionMode: 'before_only',
                   currentStep: 1,
-                  customer: { name: '', email: '' },
+                  customer: { name: '', email: '', phone: '' },
                   date: new Date().toISOString().split('T')[0],
                   vehicle: { make: '', model: '', year: '', plateNumber: '' },
                   service: { type: null, serviceId: null, serviceName: '', variationId: null, variationName: '', isCustom: false, customName: '', customVariation: '' },

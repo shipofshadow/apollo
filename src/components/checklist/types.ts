@@ -11,6 +11,7 @@ export interface ChecklistWizardState {
   customer: {
     name: string;
     email: string;
+    phone?: string;
   };
 
   date: string;

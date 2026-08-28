@@ -1841,12 +1841,193 @@ class NotificationService
      */
     public function checklistInspectionNotification(array $payload, string $phase = 'before'): void
     {
-        $customerEmail = strtolower(trim((string)($payload['customerEmail'] ?? $payload['customer']['email'] ?? '')));
-        $customerName  = trim((string)($payload['customerName']  ?? $payload['customer']['name']  ?? 'Valued Customer'));
-        $ref           = trim((string)($payload['referenceNumber'] ?? $payload['inquiryId'] ?? 'N/A'));
+        $customerEmail = strtolower(trim((string)(
+            $payload['customerEmail'] ?? 
+            $payload['customer']['email'] ?? 
+            $payload['emailAddress'] ?? 
+            $payload['email_address'] ?? 
+            $payload['email'] ?? 
+            $payload['clientEmail'] ?? ''
+        )));
+        $customerName  = trim((string)(
+            $payload['customerName'] ?? 
+            $payload['customer']['name'] ?? 
+            $payload['fullName'] ?? 
+            $payload['full_name'] ?? 
+            $payload['name'] ?? 
+            $payload['clientName'] ?? ''
+        ));
+        $customerPhone = trim((string)(
+            $payload['contactNumber'] ?? 
+            $payload['contact_number'] ?? 
+            $payload['customerPhone'] ?? 
+            $payload['phone'] ?? 
+            $payload['phoneNumber'] ?? 
+            $payload['customer']['phone'] ?? 
+            $payload['clientPhone'] ?? ''
+        ));
+        $ref           = trim((string)(
+            $payload['referenceNumber'] ?? 
+            $payload['reference_number'] ?? 
+            $payload['inquiryId'] ?? 
+            $payload['inquiry_id'] ?? 
+            $payload['ref'] ?? 
+            $payload['ref_num'] ?? 
+            $payload['draftId'] ?? ''
+        ));
+        $plateNumber   = trim((string)(
+            $payload['plateNumber'] ?? 
+            $payload['plate_number'] ?? 
+            $payload['vehiclePlateNumber'] ?? 
+            $payload['vehicle']['plateNumber'] ?? 
+            $payload['plate'] ?? ''
+        ));
+        $serviceTitle  = trim((string)(
+            $payload['serviceFieldValue'] ?? 
+            $payload['serviceTitle'] ?? 
+            $payload['service_title'] ?? 
+            $payload['productToPurchase'] ?? 
+            $payload['product_to_purchase'] ?? 
+            $payload['serviceName'] ?? 
+            $payload['service'] ?? ''
+        ));
+        $installer     = trim((string)(
+            $payload['installerName'] ?? 
+            $payload['installer_name'] ?? 
+            $payload['technicianName'] ?? 
+            $payload['installer'] ?? 
+            $payload['technician']['name'] ?? 
+            'Shop Technician'
+        ));
+        $dateRaw       = trim((string)(
+            $payload['date'] ?? 
+            $payload['inspectionDate'] ?? 
+            $payload['inspection_date'] ?? 
+            $payload['appointmentDate'] ?? 
+            $payload['appointment_date'] ?? 
+            $payload['created_at'] ?? ''
+        ));
+
+        $vehicleMake   = trim((string)($payload['vehicleMake'] ?? $payload['vehicle_make'] ?? $payload['make'] ?? $payload['vehicle']['make'] ?? ''));
+        $vehicleModel  = trim((string)($payload['vehicleModel'] ?? $payload['vehicle_model'] ?? $payload['model'] ?? $payload['vehicle']['model'] ?? ''));
+        $vehicleYear   = trim((string)($payload['vehicleYear'] ?? $payload['vehicle_year'] ?? $payload['year'] ?? $payload['yearModel'] ?? $payload['year_model'] ?? $payload['vehicle']['year'] ?? ''));
         $vehicle       = trim((string)($payload['vehicle'] ?? ''));
-        $serviceTitle  = trim((string)($payload['serviceFieldValue'] ?? $payload['serviceTitle'] ?? '1625 AutoLab Service'));
-        $installer     = trim((string)($payload['installerName'] ?? 'Shop Technician'));
+        if ($vehicle === '' && ($vehicleMake !== '' || $vehicleModel !== '' || $vehicleYear !== '')) {
+            $vehicle = trim("{$vehicleMake} {$vehicleModel} {$vehicleYear}");
+        }
+
+        // Database fallbacks if any critical field is missing
+        if ($customerPhone === '' || $plateNumber === '' || $vehicle === '' || $customerName === '' || $customerEmail === '' || $serviceTitle === '') {
+            try {
+                $db = Database::getInstance();
+                
+                // 1. Try by Reference Number
+                if ($ref !== '' && $ref !== 'N/A') {
+                    $stmtInq = $db->prepare('
+                        SELECT full_name, email_address, contact_number, plate_number, make, model, year_model, product_to_purchase 
+                        FROM customer_inquiries 
+                        WHERE reference_number = :ref OR id = :id 
+                        LIMIT 1
+                    ');
+                    $stmtInq->execute([':ref' => $ref, ':id' => $ref]);
+                    if ($row = $stmtInq->fetch(\PDO::FETCH_ASSOC)) {
+                        if (($customerName === '' || $customerName === 'Valued Customer') && !empty($row['full_name'])) {
+                            $customerName = trim((string)$row['full_name']);
+                        }
+                        if ($customerEmail === '' && !empty($row['email_address'])) {
+                            $customerEmail = strtolower(trim((string)$row['email_address']));
+                        }
+                        if ($customerPhone === '' && !empty($row['contact_number'])) {
+                            $customerPhone = trim((string)$row['contact_number']);
+                        }
+                        if ($plateNumber === '' && !empty($row['plate_number'])) {
+                            $plateNumber = trim((string)$row['plate_number']);
+                        }
+                        if ($vehicle === '' && (!empty($row['make']) || !empty($row['model']) || !empty($row['year_model']))) {
+                            $vehicle = trim(($row['make'] ?? '') . ' ' . ($row['model'] ?? '') . ' ' . ($row['year_model'] ?? ''));
+                        }
+                        if ($serviceTitle === '' && !empty($row['product_to_purchase'])) {
+                            $serviceTitle = trim((string)$row['product_to_purchase']);
+                        }
+                    }
+
+                    if ($customerPhone === '' || $plateNumber === '' || $vehicle === '' || $customerName === '' || $customerEmail === '') {
+                        $stmtSub = $db->prepare('
+                            SELECT customer_name, customer_email, contact_number, plate_number, vehicle_make, vehicle_model, vehicle_year, service_title, installer_name
+                            FROM public_checklist_submissions
+                            WHERE reference_number = :ref OR inquiry_id = :id
+                            ORDER BY id DESC
+                            LIMIT 1
+                        ');
+                        $stmtSub->execute([':ref' => $ref, ':id' => $ref]);
+                        if ($rowSub = $stmtSub->fetch(\PDO::FETCH_ASSOC)) {
+                            if (($customerName === '' || $customerName === 'Valued Customer') && !empty($rowSub['customer_name'])) {
+                                $customerName = trim((string)$rowSub['customer_name']);
+                            }
+                            if ($customerEmail === '' && !empty($rowSub['customer_email'])) {
+                                $customerEmail = strtolower(trim((string)$rowSub['customer_email']));
+                            }
+                            if ($customerPhone === '' && !empty($rowSub['contact_number'])) {
+                                $customerPhone = trim((string)$rowSub['contact_number']);
+                            }
+                            if ($plateNumber === '' && !empty($rowSub['plate_number'])) {
+                                $plateNumber = trim((string)$rowSub['plate_number']);
+                            }
+                            if ($vehicle === '' && (!empty($rowSub['vehicle_make']) || !empty($rowSub['vehicle_model']) || !empty($rowSub['vehicle_year']))) {
+                                $vehicle = trim(($rowSub['vehicle_make'] ?? '') . ' ' . ($rowSub['vehicle_model'] ?? '') . ' ' . ($rowSub['vehicle_year'] ?? ''));
+                            }
+                        }
+                    }
+                }
+
+                // 2. Try by Plate Number if reference didn't fill everything
+                if (($customerPhone === '' || $vehicle === '' || $customerName === '' || $customerEmail === '') && $plateNumber !== '') {
+                    $stmtPlate = $db->prepare('
+                        SELECT full_name, email_address, contact_number, plate_number, make, model, year_model, product_to_purchase, reference_number
+                        FROM customer_inquiries 
+                        WHERE plate_number = :plate 
+                        ORDER BY id DESC LIMIT 1
+                    ');
+                    $stmtPlate->execute([':plate' => $plateNumber]);
+                    if ($rowP = $stmtPlate->fetch(\PDO::FETCH_ASSOC)) {
+                        if (($customerName === '' || $customerName === 'Valued Customer') && !empty($rowP['full_name'])) {
+                            $customerName = trim((string)$rowP['full_name']);
+                        }
+                        if ($customerEmail === '' && !empty($rowP['email_address'])) {
+                            $customerEmail = strtolower(trim((string)$rowP['email_address']));
+                        }
+                        if ($customerPhone === '' && !empty($rowP['contact_number'])) {
+                            $customerPhone = trim((string)$rowP['contact_number']);
+                        }
+                        if ($vehicle === '' && (!empty($rowP['make']) || !empty($rowP['model']) || !empty($rowP['year_model']))) {
+                            $vehicle = trim(($rowP['make'] ?? '') . ' ' . ($rowP['model'] ?? '') . ' ' . ($rowP['year_model'] ?? ''));
+                        }
+                        if ($ref === '' && !empty($rowP['reference_number'])) {
+                            $ref = trim((string)$rowP['reference_number']);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[checklistInspectionNotification] DB fallback failed: ' . $e->getMessage());
+            }
+        }
+
+        // Format inspection date
+        if ($dateRaw !== '') {
+            $parsed = strtotime($dateRaw);
+            $inspectionDate = ($parsed !== false) ? date('F j, Y', $parsed) : $dateRaw;
+        } else {
+            $inspectionDate = date('F j, Y');
+        }
+
+        // Fallbacks for display
+        $customerName = ($customerName !== '') ? $customerName : 'Valued Customer';
+        $refDisplay   = ($ref !== '') ? $ref : 'N/A';
+        $serviceTitle = ($serviceTitle !== '') ? $serviceTitle : '1625 AutoLab Service';
+        $vehicleDisplay = ($vehicle !== '') ? $vehicle : 'N/A';
+        $plateDisplay = ($plateNumber !== '') ? $plateNumber : 'N/A';
+        $phoneDisplay = ($customerPhone !== '') ? $customerPhone : 'N/A';
+        $emailDisplay = ($customerEmail !== '') ? $customerEmail : 'N/A';
 
         require_once __DIR__ . '/ChecklistPdfTemplates.php';
         require_once __DIR__ . '/ChecklistPdfOverlayRenderer.php';
@@ -1862,7 +2043,7 @@ class NotificationService
                 $phaseLabel = strtoupper($phase);
                 $attachments[] = [
                     'data' => $pdfBinary,
-                    'name' => "1625_Autolab_{$ref}_{$phaseLabel}_Inspection.pdf",
+                    'name' => "1625_Autolab_{$refDisplay}_{$phaseLabel}_Inspection.pdf",
                 ];
             }
         } elseif ($phase === 'final' || $phase === 'both') {
@@ -1876,7 +2057,7 @@ class NotificationService
                 $pdfBefore = $renderer->renderPublicChecklist($payloadBefore, $templateBefore);
                 $attachments[] = [
                     'data' => $pdfBefore,
-                    'name' => "1625_Autolab_{$ref}_BEFORE_Inspection.pdf",
+                    'name' => "1625_Autolab_{$refDisplay}_BEFORE_Inspection.pdf",
                 ];
             }
 
@@ -1889,7 +2070,7 @@ class NotificationService
                 $pdfAfter = $renderer->renderPublicChecklist($payloadAfter, $templateAfter);
                 $attachments[] = [
                     'data' => $pdfAfter,
-                    'name' => "1625_Autolab_{$ref}_AFTER_Inspection.pdf",
+                    'name' => "1625_Autolab_{$refDisplay}_AFTER_Inspection.pdf",
                 ];
             }
         }
@@ -1898,15 +2079,19 @@ class NotificationService
             ? 'Before Installation Checklist' 
             : (($phase === 'after') ? 'After Installation Checklist' : 'Before/After Installation Checklist');
 
-        $subject = "1625 AutoLab - Inspection Report [REF: {$ref}] - {$phaseTitle}";
+        $subject = "1625 AutoLab - Inspection Report [REF: {$refDisplay}] - {$phaseTitle}";
 
         $htmlBody = $this->render('checklist-inspection', [
             'phase_title'      => htmlspecialchars($phaseTitle),
             'customer_name'    => htmlspecialchars($customerName),
-            'reference_number' => htmlspecialchars($ref),
+            'customer_email'   => htmlspecialchars($emailDisplay),
+            'customer_phone'   => htmlspecialchars($phoneDisplay),
+            'reference_number' => htmlspecialchars($refDisplay),
             'service_title'    => htmlspecialchars($serviceTitle),
-            'vehicle'          => htmlspecialchars($vehicle),
+            'vehicle'          => htmlspecialchars($vehicleDisplay),
+            'plate_number'     => htmlspecialchars($plateDisplay),
             'installer'        => htmlspecialchars($installer),
+            'inspection_date'  => htmlspecialchars($inspectionDate),
         ]);
 
         // 1. Send to Customer if valid email exists

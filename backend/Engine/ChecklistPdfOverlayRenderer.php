@@ -107,16 +107,24 @@ final class ChecklistPdfOverlayRenderer
         $pdf->SetTextColor(...self::INK);
         $pdf->SetFont('helvetica', '', 9);
 
-        $customerName  = $this->str($payload, 'customerName', 'fullName');
-        $date          = $this->formatDate($this->str($payload, 'date'));
-        $vehicle       = $this->str($payload, 'vehicle');
-        $plateNumber   = $this->str($payload, 'plateNumber');
+        $customerName  = $this->str($payload, 'customerName', 'fullName', 'full_name', 'name');
+        $date          = $this->formatDate($this->str($payload, 'date', 'inspectionDate', 'inspection_date', 'appointmentDate', 'appointment_date'));
+        $vehicle       = $this->str($payload, 'vehicle', 'vehicle_info');
+        if ($vehicle === '') {
+            $make  = $this->str($payload, 'vehicleMake', 'vehicle_make', 'make');
+            $model = $this->str($payload, 'vehicleModel', 'vehicle_model', 'model');
+            $year  = $this->str($payload, 'vehicleYear', 'vehicle_year', 'year', 'yearModel', 'year_model');
+            if ($make !== '' || $model !== '' || $year !== '') {
+                $vehicle = trim("{$make} {$model} {$year}");
+            }
+        }
+        $plateNumber   = $this->str($payload, 'plateNumber', 'plate_number', 'plate');
         $serviceObj = is_array($payload['service'] ?? null) ? $payload['service'] : [];
-        $serviceField  = $this->str($payload, 'serviceFieldValue', 'headUnitModel', 'headlightSetup', 'variationName', 'customVariation');
+        $serviceField  = $this->str($payload, 'serviceFieldValue', 'serviceTitle', 'service_title', 'headUnitModel', 'headlightSetup', 'variationName', 'customVariation', 'productToPurchase', 'product_to_purchase');
         if ($serviceField === '' && !empty($serviceObj)) {
             $serviceField = trim((string)($serviceObj['variationName'] ?? $serviceObj['customVariation'] ?? $serviceObj['serviceName'] ?? ''));
         }
-        $installerName = $this->str($payload, 'installerName');
+        $installerName = $this->str($payload, 'installerName', 'installer_name', 'technicianName', 'technician_name', 'installer');
 
         $this->cell($pdf, $fields['customer_name'],  $customerName);
         $this->cell($pdf, $fields['date'],           $date);
