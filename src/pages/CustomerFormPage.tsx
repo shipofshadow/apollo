@@ -26,7 +26,7 @@ import {
   FaWrench,
   FaBell
 } from 'react-icons/fa';
-import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck, Copy, Store, Home, MapPin } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck, Copy, Store, Home } from 'lucide-react';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -550,42 +550,40 @@ export default function CustomerFormPage() {
                       Service Location / Type <span className="text-brand-orange">*</span>
                     </label>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {/* Shop Visit Option */}
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, serviceType: 'shop_visit' }))}
-                        className={`p-4 sm:p-5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden group ${formData.serviceType === 'shop_visit'
-                          ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-lg shadow-brand-orange/10'
-                          : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
-                          }`}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
+                          formData.serviceType === 'shop_visit'
+                            ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-md'
+                            : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
+                        }`}
                       >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`p-2 rounded-lg ${
+                            formData.serviceType === 'shop_visit' ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400'
+                          }`}>
+                            <Store className="w-3.5 h-3.5" />
+                          </span>
+                          {formData.serviceType === 'shop_visit' && <Check className="w-4 h-4 text-brand-orange" />}
+                        </div>
                         <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className={`p-2.5 rounded-lg transition-colors ${formData.serviceType === 'shop_visit'
-                              ? 'bg-brand-orange text-white shadow-md'
-                              : 'bg-gray-800 text-gray-400 group-hover:text-gray-300'
-                              }`}>
-                              <Store className="w-4 h-4" />
-                            </span>
-                            <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${formData.serviceType === 'shop_visit'
-                              ? 'bg-brand-orange/20 border-brand-orange/40 text-brand-orange'
-                              : 'bg-gray-800/80 border-gray-700 text-gray-400'
-                              }`}>
-                              {formData.serviceType === 'shop_visit' ? '✓ Selected' : 'Select'}
-                            </span>
-                          </div>
-                          <h3 className={`text-sm font-bold uppercase tracking-wider mb-1 ${formData.serviceType === 'shop_visit' ? 'text-white' : 'text-gray-200'
-                            }`}>
+                          <h3 className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                            formData.serviceType === 'shop_visit' ? 'text-brand-orange' : 'text-white'
+                          }`}>
                             Shop Visit
                           </h3>
-                          <p className="text-xs text-gray-400 leading-relaxed">
+                          <p className="text-[10px] text-gray-400 leading-relaxed">
                             Visit our shop in KM 20 Ortigas Ave Ext., Cainta, Philippines, 1900.
                           </p>
                         </div>
-                        <div className="mt-3.5 pt-2.5 border-t border-gray-800/80 flex items-center gap-1.5 text-[11px] text-brand-orange font-medium">
-                          <MapPin className="w-3.5 h-3.5 shrink-0" />
-                          <span>1625 Autolab</span>
+                        <div className="mt-3 pt-2 border-t border-gray-800/80 flex items-center justify-between text-[9px] font-mono uppercase">
+                          <span className={formData.serviceType === 'shop_visit' ? 'text-brand-orange font-bold' : 'text-gray-500'}>
+                            {formData.serviceType === 'shop_visit' ? '✓ Selected' : 'Select'}
+                          </span>
+                          <span className="text-gray-500">1625 Autolab</span>
                         </div>
                       </button>
 
@@ -593,37 +591,35 @@ export default function CustomerFormPage() {
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, serviceType: 'home_service' }))}
-                        className={`p-4 sm:p-5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden group ${formData.serviceType === 'home_service'
-                          ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-lg shadow-brand-orange/10'
-                          : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
-                          }`}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
+                          formData.serviceType === 'home_service'
+                            ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-md'
+                            : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
+                        }`}
                       >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`p-2 rounded-lg ${
+                            formData.serviceType === 'home_service' ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400'
+                          }`}>
+                            <Home className="w-3.5 h-3.5" />
+                          </span>
+                          {formData.serviceType === 'home_service' && <Check className="w-4 h-4 text-brand-orange" />}
+                        </div>
                         <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className={`p-2.5 rounded-lg transition-colors ${formData.serviceType === 'home_service'
-                              ? 'bg-brand-orange text-white shadow-md'
-                              : 'bg-gray-800 text-gray-400 group-hover:text-gray-300'
-                              }`}>
-                              <Home className="w-4 h-4" />
-                            </span>
-                            <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${formData.serviceType === 'home_service'
-                              ? 'bg-brand-orange/20 border-brand-orange/40 text-brand-orange'
-                              : 'bg-gray-800/80 border-gray-700 text-gray-400'
-                              }`}>
-                              {formData.serviceType === 'home_service' ? '✓ Selected' : 'Select'}
-                            </span>
-                          </div>
-                          <h3 className={`text-sm font-bold uppercase tracking-wider mb-1 ${formData.serviceType === 'home_service' ? 'text-white' : 'text-gray-200'
-                            }`}>
+                          <h3 className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                            formData.serviceType === 'home_service' ? 'text-brand-orange' : 'text-white'
+                          }`}>
                             Home Service
                           </h3>
-                          <p className="text-xs text-gray-400 leading-relaxed">
-                            On-site installation. Our technician team brings tools and gear directly to your doorstep/address.
+                          <p className="text-[10px] text-gray-400 leading-relaxed">
+                            On-site installation. Our technician team brings tools and gear directly to your doorstep.
                           </p>
                         </div>
-                        <div className="mt-3.5 pt-2.5 border-t border-gray-800/80 flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
-                          <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                          <span>Service to Your Address</span>
+                        <div className="mt-3 pt-2 border-t border-gray-800/80 flex items-center justify-between text-[9px] font-mono uppercase">
+                          <span className={formData.serviceType === 'home_service' ? 'text-brand-orange font-bold' : 'text-gray-500'}>
+                            {formData.serviceType === 'home_service' ? '✓ Selected' : 'Select'}
+                          </span>
+                          <span className="text-gray-500">To Your Address</span>
                         </div>
                       </button>
                     </div>
