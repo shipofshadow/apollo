@@ -2,7 +2,7 @@
  * ========================================================================================
  * 1625 AUTOLAB - GOOGLE SHEETS BIDIRECTIONAL LIVE SYNC SCRIPT
  * ========================================================================================
- * Version: 2.1.1 (Row 7 Headers & Row 8 Data Start - Bidirectional Two-Way Sync)
+ * Version: 2.1.4 (Row 7 Headers & Row 8 Data Start - Bidirectional Two-Way Sync)
  *
  * This Google Apps Script powers real-time two-way synchronization between your Google
  * Spreadsheet ('Sales' sheet, Header Row 7, Data starting on Row 8) and Apollo:
@@ -36,7 +36,7 @@ var CONFIG = {
   HEADER_ROW: 7,
 };
 
-// 18 Standard Column definitions matching your 'Sales' sheet order:
+// Standard Column definitions matching your 'Sales' sheet order:
 var COLUMNS = [
   'Timestamp',           // Col 1 (A)
   'Reference Number',   // Col 2 (B)
@@ -49,15 +49,19 @@ var COLUMNS = [
   'Car Make',           // Col 9 (I)
   'Car Model',          // Col 10 (J)
   'Year Model',         // Col 11 (K)
-  'Service Name',       // Col 12 (L)
-  'Product to Purchase',// Col 13 (M)
-  'Plate Number',       // Col 14 (N)
-  'Appointment Date',   // Col 15 (O)
-  'Appointment Time',   // Col 16 (P)
-  'Status',             // Col 17 (Q)
-  'Last Updated',       // Col 18 (R)
-  'Sync Status'         // Col 19 (S) - Live sync status
+  'Service Type',       // Col 12 (L)
+  'Product to Purchase',// Col 14 (N)
+  'Service Name',       // Col 13 (M)
+  'Plate Number',       // Col 15 (O)
+  'Appointment Date',   // Col 16 (P)
+  'Appointment Time',   // Col 17 (Q)
+  'Status',             // Col 18 (R)
+  'Last Updated',       // Col 19 (S)
 ];
+
+// Column number for Sync Status – placed at column AS (46) to keep it
+// far from any data-validation rules that live on the main data columns.
+var SYNC_STATUS_COL = 46; // Column AS
 
 // ----------------------------------------------------------------------------------------
 // SCRIPT PROPERTIES (Storage for Website URL & Secret Key)
@@ -258,10 +262,8 @@ function syncSingleRowToApollo(sheet, rowNumber) {
     var nowFormatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 
     if (responseCode >= 200 && responseCode < 300 && result.success !== false) {
-      // Update Sync Status and Last Updated in the sheet
-      if (colMap['Sync Status']) {
-        sheet.getRange(rowNumber, colMap['Sync Status']).setValue('✅ Synced (' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm:ss') + ')');
-      }
+      // Update Sync Status (col AS=45) and Last Updated in the sheet
+      sheet.getRange(rowNumber, SYNC_STATUS_COL).setValue('✅ Synced (' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm:ss') + ')');
       if (colMap['Last Updated']) {
         sheet.getRange(rowNumber, colMap['Last Updated']).setValue(nowFormatted);
       }
@@ -276,16 +278,12 @@ function syncSingleRowToApollo(sheet, rowNumber) {
       return { success: true, response: result };
     } else {
       var errMsg = result.error || ('HTTP ' + responseCode);
-      if (colMap['Sync Status']) {
-        sheet.getRange(rowNumber, colMap['Sync Status']).setValue('❌ Error: ' + errMsg);
-      }
+      sheet.getRange(rowNumber, SYNC_STATUS_COL).setValue('❌ Error: ' + errMsg);
       return { success: false, error: errMsg };
     }
   } catch (err) {
     var colMapErr = getColumnMap(sheet);
-    if (colMapErr['Sync Status']) {
-      sheet.getRange(rowNumber, colMapErr['Sync Status']).setValue('❌ ' + err.message);
-    }
+      sheet.getRange(rowNumber, SYNC_STATUS_COL).setValue('❌ ' + err.message);
     return { success: false, error: err.message };
   }
 }
@@ -365,6 +363,8 @@ function upsertInquiryRow(inquiry, isFromApi) {
   var valMake = String(inquiry.make || inquiry.carMake || inquiry['Car Make'] || '').trim();
   var valModel = String(inquiry.model || inquiry.carModel || inquiry['Car Model'] || '').trim();
   var valYear = String(inquiry.yearModel || inquiry.year_model || inquiry['Year Model'] || inquiry.year || '').trim();
+  var rawSt = String(inquiry.serviceType || inquiry.service_type || inquiry['Service Type'] || inquiry['Service Location'] || inquiry.serviceLocation || '').toLowerCase().trim();
+  var valServiceType = (rawSt === 'home_service' || rawSt === 'home service') ? 'Home Service' : 'Shop Visit';
   var valService = String(inquiry.serviceName || inquiry.service_name || inquiry['Service Name'] || inquiry.service || '').trim();
   var valProduct = String(inquiry.productToPurchase || inquiry.product_to_purchase || inquiry['Product to Purchase'] || '').trim();
   var valPlate = String(inquiry.plateNumber || inquiry.plate_number || inquiry['Plate Number'] || '').trim();
@@ -389,6 +389,7 @@ function upsertInquiryRow(inquiry, isFromApi) {
       case 'Car Make': rowArray.push(valMake); break;
       case 'Car Model': rowArray.push(valModel); break;
       case 'Year Model': rowArray.push(valYear); break;
+      case 'Service Type': rowArray.push(valServiceType); break;
       case 'Service Name': rowArray.push(valService); break;
       case 'Product to Purchase': rowArray.push(valProduct); break;
       case 'Plate Number': rowArray.push(valPlate); break;
@@ -396,12 +397,18 @@ function upsertInquiryRow(inquiry, isFromApi) {
       case 'Appointment Time': rowArray.push(valTime); break;
       case 'Status': rowArray.push(valStatus); break;
       case 'Last Updated': rowArray.push(valUpdated); break;
-      case 'Sync Status': rowArray.push(valSync); break;
       default: rowArray.push(''); break;
     }
   }
 
+  // Clear any data validation on the main data range before writing.
+  sheet.getRange(targetRow, 1, 1, rowArray.length).clearDataValidations();
   sheet.getRange(targetRow, 1, 1, rowArray.length).setValues([rowArray]);
+
+  // Write Sync Status separately to column AS (45) — isolated from all
+  // data-validation rules that apply to the main columns A–R.
+  sheet.getRange(targetRow, SYNC_STATUS_COL).clearDataValidations();
+  sheet.getRange(targetRow, SYNC_STATUS_COL).setValue(valSync);
 
   // Apply row formatting
   applyRowStyles(sheet, targetRow, valStatus);
@@ -468,13 +475,14 @@ function getRowDataObject(sheet, rowNumber) {
     make: getVal('Car Make', 9) || getVal('Make', 9),
     model: getVal('Car Model', 10) || getVal('Model', 10),
     yearModel: getVal('Year Model', 11) || getVal('Year', 11),
-    serviceName: getVal('Service Name', 12) || getVal('Service', 12),
-    productToPurchase: getVal('Product to Purchase', 13) || getVal('Product', 13),
-    plateNumber: getVal('Plate Number', 14) || getVal('Plate', 14),
-    appointmentDate: getVal('Appointment Date', 15),
-    appointmentTime: getVal('Appointment Time', 16),
-    status: getVal('Status', 17),
-    lastUpdated: getVal('Last Updated', 18)
+    serviceType: getVal('Service Type', 12) || getVal('Service Location', 12),
+    serviceName: getVal('Service Name', 13) || getVal('Service', 13),
+    productToPurchase: getVal('Product to Purchase', 14) || getVal('Product', 14),
+    plateNumber: getVal('Plate Number', 15) || getVal('Plate', 15),
+    appointmentDate: getVal('Appointment Date', 16),
+    appointmentTime: getVal('Appointment Time', 17),
+    status: getVal('Status', 18),
+    lastUpdated: getVal('Last Updated', 19)
   };
 }
 
@@ -541,6 +549,16 @@ function setupSheetHeaders(sheet) {
   headerRange.setVerticalAlignment('middle');
   sheet.setRowHeight(headerRow, 36);
 
+  // Service Type column dropdown validation on Row 8+
+  var serviceTypeColIdx = COLUMNS.indexOf('Service Type') + 1;
+  if (serviceTypeColIdx > 0) {
+    var serviceTypeRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['Shop Visit', 'Home Service'], true)
+      .setAllowInvalid(true)
+      .build();
+    sheet.getRange(headerRow + 1, serviceTypeColIdx, 500, 1).setDataValidation(serviceTypeRule);
+  }
+
   // Status column dropdown validation on Row 8+
   var statusColIdx = COLUMNS.indexOf('Status') + 1;
   if (statusColIdx > 0) {
@@ -550,6 +568,13 @@ function setupSheetHeaders(sheet) {
       .build();
     sheet.getRange(headerRow + 1, statusColIdx, 500, 1).setDataValidation(statusRule);
   }
+
+  // Write 'Sync Status' header at col AS (45) and ensure no validation there.
+  sheet.getRange(headerRow, SYNC_STATUS_COL).setValue('Sync Status')
+    .setBackground('#18181b').setFontColor('#f97316').setFontWeight('bold')
+    .setFontFamily('Consolas').setFontSize(10)
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.getRange(headerRow + 1, SYNC_STATUS_COL, 500, 1).clearDataValidations();
 }
 
 function applyRowStyles(sheet, rowNumber, status) {

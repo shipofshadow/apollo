@@ -58,6 +58,8 @@ class InquiryService
             'reference_number' => $refNum,
             'user_id' => $data['userId'] ?? null,
             'service_id' => $serviceId,
+            'serviceType' => $normalized['serviceType'] ?? 'shop_visit',
+            'service_type' => $normalized['serviceType'] ?? 'shop_visit',
             'fullName' => $normalized['fullName'],
             'address' => $normalized['address'],
             'contactNumber' => $normalized['contactNumber'],
@@ -114,7 +116,7 @@ class InquiryService
         }
         $db = Database::getInstance();
         $stmt = $db->prepare(
-                'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, reference_number, user_id, service_id, service_type, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
@@ -329,6 +331,13 @@ class InquiryService
             $fieldsToUpdate['service_id'] = ($rawSvc !== null && $rawSvc !== '') ? (int)$rawSvc : null;
         }
 
+        if (array_key_exists('serviceType', $data) || array_key_exists('service_type', $data) || array_key_exists('serviceLocation', $data) || array_key_exists('service_location', $data)) {
+            $rawServiceType = trim((string) ($data['serviceType'] ?? $data['service_type'] ?? $data['serviceLocation'] ?? $data['service_location'] ?? ''));
+            if ($rawServiceType !== '') {
+                $fieldsToUpdate['service_type'] = (strtolower($rawServiceType) === 'home_service' || strtolower($rawServiceType) === 'home service') ? 'home_service' : 'shop_visit';
+            }
+        }
+
         if (array_key_exists('status', $data)) {
             $status = trim((string)$data['status']);
             $allowed = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
@@ -407,6 +416,10 @@ class InquiryService
                 if (isset($fieldsToUpdate['plate_number'])) $item['plateNumber'] = $fieldsToUpdate['plate_number'];
                 if (isset($fieldsToUpdate['product_to_purchase'])) $item['productToPurchase'] = $fieldsToUpdate['product_to_purchase'];
                 if (array_key_exists('service_id', $fieldsToUpdate)) $item['serviceId'] = $fieldsToUpdate['service_id'];
+                if (isset($fieldsToUpdate['service_type'])) {
+                    $item['serviceType'] = $fieldsToUpdate['service_type'];
+                    $item['service_type'] = $fieldsToUpdate['service_type'];
+                }
                 if (isset($fieldsToUpdate['status'])) $item['status'] = $fieldsToUpdate['status'];
                 if (isset($fieldsToUpdate['internal_notes'])) $item['internalNotes'] = $fieldsToUpdate['internal_notes'];
                 if (isset($fieldsToUpdate['appointment_date'])) $item['appointmentDate'] = $fieldsToUpdate['appointment_date'];
@@ -712,6 +725,7 @@ class InquiryService
             'make' => $getValue($data, ['make', 'Car Make']),
             'model' => $getValue($data, ['model', 'Car Model']),
             'yearModel' => $getValue($data, ['yearModel', 'year_model', 'Year Model']),
+            'serviceType' => $getValue($data, ['serviceType', 'service_type', 'serviceLocation', 'service_location', 'serviceOption', 'service_option', 'Service Type', 'Service Location']) ?: 'shop_visit',
             'productToPurchase' => $getValue($data, ['productToPurchase', 'product_to_purchase', 'Product to Purchase']),
             'appointmentDate' => $getValue($data, ['appointmentDate', 'appointment_date', 'Appointment Date', 'bookingDate', 'booking_date']),
             'appointmentTime' => $getValue($data, ['appointmentTime', 'appointment_time', 'Appointment Time', 'bookingTime', 'booking_time']),
@@ -756,11 +770,11 @@ class InquiryService
         $db = Database::getInstance();
         $stmt = $db->prepare(
             'INSERT INTO customer_inquiries (
-                id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                id, reference_number, user_id, service_id, service_type, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, created_at, updated_at
             ) VALUES (
-                :id, :reference_number, :user_id, :service_id, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
+                :id, :reference_number, :user_id, :service_id, :service_type, :full_name, :address, :contact_number, :email_address, :facebook_name, :plate_number,
                 :make, :model, :year_model, :product_to_purchase, :appointment_date,
                 :appointment_time, :status, :created_at, :updated_at
             )'
@@ -771,6 +785,7 @@ class InquiryService
             ':reference_number' => (string) ($inquiry['referenceNumber'] ?? $inquiry['reference_number'] ?? ''),
             ':user_id' => $inquiry['user_id'] ? (string) $inquiry['user_id'] : null,
             ':service_id' => $inquiry['service_id'] ?? null,
+            ':service_type' => (string) ($inquiry['serviceType'] ?? $inquiry['service_type'] ?? 'shop_visit'),
             ':full_name' => (string) $inquiry['fullName'],
             ':address' => (string) $inquiry['address'],
             ':contact_number' => (string) $inquiry['contactNumber'],
@@ -905,7 +920,7 @@ class InquiryService
     {
         $db = Database::getInstance();
         $stmt = $db->query(
-                'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+                'SELECT id, reference_number, user_id, service_id, service_type, full_name, address, contact_number, email_address, facebook_name, plate_number,
                     make, model, year_model, product_to_purchase, appointment_date,
                     appointment_time, status, internal_notes, created_at
                  FROM customer_inquiries
@@ -985,7 +1000,7 @@ class InquiryService
         $prefixedId = str_starts_with($id, 'inq-') ? $id : 'inq-' . $id;
 
         $stmt = $db->prepare(
-            'SELECT id, reference_number, user_id, service_id, full_name, address, contact_number, email_address, facebook_name, plate_number,
+            'SELECT id, reference_number, user_id, service_id, service_type, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, internal_notes, created_at
              FROM customer_inquiries
@@ -1014,6 +1029,8 @@ class InquiryService
             'referenceNumber' => (string) ($row['reference_number'] ?? ''),
             'userId' => $row['user_id'] ? (string) $row['user_id'] : null,
             'serviceId' => isset($row['service_id']) && $row['service_id'] !== null ? (int) $row['service_id'] : null,
+            'serviceType' => (string) ($row['service_type'] ?? 'shop_visit'),
+            'service_type' => (string) ($row['service_type'] ?? 'shop_visit'),
             'fullName' => (string) ($row['full_name'] ?? ''),
             'address' => (string) ($row['address'] ?? ''),
             'contactNumber' => (string) ($row['contact_number'] ?? ''),
@@ -1646,6 +1663,7 @@ class InquiryService
             'plate_number'        => 'plateNumber',
             'product_to_purchase' => 'productToPurchase',
             'service_id'          => 'serviceId',
+            'service_type'        => 'serviceType',
             'status'              => 'status',
             'internal_notes'      => 'internalNotes',
             'appointment_date'    => 'appointmentDate',
@@ -1665,6 +1683,7 @@ class InquiryService
             'plate_number'        => 'Plate number',
             'product_to_purchase' => 'Product / service',
             'service_id'          => 'Assigned service',
+            'service_type'        => 'Service type',
             'status'              => 'Status',
             'internal_notes'      => 'Internal notes',
             'appointment_date'    => 'Appointment date',

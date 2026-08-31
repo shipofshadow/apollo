@@ -26,7 +26,7 @@ import {
   FaWrench,
   FaBell
 } from 'react-icons/fa';
-import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck, Copy } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, Check, Sparkles, ShieldCheck, Copy, Store, Home, MapPin } from 'lucide-react';
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
@@ -100,6 +100,7 @@ const INITIAL_FORM_STATE = {
   model: '',
   yearModel: '',
   plateNumber: '',
+  serviceType: 'shop_visit' as 'shop_visit' | 'home_service',
   appointmentDate: '', // Will store as YYYY-MM-DD
   appointmentTime: '', // Will store as h:mm aa (e.g. 2:30 PM)
   productToPurchase: ''
@@ -314,7 +315,7 @@ export default function CustomerFormPage() {
       />
 
       <div className="container mx-auto px-4 md:px-6 max-w-7xl">
-        
+
         {/* ── 1. Page Header & Process Bar ────────────────────────── */}
         {step === 1 && (
           <header className="mb-10 text-center relative">
@@ -332,7 +333,7 @@ export default function CustomerFormPage() {
             {/* Visual Process Indicator */}
             <div className="mt-8 max-w-xl mx-auto flex items-center justify-between relative px-2">
               <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-800 -translate-y-1/2 -z-10" />
-              
+
               {/* Step 1: Details */}
               <div className="flex flex-col items-center gap-1.5 bg-brand-darker px-3">
                 <span className="w-7 h-7 rounded-full bg-brand-orange text-white font-mono font-bold text-xs flex items-center justify-center shadow-lg shadow-brand-orange/30">
@@ -343,16 +344,14 @@ export default function CustomerFormPage() {
 
               {/* Step 2: Schedule */}
               <div className="flex flex-col items-center gap-1.5 bg-brand-darker px-3">
-                <span className={`w-7 h-7 rounded-full font-mono font-bold text-xs flex items-center justify-center transition-colors ${
-                  selectedDate && selectedTime 
-                    ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/30' 
-                    : 'bg-gray-800 text-gray-400 border border-gray-700'
-                }`}>
+                <span className={`w-7 h-7 rounded-full font-mono font-bold text-xs flex items-center justify-center transition-colors ${selectedDate && selectedTime
+                  ? 'bg-brand-orange text-white shadow-lg shadow-brand-orange/30'
+                  : 'bg-gray-800 text-gray-400 border border-gray-700'
+                  }`}>
                   02
                 </span>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                  selectedDate && selectedTime ? 'text-brand-orange' : 'text-gray-500'
-                }`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${selectedDate && selectedTime ? 'text-brand-orange' : 'text-gray-500'
+                  }`}>
                   Schedule
                 </span>
               </div>
@@ -374,7 +373,7 @@ export default function CustomerFormPage() {
 
             {/* Left Main Column (8 cols) */}
             <div className="lg:col-span-8 space-y-8">
-              
+
               {/* Card Wrapper */}
               <div className="bg-brand-dark border border-gray-800 rounded-xl p-5 sm:p-8 shadow-xl space-y-8">
 
@@ -532,7 +531,7 @@ export default function CustomerFormPage() {
                 </section>
 
                 {/* ── Section 03: Service & Request ──────────────────── */}
-                <section className="space-y-5 border-b border-gray-800/80 pb-8">
+                <section className="space-y-6 border-b border-gray-800/80 pb-8">
                   <div className="flex items-center gap-3">
                     <span className="w-8 h-8 rounded-lg bg-brand-orange/10 border border-brand-orange/30 flex items-center justify-center text-brand-orange font-mono font-bold text-xs">
                       03
@@ -541,7 +540,92 @@ export default function CustomerFormPage() {
                       <h2 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
                         <FaWrench className="text-brand-orange w-3.5 h-3.5" /> Service &amp; Request
                       </h2>
-                      <p className="text-xs text-gray-400">Choose a primary service or describe what you need.</p>
+                      <p className="text-xs text-gray-400">Select your preferred service location and package details.</p>
+                    </div>
+                  </div>
+
+                  {/* ── Shop Visit vs Home Service Selection ────────────── */}
+                  <div className="space-y-3">
+                    <label className="block text-xs font-semibold text-gray-300">
+                      Service Location / Type <span className="text-brand-orange">*</span>
+                    </label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Shop Visit Option */}
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, serviceType: 'shop_visit' }))}
+                        className={`p-4 sm:p-5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden group ${formData.serviceType === 'shop_visit'
+                          ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-lg shadow-brand-orange/10'
+                          : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
+                          }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className={`p-2.5 rounded-lg transition-colors ${formData.serviceType === 'shop_visit'
+                              ? 'bg-brand-orange text-white shadow-md'
+                              : 'bg-gray-800 text-gray-400 group-hover:text-gray-300'
+                              }`}>
+                              <Store className="w-4 h-4" />
+                            </span>
+                            <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${formData.serviceType === 'shop_visit'
+                              ? 'bg-brand-orange/20 border-brand-orange/40 text-brand-orange'
+                              : 'bg-gray-800/80 border-gray-700 text-gray-400'
+                              }`}>
+                              {formData.serviceType === 'shop_visit' ? '✓ Selected' : 'Select'}
+                            </span>
+                          </div>
+                          <h3 className={`text-sm font-bold uppercase tracking-wider mb-1 ${formData.serviceType === 'shop_visit' ? 'text-white' : 'text-gray-200'
+                            }`}>
+                            Shop Visit
+                          </h3>
+                          <p className="text-xs text-gray-400 leading-relaxed">
+                            Visit our shop in KM 20 Ortigas Ave Ext., Cainta, Philippines, 1900.
+                          </p>
+                        </div>
+                        <div className="mt-3.5 pt-2.5 border-t border-gray-800/80 flex items-center gap-1.5 text-[11px] text-brand-orange font-medium">
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                          <span>1625 Autolab</span>
+                        </div>
+                      </button>
+
+                      {/* Home Service Option */}
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, serviceType: 'home_service' }))}
+                        className={`p-4 sm:p-5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden group ${formData.serviceType === 'home_service'
+                          ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-lg shadow-brand-orange/10'
+                          : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
+                          }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className={`p-2.5 rounded-lg transition-colors ${formData.serviceType === 'home_service'
+                              ? 'bg-brand-orange text-white shadow-md'
+                              : 'bg-gray-800 text-gray-400 group-hover:text-gray-300'
+                              }`}>
+                              <Home className="w-4 h-4" />
+                            </span>
+                            <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full border ${formData.serviceType === 'home_service'
+                              ? 'bg-brand-orange/20 border-brand-orange/40 text-brand-orange'
+                              : 'bg-gray-800/80 border-gray-700 text-gray-400'
+                              }`}>
+                              {formData.serviceType === 'home_service' ? '✓ Selected' : 'Select'}
+                            </span>
+                          </div>
+                          <h3 className={`text-sm font-bold uppercase tracking-wider mb-1 ${formData.serviceType === 'home_service' ? 'text-white' : 'text-gray-200'
+                            }`}>
+                            Home Service
+                          </h3>
+                          <p className="text-xs text-gray-400 leading-relaxed">
+                            On-site installation. Our technician team brings tools and gear directly to your doorstep/address.
+                          </p>
+                        </div>
+                        <div className="mt-3.5 pt-2.5 border-t border-gray-800/80 flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
+                          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                          <span>Service to Your Address</span>
+                        </div>
+                      </button>
                     </div>
                   </div>
 
@@ -560,11 +644,10 @@ export default function CustomerFormPage() {
                               key={s.id}
                               type="button"
                               onClick={() => setSelectedServiceId(isSelected ? '' : String(s.id))}
-                              className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
-                                isSelected
-                                  ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-md'
-                                  : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
-                              }`}
+                              className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${isSelected
+                                ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-md'
+                                : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
+                                }`}
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <span className={`p-2 rounded-lg ${isSelected ? 'bg-brand-orange text-white' : 'bg-gray-800 text-gray-400'}`}>
@@ -625,7 +708,7 @@ export default function CustomerFormPage() {
 
                   {/* Date & Time Grid */}
                   <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch pt-2">
-                    
+
                     {/* Left: Custom Calendar (6 cols) */}
                     <div className="xl:col-span-6 flex flex-col bg-brand-darker/60 border border-gray-800 p-4 sm:p-5 rounded-xl min-w-0">
                       <p className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest text-brand-orange mb-4">
@@ -645,7 +728,7 @@ export default function CustomerFormPage() {
 
                     {/* Right: Time Slots Panel (6 cols) */}
                     <div className="xl:col-span-6 flex flex-col bg-brand-darker/60 border border-gray-800 p-4 sm:p-5 rounded-xl min-w-0">
-                      
+
                       {/* Time Slots Header */}
                       <div className="flex items-center justify-between mb-4">
                         <label className="text-xs font-bold uppercase tracking-widest text-brand-orange flex items-center gap-2">
@@ -679,7 +762,7 @@ export default function CustomerFormPage() {
                         </div>
                       ) : (
                         <div className="flex-1">
-                          
+
                           {/* Closed Day Notice */}
                           {!availabilityLoading && !shopDayIsOpen && (
                             <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg text-center">
@@ -724,7 +807,7 @@ export default function CustomerFormPage() {
                                 <p className="text-[11px] text-gray-400 mb-3 pb-3 border-b border-gray-800">
                                   Operating hours: 6:00 AM to {formatCloseTimeString(shopCloseTime)}.
                                 </p>
-                                
+
                                 <div className="w-full">
                                   {/* No Slots Available & Waitlist Workflow */}
                                   {visibleSlots.length === 0 && (
@@ -735,8 +818,8 @@ export default function CustomerFormPage() {
                                           No Appointments Available
                                         </h3>
                                         <p className="text-xs text-gray-400 mt-1">
-                                          {isTodaySelected 
-                                            ? 'No slots remaining for today.' 
+                                          {isTodaySelected
+                                            ? 'No slots remaining for today.'
                                             : 'There are currently no available slots for this date.'}
                                         </p>
                                       </div>
@@ -806,20 +889,18 @@ export default function CustomerFormPage() {
                                                 key={time}
                                                 type="button"
                                                 onClick={() => handleTimeSelect(time)}
-                                                className={`p-3 rounded-lg border text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer focus:outline-none ${
-                                                  isSelected
-                                                    ? 'border-brand-orange bg-brand-orange text-white shadow-lg'
-                                                    : 'border-gray-800 bg-brand-dark hover:border-brand-orange/60 hover:bg-black/40 text-gray-200'
-                                                }`}
+                                                className={`p-3 rounded-lg border text-center transition-all duration-200 flex flex-col items-center justify-center cursor-pointer focus:outline-none ${isSelected
+                                                  ? 'border-brand-orange bg-brand-orange text-white shadow-lg'
+                                                  : 'border-gray-800 bg-brand-dark hover:border-brand-orange/60 hover:bg-black/40 text-gray-200'
+                                                  }`}
                                               >
                                                 <span className="text-xs font-bold font-mono tracking-wide">{time}</span>
-                                                <span className={`text-[10px] font-semibold mt-0.5 ${
-                                                  isSelected
-                                                    ? 'text-white/90'
-                                                    : almostFull
+                                                <span className={`text-[10px] font-semibold mt-0.5 ${isSelected
+                                                  ? 'text-white/90'
+                                                  : almostFull
                                                     ? 'text-brand-orange'
                                                     : 'text-gray-500'
-                                                }`}>
+                                                  }`}>
                                                   {isSelected ? '✓ SELECTED' : almostFull ? 'LAST SPOT' : `${spotsLeft} spots left`}
                                                 </span>
                                               </button>
@@ -847,7 +928,7 @@ export default function CustomerFormPage() {
             {/* ── Right Column: Sticky Booking Summary (4 cols) ────── */}
             <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
               <div className="bg-brand-dark border border-gray-800 p-5 sm:p-6 rounded-xl shadow-xl space-y-6">
-                
+
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-gray-800 pb-4">
                   <div>
@@ -861,7 +942,7 @@ export default function CustomerFormPage() {
 
                 {/* Summary Rows */}
                 <div className="space-y-3.5 text-xs font-mono">
-                  
+
                   {/* Client */}
                   <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
                     <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Client</span>
@@ -882,6 +963,24 @@ export default function CustomerFormPage() {
                     {formData.plateNumber && <span className="text-gray-400 text-[11px] block uppercase">Plate: {formData.plateNumber}</span>}
                   </div>
 
+                  {/* Service Delivery Type Summary */}
+                  <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
+                    <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Service Location</span>
+                    <span className="text-white font-sans font-semibold text-xs flex items-center gap-1.5 mt-0.5">
+                      {formData.serviceType === 'home_service' ? (
+                        <>
+                          <Home className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-amber-300">Home Service (Mobile Dispatch)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Store className="w-3.5 h-3.5 text-brand-orange" />
+                          <span className="text-brand-orange">Shop Visit (1625 Autolab)</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+
                   {/* Service */}
                   <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
                     <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Primary Service</span>
@@ -891,11 +990,10 @@ export default function CustomerFormPage() {
                   </div>
 
                   {/* Appointment Schedule Highlight */}
-                  <div className={`p-3 rounded-lg border transition-all ${
-                    formData.appointmentDate && formData.appointmentTime
-                      ? 'bg-brand-orange/10 border-brand-orange/40 ring-1 ring-brand-orange/20'
-                      : 'bg-brand-darker/70 border-gray-800/80'
-                  }`}>
+                  <div className={`p-3 rounded-lg border transition-all ${formData.appointmentDate && formData.appointmentTime
+                    ? 'bg-brand-orange/10 border-brand-orange/40 ring-1 ring-brand-orange/20'
+                    : 'bg-brand-darker/70 border-gray-800/80'
+                    }`}>
                     <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Appointment</span>
                     {formData.appointmentDate ? (
                       <span className="text-white font-sans font-semibold text-xs block">
@@ -952,8 +1050,8 @@ export default function CustomerFormPage() {
                     !turnstileToken
                       ? 'Please complete the security check above'
                       : !privacyAgreed
-                      ? 'Please agree to the Privacy Policy'
-                      : undefined
+                        ? 'Please agree to the Privacy Policy'
+                        : undefined
                   }
                   className="w-full bg-brand-orange hover:bg-orange-600 text-white py-3.5 rounded-lg font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
@@ -983,7 +1081,7 @@ export default function CustomerFormPage() {
         {/* ── 16. Confirmation Success View (Step 2) ──────────────── */}
         {step === 2 && submittedData && (
           <div className="max-w-3xl mx-auto py-12 px-4 text-center space-y-8 animate-fadeIn">
-            
+
             {/* Success Check Icon */}
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 border border-green-500/30 shadow-xl text-green-400 mb-2">
               <CheckCircle className="w-10 h-10" />
@@ -1051,6 +1149,13 @@ export default function CustomerFormPage() {
                   <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Vehicle</span>
                   <span className="text-white font-sans font-semibold text-sm">
                     {submittedData.yearModel} {submittedData.make} {submittedData.model}
+                  </span>
+                </div>
+
+                <div className="bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">
+                  <span className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-1">Service Location</span>
+                  <span className="text-white font-sans font-semibold text-sm flex items-center gap-1.5">
+                    {submittedData.serviceType === 'home_service' ? '🏠 Home Service' : '🏬 Shop Visit'}
                   </span>
                 </div>
 

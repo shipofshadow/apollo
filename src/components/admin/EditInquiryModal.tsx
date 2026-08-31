@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, User, Car, Wrench, Loader2 } from 'lucide-react';
+import { X, Save, User, Car, Wrench, Loader2, Store, Home } from 'lucide-react';
 import { updateInquiryFullApi } from '../../services/api';
 import type { Inquiry, Service } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -33,6 +33,7 @@ export default function EditInquiryModal({
     model: '',
     yearModel: '',
     plateNumber: '',
+    serviceType: 'shop_visit',
     productToPurchase: '',
     serviceId: '' as string | number,
   });
@@ -52,6 +53,7 @@ export default function EditInquiryModal({
         model: inquiry.model || '',
         yearModel: inquiry.yearModel || inquiry.year || '',
         plateNumber: inquiry.plateNumber || '',
+        serviceType: inquiry.serviceType === 'home_service' ? 'home_service' : 'shop_visit',
         productToPurchase: inquiry.productToPurchase || '',
         serviceId: inquiry.serviceId !== undefined && inquiry.serviceId !== null ? String(inquiry.serviceId) : '',
       });
@@ -105,6 +107,7 @@ export default function EditInquiryModal({
         model: formData.model.trim(),
         yearModel: formData.yearModel.trim(),
         plateNumber: formData.plateNumber.trim(),
+        serviceType: formData.serviceType,
         productToPurchase: formData.productToPurchase.trim(),
         serviceId: formData.serviceId !== '' ? Number(formData.serviceId) : null,
       };
@@ -277,10 +280,49 @@ export default function EditInquiryModal({
           </div>
 
           {/* Section 3: Service / Package Info */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-brand-orange text-xs font-mono font-bold uppercase tracking-wider border-b border-gray-800 pb-2">
-              <Wrench className="w-4 h-4" /> Service & Package Choice
+              <Wrench className="w-4 h-4" /> Service &amp; Package Choice
             </div>
+
+            {/* Service Location / Type Selector */}
+            <div>
+              <label className="block text-[11px] font-mono text-gray-400 mb-1.5 uppercase">Service Delivery Location / Type *</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleChange('serviceType', 'shop_visit')}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                    formData.serviceType === 'shop_visit'
+                      ? 'bg-brand-orange/15 border-brand-orange text-white ring-1 ring-brand-orange/40'
+                      : 'bg-brand-dark border-gray-800 text-gray-400 hover:border-gray-700'
+                  }`}
+                >
+                  <Store className={`w-4 h-4 ${formData.serviceType === 'shop_visit' ? 'text-brand-orange' : 'text-gray-500'}`} />
+                  <div>
+                    <div className="text-xs font-mono font-bold uppercase">Shop Visit</div>
+                    <div className="text-[10px] text-gray-400">Main Facility, San Fernando</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleChange('serviceType', 'home_service')}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                    formData.serviceType === 'home_service'
+                      ? 'bg-brand-orange/15 border-brand-orange text-white ring-1 ring-brand-orange/40'
+                      : 'bg-brand-dark border-gray-800 text-gray-400 hover:border-gray-700'
+                  }`}
+                >
+                  <Home className={`w-4 h-4 ${formData.serviceType === 'home_service' ? 'text-brand-orange' : 'text-gray-500'}`} />
+                  <div>
+                    <div className="text-xs font-mono font-bold uppercase">Home Service</div>
+                    <div className="text-[10px] text-gray-400">Mobile On-Site Dispatch</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-mono text-gray-400 mb-1 uppercase">Requested Product / Package *</label>

@@ -3,7 +3,7 @@ import {
   ArrowLeft, CheckCircle2,
   Trash2, AlertTriangle, User, Car, Activity, Tag,
   ChevronLeft, ChevronRight, ChevronDown, Calendar, ClipboardList,
-  StickyNote, FileText, Save, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Mail, Phone
+  StickyNote, FileText, Save, Wrench, RefreshCw, Loader2, BadgeCheck, XCircle, Mail, Phone, Store, Home
 } from 'lucide-react';
 import {
   fetchInquiryByIdApi,
@@ -745,10 +745,21 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
         </div>
 
         {/* Compact Metadata Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono text-gray-300">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-xs font-mono text-gray-300">
           <div className="flex items-center gap-2">
             <Tag className="w-4 h-4 text-brand-orange shrink-0" />
             <span className="truncate">Ref: <strong className="text-white">{inquiry.referenceNumber || 'N/A'}</strong></span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {inquiry.serviceType === 'home_service' ? (
+              <Home className="w-4 h-4 text-amber-400 shrink-0" />
+            ) : (
+              <Store className="w-4 h-4 text-brand-orange shrink-0" />
+            )}
+            <span className="truncate font-semibold">
+              {inquiry.serviceType === 'home_service' ? 'Home Service' : 'Shop Visit'}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -863,9 +874,26 @@ export default function AdminInquiryDetail({ inquiryId, onBack, backLabel = 'Ret
                       </span>
                     </div>
 
-                    <div className="bg-brand-orange/10 border border-brand-orange/20 p-3 rounded-lg mt-2">
-                      <span className="text-[10px] font-mono text-brand-orange uppercase block font-bold">Product / Service Request</span>
-                      <p className="text-white font-medium text-xs mt-1 leading-relaxed">
+                    <div className="bg-brand-orange/10 border border-brand-orange/20 p-3 rounded-lg mt-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono text-brand-orange uppercase block font-bold">Product / Service Request</span>
+                        <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${
+                          inquiry.serviceType === 'home_service'
+                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                            : 'bg-brand-orange/20 border-brand-orange/40 text-brand-orange'
+                        }`}>
+                          {inquiry.serviceType === 'home_service' ? (
+                            <>
+                              <Home className="w-3 h-3" /> Home Service
+                            </>
+                          ) : (
+                            <>
+                              <Store className="w-3 h-3" /> Shop Visit
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <p className="text-white font-medium text-xs leading-relaxed">
                         {inquiry.productToPurchase || 'Service inquiry'}
                       </p>
                     </div>

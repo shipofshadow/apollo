@@ -89,6 +89,8 @@ class GoogleSheetsSyncService
                 $serviceName = (string) ($inquiry['productToPurchase'] ?? $inquiry['product_to_purchase'] ?? '');
             }
 
+            $rawServiceType = (string) ($inquiry['serviceType'] ?? $inquiry['service_type'] ?? 'shop_visit');
+            $serviceTypeVal = (strtolower($rawServiceType) === 'home_service' || strtolower($rawServiceType) === 'home service') ? 'Home Service' : 'Shop Visit';
             $idVal = (string) ($inquiry['id'] ?? $inquiry['inquiryId'] ?? '');
             $refVal = (string) ($inquiry['referenceNumber'] ?? $inquiry['reference_number'] ?? '');
             $fullNameVal = (string) ($inquiry['fullName'] ?? $inquiry['full_name'] ?? '');
@@ -120,6 +122,7 @@ class GoogleSheetsSyncService
                 'make' => $makeVal,
                 'model' => $modelVal,
                 'yearModel' => $yearVal,
+                'serviceType' => $serviceTypeVal,
                 'serviceName' => $serviceName,
                 'productToPurchase' => $productVal,
                 'plateNumber' => $plateVal,
@@ -139,6 +142,7 @@ class GoogleSheetsSyncService
                 'contact_number' => $phoneVal,
                 'facebook_name' => $fbVal,
                 'year_model' => $yearVal,
+                'service_type' => $serviceTypeVal,
                 'product_to_purchase' => $productVal,
                 'plate_number' => $plateVal,
                 'appointment_date' => $dateVal,
@@ -156,6 +160,8 @@ class GoogleSheetsSyncService
                 'Car Make' => $makeVal,
                 'Car Model' => $modelVal,
                 'Year Model' => $yearVal,
+                'Service Type' => $serviceTypeVal,
+                'Service Location' => $serviceTypeVal,
                 'Service Name' => $serviceName,
                 'Product to Purchase' => $productVal,
                 'Plate Number' => $plateVal,
@@ -277,6 +283,8 @@ class GoogleSheetsSyncService
         $make = trim((string) ($data['make'] ?? $data['Car Make'] ?? $data['Make'] ?? ''));
         $model = trim((string) ($data['model'] ?? $data['Car Model'] ?? $data['Model'] ?? ''));
         $year = trim((string) ($data['yearModel'] ?? $data['year_model'] ?? $data['Year Model'] ?? $data['year'] ?? ''));
+        $rawServiceType = trim((string) ($data['serviceType'] ?? $data['service_type'] ?? $data['Service Type'] ?? $data['Service Location'] ?? $data['serviceLocation'] ?? $data['service_location'] ?? ''));
+        $serviceType = (strtolower($rawServiceType) === 'home_service' || strtolower($rawServiceType) === 'home service') ? 'home_service' : ($rawServiceType !== '' ? 'shop_visit' : '');
         $serviceOrProduct = trim((string) ($data['productToPurchase'] ?? $data['product_to_purchase'] ?? $data['Product to Purchase'] ?? $data['serviceName'] ?? $data['service_name'] ?? $data['Service Name'] ?? $data['service'] ?? ''));
         $plate = trim((string) ($data['plateNumber'] ?? $data['plate_number'] ?? $data['Plate Number'] ?? ''));
         $rawDate = trim((string) ($data['appointmentDate'] ?? $data['appointment_date'] ?? $data['Appointment Date'] ?? $data['date'] ?? ''));
@@ -375,6 +383,9 @@ class GoogleSheetsSyncService
                 if ($year !== '' && $year !== (string) ($existing['yearModel'] ?? '')) {
                     $changes['yearModel'] = $year;
                 }
+                if ($serviceType !== '' && $serviceType !== (string) ($existing['serviceType'] ?? $existing['service_type'] ?? '')) {
+                    $changes['serviceType'] = $serviceType;
+                }
                 if ($plate !== '' && $plate !== (string) ($existing['plateNumber'] ?? '')) {
                     $changes['plateNumber'] = $plate;
                 }
@@ -468,6 +479,7 @@ class GoogleSheetsSyncService
                 'make' => $make !== '' ? $make : 'General',
                 'model' => $model !== '' ? $model : 'Vehicle',
                 'yearModel' => $year !== '' ? $year : date('Y'),
+                'serviceType' => $serviceType !== '' ? $serviceType : 'shop_visit',
                 'productToPurchase' => $serviceOrProduct !== '' ? $serviceOrProduct : 'General Inquiry',
                 'plateNumber' => $plate,
                 'appointmentDate' => $validDate,
@@ -692,6 +704,8 @@ class GoogleSheetsSyncService
             'make' => 'Toyota',
             'model' => 'Vios',
             'yearModel' => '2023',
+            'serviceType' => 'Shop Visit',
+            'Service Type' => 'Shop Visit',
             'serviceName' => 'Headlight Retrofit Test',
             'productToPurchase' => 'Headlight Retrofit Package',
             'plateNumber' => 'TEST-123',

@@ -16,6 +16,7 @@ type Inquiry = {
   make: string;
   model: string;
   year?: string;
+  serviceType?: string;
   productToPurchase: string;
   status: string;
   internalNotes?: string | null;
@@ -173,6 +174,7 @@ export async function generateInquiryReportPDF(
     headStyles: { fillColor: [248, 250, 252], textColor: BRAND.gray, fontStyle: 'bold' },
     styles: { fontSize: 9, cellPadding: 3, textColor: BRAND.slate, lineColor: [226, 232, 240] },
     body: [
+      ['Service Location / Type', inquiry.serviceType === 'home_service' ? 'Home Service (Mobile Dispatch)' : 'Shop Visit (San Fernando Bay)'],
       ['Product / Service', valueOrDash(inquiry.productToPurchase)],
       ['Appointment Date', valueOrDash(inquiry.appointmentDate)],
       ['Appointment Time', valueOrDash(inquiry.appointmentTime)],

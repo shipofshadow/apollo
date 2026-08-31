@@ -1047,6 +1047,7 @@ export interface Inquiry {
   model: string;
   year?: string;
   yearModel?: string;
+  serviceType?: 'shop_visit' | 'home_service' | string;
   productToPurchase: string;
   status: string;
   internalNotes?: string | null;
