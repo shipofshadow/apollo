@@ -245,6 +245,11 @@ export default function CustomerFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (services.length > 0 && !selectedServiceId) {
+      showToast('Please select a primary service.', 'error');
+      return;
+    }
+
     if (!formData.plateNumber.trim()) {
       showToast('Please enter your Vehicle Plate / CS Number.', 'error');
       return;
@@ -640,7 +645,7 @@ export default function CustomerFormPage() {
                   {services.length > 0 && (
                     <div className="space-y-3">
                       <label className="block text-xs font-semibold text-gray-300">
-                        Select Primary Service <span className="text-gray-500 font-normal">(optional)</span>
+                        Select Primary Service <span className="text-brand-orange">*</span>
                       </label>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -650,7 +655,7 @@ export default function CustomerFormPage() {
                             <button
                               key={s.id}
                               type="button"
-                              onClick={() => setSelectedServiceId(isSelected ? '' : String(s.id))}
+                              onClick={() => setSelectedServiceId(String(s.id))}
                               className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${isSelected
                                 ? 'border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange/50 shadow-md'
                                 : 'border-gray-800 bg-brand-darker/60 hover:border-gray-700 hover:bg-brand-darker'
@@ -996,8 +1001,10 @@ export default function CustomerFormPage() {
                   {/* Service */}
                   <div className="bg-brand-darker/70 border border-gray-800/80 p-3 rounded-lg space-y-0.5">
                     <span className="text-[9px] uppercase tracking-widest text-gray-500 font-bold block">Primary Service</span>
-                    <span className="text-brand-orange font-sans font-semibold text-xs block leading-snug">
-                      {selectedServiceObj ? selectedServiceObj.title : <span className="text-gray-600 font-normal italic">None selected</span>}
+                    <span className={`text-xs block leading-snug ${
+                      selectedServiceObj ? 'text-brand-orange font-sans font-semibold' : 'text-amber-400/80 font-normal italic'
+                    }`}>
+                      {selectedServiceObj ? selectedServiceObj.title : 'Required — please select'}
                     </span>
                   </div>
 
@@ -1057,13 +1064,15 @@ export default function CustomerFormPage() {
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  disabled={isSubmitting || !turnstileToken || !privacyAgreed}
+                  disabled={isSubmitting || !turnstileToken || !privacyAgreed || (services.length > 0 && !selectedServiceId)}
                   title={
                     !turnstileToken
                       ? 'Please complete the security check above'
                       : !privacyAgreed
                         ? 'Please agree to the Privacy Policy'
-                        : undefined
+                        : services.length > 0 && !selectedServiceId
+                          ? 'Please select a primary service'
+                          : undefined
                   }
                   className="w-full bg-brand-orange hover:bg-orange-600 text-white py-3.5 rounded-lg font-bold uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
