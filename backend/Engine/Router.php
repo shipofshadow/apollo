@@ -2191,7 +2191,9 @@ class Router
     private function handleGoogleSheetsAllInquiries(array $vars = []): void
     {
         $settings = (new SiteSettingsService())->getAll();
-        $configuredSecret = trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
+        $configuredSecret = (defined('GOOGLE_SHEETS_SYNC_SECRET') && GOOGLE_SHEETS_SYNC_SECRET !== '')
+            ? GOOGLE_SHEETS_SYNC_SECRET
+            : trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
         if ($configuredSecret !== '') {
             $candidate = trim((string) (
                 ($_SERVER['HTTP_X_SHEETS_SECRET'] ?? '')

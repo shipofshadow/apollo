@@ -216,7 +216,9 @@ class GoogleSheetsSyncService
         $settings = (new SiteSettingsService())->getAll();
 
         if (!$bypassSecretCheck) {
-            $configuredSecret = trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
+            $configuredSecret = defined('GOOGLE_SHEETS_SYNC_SECRET') && GOOGLE_SHEETS_SYNC_SECRET !== ''
+                ? GOOGLE_SHEETS_SYNC_SECRET
+                : trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
             if ($configuredSecret !== '') {
                 $candidate = trim((string) (
                     $providedSecret
@@ -587,7 +589,11 @@ class GoogleSheetsSyncService
     public static function getAppsScriptTemplate(?string $siteUrl = null, ?string $secret = null): string
     {
         $settings = (new SiteSettingsService())->getAll();
-        $configuredSecret = $secret ?? trim((string) ($settings['google_sheets_sync_secret'] ?? ''));
+        $configuredSecret = $secret ?? (
+            (defined('GOOGLE_SHEETS_SYNC_SECRET') && GOOGLE_SHEETS_SYNC_SECRET !== '')
+                ? GOOGLE_SHEETS_SYNC_SECRET
+                : trim((string) ($settings['google_sheets_sync_secret'] ?? ''))
+        );
         
         $baseInboundUrl = $siteUrl ?? (
             (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https://' : 'http://')

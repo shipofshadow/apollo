@@ -5,7 +5,7 @@ import {
   Plus, Pencil, Trash2, Save, X, Upload, Star, Layout,
   ServerCog, CheckCircle2, RefreshCw, Database, Info,
   Sparkles, ShieldCheck, ArrowLeft, Play, Copy, Code2,
-  Key, Check, FileSpreadsheet,
+  Check, FileSpreadsheet,
   ArrowDownToLine, ArrowUpFromLine,
 } from 'lucide-react';
 import {
@@ -1570,7 +1570,7 @@ function SystemPanel() {
   const [shopSettingsSuccess, setShopSettingsSuccess] = useState(false);
 
   const [googleSheetsWebhookUrl, setGoogleSheetsWebhookUrl] = useState('');
-  const [googleSheetsSyncSecret, setGoogleSheetsSyncSecret] = useState('');
+
   const [sheetsSettingsSaving, setSheetsSettingsSaving] = useState(false);
   const [sheetsSettingsError, setSheetsSettingsError] = useState<string | null>(null);
   const [sheetsSettingsSuccess, setSheetsSettingsSuccess] = useState<string | null>(null);
@@ -1582,7 +1582,7 @@ function SystemPanel() {
   const [scriptCode, setScriptCode] = useState('');
   const [scriptLoading, setScriptLoading] = useState(false);
   const [copiedInboundUrl, setCopiedInboundUrl] = useState(false);
-  const [copiedSecret, setCopiedSecret] = useState(false);
+
   const [copiedScript, setCopiedScript] = useState(false);
 
   const inboundWebhookUrl = typeof window !== 'undefined'
@@ -1631,8 +1631,7 @@ function SystemPanel() {
     // Default shop_enabled to true (1) if setting is not yet in DB
     setShopEnabled(settings.shop_enabled === undefined ? true : toBool(settings.shop_enabled));
     setGoogleSheetsWebhookUrl(settings.google_sheets_webhook_url ?? '');
-    setGoogleSheetsSyncSecret(settings.google_sheets_sync_secret ?? '');
-  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings, settings.disable_registration, settings.shop_enabled, settings.google_sheets_webhook_url, settings.google_sheets_sync_secret]);
+  }, [settings.staff_can_manage_all_bookings, settings.staff_can_view_all_bookings, settings.disable_registration, settings.shop_enabled, settings.google_sheets_webhook_url]);
 
   const handleSaveRegistrationSettings = async () => {
     if (!token || registrationSettingsSaving) return;
@@ -1674,21 +1673,14 @@ function SystemPanel() {
     }
   };
 
-  const handleGenerateSecret = () => {
-    const array = new Uint8Array(16);
-    crypto.getRandomValues(array);
-    const rand = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-    setGoogleSheetsSyncSecret(`1625_sec_${rand}`);
-  };
 
-  const copyToClipboard = (text: string, type: 'url' | 'secret' | 'script') => {
+
+  const copyToClipboard = (text: string, type: 'url' | 'script') => {
     navigator.clipboard.writeText(text);
     if (type === 'url') {
       setCopiedInboundUrl(true);
       setTimeout(() => setCopiedInboundUrl(false), 2000);
-    } else if (type === 'secret') {
-      setCopiedSecret(true);
-      setTimeout(() => setCopiedSecret(false), 2000);
+
     } else {
       setCopiedScript(true);
       setTimeout(() => setCopiedScript(false), 2000);
@@ -1705,10 +1697,9 @@ function SystemPanel() {
         token,
         data: {
           google_sheets_webhook_url: googleSheetsWebhookUrl.trim(),
-          google_sheets_sync_secret: googleSheetsSyncSecret.trim(),
         },
       })).unwrap();
-      setSheetsSettingsSuccess('Google Sheets webhook URL and secret saved successfully.');
+      setSheetsSettingsSuccess('Google Sheets webhook URL saved successfully.');
       setTimeout(() => setSheetsSettingsSuccess(null), 4000);
     } catch (e: unknown) {
       setSheetsSettingsError((e as Error).message ?? 'Failed to save Google Sheets settings.');
@@ -2219,42 +2210,7 @@ function SystemPanel() {
                 </p>
               </div>
 
-              {/* Webhook Secret Key */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-mono font-bold uppercase tracking-widest text-gray-300 flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-amber-400" />
-                    3. Webhook Secret Key (Optional Security)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleGenerateSecret}
-                    className="text-[10px] font-mono text-brand-orange hover:underline cursor-pointer"
-                  >
-                    + Generate Secret
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={googleSheetsSyncSecret}
-                    onChange={e => setGoogleSheetsSyncSecret(e.target.value)}
-                    placeholder="e.g. 1625_sec_..."
-                    className="w-full bg-brand-darker border border-gray-800 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:border-brand-orange font-mono text-xs placeholder:text-gray-600 transition-colors"
-                  />
-                  {googleSheetsSyncSecret && (
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(googleSheetsSyncSecret, 'secret')}
-                      className="px-3 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white rounded-lg text-xs font-mono flex items-center gap-1.5 shrink-0 transition-colors border border-gray-700 cursor-pointer"
-                      title="Copy Secret Key"
-                    >
-                      {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-gray-400" />}
-                      <span>{copiedSecret ? 'Copied!' : 'Copy'}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+
 
               {settings.google_sheets_last_sync_at && (
                 <div className="text-[11px] font-mono text-gray-500 flex items-center gap-1.5">

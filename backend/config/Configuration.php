@@ -161,3 +161,12 @@ define('TURNSTILE_BYPASS', filter_var($_ENV['TURNSTILE_BYPASS'] ?? 'false', FILT
 // ---------------------------------------------------------------------------
 
 define('WAITLIST_CLAIM_TTL_MINUTES', (int)($_ENV['WAITLIST_CLAIM_TTL_MINUTES'] ?? 30));
+
+// ---------------------------------------------------------------------------
+// Google Sheets Live Sync
+// GOOGLE_SHEETS_SYNC_SECRET: the shared secret key used to authenticate
+// webhook calls between Google Apps Script and this backend.
+// When set, this .env value takes precedence over the DB site setting.
+// ---------------------------------------------------------------------------
+
+define('GOOGLE_SHEETS_SYNC_SECRET', trim((string) ($_ENV['GOOGLE_SHEETS_SYNC_SECRET'] ?? '')));

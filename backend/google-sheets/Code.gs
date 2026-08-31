@@ -2,7 +2,7 @@
  * ========================================================================================
  * 1625 AUTOLAB - GOOGLE SHEETS BIDIRECTIONAL LIVE SYNC SCRIPT
  * ========================================================================================
- * Version: 2.1 (Row 7 Headers & Row 8 Data Start - Bidirectional Two-Way Sync)
+ * Version: 2.1.1 (Row 7 Headers & Row 8 Data Start - Bidirectional Two-Way Sync)
  *
  * This Google Apps Script powers real-time two-way synchronization between your Google
  * Spreadsheet ('Sales' sheet, Header Row 7, Data starting on Row 8) and Apollo:
@@ -27,7 +27,7 @@
 // ----------------------------------------------------------------------------------------
 var CONFIG = {
   // Your website's inbound webhook URL
-  DEFAULT_API_URL: 'https://www.1625autolab.com/api/integrations/google-sheets/inbound',
+  DEFAULT_API_URL: 'https://api.1625autolab.com/api/integrations/google-sheets/inbound',
   // Your Webhook Secret Key
   DEFAULT_SECRET: '3213e76c579444693434',
   // Target Sheet Name
@@ -342,8 +342,9 @@ function upsertInquiryRow(inquiry, isFromApi) {
 
   var isNewRow = (targetRow === -1);
   if (isNewRow) {
-    // Append as new row starting at Row 8 or below
-    targetRow = Math.max(lastRow + 1, startDataRow);
+    // Insert at the top (right below headers at Row 8), pushing existing data down
+    sheet.insertRowBefore(startDataRow);
+    targetRow = startDataRow;
   }
 
   // Set suppression flag in cache to prevent onEdit trigger echo loop
