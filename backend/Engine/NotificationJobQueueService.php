@@ -873,11 +873,18 @@ class NotificationJobQueueService
                 }
 
                 try {
+                    $rawSt = strtolower(trim((string) ($data['serviceType'] ?? $data['service_type'] ?? 'shop_visit')));
+                    $serviceTypeLabel = ($rawSt === 'home_service' || $rawSt === 'home service') ? 'Home Service' : 'Shop Visit';
+                    $serviceFeeNote = $serviceTypeLabel === 'Home Service' ? ' (Home service fee applies)' : '';
+
                     (new UserNotificationService())->createForAdmin(
                         'inquiry',
-                        'New Customer Inquiry',
-                        'A new inquiry has been submitted by ' . ($data['fullName'] ?? $data['name'] ?? 'a customer') . '.',
-                        ['inquiryId' => $data['id'] ?? null]
+                        'New Customer Inquiry (' . $serviceTypeLabel . ')',
+                        'A new ' . $serviceTypeLabel . ' inquiry has been submitted by ' . ($data['fullName'] ?? $data['name'] ?? 'a customer') . $serviceFeeNote . '.',
+                        [
+                            'inquiryId' => $data['id'] ?? null,
+                            'serviceType' => $serviceTypeLabel,
+                        ]
                     );
                 } catch (\Throwable $e) {
                     error_log('[NotificationJobQueueService] customer inquiry in-app notification failed: ' . $e->getMessage());

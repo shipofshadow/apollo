@@ -292,27 +292,25 @@ export default function EditInquiryModal({
                 <button
                   type="button"
                   onClick={() => handleChange('serviceType', 'shop_visit')}
-                  className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
-                    formData.serviceType === 'shop_visit'
+                  className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${formData.serviceType === 'shop_visit'
                       ? 'bg-brand-orange/15 border-brand-orange text-white ring-1 ring-brand-orange/40'
                       : 'bg-brand-dark border-gray-800 text-gray-400 hover:border-gray-700'
-                  }`}
+                    }`}
                 >
                   <Store className={`w-4 h-4 ${formData.serviceType === 'shop_visit' ? 'text-brand-orange' : 'text-gray-500'}`} />
                   <div>
                     <div className="text-xs font-mono font-bold uppercase">Shop Visit</div>
-                    <div className="text-[10px] text-gray-400">Main Facility, San Fernando</div>
+                    <div className="text-[10px] text-gray-400">1625 Autolab</div>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleChange('serviceType', 'home_service')}
-                  className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
-                    formData.serviceType === 'home_service'
+                  className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${formData.serviceType === 'home_service'
                       ? 'bg-brand-orange/15 border-brand-orange text-white ring-1 ring-brand-orange/40'
                       : 'bg-brand-dark border-gray-800 text-gray-400 hover:border-gray-700'
-                  }`}
+                    }`}
                 >
                   <Home className={`w-4 h-4 ${formData.serviceType === 'home_service' ? 'text-brand-orange' : 'text-gray-500'}`} />
                   <div>

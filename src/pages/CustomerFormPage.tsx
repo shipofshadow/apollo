@@ -612,17 +612,28 @@ export default function CustomerFormPage() {
                             Home Service
                           </h3>
                           <p className="text-[10px] text-gray-400 leading-relaxed">
-                            On-site installation. Our technician team brings tools and gear directly to your doorstep.
+                            On-site installation at your doorstep. <span className="text-amber-400/90 font-medium">Subject to home service / travel fee.</span>
                           </p>
                         </div>
                         <div className="mt-3 pt-2 border-t border-gray-800/80 flex items-center justify-between text-[9px] font-mono uppercase">
                           <span className={formData.serviceType === 'home_service' ? 'text-brand-orange font-bold' : 'text-gray-500'}>
                             {formData.serviceType === 'home_service' ? '✓ Selected' : 'Select'}
                           </span>
-                          <span className="text-gray-500">To Your Address</span>
+                          <span className="text-amber-400 font-semibold">+ Service Fee</span>
                         </div>
                       </button>
                     </div>
+
+                    {/* Home Service Fee Notice Banner */}
+                    {formData.serviceType === 'home_service' && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5 text-xs text-amber-200/90 leading-relaxed animate-fadeIn">
+                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold text-amber-300">Home Service Fee Notice: </span>
+                          An additional home service / travel fee applies depending on your location and distance. Our team will verify your address and confirm the total fee prior to dispatch.
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Selectable Service Cards */}
@@ -975,6 +986,11 @@ export default function CustomerFormPage() {
                         </>
                       )}
                     </span>
+                    {formData.serviceType === 'home_service' && (
+                      <span className="text-[10px] text-amber-400/90 block mt-1 font-sans">
+                        * Note: Additional home service fee applies
+                      </span>
+                    )}
                   </div>
 
                   {/* Service */}
@@ -1153,6 +1169,11 @@ export default function CustomerFormPage() {
                   <span className="text-white font-sans font-semibold text-sm flex items-center gap-1.5">
                     {submittedData.serviceType === 'home_service' ? '🏠 Home Service' : '🏬 Shop Visit'}
                   </span>
+                  {submittedData.serviceType === 'home_service' && (
+                    <span className="text-[10px] text-amber-400 font-sans block mt-1">
+                      * Home service fee applies (to be confirmed upon dispatch)
+                    </span>
+                  )}
                 </div>
 
                 <div className="bg-brand-darker/60 p-3.5 rounded-lg border border-gray-800/80">

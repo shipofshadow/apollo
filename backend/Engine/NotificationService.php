@@ -202,6 +202,11 @@ class NotificationService
         $appointmentTime = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
 
+        $rawSt = strtolower($s['rawServiceType']);
+        $serviceType = ($rawSt === 'home_service' || $rawSt === 'home service') ? 'Home Service (Mobile Dispatch)' : 'Shop Visit (1625 Autolab)';
+        $serviceTypeVal = ($rawSt === 'home_service' || $rawSt === 'home service') ? 'Home Service' : 'Shop Visit';
+        $heading = $serviceTypeVal === 'Home Service' ? 'New Home Service Customer Inquiry' : 'New Shop Visit Customer Inquiry';
+
         $body = $this->render('customer-inquiry-admin', [
             'name' => $name,
             'email' => $email,
@@ -213,12 +218,14 @@ class NotificationService
             'address' => $address !== '' ? $address : '—',
             'plate' => $s['rawPlate'] !== '' ? htmlspecialchars($s['rawPlate']) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
+            'service_type' => htmlspecialchars($serviceType),
+            'service_type_heading' => htmlspecialchars($heading),
+            'service_type_label' => htmlspecialchars($serviceTypeVal),
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
-
         ]);
 
-        $this->sendToRecipients($recipients, 'New Customer Inquiry | 1625 Autolab', $body, 'Admin');
+        $this->sendToRecipients($recipients, 'New Customer Inquiry (' . $serviceTypeVal . ') | 1625 Autolab', $body, 'Admin');
     }
 
     /**
@@ -252,6 +259,10 @@ class NotificationService
         $appointmentTime = htmlspecialchars($s['rawTime'] !== '' ? $s['rawTime'] : '—');
 
 
+        $rawSt = strtolower($s['rawServiceType']);
+        $serviceType = ($rawSt === 'home_service' || $rawSt === 'home service') ? 'Home Service (Mobile Dispatch)' : 'Shop Visit (1625 Autolab)';
+        $serviceTypeVal = ($rawSt === 'home_service' || $rawSt === 'home service') ? 'Home Service' : 'Shop Visit';
+
         $body = $this->render('customer-inquiry-customer', [
            'name' => $name,
             'email' => $email,
@@ -263,6 +274,8 @@ class NotificationService
             'address' => $address !== '' ? $address : '—',
             'plate' => $s['rawPlate'] !== '' ? htmlspecialchars($s['rawPlate']) : '—',
             'facebook' => $facebook !== '' ? $facebook : '—',
+            'service_type' => htmlspecialchars($serviceType),
+            'service_type_label' => htmlspecialchars($serviceTypeVal),
             'booking_date' => $appointmentDate,
             'booking_time' => $appointmentTime,
         ]);
@@ -1830,6 +1843,7 @@ class NotificationService
             'rawFacebook'=> str_replace(["\r", "\n"], '', (string) ($inquiry['facebookName'] ?? '')),
             'rawPlate'   => str_replace(["\r", "\n"], '', (string) ($inquiry['plateNumber'] ?? '')),
             'rawOtherModel'=> str_replace(["\r", "\n"], '', (string) ($inquiry['otherModel'] ?? '')),
+            'rawServiceType'=> str_replace(["\r", "\n"], '', (string) ($inquiry['serviceType'] ?? $inquiry['service_type'] ?? 'shop_visit')),
         ];
     }
 

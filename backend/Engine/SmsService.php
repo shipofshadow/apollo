@@ -99,12 +99,18 @@ public function customerInquiryAdmin(array $inquiry): void
     $address = trim((string) ($inquiry['address'] ?? ''));
     $facebook = trim((string) ($inquiry['facebookName'] ?? ''));
 
+    $rawSt = strtolower(trim((string) ($inquiry['serviceType'] ?? $inquiry['service_type'] ?? 'shop_visit')));
+    $isHome = ($rawSt === 'home_service' || $rawSt === 'home service');
+    $headline = $isHome ? 'NEW HOME SERVICE CUSTOMER INQUIRY' : 'NEW SHOP VISIT CUSTOMER INQUIRY';
+    $serviceType = $isHome ? 'Home Service (Mobile Dispatch)' : 'Shop Visit (1625 Autolab)';
+
     $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
     $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
 
     $vehicle = trim($make . ' ' . ($model === 'Other Model' ? $otherModel : $model));
 
-    $message = "NEW CUSTOMER INQUIRY\n\n"
+    $message = "{$headline}\n\n"
+        . "Service Type: {$serviceType}\n\n"
         . "Customer\n"
         . "Name: {$name}\n"
         . ($customerPhone !== '' ? "Phone: {$customerPhone}\n" : '')
@@ -141,13 +147,20 @@ public function customerInquiryAdmin(array $inquiry): void
         $date = trim((string) ($inquiry['appointmentDate'] ?? ''));
         $time = trim((string) ($inquiry['appointmentTime'] ?? ''));
 
+        $rawSt = strtolower(trim((string) ($inquiry['serviceType'] ?? $inquiry['service_type'] ?? 'shop_visit')));
+        $isHome = ($rawSt === 'home_service' || $rawSt === 'home service');
+        $serviceType = $isHome ? 'Home Service' : 'Shop Visit';
+        $feeNotice = $isHome ? "\n* Note: Applicable home service / travel fee applies depending on location.\n" : '';
+
         $message = "Hi {$name}!\n\n"
-            . "Thank you for booking an installation service with us. Your appointment has been successfully received.\n\n"
+            . "Thank you for booking an installation service with us. Your appointment request ({$serviceType}) has been received.\n\n"
+            . "Service: {$serviceType}\n"
             . ($date !== '' ? "Date: {$date}\n" : '')
-            . ($time !== '' ? "Time: {$time}\n\n" : "\n")
-            . "Our team will contact you before the scheduled appointment to confirm your booking and provide any necessary updates.\n\n"
-            . "If you need to reschedule or have any questions, simply contact us on our Facebook page.\n\n"
-            . "Thank you for choosing us—we look forward to serving you!";
+            . ($time !== '' ? "Time: {$time}\n" : '')
+            . $feeNotice
+            . "\nOur team will contact you before the scheduled appointment to confirm your booking and details.\n\n"
+            . "If you need to reschedule or have questions, message us on our Facebook page.\n\n"
+            . "- 1625 Autolab";
 
         $this->send($phone, $message);
     }
