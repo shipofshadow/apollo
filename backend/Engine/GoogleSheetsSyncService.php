@@ -61,6 +61,13 @@ class GoogleSheetsSyncService
 
         try {
             $settings = (new SiteSettingsService())->getAll();
+
+            $syncEnabled = ($settings['google_sheets_sync_enabled'] ?? '1') !== '0';
+            $outboundEnabled = ($settings['google_sheets_outbound_enabled'] ?? '1') !== '0';
+            if (!$syncEnabled || !$outboundEnabled) {
+                return;
+            }
+
             $webhookUrl = trim((string) ($settings['google_sheets_webhook_url'] ?? ''));
 
             if ($webhookUrl === '') {
@@ -220,6 +227,16 @@ class GoogleSheetsSyncService
     public static function processInboundSync(array $data, ?string $providedSecret = null, bool $bypassSecretCheck = false): array
     {
         $settings = (new SiteSettingsService())->getAll();
+
+        $syncEnabled = ($settings['google_sheets_sync_enabled'] ?? '1') !== '0';
+        $inboundEnabled = ($settings['google_sheets_bidirectional_enabled'] ?? $settings['google_sheets_inbound_enabled'] ?? '1') !== '0';
+        if (!$syncEnabled || !$inboundEnabled) {
+            return [
+                'success' => false,
+                'action'  => 'disabled',
+                'message' => 'Bidirectional Google Sheets sync / inbound edits are disabled in site settings.',
+            ];
+        }
 
         if (!$bypassSecretCheck) {
             $configuredSecret = defined('GOOGLE_SHEETS_SYNC_SECRET') && GOOGLE_SHEETS_SYNC_SECRET !== ''

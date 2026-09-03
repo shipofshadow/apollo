@@ -37,6 +37,7 @@ class Router
             'settings:manage',
             'shop-hours:manage',
             'media:upload',
+            'backups:manage',
         ],
         'admin' => [
             'analytics:view',
@@ -56,6 +57,7 @@ class Router
             'settings:manage',
             'shop-hours:manage',
             'media:upload',
+            'backups:manage',
         ],
         'manager' => [
             'analytics:view',
@@ -377,6 +379,14 @@ class Router
             $r->addRoute('POST', '/api/admin/checklist/resend-email',     'handleAdminChecklistResendEmail');
             $r->addRoute('POST', '/api/admin/checklist/submission/delete', 'handleAdminChecklistDelete');
             $r->addRoute('POST', '/api/admin/checklist/submission/update', 'handleAdminChecklistUpdate');
+
+            // ── Admin Backups & Restoration ─────────────────────────────────
+            $r->addRoute('GET',    '/api/admin/backups',                     'handleAdminBackupList');
+            $r->addRoute('POST',   '/api/admin/backups/create',              'handleAdminBackupCreate');
+            $r->addRoute('GET',    '/api/admin/backups/download/{filename}', 'handleAdminBackupDownload');
+            $r->addRoute('DELETE', '/api/admin/backups/{filename}',          'handleAdminBackupDelete');
+            $r->addRoute('POST',   '/api/admin/backups/inspect',             'handleAdminBackupInspect');
+            $r->addRoute('POST',   '/api/admin/backups/restore',             'handleAdminBackupRestore');
 
             // ── Vehicle data (API Ninjas proxy) ──────────────────────────────
             $r->addRoute('GET', '/api/vehicles/makes',  'handleVehicleMakes');
@@ -906,7 +916,8 @@ class Router
         }
 
         try {
-            $result = (new UserService())->login($email, $pass);
+            $rememberMe = !empty($data['remember_me']);
+            $result = (new UserService())->login($email, $pass, $rememberMe);
             if (isset($result['user']) && is_array($result['user'])) {
                 $result['user']['permissions'] = $this->getRolePermissions((string) ($result['user']['role'] ?? ''));
             }
@@ -5512,5 +5523,188 @@ class Router
             'success' => true,
             'message' => "Inspection checklist updated successfully.",
         ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Admin Backup & Restore Handlers
+    // -------------------------------------------------------------------------
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupList(array $vars = []): void
+    {
+        $this->requireRoles(['owner', 'admin']);
+        $service = new BackupService();
+        $snapshots = $service->listSnapshots();
+        $stats = $service->getSystemStats();
+
+        echo json_encode([
+            'success'   => true,
+            'snapshots' => $snapshots,
+            'stats'     => $stats,
+        ]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupCreate(array $vars = []): void
+    {
+        $user = $this->requireRoles(['owner', 'admin']);
+        $data = $this->jsonBody();
+        $scope = (string) ($data['scope'] ?? 'full');
+
+        $service = new BackupService();
+        $result = $service->createBackup($scope, $user);
+
+        echo json_encode($result);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupDownload(array $vars = []): void
+    {
+        $this->requireRoles(['owner', 'admin']);
+        $filename = trim($vars['filename'] ?? '');
+
+        $service = new BackupService();
+        $filePath = $service->getSnapshotPath($filename);
+
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $mime = $ext === 'zip' ? 'application/zip' : 'application/sql';
+
+        header('Content-Description: File Transfer');
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: attachment; filename="' . basename($filePath) . '"');
+        header('Content-Length: ' . filesize($filePath));
+        header('Pragma: public');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+
+        readfile($filePath);
+        exit;
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupDelete(array $vars = []): void
+    {
+        $this->requireRoles(['owner', 'admin']);
+        $filename = trim($vars['filename'] ?? '');
+
+        $service = new BackupService();
+        $deleted = $service->deleteSnapshot($filename);
+
+        echo json_encode(['success' => $deleted, 'filename' => $filename]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupInspect(array $vars = []): void
+    {
+        $this->requireRoles(['owner', 'admin']);
+        $service = new BackupService();
+
+        // 1. Check if a file was uploaded via multipart/form-data
+        if (!empty($_FILES['backup_file']['tmp_name']) && is_uploaded_file($_FILES['backup_file']['tmp_name'])) {
+            $tmpPath = $_FILES['backup_file']['tmp_name'];
+            $origName = $_FILES['backup_file']['name'] ?? 'uploaded_backup.zip';
+            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+
+            if (!in_array($ext, ['zip', 'sql'], true)) {
+                throw new InvalidArgumentException('Uploaded file must be a .zip or .sql backup file.', 422);
+            }
+
+            // Move to temporary folder for inspection
+            $tempInspectPath = $service->getSystemStats()['backups']['backupDir'] . '/tmp/inspect_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            if (!move_uploaded_file($tmpPath, $tempInspectPath)) {
+                throw new RuntimeException('Failed to process uploaded backup file.', 500);
+            }
+
+            $inspection = $service->inspectBackup($tempInspectPath);
+            $inspection['filename'] = $origName;
+            $inspection['tempToken'] = basename($tempInspectPath);
+            echo json_encode(['success' => true, 'inspection' => $inspection]);
+            return;
+        }
+
+        // 2. Check if inspecting an existing server snapshot
+        $data = $this->jsonBody();
+        $snapshotFilename = trim((string) ($data['snapshotFilename'] ?? ''));
+
+        if ($snapshotFilename === '') {
+            throw new InvalidArgumentException('Missing backup file or snapshot filename to inspect.', 400);
+        }
+
+        $snapshotPath = $service->getSnapshotPath($snapshotFilename);
+        $inspection = $service->inspectBackup($snapshotPath);
+
+        echo json_encode(['success' => true, 'inspection' => $inspection]);
+    }
+
+    /** @param array<string, string> $vars */
+    private function handleAdminBackupRestore(array $vars = []): void
+    {
+        $user = $this->requireRoles(['owner', 'admin']);
+        $service = new BackupService();
+
+        $restoreDb = true;
+        $restoreMedia = true;
+        $restoreSettings = true;
+        $sourcePath = '';
+        $isTempUpload = false;
+
+        // Check multipart form upload
+        if (!empty($_FILES['backup_file']['tmp_name']) && is_uploaded_file($_FILES['backup_file']['tmp_name'])) {
+            $tmpPath = $_FILES['backup_file']['tmp_name'];
+            $origName = $_FILES['backup_file']['name'] ?? 'uploaded_backup.zip';
+            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+
+            if (!in_array($ext, ['zip', 'sql'], true)) {
+                throw new InvalidArgumentException('Uploaded file must be a .zip or .sql backup file.', 422);
+            }
+
+            $sourcePath = $service->getSystemStats()['backups']['backupDir'] . '/tmp/restore_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            if (!move_uploaded_file($tmpPath, $sourcePath)) {
+                throw new RuntimeException('Failed to process uploaded restore file.', 500);
+            }
+            $isTempUpload = true;
+
+            $restoreDb = isset($_POST['restoreDatabase']) ? filter_var($_POST['restoreDatabase'], FILTER_VALIDATE_BOOLEAN) : true;
+            $restoreMedia = isset($_POST['restoreMedia']) ? filter_var($_POST['restoreMedia'], FILTER_VALIDATE_BOOLEAN) : true;
+            $restoreSettings = isset($_POST['restoreSettings']) ? filter_var($_POST['restoreSettings'], FILTER_VALIDATE_BOOLEAN) : true;
+        } else {
+            $data = $this->jsonBody();
+
+            // Check if tempToken from previous inspect was passed
+            $tempToken = trim((string) ($data['tempToken'] ?? ''));
+            if ($tempToken !== '') {
+                $cleanToken = basename($tempToken);
+                $candidate = $service->getSystemStats()['backups']['backupDir'] . '/tmp/' . $cleanToken;
+                if (is_file($candidate)) {
+                    $sourcePath = $candidate;
+                    $isTempUpload = true;
+                }
+            }
+
+            if ($sourcePath === '') {
+                $snapshotFilename = trim((string) ($data['snapshotFilename'] ?? ''));
+                if ($snapshotFilename === '') {
+                    throw new InvalidArgumentException('No backup file or server snapshot specified for restoration.', 400);
+                }
+                $sourcePath = $service->getSnapshotPath($snapshotFilename);
+            }
+
+            $restoreDb = isset($data['restoreDatabase']) ? (bool) $data['restoreDatabase'] : true;
+            $restoreMedia = isset($data['restoreMedia']) ? (bool) $data['restoreMedia'] : true;
+            $restoreSettings = isset($data['restoreSettings']) ? (bool) $data['restoreSettings'] : true;
+        }
+
+        try {
+            $result = $service->restoreBackup($sourcePath, [
+                'restoreDatabase' => $restoreDb,
+                'restoreMedia'    => $restoreMedia,
+                'restoreSettings' => $restoreSettings,
+            ], $user);
+
+            echo json_encode($result);
+        } finally {
+            if ($isTempUpload && is_file($sourcePath)) {
+                @unlink($sourcePath);
+            }
+        }
     }
 }

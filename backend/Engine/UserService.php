@@ -69,17 +69,22 @@ class UserService
      *
      * @param  string $email
      * @param  string $password
-     * @return array{ token: string, user: array<string, mixed> }
+     * @param  bool   $rememberMe  When true, issues 1-year tokens instead of the default TTL.
+     * @return array{ token: string, refresh_token: string, user: array<string, mixed> }
      */
-    public function login(string $email, string $password): array
+    public function login(string $email, string $password, bool $rememberMe = false): array
     {
-        $token   = Auth::login(['email' => $email, 'password' => $password]);
+        // 1 year for "Remember Me", otherwise default JWT_TTL (1 hour)
+        $accessTtl  = $rememberMe ? 365 * 24 * 60 * 60 : JWT_TTL;
+        // Refresh token: same 1-year window when remembered, 7 days otherwise
+        $refreshTtl = $rememberMe ? 365 * 24 * 60 * 60 : 7 * 24 * 60 * 60;
+
+        $token   = Auth::login(['email' => $email, 'password' => $password], $accessTtl);
         $payload = Auth::decodeToken($token);
         $userId  = (int) $payload['sub'];
         $user    = $this->findById($userId);
 
-        // Issue a long-lived refresh token (7 days)
-        $refreshToken = Auth::issueToken(['sub' => $userId, 'type' => 'refresh'], 7 * 24 * 60 * 60);
+        $refreshToken = Auth::issueToken(['sub' => $userId, 'type' => 'refresh'], $refreshTtl);
 
         return ['token' => $token, 'refresh_token' => $refreshToken, 'user' => $user];
     }

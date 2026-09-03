@@ -157,10 +157,10 @@ async function apiFetch<T>(
 
 // ── Auth API ─────────────────────────────────────────────────────────────────
 
-export const loginApi = (email: string, password: string, cfTurnstileToken: string) =>
+export const loginApi = (email: string, password: string, cfTurnstileToken: string, rememberMe = false) =>
   apiFetch<{ token: string; user: User }>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password, 'cf-turnstile-response': cfTurnstileToken }),
+    body: JSON.stringify({ email, password, 'cf-turnstile-response': cfTurnstileToken, remember_me: rememberMe }),
   });
 
 export const registerApi = (data: {
@@ -2176,5 +2176,92 @@ export const getSheetsScriptApi = (token: string) =>
     token
   );
 
+// ── Backup & Restore API ──────────────────────────────────────────────────────
 
+import type { BackupSnapshot, BackupSystemStats, BackupInspectResult, BackupRestoreResult } from '../types';
 
+/** Fetch the backup snapshot list and system diagnostic stats. */
+export const getBackupsApi = (token: string) =>
+  apiFetch<{ success: boolean; snapshots: BackupSnapshot[]; stats: BackupSystemStats }>(
+    '/api/admin/backups',
+    {},
+    token
+  );
+
+/** Trigger a new backup creation. scope: 'full' | 'db' | 'media' */
+export const createBackupApi = (token: string, scope: 'full' | 'db' | 'media' = 'full') =>
+  apiFetch<{ success: boolean; filename: string; sizeFormatted: string; sizeBytes: number }>(
+    '/api/admin/backups/create',
+    { method: 'POST', body: JSON.stringify({ scope }) },
+    token
+  );
+
+/** Delete a snapshot by filename. */
+export const deleteBackupApi = (token: string, filename: string) =>
+  apiFetch<{ success: boolean; filename: string; message?: string }>(
+    `/api/admin/backups/${encodeURIComponent(filename)}`,
+    { method: 'DELETE' },
+    token
+  );
+
+/**
+ * Inspect a server-side snapshot by filename, or upload a local file.
+ * Pass a `snapshotFilename` string for server snapshots, or a `File` for uploads.
+ */
+export const inspectBackupApi = (
+  token: string,
+  source: string | File
+): Promise<{ success: boolean; inspection: BackupInspectResult }> => {
+  if (source instanceof File) {
+    const formData = new FormData();
+    formData.append('backup_file', source);
+    return fetch(`${BACKEND_URL}/api/admin/backups/inspect`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }).then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || data.message || `Inspect failed (${res.status})`);
+      }
+      return data as { success: boolean; inspection: BackupInspectResult };
+    });
+  }
+  return apiFetch<{ success: boolean; inspection: BackupInspectResult }>(
+    '/api/admin/backups/inspect',
+    { method: 'POST', body: JSON.stringify({ snapshotFilename: source }) },
+    token
+  );
+};
+
+/**
+ * Execute a restore operation.
+ * Provide either `tempToken` (from a file upload inspect) or `snapshotFilename`.
+ */
+export const restoreBackupApi = (
+  token: string,
+  payload: {
+    restoreDatabase: boolean;
+    restoreMedia: boolean;
+    restoreSettings: boolean;
+    tempToken?: string;
+    snapshotFilename?: string;
+  }
+) =>
+  apiFetch<BackupRestoreResult & { success: boolean }>(
+    '/api/admin/backups/restore',
+    { method: 'POST', body: JSON.stringify(payload) },
+    token
+  );
+
+/**
+ * Download a backup snapshot as a Blob.
+ */
+export const downloadBackupApi = async (token: string, filename: string): Promise<Blob> => {
+  const res = await fetch(
+    `${BACKEND_URL}/api/admin/backups/download/${encodeURIComponent(filename)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  return res.blob();
+};

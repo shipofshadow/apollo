@@ -601,6 +601,9 @@ export interface SiteSettings {
   shop_enabled?: string;
   google_sheets_webhook_url?: string;
   google_sheets_sync_secret?: string;
+  google_sheets_sync_enabled?: string;
+  google_sheets_outbound_enabled?: string;
+  google_sheets_bidirectional_enabled?: string;
   google_sheets_last_sync_at?: string;
   booking_horizon_weeks?: string;
   [key: string]: string | undefined;
@@ -1052,5 +1055,74 @@ export interface Inquiry {
   status: string;
   internalNotes?: string | null;
   serviceId?: number | null;
+}
+
+// ── Backups & Restoration ───────────────────────────────────────────────────
+
+export interface BackupSnapshot {
+  filename: string;
+  extension: 'zip' | 'sql' | string;
+  sizeBytes: number;
+  sizeFormatted: string;
+  createdAt: string;
+  timestamp: number;
+  scope: 'full' | 'db' | 'media' | 'unknown' | string;
+  driver: 's3' | 'local' | 'unknown' | string;
+  tableCount: number;
+  mediaCount: number;
+  version: string;
+}
+
+export interface BackupSystemStats {
+  database: {
+    connected: boolean;
+    name: string;
+    host: string;
+    tableCount: number;
+    totalRows: number;
+    sizeBytes: number;
+  };
+  storage: {
+    disk: 's3' | 'local' | string;
+    r2Configured: boolean;
+    r2Bucket: string;
+    r2Prefix: string;
+    localUploadsCount: number;
+    localUploadsBytes: number;
+  };
+  backups: {
+    snapshotCount: number;
+    totalBackupBytes: number;
+    backupDir: string;
+  };
+}
+
+export interface BackupInspectResult {
+  valid: boolean;
+  type: 'zip' | 'sql' | string;
+  filename: string;
+  sizeBytes: number;
+  sizeFormatted: string;
+  createdAt: string;
+  scope: 'full' | 'db' | 'media' | string;
+  driver?: string;
+  hasDatabase: boolean;
+  hasMedia: boolean;
+  hasSettings: boolean;
+  tableCount: number;
+  tables?: string[];
+  mediaCount: number;
+  tempToken?: string;
+  manifest?: Record<string, unknown> | null;
+}
+
+export interface BackupRestoreResult {
+  success: boolean;
+  durationSeconds: number;
+  tablesRestored: number;
+  statementsExecuted: number;
+  mediaRestoredCount: number;
+  settingsRestored: boolean;
+  message?: string;
 }
 

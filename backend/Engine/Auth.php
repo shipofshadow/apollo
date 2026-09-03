@@ -173,7 +173,7 @@ class Auth
      * @param  array<string, mixed> $credentials  e.g. ['email'=>'...', 'password'=>'...']
      * @throws RuntimeException  On invalid credentials or DB errors.
      */
-    public static function login(array $credentials): string
+    public static function login(array $credentials, int $ttl = 0): string
     {
         $db    = Database::getInstance();
         $email = strtolower(trim((string) ($credentials['email'] ?? '')));
@@ -215,7 +215,7 @@ class Auth
             'role' => $row['role'],
             'name' => $row['name'],
             'type' => 'access',
-        ]);
+        ], $ttl);
     }
 
     /**

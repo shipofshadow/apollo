@@ -11,9 +11,9 @@ import { fetchSiteSettingsAsync } from '../../store/siteSettingsSlice';
 import type { AppDispatch, RootState } from '../../store';
 
 export default function LoginPage() {
-  const navigate   = useNavigate();
-  const [params]   = useSearchParams();
-  const redirect   = params.get('redirect') ?? '';
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const redirect = params.get('redirect') ?? '';
 
   const dispatch = useDispatch<AppDispatch>();
   const siteSettings = useSelector((state: RootState) => state.siteSettings.settings);
@@ -26,14 +26,22 @@ export default function LoginPage() {
     dispatch(fetchSiteSettingsAsync());
   }, [dispatch]);
 
-  const [email,    setEmail]    = useState(params.get('email') ?? '');
+  const [email, setEmail] = useState(params.get('email') ?? '');
   const [password, setPassword] = useState('');
-  const [showPw,   setShowPw]   = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('apollo_remember_me_pref') === '1');
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [turnstileKey,   setTurnstileKey]   = useState(0);
+  const [turnstileKey, setTurnstileKey] = useState(0);
   const [resendBusy, setResendBusy] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState('');
   const hasShownToast = useRef(false);
+
+  // Persist the remember-me preference so the checkbox is pre-filled next visit
+  const handleRememberMeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setRememberMe(checked);
+    localStorage.setItem('apollo_remember_me_pref', checked ? '1' : '0');
+  };
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -83,7 +91,7 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, password, turnstileToken)
+    login(email, password, turnstileToken, rememberMe)
       .catch(() => setTurnstileKey(k => k + 1));
   };
 
@@ -188,6 +196,39 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {/* ── Remember Me ─────────────────────────────────── */}
+            <label
+              htmlFor="remember-me"
+              className="flex items-center gap-3 cursor-pointer select-none group"
+            >
+              <span className="relative flex-shrink-0 w-5 h-5">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={handleRememberMeChange}
+                  className="peer sr-only"
+                />
+                {/* Custom checkbox box */}
+                <span className="block w-5 h-5 rounded-sm border border-gray-700 bg-brand-darker transition-colors peer-checked:border-brand-orange peer-checked:bg-brand-orange group-hover:border-gray-500" />
+                {/* Checkmark */}
+                <svg
+                  className="absolute inset-0 m-auto w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="2,6 5,9 10,3" />
+                </svg>
+              </span>
+              <span className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">
+                Remember me
+              </span>
+            </label>
 
             <TurnstileWidget
               onVerify={setTurnstileToken}

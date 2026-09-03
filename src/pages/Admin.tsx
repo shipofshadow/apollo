@@ -4,7 +4,7 @@ import {
   BarChart3, Package, FileText, Calendar, LogOut, Wrench,
   Clock, ArrowLeft, UserCog, SlidersHorizontal, HelpCircle, Tag,
   Menu, X, ChevronLeft, ChevronRight, ChevronDown, Star, CalendarDays, ShieldCheck,
-  Camera, MessageSquare, Users, Workflow, Megaphone, Boxes, Activity,
+  Camera, MessageSquare, Users, Workflow, Megaphone, Boxes, Activity, Database,
 } from 'lucide-react';
 import logo from '../assets/logo.png';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +36,7 @@ import ActivityLogsPanel    from './admin/ActivityLogsPanel';
 import NotificationQueuePanel from './admin/NotificationQueuePanel';
 import MarketingCampaignsPanel from './admin/MarketingCampaignsPanel';
 import InventoryPanel from './admin/InventoryPanel';
+import BackupRestorePanel from './admin/BackupRestorePanel';
 import ConversationsPage    from './chatbot/ConversationsPage';
 import FlowEditorPage       from './chatbot/FlowEditorPage';
 import { useDispatch, useSelector } from 'react-redux';
@@ -69,6 +70,7 @@ const TAB_PATHS: Record<string, string> = {
   'activity-logs': '/admin/activity-logs',
   'notification-queue': '/admin/notification-queue',
   'semaphore': '/admin/semaphore',
+  'backup-restore': '/admin/backup-restore',
   settings: '/admin/account',
 };
 
@@ -174,6 +176,7 @@ export default function AdminPage() {
       children: [
         { key: 'marketing-campaigns', label: 'Campaigns', icon: Megaphone },
         { key: 'site-settings', label: 'Site Config',     icon: SlidersHorizontal },
+        { key: 'backup-restore', label: 'Backup & Restore', icon: Database },
         { key: 'security-audit', label: 'Security Audit', icon: ShieldCheck },
         { key: 'activity-logs', label: 'Activity Logs', icon: Activity },
         { key: 'notification-queue', label: 'Queue Monitor', icon: Workflow },
@@ -267,6 +270,10 @@ export default function AdminPage() {
 
     if (key === 'activity-logs') {
       return role === 'owner';
+    }
+
+    if (key === 'backup-restore') {
+      return role === 'owner' || role === 'admin';
     }
 
     if (isAdmin) return true;
@@ -387,6 +394,7 @@ export default function AdminPage() {
       case 'activity-logs': return <ActivityLogsPanel />;
       case 'notification-queue': return <NotificationQueuePanel />;
       case 'semaphore':     return <SemaphorePanel />;
+      case 'backup-restore': return <BackupRestorePanel />;
       case 'settings':      return <AccountSettingsPanel />;
       default: return null;
     }

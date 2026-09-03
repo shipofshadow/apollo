@@ -200,6 +200,9 @@ class SiteSettingsService
             'disable_registration' => '0',
             'shop_enabled' => '1',
             'google_sheets_webhook_url' => '',
+            'google_sheets_sync_enabled' => '1',
+            'google_sheets_outbound_enabled' => '1',
+            'google_sheets_bidirectional_enabled' => '1',
             // Contact page settings
             'contact_heading'  => 'Contact The Lab',
             'contact_tagline'  => 'Ready to upgrade your ride? Reach out and we\'ll get back to you within 24 hours.',

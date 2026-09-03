@@ -68,7 +68,7 @@ export interface AuthContextValue {
   error: string | null;
 
   // Actions – all async methods throw on failure so callers can catch
-  login: (email: string, password: string, cfTurnstileToken: string) => Promise<void>;
+  login: (email: string, password: string, cfTurnstileToken: string, rememberMe?: boolean) => Promise<void>;
   register: (data: {
     name: string;
     email: string;
@@ -107,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Async action wrappers ─────────────────────────────────────────────────
 
-  const login = async (email: string, password: string, cfTurnstileToken: string): Promise<void> => {
-    const result = await dispatch(loginAsync({ email, password, cfTurnstileToken }));
+  const login = async (email: string, password: string, cfTurnstileToken: string, rememberMe = false): Promise<void> => {
+    const result = await dispatch(loginAsync({ email, password, cfTurnstileToken, rememberMe }));
     if (loginAsync.rejected.match(result)) {
       throw new Error((result.payload as string) ?? 'Login failed.');
     }

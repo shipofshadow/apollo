@@ -9,35 +9,48 @@ import {
   refreshTokenApi,
 } from '../services/api';
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
+// ── Storage helpers ───────────────────────────────────────────────────────────
+//
+// When "Remember Me" is checked  → credentials live in localStorage  (persist across restarts)
+// When "Remember Me" is unchecked → credentials live in sessionStorage (cleared on tab close)
+// The flag itself always lives in localStorage so we know which storage to read on reload.
 
-const TOKEN_KEY = 'apollo_token';
+const TOKEN_KEY        = 'apollo_token';
 const REFRESH_TOKEN_KEY = 'apollo_refresh_token';
-const USER_KEY  = 'apollo_user';
+const USER_KEY         = 'apollo_user';
+const REMEMBER_ME_KEY  = 'apollo_remember_me';
 
-function saveToStorage(token: string, refreshToken: string, user: User): void {
+function saveToStorage(token: string, refreshToken: string, user: User, rememberMe: boolean): void {
   try {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    const store = rememberMe ? localStorage : sessionStorage;
+    localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? '1' : '0');
+    store.setItem(TOKEN_KEY, token);
+    store.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    store.setItem(USER_KEY, JSON.stringify(user));
   } catch { /* storage unavailable */ }
 }
 
 function clearStorage(): void {
   try {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    // Clear from both storages and remove the flag
+    for (const key of [TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY]) {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    }
+    localStorage.removeItem(REMEMBER_ME_KEY);
   } catch { /* ignore */ }
 }
 
 function loadFromStorage(): { token: string | null; refreshToken: string | null; user: User | null } {
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    const raw = localStorage.getItem(USER_KEY);
-    
-    // We only strictly need token and raw for Sanctum
+    // Determine which storage was used based on the persisted flag
+    const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+    const store = remembered ? localStorage : sessionStorage;
+
+    const token        = store.getItem(TOKEN_KEY);
+    const refreshToken = store.getItem(REFRESH_TOKEN_KEY);
+    const raw          = store.getItem(USER_KEY);
+
     if (!token || !raw) return { token: null, refreshToken: null, user: null };
 
     return { token, refreshToken, user: JSON.parse(raw) as User };
@@ -50,9 +63,13 @@ function loadFromStorage(): { token: string | null; refreshToken: string | null;
 
 export const loginAsync = createAsyncThunk(
   'auth/login',
-  async (creds: { email: string; password: string; cfTurnstileToken: string }, { rejectWithValue }) => {
+  async (
+    creds: { email: string; password: string; cfTurnstileToken: string; rememberMe?: boolean },
+    { rejectWithValue }
+  ) => {
     try {
-      return await loginApi(creds.email, creds.password, creds.cfTurnstileToken);
+      const result = await loginApi(creds.email, creds.password, creds.cfTurnstileToken, creds.rememberMe ?? false);
+      return { ...result, rememberMe: creds.rememberMe ?? false };
     } catch (e: unknown) {
       return rejectWithValue((e as Error).message ?? 'Login failed.');
     }
@@ -160,9 +177,9 @@ const authSlice = createSlice({
       state.token  = action.payload.token;
       state.refreshToken = (action.payload as any).refresh_token || null;
       state.user   = action.payload.user;
-      
-      // Save to localStorage regardless of refreshToken existence
-      saveToStorage(action.payload.token, state.refreshToken || '', action.payload.user);
+
+      const rememberMe = (action.payload as any).rememberMe ?? false;
+      saveToStorage(action.payload.token, state.refreshToken || '', action.payload.user, rememberMe);
     });
     builder.addCase(loginAsync.rejected, (state, action) => {
       state.status = 'error';
@@ -190,7 +207,8 @@ const authSlice = createSlice({
     // ── fetchMe ──────────────────────────────────────────────────────────
     builder.addCase(fetchMeAsync.fulfilled, (state, action) => {
       state.user = action.payload;
-      if (state.token && state.refreshToken) saveToStorage(state.token, state.refreshToken, action.payload);
+      const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+      if (state.token && state.refreshToken) saveToStorage(state.token, state.refreshToken, action.payload, remembered);
     });
 
     // ── updateProfile ─────────────────────────────────────────────────────
@@ -201,7 +219,8 @@ const authSlice = createSlice({
     builder.addCase(updateProfileAsync.fulfilled, (state, action) => {
       state.status = 'success';
       state.user   = action.payload;
-      if (state.token && state.refreshToken) saveToStorage(state.token, state.refreshToken, action.payload);
+      const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+      if (state.token && state.refreshToken) saveToStorage(state.token, state.refreshToken, action.payload, remembered);
     });
     builder.addCase(updateProfileAsync.rejected, (state, action) => {
       state.status = 'error';
@@ -226,7 +245,8 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.refreshToken = action.payload.refreshToken;
       if (state.user) {
-        saveToStorage(action.payload.token, action.payload.refreshToken, state.user);
+        const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+        saveToStorage(action.payload.token, action.payload.refreshToken, state.user, remembered);
       }
     });
     builder.addCase(refreshTokenAsync.rejected, (state, action) => {
