@@ -32,8 +32,8 @@ var CONFIG = {
   DEFAULT_SECRET: '3213e76c579444693434',
   // Target Sheet Name
   SHEET_NAME: 'Sales',
-  // Default Header Row (Headers on Row 7 by default, but script auto-detects Row 1-10)
-  HEADER_ROW: 7,
+  // Default Header Row: Row 1 (Headers on Row 1, Data rows start at Row 2)
+  HEADER_ROW: 1,
 };
 
 // Standard Column definitions matching your 'Sales' sheet order:
@@ -241,12 +241,12 @@ function syncSingleRowToApollo(sheet, rowNumber) {
   }
 
   try {
-    var payload = JSON.stringify({
+    var body = Object.assign({
       source: 'google_sheets',
       rowNumber: rowNumber,
-      timestamp: new Date().toISOString(),
-      ...rowData
-    });
+      timestamp: new Date().toISOString()
+    }, rowData);
+    var payload = JSON.stringify(body);
 
     var options = {
       method: 'post',
@@ -488,12 +488,10 @@ function upsertInquiryRow(inquiry, isFromApi) {
     }
   }
 
-  // Clear data validation on target row and write values
-  sheet.getRange(targetRow, 1, 1, rowArray.length).clearDataValidations();
+  // Write values to target row (preserving any table validations/dropdowns)
   sheet.getRange(targetRow, 1, 1, rowArray.length).setValues([rowArray]);
 
   // Write Sync Status separately to column AS
-  sheet.getRange(targetRow, SYNC_STATUS_COL).clearDataValidations();
   sheet.getRange(targetRow, SYNC_STATUS_COL).setValue(valSync);
 
   // Apply row formatting
@@ -602,10 +600,10 @@ function getOrCreateTargetSheet() {
 
 /**
  * Dynamically detects the header row by scanning rows 1 to 15 for recognizable column names.
- * Falls back to CONFIG.HEADER_ROW (default 7).
+ * Falls back to CONFIG.HEADER_ROW (default 1).
  */
 function getHeaderRow(sheet) {
-  var configured = CONFIG.HEADER_ROW || 7;
+  var configured = CONFIG.HEADER_ROW || 1;
   var maxRows = Math.min(sheet.getLastRow(), 15);
   if (maxRows < 1) return configured;
 
@@ -808,6 +806,7 @@ function onOpen() {
     .addSeparator()
     .addItem('📥 Pull All Inquiries from Website', 'menuPullAllFromWebsite')
     .addSeparator()
+    .addItem('🧹 Remove Duplicate Rows from Sheet', 'menuRemoveDuplicates')
     .addItem('🛠️ Enable Real-Time Auto-Sync (Install Trigger)', 'installEditTrigger')
     .addItem('📋 Format Headers & Columns', 'menuFormatHeaders')
     .addItem('⚙️ Configure Website URL & Secret', 'menuConfigureSettings')
@@ -960,6 +959,99 @@ function installEditTrigger() {
   SpreadsheetApp.getUi().alert('🎉 Auto-Sync on Edit is now ENABLED!\n\nWhenever you or your staff change any cell on data rows, it will automatically update on the website.');
 }
 
+/**
+ * Safely finds and removes duplicate rows in the sheet (keeps the first occurrence)
+ */
+function menuRemoveDuplicates() {
+  var ui = SpreadsheetApp.getUi();
+  var sheet = getOrCreateTargetSheet();
+  var headerRow = getHeaderRow(sheet);
+  var startDataRow = headerRow + 1;
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < startDataRow) {
+    ui.alert('No data rows found to check.');
+    return;
+  }
+
+  var colMap = getColumnMap(sheet);
+  var idColIdx = colMap['Inquiry ID'] ? colMap['Inquiry ID'] - 1 : 2;
+  var refColIdx = colMap['Reference Number'] ? colMap['Reference Number'] - 1 : 1;
+  var phoneColIdx = colMap['Contact Number'] ? colMap['Contact Number'] - 1 : 6;
+  var dateColIdx = colMap['Appointment Date'] ? colMap['Appointment Date'] - 1 : 15;
+
+  var numRows = lastRow - headerRow;
+  var values = sheet.getRange(startDataRow, 1, numRows, sheet.getLastColumn()).getValues();
+
+  var seenIds = {};
+  var seenRefs = {};
+  var seenPhoneDates = {};
+  var duplicateRows = []; // store 1-based row numbers
+
+  for (var i = 0; i < values.length; i++) {
+    var currentRowNum = startDataRow + i;
+    var rowId = String(values[i][idColIdx] || '').toLowerCase().trim();
+    var rowRef = cleanAlphanum(values[i][refColIdx] || '');
+    var rowPhone = cleanDigits(values[i][phoneColIdx] || '');
+    var rowDate = String(values[i][dateColIdx] || '').trim();
+
+    var isDup = false;
+
+    // Check ID
+    if (rowId && rowId.length >= 6) {
+      if (seenIds[rowId]) {
+        isDup = true;
+      } else {
+        seenIds[rowId] = currentRowNum;
+      }
+    }
+
+    // Check Reference Number
+    if (!isDup && rowRef && rowRef.length >= 6) {
+      if (seenRefs[rowRef]) {
+        isDup = true;
+      } else {
+        seenRefs[rowRef] = currentRowNum;
+      }
+    }
+
+    // Check Phone + Date
+    if (!isDup && rowPhone && rowPhone.length >= 7 && rowDate) {
+      var key = rowPhone + '_' + rowDate;
+      if (seenPhoneDates[key]) {
+        isDup = true;
+      } else {
+        seenPhoneDates[key] = currentRowNum;
+      }
+    }
+
+    if (isDup) {
+      duplicateRows.push(currentRowNum);
+    }
+  }
+
+  if (duplicateRows.length === 0) {
+    ui.alert('✅ No duplicate rows found! Your sheet is clean.');
+    return;
+  }
+
+  var confirm = ui.alert(
+    'Duplicate Rows Detected',
+    'Found ' + duplicateRows.length + ' duplicate row(s) (Row ' + duplicateRows.join(', Row ') + ').\n\nDo you want to permanently delete these duplicate rows?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm !== ui.Button.YES) return;
+
+  // Delete from bottom to top to preserve row indexing
+  for (var d = duplicateRows.length - 1; d >= 0; d--) {
+    sheet.deleteRow(duplicateRows[d]);
+  }
+
+  ui.alert('✅ Successfully removed ' + duplicateRows.length + ' duplicate row(s)!');
+}
+
 function showToast(msg, title, timeoutSec) {
   SpreadsheetApp.getActiveSpreadsheet().toast(msg, title || '1625 AutoLab', timeoutSec || 4);
 }
+
