@@ -683,20 +683,208 @@ class InquiryService
         $items = $this->fileGetAll();
         $cleanId = str_starts_with($id, 'inq-') ? substr($id, 4) : $id;
         $prefixedId = str_starts_with($id, 'inq-') ? $id : 'inq-' . $id;
+        $normRef = strtolower(preg_replace('/[-_\s]+/', '', $id));
 
         foreach ($items as $item) {
             $itemId = (string) ($item['id'] ?? '');
-            $itemRef = (string) ($item['referenceNumber'] ?? $item['reference_number'] ?? '');
+            $rawRef = (string) ($item['referenceNumber'] ?? $item['reference_number'] ?? '');
+            $itemNormRef = strtolower(preg_replace('/[-_\s]+/', '', $rawRef));
+
             if (
                 $itemId === $id ||
                 $itemId === $cleanId ||
                 $itemId === $prefixedId ||
-                $itemRef === $id ||
-                $itemRef === $cleanId
+                $rawRef === $id ||
+                $rawRef === $cleanId ||
+                ($normRef !== '' && $itemNormRef === $normRef)
             ) {
                 return $item;
             }
         }
+        return null;
+    }
+
+    /**
+     * Locate an existing inquiry using multiple layered fallback heuristics.
+     * Prevents accidental duplication when syncing from Google Sheets or third-party webhooks.
+     *
+     * @param array<string, mixed> $criteria
+     * @return array<string, mixed>|null
+     */
+    public function findMatchingInquiry(array $criteria): ?array
+    {
+        $id = trim((string) ($criteria['id'] ?? $criteria['inquiryId'] ?? $criteria['inquiry_id'] ?? ''));
+        $ref = trim((string) ($criteria['referenceNumber'] ?? $criteria['reference_number'] ?? ''));
+        $rawPhone = trim((string) ($criteria['contactNumber'] ?? $criteria['contact_number'] ?? $criteria['phone'] ?? ''));
+        $rawPlate = trim((string) ($criteria['plateNumber'] ?? $criteria['plate_number'] ?? $criteria['plate'] ?? ''));
+        $rawDate = trim((string) ($criteria['appointmentDate'] ?? $criteria['appointment_date'] ?? $criteria['date'] ?? ''));
+        $rawEmail = strtolower(trim((string) ($criteria['emailAddress'] ?? $criteria['email_address'] ?? $criteria['email'] ?? '')));
+        $rawName = trim((string) ($criteria['fullName'] ?? $criteria['full_name'] ?? $criteria['name'] ?? ''));
+
+        // 1. Primary: By exact or normalized ID / Reference Number
+        if ($id !== '') {
+            $found = $this->getById($id);
+            if ($found !== null) return $found;
+        }
+        if ($ref !== '') {
+            $found = $this->getById($ref);
+            if ($found !== null) return $found;
+        }
+
+        // Clean values for secondary matching
+        $digits = preg_replace('/\D+/', '', $rawPhone);
+        $phone10 = strlen($digits) >= 10 ? substr($digits, -10) : ($digits !== '' ? $digits : null);
+        $plateNorm = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $rawPlate));
+        $dateNorm = '';
+        if ($rawDate !== '') {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDate)) {
+                $dateNorm = $rawDate;
+            } else {
+                $ts = strtotime($rawDate);
+                if ($ts !== false && $ts > 0) {
+                    $dateNorm = date('Y-m-d', $ts);
+                }
+            }
+        }
+        $validEmail = (filter_var($rawEmail, FILTER_VALIDATE_EMAIL) && !str_ends_with($rawEmail, '@1625autolab.local')) ? $rawEmail : null;
+        $nameClean = mb_strtolower(trim(preg_replace('/\s+/', ' ', $rawName)));
+
+        if ($this->useDb) {
+            $db = Database::getInstance();
+
+            // 2. Normalized Plate + Appointment Date
+            if ($plateNorm !== '' && $dateNorm !== '') {
+                $stmt = $db->prepare(
+                    'SELECT id FROM customer_inquiries 
+                     WHERE REPLACE(REPLACE(UPPER(plate_number), " ", ""), "-", "") = :plate 
+                       AND appointment_date = :dt 
+                     LIMIT 1'
+                );
+                $stmt->execute([':plate' => $plateNorm, ':dt' => $dateNorm]);
+                if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $found = $this->dbGetById((string) $row['id']);
+                    if ($found !== null) return $found;
+                }
+            }
+
+            // 3. Normalized Phone (last 10 digits) + Appointment Date
+            if ($phone10 !== null && $phone10 !== '' && $dateNorm !== '') {
+                $stmt = $db->prepare(
+                    'SELECT id FROM customer_inquiries 
+                     WHERE RIGHT(contact_number, 10) = :phone10 
+                       AND appointment_date = :dt 
+                     LIMIT 1'
+                );
+                $stmt->execute([':phone10' => $phone10, ':dt' => $dateNorm]);
+                if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $found = $this->dbGetById((string) $row['id']);
+                    if ($found !== null) return $found;
+                }
+            }
+
+            // 4. Normalized Phone + Normalized Plate
+            if ($phone10 !== null && $phone10 !== '' && $plateNorm !== '') {
+                $stmt = $db->prepare(
+                    'SELECT id FROM customer_inquiries 
+                     WHERE RIGHT(contact_number, 10) = :phone10 
+                       AND REPLACE(REPLACE(UPPER(plate_number), " ", ""), "-", "") = :plate 
+                     LIMIT 1'
+                );
+                $stmt->execute([':phone10' => $phone10, ':plate' => $plateNorm]);
+                if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $found = $this->dbGetById((string) $row['id']);
+                    if ($found !== null) return $found;
+                }
+            }
+
+            // 5. Normalized Phone + Customer Name (fuzzy name check)
+            if ($phone10 !== null && $phone10 !== '' && mb_strlen($nameClean) >= 3) {
+                $stmt = $db->prepare(
+                    'SELECT id, full_name FROM customer_inquiries 
+                     WHERE RIGHT(contact_number, 10) = :phone10 
+                     ORDER BY created_at DESC'
+                );
+                $stmt->execute([':phone10' => $phone10]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($rows as $r) {
+                    $existingName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) ($r['full_name'] ?? ''))));
+                    if (
+                        $existingName === $nameClean ||
+                        str_contains($existingName, $nameClean) ||
+                        str_contains($nameClean, $existingName) ||
+                        levenshtein($existingName, $nameClean) <= 3
+                    ) {
+                        $found = $this->dbGetById((string) $r['id']);
+                        if ($found !== null) return $found;
+                    }
+                }
+            }
+
+            // 6. Valid Email + Customer Name (fuzzy name check)
+            if ($validEmail !== null && mb_strlen($nameClean) >= 3) {
+                $stmt = $db->prepare(
+                    'SELECT id, full_name FROM customer_inquiries 
+                     WHERE LOWER(email_address) = :email 
+                     ORDER BY created_at DESC'
+                );
+                $stmt->execute([':email' => $validEmail]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($rows as $r) {
+                    $existingName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) ($r['full_name'] ?? ''))));
+                    if (
+                        $existingName === $nameClean ||
+                        str_contains($existingName, $nameClean) ||
+                        str_contains($nameClean, $existingName)
+                    ) {
+                        $found = $this->dbGetById((string) $r['id']);
+                        if ($found !== null) return $found;
+                    }
+                }
+            }
+
+            // 7. Normalized Phone alone — if there's only one inquiry with this phone
+            if ($phone10 !== null && $phone10 !== '') {
+                $stmt = $db->prepare(
+                    'SELECT id FROM customer_inquiries 
+                     WHERE RIGHT(contact_number, 10) = :phone10 
+                     ORDER BY created_at DESC'
+                );
+                $stmt->execute([':phone10' => $phone10]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                if (count($rows) === 1) {
+                    $found = $this->dbGetById((string) $rows[0]['id']);
+                    if ($found !== null) return $found;
+                }
+            }
+        } else {
+            // File storage fallback
+            $all = $this->fileGetAll();
+            foreach ($all as $item) {
+                $itemPhoneDigits = preg_replace('/\D+/', '', (string)($item['contactNumber'] ?? ''));
+                $itemPhone10 = strlen($itemPhoneDigits) >= 10 ? substr($itemPhoneDigits, -10) : $itemPhoneDigits;
+                $itemPlateNorm = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($item['plateNumber'] ?? '')));
+                $itemDate = (string)($item['appointmentDate'] ?? '');
+                $itemNameClean = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)($item['fullName'] ?? ''))));
+                $itemEmail = strtolower(trim((string)($item['emailAddress'] ?? '')));
+
+                if ($plateNorm !== '' && $dateNorm !== '' && $itemPlateNorm === $plateNorm && $itemDate === $dateNorm) {
+                    return $item;
+                }
+                if ($phone10 !== null && $phone10 !== '' && $dateNorm !== '' && $itemPhone10 === $phone10 && $itemDate === $dateNorm) {
+                    return $item;
+                }
+                if ($phone10 !== null && $phone10 !== '' && $plateNorm !== '' && $itemPhone10 === $phone10 && $itemPlateNorm === $plateNorm) {
+                    return $item;
+                }
+                if ($phone10 !== null && $phone10 !== '' && $nameClean !== '' && $itemPhone10 === $phone10 && ($itemNameClean === $nameClean || str_contains($itemNameClean, $nameClean) || str_contains($nameClean, $itemNameClean))) {
+                    return $item;
+                }
+                if ($validEmail !== null && $nameClean !== '' && $itemEmail === $validEmail && ($itemNameClean === $nameClean || str_contains($itemNameClean, $nameClean))) {
+                    return $item;
+                }
+            }
+        }
+
         return null;
     }
 
@@ -998,21 +1186,40 @@ class InquiryService
         $db = Database::getInstance();
         $cleanId = str_starts_with($id, 'inq-') ? substr($id, 4) : $id;
         $prefixedId = str_starts_with($id, 'inq-') ? $id : 'inq-' . $id;
+        $dashRef = str_replace('_', '-', $id);
+        $underRef = str_replace('-', '_', $id);
+        $cleanDashRef = str_replace('_', '-', $cleanId);
+        $cleanUnderRef = str_replace('-', '_', $cleanId);
+        $normRef = strtolower(preg_replace('/[-_\s]+/', '', $id));
 
         $stmt = $db->prepare(
             'SELECT id, reference_number, user_id, service_id, service_type, full_name, address, contact_number, email_address, facebook_name, plate_number,
                 make, model, year_model, product_to_purchase, appointment_date,
                 appointment_time, status, internal_notes, created_at
              FROM customer_inquiries
-             WHERE id = :id OR id = :cleanId OR id = :prefixedId OR reference_number = :ref OR reference_number = :cleanRef
+             WHERE id = :id 
+                OR id = :cleanId 
+                OR id = :prefixedId 
+                OR reference_number = :ref 
+                OR reference_number = :cleanRef
+                OR reference_number = :dashRef
+                OR reference_number = :underRef
+                OR reference_number = :cleanDashRef
+                OR reference_number = :cleanUnderRef
+                OR LOWER(REPLACE(REPLACE(REPLACE(reference_number, "-", ""), "_", ""), " ", "")) = :normRef
              LIMIT 1'
         );
         $stmt->execute([
-            ':id'         => $id,
-            ':cleanId'    => $cleanId,
-            ':prefixedId' => $prefixedId,
-            ':ref'        => $id,
-            ':cleanRef'   => $cleanId,
+            ':id'            => $id,
+            ':cleanId'       => $cleanId,
+            ':prefixedId'    => $prefixedId,
+            ':ref'           => $id,
+            ':cleanRef'      => $cleanId,
+            ':dashRef'       => $dashRef,
+            ':underRef'      => $underRef,
+            ':cleanDashRef'  => $cleanDashRef,
+            ':cleanUnderRef' => $cleanUnderRef,
+            ':normRef'       => $normRef,
         ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $this->mapDbRow($row);

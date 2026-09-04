@@ -2,18 +2,18 @@
  * ========================================================================================
  * 1625 AUTOLAB - GOOGLE SHEETS BIDIRECTIONAL LIVE SYNC SCRIPT
  * ========================================================================================
- * Version: 2.1.4 (Row 7 Headers & Row 8 Data Start - Bidirectional Two-Way Sync)
+ * Version: 2.2.0 (Intelligent Multi-Pass Row Matching & Bidirectional Two-Way Sync)
  *
  * This Google Apps Script powers real-time two-way synchronization between your Google
- * Spreadsheet ('Sales' sheet, Header Row 7, Data starting on Row 8) and Apollo:
+ * Spreadsheet ('Sales' sheet) and Apollo:
  *
  *  1. [Apollo -> Google Sheets]
- *     When a customer books or an admin updates an inquiry on the website,
- *     Apollo sends a webhook POST to this script. This script updates or appends
- *     the row starting at Row 8.
+ *     When a customer books or an admin updates an inquiry on the website (e.g. Status change),
+ *     Apollo sends a webhook POST to this script. This script matches the existing row via
+ *     Inquiry ID, Reference Number, Phone, or Plate, and updates the row in-place without duplicating.
  *
  *  2. [Google Sheets -> Apollo]
- *     When staff/admin edits any cell on Row 8 or below (Status, Date, Time, Name, etc.),
+ *     When staff/admin edits any cell on the data rows (Status, Date, Time, Name, etc.),
  *     the installable onEdit trigger instantly sends the updated row back to Apollo.
  *
  *  3. [One-Click Bulk Sync]
@@ -32,7 +32,7 @@ var CONFIG = {
   DEFAULT_SECRET: '3213e76c579444693434',
   // Target Sheet Name
   SHEET_NAME: 'Sales',
-  // Header Row (Headers are on Row 7, data begins on Row 8)
+  // Default Header Row (Headers on Row 7 by default, but script auto-detects Row 1-10)
   HEADER_ROW: 7,
 };
 
@@ -50,8 +50,8 @@ var COLUMNS = [
   'Car Model',          // Col 10 (J)
   'Year Model',         // Col 11 (K)
   'Service Type',       // Col 12 (L)
-  'Product to Purchase',// Col 14 (N)
   'Service Name',       // Col 13 (M)
+  'Product to Purchase',// Col 14 (N)
   'Plate Number',       // Col 15 (O)
   'Appointment Date',   // Col 16 (P)
   'Appointment Time',   // Col 17 (Q)
@@ -87,6 +87,18 @@ function getWebhookSecret() {
 function initialSetup() {
   var activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   PropertiesService.getScriptProperties().setProperty('key', activeSpreadsheet.getId());
+}
+
+// ----------------------------------------------------------------------------------------
+// NORMALIZATION HELPERS
+// ----------------------------------------------------------------------------------------
+function cleanDigits(val) {
+  var d = String(val || '').replace(/\D/g, '');
+  return d.length >= 10 ? d.slice(-10) : d;
+}
+
+function cleanAlphanum(val) {
+  return String(val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 // ----------------------------------------------------------------------------------------
@@ -149,7 +161,7 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      scriptName: '1625 AutoLab Live Sync (Row 8 Start)'
+      scriptName: '1625 AutoLab Live Sync v2.2.0'
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -173,7 +185,7 @@ function doGet(e) {
 
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    message: '1625 AutoLab Google Sheets Sync Webhook is active (Row 7 Headers, Row 8 Data Start).'
+    message: '1625 AutoLab Google Sheets Sync Webhook is active.'
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -191,12 +203,12 @@ function installedOnEdit(e) {
     return; // Edit was on another sheet tab
   }
 
-  var headerRow = CONFIG.HEADER_ROW || 7;
-  var startDataRow = headerRow + 1; // Row 8
+  var headerRow = getHeaderRow(sheet);
+  var startDataRow = headerRow + 1;
 
   var row = e.range.getRow();
   if (row < startDataRow) {
-    return; // Headers or top title rows (Row 1 to 7) were edited - ignore
+    return; // Headers or top title rows were edited - ignore
   }
 
   // Prevent sync loops if the update was triggered programmatically by doPost
@@ -223,8 +235,8 @@ function syncSingleRowToApollo(sheet, rowNumber) {
 
   var rowData = getRowDataObject(sheet, rowNumber);
 
-  // If row has no full name and no reference number, skip syncing
-  if (!rowData.fullName && !rowData.referenceNumber) {
+  // If row has no full name and no contact and no reference number, skip syncing
+  if (!rowData.fullName && !rowData.contactNumber && !rowData.referenceNumber) {
     return { success: false, error: 'Row is empty' };
   }
 
@@ -262,17 +274,21 @@ function syncSingleRowToApollo(sheet, rowNumber) {
     var nowFormatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 
     if (responseCode >= 200 && responseCode < 300 && result.success !== false) {
-      // Update Sync Status (col AS=45) and Last Updated in the sheet
+      // Update Sync Status and Last Updated in the sheet
       sheet.getRange(rowNumber, SYNC_STATUS_COL).setValue('✅ Synced (' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm:ss') + ')');
       if (colMap['Last Updated']) {
         sheet.getRange(rowNumber, colMap['Last Updated']).setValue(nowFormatted);
       }
-      // If Apollo generated a Reference Number or ID, write it to sheet
-      if (result.inquiry && result.inquiry.referenceNumber && colMap['Reference Number']) {
-        sheet.getRange(rowNumber, colMap['Reference Number']).setValue(result.inquiry.referenceNumber);
+      // If Apollo generated or returned Reference Number or ID, write it to sheet so future edits match instantly
+      var retInquiry = result.inquiry || {};
+      var retRef = retInquiry.referenceNumber || retInquiry.reference_number || result.referenceNumber || '';
+      var retId = retInquiry.id || retInquiry.inquiryId || result.inquiryId || '';
+
+      if (retRef && colMap['Reference Number']) {
+        sheet.getRange(rowNumber, colMap['Reference Number']).setValue(retRef);
       }
-      if (result.inquiry && result.inquiry.id && colMap['Inquiry ID']) {
-        sheet.getRange(rowNumber, colMap['Inquiry ID']).setValue(result.inquiry.id);
+      if (retId && colMap['Inquiry ID']) {
+        sheet.getRange(rowNumber, colMap['Inquiry ID']).setValue(retId);
       }
 
       return { success: true, response: result };
@@ -282,65 +298,136 @@ function syncSingleRowToApollo(sheet, rowNumber) {
       return { success: false, error: errMsg };
     }
   } catch (err) {
-    var colMapErr = getColumnMap(sheet);
-      sheet.getRange(rowNumber, SYNC_STATUS_COL).setValue('❌ ' + err.message);
+    sheet.getRange(rowNumber, SYNC_STATUS_COL).setValue('❌ ' + err.message);
     return { success: false, error: err.message };
   }
 }
 
 // ----------------------------------------------------------------------------------------
-// ROW UPSERT LOGIC (Apollo -> Sheets) - Starts on Row 8
+// ROW UPSERT LOGIC (Apollo -> Sheets) - Multi-Tier Matching to Prevent Duplication
 // ----------------------------------------------------------------------------------------
 function upsertInquiryRow(inquiry, isFromApi) {
   var sheet = getOrCreateTargetSheet();
   var colMap = getColumnMap(sheet);
 
-  var headerRow = CONFIG.HEADER_ROW || 7;
-  var startDataRow = headerRow + 1; // Row 8
+  var headerRow = getHeaderRow(sheet);
+  var startDataRow = headerRow + 1;
 
-  var refNum = String(inquiry.referenceNumber || inquiry.reference_number || inquiry['Reference Number'] || inquiry.inquiryId || inquiry['Inquiry ID'] || inquiry.id || '').trim();
-  var inqId = String(inquiry.id || inquiry.inquiryId || inquiry.inquiry_id || inquiry['Inquiry ID'] || '').trim();
-  var targetEmail = String(inquiry.emailAddress || inquiry.email_address || inquiry['Email address'] || '').toLowerCase().trim();
-  var targetPhone = String(inquiry.contactNumber || inquiry.contact_number || inquiry['Contact Number'] || '').toLowerCase().trim();
+  var inqId = String(inquiry.id || inquiry.inquiryId || inquiry.inquiry_id || inquiry['Inquiry ID'] || '').trim().toLowerCase();
+  var refNum = String(inquiry.referenceNumber || inquiry.reference_number || inquiry['Reference Number'] || '').trim();
+  var targetEmail = String(inquiry.emailAddress || inquiry.email_address || inquiry['Email address'] || inquiry['Email Address'] || '').toLowerCase().trim();
+  var targetPhone = cleanDigits(inquiry.contactNumber || inquiry.contact_number || inquiry['Contact Number'] || inquiry.phone);
+  var targetPlate = cleanAlphanum(inquiry.plateNumber || inquiry.plate_number || inquiry['Plate Number']);
+  var targetName = cleanAlphanum(inquiry.fullName || inquiry.full_name || inquiry['Full Name'] || inquiry.customerName);
+  var targetDate = String(inquiry.appointmentDate || inquiry.appointment_date || inquiry['Appointment Date'] || '').trim();
+  var cleanRef = cleanAlphanum(refNum);
 
   var lastRow = sheet.getLastRow();
   var targetRow = -1;
 
-  // Search existing data rows (starting at Row 8)
+  // Search existing data rows
   if (lastRow >= startDataRow) {
     var numRows = lastRow - headerRow;
     var dataRange = sheet.getRange(startDataRow, 1, numRows, sheet.getLastColumn());
     var values = dataRange.getValues();
 
-    var refColIdx = colMap['Reference Number'] ? colMap['Reference Number'] - 1 : 1; // Col 2 (B)
-    var idColIdx = colMap['Inquiry ID'] ? colMap['Inquiry ID'] - 1 : 2;             // Col 3 (C)
-    var emailColIdx = colMap['Email address'] ? colMap['Email address'] - 1 : 4;   // Col 5 (E)
-    var phoneColIdx = colMap['Contact Number'] ? colMap['Contact Number'] - 1 : 6; // Col 7 (G)
+    var refColIdx = colMap['Reference Number'] ? colMap['Reference Number'] - 1 : 1;
+    var idColIdx = colMap['Inquiry ID'] ? colMap['Inquiry ID'] - 1 : 2;
+    var nameColIdx = colMap['Full Name'] ? colMap['Full Name'] - 1 : 3;
+    var emailColIdx = colMap['Email address'] ? colMap['Email address'] - 1 : 4;
+    var phoneColIdx = colMap['Contact Number'] ? colMap['Contact Number'] - 1 : 6;
+    var plateColIdx = colMap['Plate Number'] ? colMap['Plate Number'] - 1 : 14;
+    var dateColIdx = colMap['Appointment Date'] ? colMap['Appointment Date'] - 1 : 15;
 
+    // PASS 1: Exact or normalized Inquiry ID or Reference Number (Strongest Match)
     for (var i = 0; i < values.length; i++) {
-      var rowRef = String(values[i][refColIdx] || '').toLowerCase().trim();
       var rowId = String(values[i][idColIdx] || '').toLowerCase().trim();
-      var rowEmail = String(values[i][emailColIdx] || '').toLowerCase().trim();
-      var rowPhone = String(values[i][phoneColIdx] || '').toLowerCase().trim();
+      var rowRef = cleanAlphanum(values[i][refColIdx] || '');
       var rowText = values[i].join(' ').toLowerCase();
 
-      // 1. Primary match: Reference Number or Inquiry ID
-      if (refNum && (rowRef === refNum.toLowerCase() || rowId === refNum.toLowerCase() || rowText.includes(refNum.toLowerCase()))) {
-        targetRow = startDataRow + i;
-        break;
+      // Check Inquiry ID against ID column or full row
+      if (inqId && inqId.length >= 6) {
+        if (rowId === inqId || rowText.indexOf(inqId) !== -1) {
+          targetRow = startDataRow + i;
+          break;
+        }
       }
 
-      // 2. Secondary match: Email + Contact Number
-      if (targetEmail && rowEmail === targetEmail && targetPhone && rowPhone === targetPhone) {
-        targetRow = startDataRow + i;
-        break;
+      // Check Reference Number (ignoring dashes, underscores, spaces)
+      if (cleanRef && cleanRef.length >= 6) {
+        if (rowRef === cleanRef || cleanAlphanum(rowText).indexOf(cleanRef) !== -1) {
+          targetRow = startDataRow + i;
+          break;
+        }
+      }
+    }
+
+    // PASS 2: Phone + (Plate OR Date OR Name OR Email)
+    if (targetRow === -1 && targetPhone && targetPhone.length >= 7) {
+      for (var j = 0; j < values.length; j++) {
+        var rowPhone = cleanDigits(values[j][phoneColIdx]);
+        if (rowPhone !== targetPhone) continue;
+
+        var rowPlate = cleanAlphanum(values[j][plateColIdx]);
+        var rowDate = String(values[j][dateColIdx] || '').trim();
+        var rowName = cleanAlphanum(values[j][nameColIdx]);
+        var rowEmail = String(values[j][emailColIdx] || '').toLowerCase().trim();
+
+        // Phone + Plate
+        if (targetPlate && rowPlate && targetPlate === rowPlate) {
+          targetRow = startDataRow + j;
+          break;
+        }
+        // Phone + Date
+        if (targetDate && rowDate && (targetDate === rowDate || rowDate.indexOf(targetDate) !== -1)) {
+          targetRow = startDataRow + j;
+          break;
+        }
+        // Phone + Customer Name
+        if (targetName && rowName && (targetName === rowName || rowName.indexOf(targetName) !== -1 || targetName.indexOf(rowName) !== -1)) {
+          targetRow = startDataRow + j;
+          break;
+        }
+        // Phone + Email
+        if (targetEmail && rowEmail && targetEmail === rowEmail) {
+          targetRow = startDataRow + j;
+          break;
+        }
+      }
+    }
+
+    // PASS 3: Plate + Date (when plate is valid and unique)
+    if (targetRow === -1 && targetPlate && targetPlate.length >= 4 && targetDate) {
+      for (var k = 0; k < values.length; k++) {
+        var pPlate = cleanAlphanum(values[k][plateColIdx]);
+        var pDate = String(values[k][dateColIdx] || '').trim();
+        if (pPlate === targetPlate && (pDate === targetDate || pDate.indexOf(targetDate) !== -1)) {
+          targetRow = startDataRow + k;
+          break;
+        }
+      }
+    }
+
+    // PASS 4: Phone alone (if only one row matches)
+    if (targetRow === -1 && targetPhone && targetPhone.length >= 10) {
+      var phoneMatchRow = -1;
+      var phoneMatchCount = 0;
+      for (var m = 0; m < values.length; m++) {
+        var mPhone = cleanDigits(values[m][phoneColIdx]);
+        if (mPhone === targetPhone) {
+          phoneMatchCount++;
+          phoneMatchRow = startDataRow + m;
+        }
+      }
+      if (phoneMatchCount === 1) {
+        targetRow = phoneMatchRow;
       }
     }
   }
 
   var isNewRow = (targetRow === -1);
   if (isNewRow) {
-    // Insert at the top (right below headers at Row 8), pushing existing data down
+    // Insert at the top (right below headers), pushing existing data down
     sheet.insertRowBefore(startDataRow);
     targetRow = startDataRow;
   }
@@ -350,7 +437,7 @@ function upsertInquiryRow(inquiry, isFromApi) {
     CacheService.getScriptCache().put('SUPPRESS_ON_EDIT_' + targetRow, 'true', 30);
   }
 
-  // Extract standardized values
+  // Standardize values
   var now = new Date();
   var valCreated = inquiry.timestamp || inquiry['Timestamp'] || inquiry.createdAt || inquiry.created_at || Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
   var valRef = refNum;
@@ -401,12 +488,11 @@ function upsertInquiryRow(inquiry, isFromApi) {
     }
   }
 
-  // Clear any data validation on the main data range before writing.
+  // Clear data validation on target row and write values
   sheet.getRange(targetRow, 1, 1, rowArray.length).clearDataValidations();
   sheet.getRange(targetRow, 1, 1, rowArray.length).setValues([rowArray]);
 
-  // Write Sync Status separately to column AS (45) — isolated from all
-  // data-validation rules that apply to the main columns A–R.
+  // Write Sync Status separately to column AS
   sheet.getRange(targetRow, SYNC_STATUS_COL).clearDataValidations();
   sheet.getRange(targetRow, SYNC_STATUS_COL).setValue(valSync);
 
@@ -425,7 +511,7 @@ function upsertInquiryRow(inquiry, isFromApi) {
 }
 
 /**
- * Bulk sync an array of inquiries from Apollo into Google Sheets starting on Row 8
+ * Bulk sync an array of inquiries from Apollo into Google Sheets
  */
 function bulkSyncRowsFromApollo(rows) {
   var sheet = getOrCreateTargetSheet();
@@ -487,15 +573,15 @@ function getRowDataObject(sheet, rowNumber) {
 }
 
 function getAllInquiryObjects(sheet) {
-  var headerRow = CONFIG.HEADER_ROW || 7;
-  var startDataRow = headerRow + 1; // Row 8
+  var headerRow = getHeaderRow(sheet);
+  var startDataRow = headerRow + 1;
   var lastRow = sheet.getLastRow();
   if (lastRow < startDataRow) return [];
 
   var result = [];
   for (var r = startDataRow; r <= lastRow; r++) {
     var obj = getRowDataObject(sheet, r);
-    if (obj.fullName || obj.referenceNumber) {
+    if (obj.fullName || obj.contactNumber || obj.referenceNumber) {
       result.push(obj);
     }
   }
@@ -514,17 +600,125 @@ function getOrCreateTargetSheet() {
   return sheet;
 }
 
+/**
+ * Dynamically detects the header row by scanning rows 1 to 15 for recognizable column names.
+ * Falls back to CONFIG.HEADER_ROW (default 7).
+ */
+function getHeaderRow(sheet) {
+  var configured = CONFIG.HEADER_ROW || 7;
+  var maxRows = Math.min(sheet.getLastRow(), 15);
+  if (maxRows < 1) return configured;
+
+  var keyHeaders = ['reference', 'ref', 'inquiry', 'full name', 'name', 'status', 'contact', 'timestamp'];
+
+  // Check configured row first
+  if (configured <= maxRows) {
+    var confValues = sheet.getRange(configured, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var confMatches = 0;
+    for (var k = 0; k < confValues.length; k++) {
+      var hText = String(confValues[k] || '').toLowerCase().trim();
+      for (var j = 0; j < keyHeaders.length; j++) {
+        if (hText.indexOf(keyHeaders[j]) !== -1) {
+          confMatches++;
+          break;
+        }
+      }
+    }
+    if (confMatches >= 2) return configured;
+  }
+
+  // Scan rows 1 through maxRows
+  for (var r = 1; r <= maxRows; r++) {
+    var rowValues = sheet.getRange(r, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var matches = 0;
+    for (var c = 0; c < rowValues.length; c++) {
+      var cellText = String(rowValues[c] || '').toLowerCase().trim();
+      for (var m = 0; m < keyHeaders.length; m++) {
+        if (cellText.indexOf(keyHeaders[m]) !== -1) {
+          matches++;
+          break;
+        }
+      }
+    }
+    if (matches >= 2) {
+      return r;
+    }
+  }
+
+  return configured;
+}
+
+/**
+ * Builds a column index map that is case-insensitive and alias-aware.
+ */
 function getColumnMap(sheet) {
-  var headerRow = CONFIG.HEADER_ROW || 7;
+  var headerRow = getHeaderRow(sheet);
   var lastCol = sheet.getLastColumn();
   var map = {};
   if (lastCol < 1) return map;
 
   var headers = sheet.getRange(headerRow, 1, 1, lastCol).getValues()[0];
   for (var i = 0; i < headers.length; i++) {
-    var h = String(headers[i]).trim();
-    if (h) {
-      map[h] = i + 1; // 1-based index
+    var rawH = String(headers[i] || '').trim();
+    if (!rawH) continue;
+    var normH = rawH.toLowerCase();
+    var colNum = i + 1;
+
+    map[rawH] = colNum;
+    map[normH] = colNum;
+
+    // Aliases
+    if (normH.indexOf('reference') !== -1 || normH.indexOf('ref') !== -1) {
+      map['Reference Number'] = colNum;
+    }
+    if (normH.indexOf('inquiry id') !== -1 || normH === 'id' || normH === 'inquiry_id') {
+      map['Inquiry ID'] = colNum;
+    }
+    if (normH === 'name' || normH.indexOf('full name') !== -1 || normH.indexOf('customer') !== -1) {
+      map['Full Name'] = colNum;
+    }
+    if (normH.indexOf('email') !== -1) {
+      map['Email address'] = colNum;
+      map['Email Address'] = colNum;
+    }
+    if (normH.indexOf('contact') !== -1 || normH.indexOf('phone') !== -1 || normH.indexOf('mobile') !== -1) {
+      map['Contact Number'] = colNum;
+    }
+    if (normH.indexOf('facebook') !== -1 || normH === 'fb' || normH === 'fb name') {
+      map['Facebook Name'] = colNum;
+    }
+    if (normH.indexOf('make') !== -1) {
+      map['Car Make'] = colNum;
+    }
+    if (normH.indexOf('model') !== -1 && normH.indexOf('year') === -1) {
+      map['Car Model'] = colNum;
+    }
+    if (normH.indexOf('year') !== -1) {
+      map['Year Model'] = colNum;
+    }
+    if (normH.indexOf('service type') !== -1 || normH.indexOf('service location') !== -1) {
+      map['Service Type'] = colNum;
+    }
+    if (normH.indexOf('service name') !== -1 || normH === 'service') {
+      map['Service Name'] = colNum;
+    }
+    if (normH.indexOf('product') !== -1) {
+      map['Product to Purchase'] = colNum;
+    }
+    if (normH.indexOf('plate') !== -1) {
+      map['Plate Number'] = colNum;
+    }
+    if (normH.indexOf('appointment date') !== -1 || normH === 'date' || normH.indexOf('booking date') !== -1) {
+      map['Appointment Date'] = colNum;
+    }
+    if (normH.indexOf('appointment time') !== -1 || normH === 'time' || normH.indexOf('booking time') !== -1) {
+      map['Appointment Time'] = colNum;
+    }
+    if (normH === 'status' || normH.indexOf('status') !== -1) {
+      map['Status'] = colNum;
+    }
+    if (normH.indexOf('updated') !== -1) {
+      map['Last Updated'] = colNum;
     }
   }
   return map;
@@ -535,7 +729,7 @@ function setupSheetHeaders(sheet) {
     sheet = getOrCreateTargetSheet();
   }
 
-  var headerRow = CONFIG.HEADER_ROW || 7;
+  var headerRow = getHeaderRow(sheet);
   sheet.getRange(headerRow, 1, 1, COLUMNS.length).setValues([COLUMNS]);
 
   // Header Styling (1625 AutoLab Dark / Orange Theme)
@@ -549,8 +743,9 @@ function setupSheetHeaders(sheet) {
   headerRange.setVerticalAlignment('middle');
   sheet.setRowHeight(headerRow, 36);
 
-  // Service Type column dropdown validation on Row 8+
-  var serviceTypeColIdx = COLUMNS.indexOf('Service Type') + 1;
+  // Service Type column dropdown validation
+  var colMap = getColumnMap(sheet);
+  var serviceTypeColIdx = colMap['Service Type'] || (COLUMNS.indexOf('Service Type') + 1);
   if (serviceTypeColIdx > 0) {
     var serviceTypeRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['Shop Visit', 'Home Service'], true)
@@ -559,8 +754,8 @@ function setupSheetHeaders(sheet) {
     sheet.getRange(headerRow + 1, serviceTypeColIdx, 500, 1).setDataValidation(serviceTypeRule);
   }
 
-  // Status column dropdown validation on Row 8+
-  var statusColIdx = COLUMNS.indexOf('Status') + 1;
+  // Status column dropdown validation
+  var statusColIdx = colMap['Status'] || (COLUMNS.indexOf('Status') + 1);
   if (statusColIdx > 0) {
     var statusRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'], true)
@@ -569,7 +764,7 @@ function setupSheetHeaders(sheet) {
     sheet.getRange(headerRow + 1, statusColIdx, 500, 1).setDataValidation(statusRule);
   }
 
-  // Write 'Sync Status' header at col AS (45) and ensure no validation there.
+  // Write 'Sync Status' header at col AS (46)
   sheet.getRange(headerRow, SYNC_STATUS_COL).setValue('Sync Status')
     .setBackground('#18181b').setFontColor('#f97316').setFontWeight('bold')
     .setFontFamily('Consolas').setFontSize(10)
@@ -584,7 +779,7 @@ function applyRowStyles(sheet, rowNumber, status) {
   range.setVerticalAlignment('middle');
 
   var colMap = getColumnMap(sheet);
-  var statusCol = colMap['Status'] || 17;
+  var statusCol = colMap['Status'] || 18;
   if (statusCol) {
     var statusCell = sheet.getRange(rowNumber, statusCol);
     var st = String(status).toLowerCase();
@@ -614,7 +809,7 @@ function onOpen() {
     .addItem('📥 Pull All Inquiries from Website', 'menuPullAllFromWebsite')
     .addSeparator()
     .addItem('🛠️ Enable Real-Time Auto-Sync (Install Trigger)', 'installEditTrigger')
-    .addItem('📋 Format Headers & Columns (Row 7)', 'menuFormatHeaders')
+    .addItem('📋 Format Headers & Columns', 'menuFormatHeaders')
     .addItem('⚙️ Configure Website URL & Secret', 'menuConfigureSettings')
     .addToUi();
 }
@@ -622,11 +817,11 @@ function onOpen() {
 function menuSyncSelectedRow() {
   var sheet = SpreadsheetApp.getActiveSheet();
   var row = sheet.getActiveCell().getRow();
-  var headerRow = CONFIG.HEADER_ROW || 7;
-  var startDataRow = headerRow + 1; // Row 8
+  var headerRow = getHeaderRow(sheet);
+  var startDataRow = headerRow + 1;
 
   if (row < startDataRow) {
-    SpreadsheetApp.getUi().alert('Please select a data row (Row 8 or below) to sync.');
+    SpreadsheetApp.getUi().alert('Please select a data row (Row ' + startDataRow + ' or below) to sync.');
     return;
   }
 
@@ -641,16 +836,16 @@ function menuSyncSelectedRow() {
 
 function menuSyncAllRows() {
   var ui = SpreadsheetApp.getUi();
-  var response = ui.alert('Confirm Sync All', 'Do you want to send all rows from this spreadsheet (starting at Row 8) to the website?', ui.ButtonSet.YES_NO);
+  var response = ui.alert('Confirm Sync All', 'Do you want to send all rows from this spreadsheet to the website?', ui.ButtonSet.YES_NO);
   if (response !== ui.Button.YES) return;
 
   var sheet = getOrCreateTargetSheet();
-  var headerRow = CONFIG.HEADER_ROW || 7;
-  var startDataRow = headerRow + 1; // Row 8
+  var headerRow = getHeaderRow(sheet);
+  var startDataRow = headerRow + 1;
   var lastRow = sheet.getLastRow();
 
   if (lastRow < startDataRow) {
-    ui.alert('No inquiry rows found starting at Row 8.');
+    ui.alert('No inquiry rows found starting at Row ' + startDataRow + '.');
     return;
   }
 
@@ -699,7 +894,7 @@ function menuPullAllFromWebsite() {
 
     if (data.inquiries && Array.isArray(data.inquiries)) {
       bulkSyncRowsFromApollo(data.inquiries);
-      ui.alert('✅ Success! Pulled and updated ' + data.inquiries.length + ' inquiries from website into Row 8+.');
+      ui.alert('✅ Success! Pulled and updated ' + data.inquiries.length + ' inquiries from website into Google Sheets.');
     } else {
       ui.alert('⚠️ Received response:\n' + response.getContentText().substring(0, 300));
     }
@@ -710,7 +905,7 @@ function menuPullAllFromWebsite() {
 
 function menuFormatHeaders() {
   setupSheetHeaders(getOrCreateTargetSheet());
-  SpreadsheetApp.getUi().alert('✅ Sheet headers on Row 7 and status validations for Row 8+ have been formatted.');
+  SpreadsheetApp.getUi().alert('✅ Sheet headers and status validations have been formatted.');
 }
 
 function menuConfigureSettings() {
@@ -752,7 +947,7 @@ function installEditTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
     if (triggers[i].getHandlerFunction() === 'installedOnEdit') {
-      SpreadsheetApp.getUi().alert('ℹ️ Auto-Sync Trigger is ALREADY installed and active!\n\nAny cell you edit on Row 8+ will automatically sync to your website.');
+      SpreadsheetApp.getUi().alert('ℹ️ Auto-Sync Trigger is ALREADY installed and active!\n\nAny cell you edit on data rows will automatically sync to your website.');
       return;
     }
   }
@@ -762,7 +957,7 @@ function installEditTrigger() {
     .onEdit()
     .create();
 
-  SpreadsheetApp.getUi().alert('🎉 Auto-Sync on Edit is now ENABLED!\n\nWhenever you or your staff change any cell on Row 8+, it will automatically update on the website.');
+  SpreadsheetApp.getUi().alert('🎉 Auto-Sync on Edit is now ENABLED!\n\nWhenever you or your staff change any cell on data rows, it will automatically update on the website.');
 }
 
 function showToast(msg, title, timeoutSec) {

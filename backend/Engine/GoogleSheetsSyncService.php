@@ -190,12 +190,10 @@ class GoogleSheetsSyncService
                 CURLOPT_POSTFIELDS => $jsonPayload,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_POSTREDIR => 7, // Preserve POST method on 301/302 redirects
                 CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
                 CURLOPT_MAXREDIRS => 5,
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json; charset=utf-8',
-                    'Content-Length: ' . strlen((string)$jsonPayload),
                 ],
                 CURLOPT_TIMEOUT => 15,
                 CURLOPT_SSL_VERIFYPEER => false,
@@ -316,39 +314,19 @@ class GoogleSheetsSyncService
         // Normalize Status
         $cleanStatus = self::normalizeStatus($rawStatus);
 
+        // Normalize Phone Number (leading 0, international format, etc.)
+        $normalizedPhone = self::normalizePhone($phone);
+
         $inquirySvc = new InquiryService();
-        $existing = null;
-
-        // 1. Locate existing inquiry by Reference Number or ID
-        if ($ref !== '') {
-            $existing = $inquirySvc->getById($ref);
-        }
-        if ($existing === null && $id !== '') {
-            $existing = $inquirySvc->getById($id);
-        }
-
-        // 2. If not found by ID/Ref, try looking up by Plate + Date or Phone + Date
-        if ($existing === null && DB_NAME !== '') {
-            try {
-                $db = Database::getInstance();
-                if ($plate !== '' && $appDate !== '') {
-                    $stmt = $db->prepare('SELECT id FROM customer_inquiries WHERE plate_number = :plate AND appointment_date = :dt LIMIT 1');
-                    $stmt->execute([':plate' => $plate, ':dt' => $appDate]);
-                    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $existing = $inquirySvc->getById((string) $row['id']);
-                    }
-                }
-                if ($existing === null && $phone !== '' && $appDate !== '') {
-                    $stmt = $db->prepare('SELECT id FROM customer_inquiries WHERE contact_number = :phone AND appointment_date = :dt LIMIT 1');
-                    $stmt->execute([':phone' => $phone, ':dt' => $appDate]);
-                    if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                        $existing = $inquirySvc->getById((string) $row['id']);
-                    }
-                }
-            } catch (\Throwable) {
-                // Ignore lookup errors
-            }
-        }
+        $existing = $inquirySvc->findMatchingInquiry([
+            'id' => $id,
+            'referenceNumber' => $ref,
+            'contactNumber' => $normalizedPhone !== '' ? $normalizedPhone : $phone,
+            'plateNumber' => $plate,
+            'appointmentDate' => $appDate,
+            'emailAddress' => $email,
+            'fullName' => $fullName,
+        ]);
 
         // Suppress outbound sync while updating/inserting to prevent sync echo loops
         return self::withoutSync(function () use (
@@ -359,11 +337,13 @@ class GoogleSheetsSyncService
             $fullName,
             $email,
             $phone,
+            $normalizedPhone,
             $address,
             $fbName,
             $make,
             $model,
             $year,
+            $serviceType,
             $serviceOrProduct,
             $plate,
             $appDate,
@@ -382,8 +362,9 @@ class GoogleSheetsSyncService
                 if ($email !== '' && $email !== (string) ($existing['emailAddress'] ?? '') && filter_var($email, FILTER_VALIDATE_EMAIL)) {
                     $changes['emailAddress'] = $email;
                 }
-                if ($phone !== '' && $phone !== (string) ($existing['contactNumber'] ?? '')) {
-                    $changes['contactNumber'] = $phone;
+                $effectivePhone = $normalizedPhone !== '' ? $normalizedPhone : $phone;
+                if ($effectivePhone !== '' && $effectivePhone !== (string) ($existing['contactNumber'] ?? '')) {
+                    $changes['contactNumber'] = $effectivePhone;
                 }
                 if ($address !== '' && $address !== (string) ($existing['address'] ?? '')) {
                     $changes['address'] = $address;
@@ -489,7 +470,7 @@ class GoogleSheetsSyncService
 
             $newPayload = [
                 'fullName' => $fullName !== '' ? $fullName : 'Google Sheets Customer',
-                'contactNumber' => $phone !== '' ? $phone : '09000000000',
+                'contactNumber' => $normalizedPhone !== '' ? $normalizedPhone : ($phone !== '' ? $phone : '09000000000'),
                 'emailAddress' => $validEmail,
                 'address' => $address !== '' ? $address : 'N/A',
                 'facebookName' => $fbName,
@@ -546,6 +527,7 @@ class GoogleSheetsSyncService
             CURLOPT_URL => $urlWithAction,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_TIMEOUT => 35,
             CURLOPT_SSL_VERIFYPEER => false,
@@ -705,6 +687,29 @@ class GoogleSheetsSyncService
     }
 
     /**
+     * Normalizes Philippine contact numbers to standard 11-digit format (09XXXXXXXXX).
+     */
+    public static function normalizePhone(string $rawPhone): string
+    {
+        $raw = trim($rawPhone);
+        if ($raw === '') return '';
+        $digits = preg_replace('/\D+/', '', $raw);
+        if ($digits === '') return $raw;
+
+        if (str_starts_with($digits, '63') && strlen($digits) === 12) {
+            return '0' . substr($digits, 2);
+        }
+        if (strlen($digits) === 10 && str_starts_with($digits, '9')) {
+            return '0' . $digits;
+        }
+        if (strlen($digits) === 11 && str_starts_with($digits, '09')) {
+            return $digits;
+        }
+
+        return $raw;
+    }
+
+    /**
      * Test a webhook URL with a test payload.
      *
      * @return array<string, mixed>
@@ -744,10 +749,10 @@ class GoogleSheetsSyncService
             CURLOPT_POSTFIELDS => $jsonPayload,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json; charset=utf-8',
-                'Content-Length: ' . strlen((string)$jsonPayload),
             ],
             CURLOPT_TIMEOUT => 15,
             CURLOPT_SSL_VERIFYPEER => false,
